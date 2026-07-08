@@ -4,28 +4,45 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Trash2, Upload, Link2, Plus } from "lucide-react";
+import { Trash2, Upload, Link2, Plus, Skull } from "lucide-react";
 import { toast } from "sonner";
+import { useServerFn } from "@tanstack/react-start";
+import { updateLocationDangerZone, setLocationNpcs } from "@/lib/npc.functions";
 
-type Loc = { id: string; name: string; description: string | null; image_url: string | null };
+type Loc = { id: string; name: string; description: string | null; image_url: string | null;
+  is_danger_zone?: boolean; spawn_chance?: number; spawn_tick_seconds?: number };
 type Conn = { id: string; a_id: string; b_id: string };
+type Npc = { id: string; name: string };
 
 export function LocationManager() {
   const [locs, setLocs] = useState<Loc[]>([]);
   const [conns, setConns] = useState<Conn[]>([]);
+  const [npcs, setNpcs] = useState<Npc[]>([]);
+  const [locNpcs, setLocNpcs] = useState<Record<string, Set<string>>>({});
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
   const [linkTo, setLinkTo] = useState<string>("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const updateDz = useServerFn(updateLocationDangerZone);
+  const setLocNpcsFn = useServerFn(setLocationNpcs);
 
   async function load() {
-    const [l, c] = await Promise.all([
-      supabase.from("locations").select("id,name,description,image_url").order("name"),
+    const [l, c, n, ln] = await Promise.all([
+      supabase.from("locations").select("id,name,description,image_url,is_danger_zone,spawn_chance,spawn_tick_seconds").order("name"),
       supabase.from("location_connections").select("id,a_id,b_id"),
+      supabase.from("npcs").select("id,name").order("name"),
+      supabase.from("location_npcs").select("location_id,npc_id"),
     ]);
     setLocs((l.data as Loc[]) ?? []);
     setConns((c.data as Conn[]) ?? []);
+    setNpcs((n.data as Npc[]) ?? []);
+    const map: Record<string, Set<string>> = {};
+    (ln.data ?? []).forEach((r: any) => {
+      if (!map[r.location_id]) map[r.location_id] = new Set();
+      map[r.location_id].add(r.npc_id);
+    });
+    setLocNpcs(map);
   }
   useEffect(() => { load(); }, []);
 
@@ -71,6 +88,10 @@ export function LocationManager() {
   const sel = locs.find((l) => l.id === selected);
   const neighborIds = new Set(conns.filter((c) => c.a_id === selected || c.b_id === selected).map((c) => c.a_id === selected ? c.b_id : c.a_id));
   const availableToLink = locs.filter((l) => l.id !== selected && !neighborIds.has(l.id));
+  const selNpcs = selected ? locNpcs[selected] ?? new Set<string>() : new Set<string>();
+  const avgSpawnSec = sel?.is_danger_zone && (sel.spawn_chance ?? 0) > 0
+    ? Math.round((sel.spawn_tick_seconds ?? 60) / ((sel.spawn_chance ?? 0) / 100))
+    : null;
 
   return (
     <div className="grid gap-4 md:grid-cols-[320px_1fr]">
@@ -134,6 +155,64 @@ export function LocationManager() {
               </select>
               <Button size="sm" onClick={linkAdd} disabled={!linkTo}><Plus size={14} /></Button>
             </div>
+          </div>
+
+          <div className="scroll-panel rounded-lg p-4 space-y-3">
+            <h4 className="font-display text-lg text-gold flex items-center gap-2"><Skull size={16} /> Danger Zone</h4>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={!!sel.is_danger_zone}
+                onChange={async (e) => {
+                  await updateDz({ data: { id: sel.id, is_danger_zone: e.target.checked,
+                    spawn_chance: sel.spawn_chance ?? 0, spawn_tick_seconds: sel.spawn_tick_seconds ?? 60 } });
+                  load();
+                }} />
+              Este local é uma danger zone (NPCs podem aparecer)
+            </label>
+            {sel.is_danger_zone && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Chance de spawn por tick (%)</Label>
+                    <Input type="number" min={0} max={100} defaultValue={sel.spawn_chance ?? 0}
+                      onBlur={async (e) => {
+                        const v = Math.max(0, Math.min(100, Number(e.target.value)));
+                        await updateDz({ data: { id: sel.id, is_danger_zone: true, spawn_chance: v, spawn_tick_seconds: sel.spawn_tick_seconds ?? 60 } });
+                        load();
+                      }} />
+                  </div>
+                  <div>
+                    <Label>Tick (segundos)</Label>
+                    <Input type="number" min={10} defaultValue={sel.spawn_tick_seconds ?? 60}
+                      onBlur={async (e) => {
+                        const v = Math.max(10, Number(e.target.value));
+                        await updateDz({ data: { id: sel.id, is_danger_zone: true, spawn_chance: sel.spawn_chance ?? 0, spawn_tick_seconds: v } });
+                        load();
+                      }} />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Tempo médio estimado até um encontro: <span className="text-gold">{avgSpawnSec ? `${avgSpawnSec}s (${(avgSpawnSec/60).toFixed(1)} min)` : "—"}</span>
+                </p>
+                <div>
+                  <Label>NPCs que podem aparecer aqui</Label>
+                  <div className="grid gap-1 max-h-[220px] overflow-y-auto pr-2 mt-1">
+                    {npcs.map((n) => (
+                      <label key={n.id} className="flex items-center gap-2 text-sm p-1 hover:bg-secondary/40 rounded">
+                        <input type="checkbox" checked={selNpcs.has(n.id)}
+                          onChange={async (e) => {
+                            const next = new Set(selNpcs);
+                            if (e.target.checked) next.add(n.id); else next.delete(n.id);
+                            await setLocNpcsFn({ data: { location_id: sel.id, npc_ids: Array.from(next) } });
+                            load();
+                          }} />
+                        <span>{n.name}</span>
+                      </label>
+                    ))}
+                    {npcs.length === 0 && <p className="text-xs text-muted-foreground">Cadastre NPCs na aba NPCs primeiro.</p>}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       ) : (
