@@ -69,7 +69,7 @@ function damageTargetPlayer(p: Player, dmg: number): { pool: Pool; taken: number
 
 async function loadMyChar(context: { supabase: any; userId: string }) {
   const { data, error } = await context.supabase
-    .from("characters").select("id,nickname,avatar_url,xp,current_location_id").eq("user_id", context.userId).maybeSingle();
+    .from("characters").select("id,nickname,avatar_url,xp,current_location_id,ef_current,em_current,chakra_current").eq("user_id", context.userId).maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Sem personagem.");
   return data;
@@ -129,14 +129,16 @@ export const rollSpawn = createServerFn({ method: "POST" })
     if (myParty) {
       partyId = myParty.party_id;
       const { data } = await supabaseAdmin
-        .from("party_members").select("character_id,character:characters(id,nickname,avatar_url,xp,current_location_id)").eq("party_id", partyId);
+        .from("party_members").select("character_id,character:characters(id,nickname,avatar_url,xp,current_location_id,ef_current,em_current,chakra_current)").eq("party_id", partyId);
       members = ((data as any[]) ?? [])
         .map((m: any) => m.character)
         .filter((c: any) => c && c.current_location_id === loc.id);
     } else {
-      members = [{ id: me.id, nickname: me.nickname, avatar_url: me.avatar_url, xp: me.xp }];
+      members = [{ id: me.id, nickname: me.nickname, avatar_url: me.avatar_url, xp: me.xp,
+        ef_current: me.ef_current, em_current: me.em_current, chakra_current: me.chakra_current }];
     }
-    if (!members.some((c: any) => c.id === me.id)) members.push({ id: me.id, nickname: me.nickname, avatar_url: me.avatar_url, xp: me.xp });
+    if (!members.some((c: any) => c.id === me.id)) members.push({ id: me.id, nickname: me.nickname, avatar_url: me.avatar_url, xp: me.xp,
+      ef_current: me.ef_current, em_current: me.em_current, chakra_current: me.chakra_current });
 
     const players: Player[] = members.map((c: any) => {
       const s = computeStats(c.xp ?? 0);
