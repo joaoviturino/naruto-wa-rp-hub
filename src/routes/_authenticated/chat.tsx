@@ -234,11 +234,16 @@ function ChatPage() {
             <Users size={11} /> {presentHere.length} {presentHere.length === 1 ? "pessoa" : "pessoas"} no local
           </div>
           <div className="flex flex-wrap gap-1">
-            {presentHere.map((p) => (
+            {presentHere.slice(0, 5).map((p) => (
               <div key={p.id} title={p.nickname} className="w-6 h-6 rounded-full bg-secondary overflow-hidden ring-1 ring-border">
                 {p.avatar_url && <img src={p.avatar_url} className="w-full h-full object-cover" alt={p.nickname} />}
               </div>
             ))}
+            {presentHere.length > 5 && (
+              <div className="w-6 h-6 rounded-full bg-secondary ring-1 ring-border flex items-center justify-center text-[10px] text-muted-foreground">
+                +{presentHere.length - 5}
+              </div>
+            )}
           </div>
         </div>
       )}
