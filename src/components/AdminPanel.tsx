@@ -1,0 +1,224 @@
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { useServerFn } from "@tanstack/react-start";
+import { bootstrapAdmin, enqueueMessage, resetBotSession, setUserXp } from "@/lib/admin.functions";
+import { toast } from "sonner";
+
+export function AdminPanel() {
+  return (
+    <div className="mx-auto max-w-6xl p-6">
+      <h1 className="font-display text-3xl font-black mb-6">Painel do Kage <span className="text-gold">影</span></h1>
+      <Tabs defaultValue="dashboard">
+        <TabsList>
+          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+          <TabsTrigger value="players">Jogadores</TabsTrigger>
+          <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
+          <TabsTrigger value="catalog">Catálogo</TabsTrigger>
+        </TabsList>
+        <TabsContent value="dashboard" className="mt-4"><Dashboard /></TabsContent>
+        <TabsContent value="players" className="mt-4"><Players /></TabsContent>
+        <TabsContent value="whatsapp" className="mt-4"><BotPanel /></TabsContent>
+        <TabsContent value="catalog" className="mt-4"><Catalog /></TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function Dashboard() {
+  const [counts, setCounts] = useState({ players: 0, characters: 0, pending: 0 });
+  useEffect(() => {
+    (async () => {
+      const [{ count: players }, { count: characters }, { count: pending }] = await Promise.all([
+        supabase.from("profiles").select("*", { count: "exact", head: true }),
+        supabase.from("characters").select("*", { count: "exact", head: true }),
+        supabase.from("outbound_messages").select("*", { count: "exact", head: true }).eq("status", "pending"),
+      ]);
+      setCounts({ players: players ?? 0, characters: characters ?? 0, pending: pending ?? 0 });
+    })();
+  }, []);
+  return (
+    <div className="grid gap-4 sm:grid-cols-3">
+      <Stat label="Jogadores" value={counts.players} />
+      <Stat label="Personagens" value={counts.characters} />
+      <Stat label="Mensagens pendentes" value={counts.pending} />
+    </div>
+  );
+}
+function Stat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="scroll-panel rounded-lg p-6">
+      <div className="text-xs uppercase tracking-widest text-muted-foreground">{label}</div>
+      <div className="mt-2 font-display text-4xl font-black text-gold">{value}</div>
+    </div>
+  );
+}
+
+function Players() {
+  const [chars, setChars] = useState<any[]>([]);
+  const setXpFn = useServerFn(setUserXp);
+  async function load() {
+    const { data } = await supabase.from("characters")
+      .select("id,nickname,phone_e164,village,xp,user_id,clan:clans(name,rarity)")
+      .order("created_at", { ascending: false });
+    setChars(data ?? []);
+  }
+  useEffect(() => { load(); }, []);
+  return (
+    <div className="scroll-panel rounded-lg overflow-hidden">
+      <table className="w-full text-sm">
+        <thead className="bg-secondary/50">
+          <tr>
+            <th className="text-left p-3">Nickname</th><th className="text-left p-3">Vila</th>
+            <th className="text-left p-3">Clã</th><th className="text-left p-3">WhatsApp</th>
+            <th className="text-left p-3">XP</th>
+          </tr>
+        </thead>
+        <tbody>
+          {chars.map((c) => (
+            <tr key={c.id} className="border-t border-border">
+              <td className="p-3 font-semibold">{c.nickname}</td>
+              <td className="p-3">{c.village}</td>
+              <td className="p-3">{c.clan?.name ?? "—"}</td>
+              <td className="p-3 text-muted-foreground">{c.phone_e164}</td>
+              <td className="p-3">
+                <input type="number" className="w-20 bg-input rounded px-2 py-1 text-sm" defaultValue={c.xp}
+                  onBlur={async (e) => {
+                    const xp = Number(e.target.value);
+                    if (xp === c.xp) return;
+                    try { await setXpFn({ data: { character_id: c.id, xp } }); toast.success("XP atualizado."); load(); }
+                    catch (err: any) { toast.error(err.message); }
+                  }} />
+              </td>
+            </tr>
+          ))}
+          {chars.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">Nenhum personagem ainda.</td></tr>}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function BotPanel() {
+  const [session, setSession] = useState<any>(null);
+  const [msgs, setMsgs] = useState<any[]>([]);
+  const [phone, setPhone] = useState("");
+  const [body, setBody] = useState("");
+  const enqueue = useServerFn(enqueueMessage);
+  const reset = useServerFn(resetBotSession);
+
+  async function load() {
+    const { data: s } = await supabase.from("bot_sessions").select("*").eq("id", "default").maybeSingle();
+    const { data: m } = await supabase.from("outbound_messages").select("*").order("created_at", { ascending: false }).limit(20);
+    setSession(s); setMsgs(m ?? []);
+  }
+  useEffect(() => {
+    load();
+    const ch = supabase.channel("bot_admin")
+      .on("postgres_changes", { event: "*", schema: "public", table: "bot_sessions" }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "outbound_messages" }, load)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, []);
+
+  const statusColor: Record<string,string> = { connected: "text-emerald-400", qr: "text-gold", connecting: "text-sky-400", disconnected: "text-red-400" };
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-2">
+      <div className="scroll-panel rounded-lg p-6">
+        <h3 className="font-display text-xl text-gold">Sessão do Bot</h3>
+        <div className="mt-2 text-sm">Status: <span className={statusColor[session?.status ?? "disconnected"]}>{session?.status ?? "—"}</span></div>
+        {session?.phone && <div className="text-xs text-muted-foreground">Conectado como: {session.phone}</div>}
+        {session?.status === "qr" && session?.qr && (
+          <div className="mt-4 flex flex-col items-center">
+            <img alt="QR Code" src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(session.qr)}`} className="rounded bg-white p-2" />
+            <p className="text-xs text-muted-foreground mt-2">Abra o WhatsApp → Dispositivos conectados → Conectar dispositivo.</p>
+          </div>
+        )}
+        <div className="mt-6 flex gap-2">
+          <Button variant="outline" onClick={async () => { await reset({}); toast.success("Sessão resetada."); load(); }}>
+            Resetar sessão
+          </Button>
+        </div>
+        <p className="mt-4 text-xs text-muted-foreground">
+          O bot roda em um serviço Node separado (pasta <code>/bot</code>). Deploy em VPS/Railway/Fly. Ele lê a fila abaixo e envia via Baileys.
+        </p>
+      </div>
+
+      <div className="scroll-panel rounded-lg p-6">
+        <h3 className="font-display text-xl text-gold">Enviar mensagem de teste</h3>
+        <div className="mt-3 space-y-3">
+          <div>
+            <Label>WhatsApp (E.164)</Label>
+            <Input inputMode="numeric" value={phone} onChange={(e) => setPhone(e.target.value.replace(/[^\d+]/g, ""))} placeholder="+5511987654321" />
+          </div>
+          <div>
+            <Label>Mensagem</Label>
+            <Textarea rows={4} value={body} onChange={(e) => setBody(e.target.value)} />
+          </div>
+          <Button onClick={async () => {
+            try { await enqueue({ data: { to_phone: phone, body } }); toast.success("Mensagem enfileirada."); setBody(""); load(); }
+            catch (err: any) { toast.error(err.message); }
+          }}>Enfileirar</Button>
+        </div>
+      </div>
+
+      <div className="scroll-panel rounded-lg p-6 lg:col-span-2">
+        <h3 className="font-display text-xl text-gold">Últimas mensagens</h3>
+        <table className="w-full text-sm mt-3">
+          <thead className="text-xs text-muted-foreground">
+            <tr><th className="text-left p-2">Quando</th><th className="text-left p-2">Para</th><th className="text-left p-2">Status</th><th className="text-left p-2">Conteúdo</th></tr>
+          </thead>
+          <tbody>
+            {msgs.map((m) => (
+              <tr key={m.id} className="border-t border-border">
+                <td className="p-2 text-xs text-muted-foreground">{new Date(m.created_at).toLocaleString()}</td>
+                <td className="p-2">{m.to_phone}</td>
+                <td className="p-2">{m.status}</td>
+                <td className="p-2 max-w-md truncate">{m.body}</td>
+              </tr>
+            ))}
+            {msgs.length === 0 && <tr><td colSpan={4} className="p-6 text-center text-muted-foreground">Nenhuma mensagem ainda.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function Catalog() {
+  const [clans, setClans] = useState<any[]>([]);
+  const [items, setItems] = useState<any[]>([]);
+  const [skills, setSkills] = useState<any[]>([]);
+  useEffect(() => {
+    (async () => {
+      const [c, i, s] = await Promise.all([
+        supabase.from("clans").select("*").order("rarity"),
+        supabase.from("items").select("*").order("type"),
+        supabase.from("skills").select("*").order("rank"),
+      ]);
+      setClans(c.data ?? []); setItems(i.data ?? []); setSkills(s.data ?? []);
+    })();
+  }, []);
+  return (
+    <div className="grid gap-6 lg:grid-cols-3">
+      <CatCol title="Clãs" rows={clans.map((c) => `${c.name} · ${c.village} · ${c.rarity}`)} />
+      <CatCol title="Itens" rows={items.map((i) => `${i.name} · ${i.type}`)} />
+      <CatCol title="Skills" rows={skills.map((s) => `${s.name} (${s.rank})`)} />
+    </div>
+  );
+}
+function CatCol({ title, rows }: { title: string; rows: string[] }) {
+  return (
+    <div className="scroll-panel rounded-lg p-6">
+      <h3 className="font-display text-lg text-gold mb-3">{title} ({rows.length})</h3>
+      <ul className="space-y-1 text-sm max-h-96 overflow-y-auto">
+        {rows.map((r, i) => <li key={i} className="border-b border-border/50 py-1">{r}</li>)}
+      </ul>
+    </div>
+  );
+}

@@ -1,0 +1,15 @@
+{
+  "name": "new-era-shinobi-bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@itsukichann/baileys": "github:Itsukichann/Baileys",
+    "@supabase/supabase-js": "^2.45.0",
+    "pino": "^9.0.0"
+  }
+}
