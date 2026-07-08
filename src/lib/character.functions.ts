@@ -124,6 +124,8 @@ export const updateCharacter = createServerFn({ method: "POST" })
 
 /* ---------- INVENTORY ACTIONS (player-side) ---------- */
 
+const bagSource = z.enum(["ninja_bag","secondary_slots"]).default("ninja_bag");
+
 async function loadOwnInventory(context: { supabase: any; userId: string }) {
   const { data: char, error: cErr } = await context.supabase
     .from("characters").select("id").eq("user_id", context.userId).maybeSingle();
@@ -138,7 +140,9 @@ async function loadOwnInventory(context: { supabase: any; userId: string }) {
 
 function normalizeBag(raw: any): { item_id: string; qty: number }[] {
   if (!Array.isArray(raw)) return [];
-  return raw.map((e: any) => ({ item_id: e.item_id, qty: typeof e.qty === "number" && e.qty > 0 ? e.qty : 1 }));
+  return raw
+    .filter((e: any) => e && e.item_id)
+    .map((e: any) => ({ item_id: e.item_id, qty: typeof e.qty === "number" && e.qty > 0 ? e.qty : 1 }));
 }
 
 function removeOneFromBag(bag: { item_id: string; qty: number }[], itemId: string) {
@@ -161,7 +165,7 @@ function addOneToBag(bag: { item_id: string; qty: number }[], itemId: string) {
 /** Equipa um item da bolsa em seu slot correspondente. */
 export const equipItem = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ item_id: z.string().uuid() }).parse(i))
+  .inputValidator((i: unknown) => z.object({ item_id: z.string().uuid(), source: bagSource }).parse(i))
   .handler(async ({ data, context }) => {
     const { char, inv } = await loadOwnInventory(context);
     const { data: item, error: itErr } = await context.supabase
@@ -173,14 +177,16 @@ export const equipItem = createServerFn({ method: "POST" })
     if (item.type === "weapon_primary" && !inv.primary_unlocked) throw new Error("Slot primário bloqueado.");
     if (item.type === "weapon_secondary" && !inv.secondary_unlocked) throw new Error("Slot secundário bloqueado.");
 
-    let bag = normalizeBag(inv.ninja_bag);
-    bag = removeOneFromBag(bag, data.item_id);
+    let src = normalizeBag(inv[data.source]);
+    src = removeOneFromBag(src, data.item_id);
 
     // Se já havia algo equipado, volta pra bolsa
     const previous: string | null = inv[slotCol] ?? null;
+    let bag = data.source === "ninja_bag" ? src : normalizeBag(inv.ninja_bag);
     if (previous) bag = addOneToBag(bag, previous);
 
     const patch: any = { ninja_bag: bag };
+    if (data.source === "secondary_slots") patch.secondary_slots = src;
     patch[slotCol] = data.item_id;
     const { error } = await context.supabase.from("inventory").update(patch).eq("character_id", char.id);
     if (error) throw new Error(error.message);
@@ -208,14 +214,15 @@ export const unequipItem = createServerFn({ method: "POST" })
 /** Consome 1 unidade de um item consumível da bolsa. */
 export const consumeItem = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ item_id: z.string().uuid() }).parse(i))
+  .inputValidator((i: unknown) => z.object({ item_id: z.string().uuid(), source: bagSource }).parse(i))
   .handler(async ({ data, context }) => {
     const { char, inv } = await loadOwnInventory(context);
     const { data: item } = await context.supabase.from("items").select("type,name").eq("id", data.item_id).maybeSingle();
     if (!item) throw new Error("Item inexistente.");
     if (item.type !== "consumable") throw new Error("Este item não é consumível.");
-    const bag = removeOneFromBag(normalizeBag(inv.ninja_bag), data.item_id);
-    const { error } = await context.supabase.from("inventory").update({ ninja_bag: bag }).eq("character_id", char.id);
+    const src = removeOneFromBag(normalizeBag(inv[data.source]), data.item_id);
+    const patch: any = { [data.source]: src };
+    const { error } = await context.supabase.from("inventory").update(patch).eq("character_id", char.id);
     if (error) throw new Error(error.message);
     return { ok: true, consumed: item.name };
   });
@@ -223,11 +230,31 @@ export const consumeItem = createServerFn({ method: "POST" })
 /** Descarta 1 unidade de um item da bolsa. */
 export const dropItem = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ item_id: z.string().uuid() }).parse(i))
+  .inputValidator((i: unknown) => z.object({ item_id: z.string().uuid(), source: bagSource }).parse(i))
   .handler(async ({ data, context }) => {
     const { char, inv } = await loadOwnInventory(context);
-    const bag = removeOneFromBag(normalizeBag(inv.ninja_bag), data.item_id);
-    const { error } = await context.supabase.from("inventory").update({ ninja_bag: bag }).eq("character_id", char.id);
+    const src = removeOneFromBag(normalizeBag(inv[data.source]), data.item_id);
+    const patch: any = { [data.source]: src };
+    const { error } = await context.supabase.from("inventory").update(patch).eq("character_id", char.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/** Move 1 unidade entre bolsa ninja e slots secundários. */
+export const moveItemBetweenBags = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    item_id: z.string().uuid(),
+    from: bagSource,
+    to: bagSource,
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    if (data.from === data.to) throw new Error("Origem e destino iguais.");
+    const { char, inv } = await loadOwnInventory(context);
+    const src = removeOneFromBag(normalizeBag(inv[data.from]), data.item_id);
+    const dst = addOneToBag(normalizeBag(inv[data.to]), data.item_id);
+    const patch: any = { [data.from]: src, [data.to]: dst };
+    const { error } = await context.supabase.from("inventory").update(patch).eq("character_id", char.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
