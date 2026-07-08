@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useServerFn } from "@tanstack/react-start";
 import { moveCharacter, sendLocationMessage } from "@/lib/chat.functions";
 import { rollSpawn, getMyActiveCombat } from "@/lib/combat.functions";
-import { MapPin, Send, ImagePlus, X, Compass, Skull } from "lucide-react";
+import { MapPin, Send, ImagePlus, X, Compass, Skull, Users } from "lucide-react";
 import { toast } from "sonner";
 import { CombatDialog } from "@/components/chat/CombatDialog";
 import { PlayerActionMenu } from "@/components/chat/PlayerActionMenu";
@@ -52,6 +52,7 @@ function ChatPage() {
   const [partyMembers, setPartyMembers] = useState<any[]>([]);
   const [partyLeaderId, setPartyLeaderId] = useState<string | null>(null);
   const [partyLocations, setPartyLocations] = useState<Record<string, string | null>>({});
+  const [presentHere, setPresentHere] = useState<{ id: string; nickname: string; avatar_url: string | null }[]>([]);
 
   async function loadCore() {
     const [{ data: c }, { data: l }, { data: cn }] = await Promise.all([
@@ -158,6 +159,24 @@ function ChatPage() {
           setMessages((prev) => (prev.some((m) => m.id === raw.id) ? prev : [...prev, { ...raw, character: c } as Msg]));
           setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
         })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [currentLoc?.id]);
+
+  // Presença: quem está no local atual (atualiza quando personagens se movem)
+  useEffect(() => {
+    if (!currentLoc) { setPresentHere([]); return; }
+    async function loadPresence() {
+      const { data } = await supabase
+        .from("characters")
+        .select("id,nickname,avatar_url")
+        .eq("current_location_id", currentLoc!.id);
+      setPresentHere((data as any[]) ?? []);
+    }
+    loadPresence();
+    const ch = supabase.channel(`presence-${currentLoc.id}`)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "characters" }, loadPresence)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "characters" }, loadPresence)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [currentLoc?.id]);
