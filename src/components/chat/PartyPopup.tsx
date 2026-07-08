@@ -27,9 +27,14 @@ export function PartyPopup({ myCharId, myLocationId, members, leaderId, invites 
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) return JSON.parse(raw);
     } catch { /* noop */ }
+    const isMobile = window.innerWidth < 768;
+    if (isMobile) {
+      // Ancorado logo abaixo da barra sticky, alinhado à direita perto do contador
+      return { x: Math.max(8, window.innerWidth - 256 - 8), y: 52 };
+    }
     return { x: Math.max(16, window.innerWidth - 280), y: Math.max(16, window.innerHeight - 260) };
   });
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => (typeof window !== "undefined" && window.innerWidth < 768));
   const dragRef = useRef<{ dx: number; dy: number } | null>(null);
 
   useEffect(() => {
