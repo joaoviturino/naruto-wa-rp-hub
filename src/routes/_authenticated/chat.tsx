@@ -52,6 +52,8 @@ function ChatPage() {
   const [targetOpen, setTargetOpen] = useState(false);
   const [invites, setInvites] = useState<any[]>([]);
   const [partyMembers, setPartyMembers] = useState<any[]>([]);
+  const [partyLeaderId, setPartyLeaderId] = useState<string | null>(null);
+  const [partyLocations, setPartyLocations] = useState<Record<string, string | null>>({});
 
   async function loadCore() {
     const [{ data: c }, { data: l }, { data: cn }] = await Promise.all([
@@ -81,12 +83,18 @@ function ChatPage() {
     }
     async function loadPartyMembers() {
       const { data: mem } = await supabase.from("party_members").select("party_id").eq("character_id", character!.id).maybeSingle();
-      if (!mem) { setPartyMembers([]); return; }
+      if (!mem) { setPartyMembers([]); setPartyLeaderId(null); setPartyLocations({}); return; }
+      const { data: party } = await supabase.from("parties").select("leader_id").eq("id", (mem as any).party_id).maybeSingle();
+      setPartyLeaderId((party as any)?.leader_id ?? null);
       const { data } = await supabase
         .from("party_members")
-        .select("character:characters(id,nickname,avatar_url)")
+        .select("character:characters(id,nickname,avatar_url,current_location_id)")
         .eq("party_id", (mem as any).party_id);
-      setPartyMembers(((data as any[]) ?? []).map((r) => r.character));
+      const chars = ((data as any[]) ?? []).map((r) => r.character);
+      setPartyMembers(chars);
+      const map: Record<string, string | null> = {};
+      chars.forEach((c: any) => { map[c.id] = c.current_location_id; });
+      setPartyLocations(map);
     }
     async function checkCombat() {
       try { const r = await getCombat({}); if (r.session) setCombatId(r.session.id); }
@@ -316,20 +324,30 @@ function ChatPage() {
       {partyMembers.length > 1 && (
         <div className="fixed bottom-4 right-4 z-40 w-60 scroll-panel rounded-lg border border-gold/50 p-3 shadow-xl bg-card/95 backdrop-blur">
           <div className="flex items-center justify-between mb-2">
-            <div className="text-xs font-display text-gold flex items-center gap-1"><Users size={12} /> Meu time</div>
+            <div className="text-xs font-display text-gold flex items-center gap-1"><Users size={12} /> Meu time ({partyMembers.length}/3)</div>
             <Button variant="ghost" size="sm" className="h-6 text-[11px]" onClick={async () => { try { await partyLeave({}); toast.success("Você saiu do time."); } catch (e: any) { toast.error(e.message); } }}>Sair</Button>
           </div>
           <div className="space-y-1 max-h-52 overflow-y-auto">
-            {partyMembers.map((m: any) => (
+            {partyMembers.map((m: any) => {
+              const here = character.current_location_id && partyLocations[m.id] === character.current_location_id;
+              return (
               <div key={m.id} className="flex items-center gap-2 text-xs">
                 <div className="w-6 h-6 rounded-full bg-secondary overflow-hidden shrink-0">
                   {m.avatar_url && <img src={m.avatar_url} className="w-full h-full object-cover" alt="" />}
                 </div>
                 <span className="truncate flex-1">{m.nickname}</span>
+                {m.id === partyLeaderId && <span className="text-[10px] text-gold" title="Líder">★</span>}
+                <span className={`w-1.5 h-1.5 rounded-full ${here ? "bg-green-500" : "bg-muted-foreground/50"}`} title={here ? "Presente" : "Ausente"} />
                 {m.id === character.id && <span className="text-[10px] text-gold">você</span>}
               </div>
-            ))}
+              );
+            })}
           </div>
+          {partyLeaderId === character.id && (
+            <div className="text-[10px] text-muted-foreground mt-2 leading-tight">
+              Você é o líder. NPCs só aparecem se todos os membros estiverem no mesmo local.
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -29,8 +29,18 @@ export const invitePartyMember = createServerFn({ method: "POST" })
     let partyId: string;
     const { data: existing } = await supabaseAdmin
       .from("party_members").select("party_id").eq("character_id", me.id).maybeSingle();
-    if (existing) partyId = existing.party_id;
-    else {
+    if (existing) {
+      partyId = existing.party_id;
+      // Apenas o líder pode convidar
+      const { data: party } = await supabaseAdmin.from("parties").select("leader_id").eq("id", partyId).maybeSingle();
+      if (!party || party.leader_id !== me.id) throw new Error("Apenas o líder do time pode convidar novos membros.");
+      // Cap de 3 slots
+      const { count: memberCount } = await supabaseAdmin
+        .from("party_members").select("*", { count: "exact", head: true }).eq("party_id", partyId);
+      const { count: pendingCount } = await supabaseAdmin
+        .from("party_invites").select("*", { count: "exact", head: true }).eq("party_id", partyId).eq("status", "pending");
+      if ((memberCount ?? 0) + (pendingCount ?? 0) >= 3) throw new Error("O time já está cheio (3 slots).");
+    } else {
       const { data: p, error: pe } = await supabaseAdmin.from("parties").insert({ leader_id: me.id }).select("id").single();
       if (pe) throw new Error(pe.message);
       partyId = p.id;
@@ -67,6 +77,10 @@ export const respondPartyInvite = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("party_invites").update({ status: data.accept ? "accepted" : "rejected" }).eq("id", inv.id);
     if (data.accept) {
+      // Verifica cap de 3 slots ainda válido
+      const { count } = await supabaseAdmin
+        .from("party_members").select("*", { count: "exact", head: true }).eq("party_id", inv.party_id);
+      if ((count ?? 0) >= 3) throw new Error("O time já está cheio (3 slots).");
       // Se já está em outra party, remove antes
       await supabaseAdmin.from("party_members").delete().eq("character_id", me.id);
       const { error } = await supabaseAdmin.from("party_members").insert({ party_id: inv.party_id, character_id: me.id });
@@ -82,8 +96,16 @@ export const leaveParty = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: mem } = await supabaseAdmin.from("party_members").select("party_id").eq("character_id", me.id).maybeSingle();
     if (!mem) return { ok: true };
+    const { data: party } = await supabaseAdmin.from("parties").select("leader_id").eq("id", mem.party_id).maybeSingle();
     await supabaseAdmin.from("party_members").delete().eq("character_id", me.id);
-    // Se ficou vazia, apaga
+    // Se o líder saiu, transfere para outro membro (ou apaga se ficar vazia)
+    if (party?.leader_id === me.id) {
+      const { data: next } = await supabaseAdmin
+        .from("party_members").select("character_id").eq("party_id", mem.party_id).limit(1).maybeSingle();
+      if (next) {
+        await supabaseAdmin.from("parties").update({ leader_id: next.character_id }).eq("id", mem.party_id);
+      }
+    }
     const { count } = await supabaseAdmin.from("party_members").select("*", { count: "exact", head: true }).eq("party_id", mem.party_id);
     if (!count) await supabaseAdmin.from("parties").delete().eq("id", mem.party_id);
     return { ok: true };

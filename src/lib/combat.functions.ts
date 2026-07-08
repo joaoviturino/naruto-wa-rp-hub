@@ -98,6 +98,25 @@ export const rollSpawn = createServerFn({ method: "POST" })
     if (!loc?.is_danger_zone) return { session_id: null };
     if (!loc.spawn_chance) return { session_id: null };
 
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Se estou em uma party: só o líder rola o spawn e todos os membros precisam estar no mesmo local.
+    const { data: myPartyRow } = await supabaseAdmin
+      .from("party_members").select("party_id").eq("character_id", me.id).maybeSingle();
+    let partyIdEarly: string | null = null;
+    let partyMembersEarly: any[] = [];
+    if (myPartyRow) {
+      partyIdEarly = myPartyRow.party_id;
+      const { data: party } = await supabaseAdmin.from("parties").select("leader_id").eq("id", partyIdEarly).maybeSingle();
+      if (!party || party.leader_id !== me.id) return { session_id: null }; // só líder dispara
+      const { data: mems } = await supabaseAdmin
+        .from("party_members").select("character:characters(id,nickname,avatar_url,xp,current_location_id,ef_current,em_current,chakra_current)").eq("party_id", partyIdEarly);
+      partyMembersEarly = ((mems as any[]) ?? []).map((m: any) => m.character).filter(Boolean);
+      // Todos os membros precisam estar no local
+      const allHere = partyMembersEarly.every((c: any) => c.current_location_id === loc.id);
+      if (!allHere) return { session_id: null };
+    }
+
     // Roll gated por dwell time: precisa ter passado spawn_tick_seconds desde a última rolagem
     const { data: charRow } = await context.supabase
       .from("characters").select("last_spawn_roll_at,location_entered_at").eq("id", me.id).maybeSingle();
@@ -105,7 +124,6 @@ export const rollSpawn = createServerFn({ method: "POST" })
     const last = charRow?.last_spawn_roll_at ? new Date(charRow.last_spawn_roll_at).getTime() : (charRow?.location_entered_at ? new Date(charRow.location_entered_at).getTime() : 0);
     if (now - last < loc.spawn_tick_seconds * 1000) return { session_id: null };
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("characters").update({ last_spawn_roll_at: new Date().toISOString() }).eq("id", me.id);
 
     if (Math.random() * 100 >= loc.spawn_chance) return { session_id: null };
@@ -121,24 +139,12 @@ export const rollSpawn = createServerFn({ method: "POST" })
     for (const row of rows) { r -= row.weight ?? 1; if (r <= 0) { picked = row; break; } }
     const npc = picked.npc;
 
-    // Participantes: eu + party members no mesmo local
-    const { data: myParty } = await supabaseAdmin
-      .from("party_members").select("party_id").eq("character_id", me.id).maybeSingle();
-    let partyId: string | null = null;
-    let members: any[] = [];
-    if (myParty) {
-      partyId = myParty.party_id;
-      const { data } = await supabaseAdmin
-        .from("party_members").select("character_id,character:characters(id,nickname,avatar_url,xp,current_location_id,ef_current,em_current,chakra_current)").eq("party_id", partyId);
-      members = ((data as any[]) ?? [])
-        .map((m: any) => m.character)
-        .filter((c: any) => c && c.current_location_id === loc.id);
-    } else {
-      members = [{ id: me.id, nickname: me.nickname, avatar_url: me.avatar_url, xp: me.xp,
-        ef_current: me.ef_current, em_current: me.em_current, chakra_current: me.chakra_current }];
-    }
-    if (!members.some((c: any) => c.id === me.id)) members.push({ id: me.id, nickname: me.nickname, avatar_url: me.avatar_url, xp: me.xp,
-      ef_current: me.ef_current, em_current: me.em_current, chakra_current: me.chakra_current });
+    // Participantes
+    const partyId: string | null = partyIdEarly;
+    let members: any[] = partyIdEarly ? partyMembersEarly : [{
+      id: me.id, nickname: me.nickname, avatar_url: me.avatar_url, xp: me.xp,
+      ef_current: me.ef_current, em_current: me.em_current, chakra_current: me.chakra_current,
+    }];
 
     const players: Player[] = members.map((c: any) => {
       const s = computeStats(c.xp ?? 0);
