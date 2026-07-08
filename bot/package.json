@@ -5,11 +5,19 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "pm2": "pm2 start ecosystem.config.cjs",
+    "pm2:logs": "pm2 logs new-era-shinobi-bot",
+    "pm2:restart": "pm2 restart new-era-shinobi-bot",
+    "pm2:stop": "pm2 stop new-era-shinobi-bot"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
+    "@hapi/boom": "^10.0.1",
     "@whiskeysockets/baileys": "^7.0.0-rc13",
     "pino": "^9.0.0"
+  },
+  "devDependencies": {
+    "pm2": "^5.4.2"
   }
 }

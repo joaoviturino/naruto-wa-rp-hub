@@ -145,7 +145,15 @@ export const grantItem = createServerFn({ method: "POST" })
     const { data: inv } = await supabaseAdmin.from("inventory").select("ninja_bag,secondary_slots").eq("character_id", data.character_id).maybeSingle();
     if (!inv) throw new Error("Inventário não encontrado.");
     const current = ((inv as any)[data.slot] as any[]) ?? [];
-    const next = [...current, { item_id: data.item_id, added_at: new Date().toISOString() }];
+    let next: any[];
+    if (data.slot === "ninja_bag") {
+      next = current.map((e: any) => ({ item_id: e.item_id, qty: typeof e.qty === "number" && e.qty > 0 ? e.qty : 1 }));
+      const idx = next.findIndex((e: any) => e.item_id === data.item_id);
+      if (idx === -1) next.push({ item_id: data.item_id, qty: 1 });
+      else next[idx].qty += 1;
+    } else {
+      next = [...current, { item_id: data.item_id, added_at: new Date().toISOString() }];
+    }
     const patch: any = { [data.slot]: next };
     await supabaseAdmin.from("inventory").update(patch).eq("character_id", data.character_id);
     return { ok: true };

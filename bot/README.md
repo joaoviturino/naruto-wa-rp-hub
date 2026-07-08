@@ -29,6 +29,30 @@ A primeira execução mostra um **QR code no terminal** e também publica o QR n
 
 A sessão fica salva em `bot/auth_state/` — não commite essa pasta.
 
+## Rodar 24/7 com PM2 (recomendado)
+
+PM2 mantém o processo vivo, religa em qualquer crash e reinicia automaticamente
+quando você altera `index.js`.
+
+```bash
+cd bot
+npm install
+npx pm2 start ecosystem.config.cjs      # inicia
+npx pm2 logs new-era-shinobi-bot        # acompanha
+npx pm2 restart new-era-shinobi-bot     # reinicia manualmente
+npx pm2 save && npx pm2 startup         # (VPS Linux) auto-start no boot
+```
+
+Configuração incluída (`ecosystem.config.cjs`):
+- `autorestart: true` + backoff exponencial (`exp_backoff_restart_delay`)
+- `watch: ["index.js"]` — religa ao salvar código
+- `max_memory_restart: 512M` — recicla se estourar memória
+- `ignore_watch` cobrindo `auth_state/` para NÃO reiniciar quando a sessão é gravada
+
+Dentro do bot também há reconexão automática ao WhatsApp com backoff, keep-alive
+de presença a cada 4 min e `defaultQueryTimeoutMs` desligado — a instância não
+cai mais por "Timed Out".
+
 ## Deploy sugerido (Railway/Fly/VPS)
 
 - Defina as variáveis `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` no host.
