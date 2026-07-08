@@ -94,10 +94,10 @@ function ItemDialog({ open, onOpenChange, initial, missions, skills, adminUserId
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Nome"><Input value={f.name ?? ""} onChange={(e) => up("name", e.target.value)} /></Field>
           <Field label="Tipo">
-            <SimpleSelect value={f.type} onChange={(v) => up("type", v)} options={ITEM_TYPES.map((t) => ({ value: t, label: labelize(t) }))} />
+            <SimpleSelect value={f.type} onChange={(v: any) => up("type", v)} options={ITEM_TYPES.map((t) => ({ value: t, label: labelize(t) }))} />
           </Field>
           <Field label="Rank">
-            <SimpleSelect value={f.rank ?? "E"} onChange={(v) => up("rank", v)} options={SKILL_RANKS.map((r) => ({ value: r, label: r }))} />
+            <SimpleSelect value={f.rank ?? "E"} onChange={(v: any) => up("rank", v)} options={SKILL_RANKS.map((r) => ({ value: r, label: r }))} />
           </Field>
           <Field label="Tamanho de slot"><Input type="number" min={1} max={20} value={f.slot_size ?? 1} onChange={(e) => up("slot_size", Number(e.target.value))} /></Field>
           <Field label="Durabilidade (vazio = infinita)"><Input type="number" min={0} value={f.durability ?? ""} onChange={(e) => up("durability", e.target.value === "" ? null : Number(e.target.value))} /></Field>
@@ -108,17 +108,17 @@ function ItemDialog({ open, onOpenChange, initial, missions, skills, adminUserId
             </div>
           </Field>
           <Field label="Patente mínima">
-            <NullableSelect value={f.req_rank} onChange={(v) => up("req_rank", v)} options={NINJA_RANKS.map((r) => ({ value: r.value, label: r.label }))} />
+            <NullableSelect value={f.req_rank} onChange={(v: any) => up("req_rank", v)} options={NINJA_RANKS.map((r) => ({ value: r.value, label: r.label }))} />
           </Field>
           <Field label="Proficiência requerida">
-            <NullableSelect value={f.req_proficiency_kind} onChange={(v) => up("req_proficiency_kind", v)} options={PROFICIENCIES.map((p) => ({ value: p, label: p }))} />
+            <NullableSelect value={f.req_proficiency_kind} onChange={(v: any) => up("req_proficiency_kind", v)} options={PROFICIENCIES.map((p) => ({ value: p, label: p }))} />
           </Field>
           <Field label="Nível mínimo dessa proficiência"><Input type="number" min={0} max={100} value={f.req_proficiency_level ?? ""} onChange={(e) => up("req_proficiency_level", e.target.value === "" ? null : Number(e.target.value))} /></Field>
           <Field label="Requer missão">
-            <NullableSelect value={f.req_mission_id} onChange={(v) => up("req_mission_id", v)} options={missions.map((m: any) => ({ value: m.id, label: m.name }))} />
+            <NullableSelect value={f.req_mission_id} onChange={(v: any) => up("req_mission_id", v)} options={missions.map((m: any) => ({ value: m.id, label: m.name }))} />
           </Field>
           <Field label="Requer habilidade">
-            <NullableSelect value={f.req_skill_id} onChange={(v) => up("req_skill_id", v)} options={skills.map((s: any) => ({ value: s.id, label: s.name }))} />
+            <NullableSelect value={f.req_skill_id} onChange={(v: any) => up("req_skill_id", v)} options={skills.map((s: any) => ({ value: s.id, label: s.name }))} />
           </Field>
           <div className="sm:col-span-2">
             <Label>Descrição</Label>
@@ -152,7 +152,7 @@ function SimpleSelect({ value, onChange, options }: any) {
 }
 function NullableSelect({ value, onChange, options }: any) {
   return (
-    <Select value={value ?? "__none__"} onValueChange={(v) => onChange(v === "__none__" ? null : v)}>
+    <Select value={value ?? "__none__"} onValueChange={(v: string) => onChange(v === "__none__" ? null : v)}>
       <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
       <SelectContent>
         <SelectItem value="__none__">— Nenhum —</SelectItem>

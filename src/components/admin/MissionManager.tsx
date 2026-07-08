@@ -67,7 +67,7 @@ function MissionDialog({ open, onOpenChange, initial, onSaved }: any) {
         <div className="space-y-3">
           <div><Label>Nome</Label><Input value={f.name ?? ""} onChange={(e) => up("name", e.target.value)} /></div>
           <div><Label>Patente</Label>
-            <Select value={f.rank ?? "genin"} onValueChange={(v) => up("rank", v)}>
+            <Select value={f.rank ?? "genin"} onValueChange={(v: any) => up("rank", v)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>{NINJA_RANKS.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}</SelectContent>
             </Select>

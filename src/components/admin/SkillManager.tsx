@@ -93,20 +93,20 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Nome"><Input value={f.name ?? ""} onChange={(e) => up("name", e.target.value)} /></Field>
           <Field label="Rank">
-            <Select value={f.rank ?? "E"} onValueChange={(v) => up("rank", v)}>
+            <Select value={f.rank ?? "E"} onValueChange={(v: any) => up("rank", v)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>{SKILL_RANKS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
             </Select>
           </Field>
           <Field label="Classificação">
-            <NullableSelect value={f.classification} onChange={(v) => up("classification", v)} options={CLASSIFICATIONS.map((c) => ({ value: c, label: labelize(c) }))} />
+            <NullableSelect value={f.classification} onChange={(v: any) => up("classification", v)} options={CLASSIFICATIONS.map((c) => ({ value: c, label: labelize(c) }))} />
           </Field>
           <Field label="Classe (livre)"><Input placeholder="Elemental, Ninpô, Kekkei Genkai..." value={f.skill_class ?? ""} onChange={(e) => up("skill_class", e.target.value)} /></Field>
           <Field label="Alcance">
-            <NullableSelect value={f.range} onChange={(v) => up("range", v)} options={RANGES.map((r) => ({ value: r, label: labelize(r) }))} />
+            <NullableSelect value={f.range} onChange={(v: any) => up("range", v)} options={RANGES.map((r) => ({ value: r, label: labelize(r) }))} />
           </Field>
           <Field label="Elemento">
-            <NullableSelect value={f.element} onChange={(v) => up("element", v)} options={ELEMENTS.map((e) => ({ value: e, label: e }))} />
+            <NullableSelect value={f.element} onChange={(v: any) => up("element", v)} options={ELEMENTS.map((e) => ({ value: e, label: e }))} />
           </Field>
           <Field label="Imagem">
             <div className="flex items-center gap-2">
@@ -115,20 +115,20 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
             </div>
           </Field>
           <Field label="Clã (opcional, define técnica de clã)">
-            <NullableSelect value={f.clan_id} onChange={(v) => up("clan_id", v)} options={clans.map((c: any) => ({ value: c.id, label: `${c.name} (${c.village})` }))} />
+            <NullableSelect value={f.clan_id} onChange={(v: any) => up("clan_id", v)} options={clans.map((c: any) => ({ value: c.id, label: `${c.name} (${c.village})` }))} />
           </Field>
           <Field label="Patente mínima">
-            <NullableSelect value={f.req_rank} onChange={(v) => up("req_rank", v)} options={NINJA_RANKS.map((r) => ({ value: r.value, label: r.label }))} />
+            <NullableSelect value={f.req_rank} onChange={(v: any) => up("req_rank", v)} options={NINJA_RANKS.map((r) => ({ value: r.value, label: r.label }))} />
           </Field>
           <Field label="Proficiência requerida">
-            <NullableSelect value={f.req_proficiency_kind} onChange={(v) => up("req_proficiency_kind", v)} options={PROFICIENCIES.map((p) => ({ value: p, label: p }))} />
+            <NullableSelect value={f.req_proficiency_kind} onChange={(v: any) => up("req_proficiency_kind", v)} options={PROFICIENCIES.map((p) => ({ value: p, label: p }))} />
           </Field>
           <Field label="Nível mínimo"><Input type="number" min={0} max={100} value={f.req_proficiency_level ?? ""} onChange={(e) => up("req_proficiency_level", e.target.value === "" ? null : Number(e.target.value))} /></Field>
           <Field label="Requer missão">
-            <NullableSelect value={f.req_mission_id} onChange={(v) => up("req_mission_id", v)} options={missions.map((m: any) => ({ value: m.id, label: m.name }))} />
+            <NullableSelect value={f.req_mission_id} onChange={(v: any) => up("req_mission_id", v)} options={missions.map((m: any) => ({ value: m.id, label: m.name }))} />
           </Field>
           <Field label="Habilidade pré-requisito">
-            <NullableSelect value={f.req_prereq_skill_id} onChange={(v) => up("req_prereq_skill_id", v)}
+            <NullableSelect value={f.req_prereq_skill_id} onChange={(v: any) => up("req_prereq_skill_id", v)}
               options={allSkills.filter((x: any) => x.id !== f.id).map((s: any) => ({ value: s.id, label: `${s.name} (${s.rank})` }))} />
           </Field>
           <div className="sm:col-span-2">
@@ -158,7 +158,7 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
 function Field({ label, children }: any) { return <div><Label>{label}</Label>{children}</div>; }
 function NullableSelect({ value, onChange, options }: any) {
   return (
-    <Select value={value ?? "__none__"} onValueChange={(v) => onChange(v === "__none__" ? null : v)}>
+    <Select value={value ?? "__none__"} onValueChange={(v: string) => onChange(v === "__none__" ? null : v)}>
       <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
       <SelectContent>
         <SelectItem value="__none__">— Nenhum —</SelectItem>
