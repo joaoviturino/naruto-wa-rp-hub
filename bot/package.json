@@ -10,6 +10,7 @@
   "dependencies": {
     "@itsukichann/baileys": "github:Itsukichann/Baileys",
     "@supabase/supabase-js": "^2.45.0",
+    "@whiskeysockets/baileys": "^7.0.0-rc13",
     "pino": "^9.0.0"
   }
 }
