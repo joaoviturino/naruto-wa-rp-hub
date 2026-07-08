@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { InventoryView } from "@/components/InventoryView";
 import { Databook } from "@/components/Databook";
-import { RARITY_COLOR, RARITY_LABEL, VILLAGES, ELEMENTS, stats } from "@/lib/game";
+import { RARITY_COLOR, RARITY_LABEL, VILLAGES, ELEMENTS, stats, type Rarity } from "@/lib/game";
 import { Progress } from "@/components/ui/progress";
 import { ImageUpload } from "@/components/ImageUpload";
 import { updateCharacter } from "@/lib/character.functions";
@@ -39,7 +39,7 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
   const element = (ELEMENTS_MAP as any)[char.element_primary];
   const s = stats(char.xp);
   const nextLevel = Math.max(100, Math.pow(Math.floor(char.xp / 100) + 1, 2) * 100);
-  const rarity = (char.clan?.rarity ?? "common") as any;
+  const rarity = ((char.clan?.rarity as Rarity) ?? "common");
 
   async function updateField(field: string, url: string) {
     try {
