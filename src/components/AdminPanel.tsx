@@ -139,10 +139,14 @@ function BotPanel() {
 
       try {
         const QRCode = await import("qrcode");
+        const styles = getComputedStyle(document.documentElement);
         const dataUrl = await QRCode.toDataURL(session.qr, {
           width: 280,
           margin: 2,
-          color: { dark: "#111827", light: "#ffffff" },
+          color: {
+            dark: styles.getPropertyValue("--qr-ink").trim(),
+            light: styles.getPropertyValue("--qr-surface").trim(),
+          },
         });
         if (alive) setQrDataUrl(dataUrl);
       } catch {
@@ -165,9 +169,9 @@ function BotPanel() {
         {session?.status === "qr" && session?.qr && !String(session.qr).startsWith("__REQUEST_QR__") && (
           <div className="mt-4 flex flex-col items-center">
             {qrDataUrl ? (
-              <img alt="QR Code do WhatsApp" src={qrDataUrl} className="h-72 w-72 rounded bg-white p-2" />
+              <img alt="QR Code do WhatsApp" src={qrDataUrl} className="qr-code-surface h-72 w-72 rounded p-2" />
             ) : (
-              <div className="grid h-72 w-72 place-items-center rounded bg-white p-4 text-center text-sm text-slate-900">Montando QR...</div>
+              <div className="qr-code-surface grid h-72 w-72 place-items-center rounded p-4 text-center text-sm">Montando QR...</div>
             )}
             <p className="text-xs text-muted-foreground mt-2">Abra o WhatsApp → Dispositivos conectados → Conectar dispositivo.</p>
           </div>

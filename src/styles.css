@@ -79,6 +79,8 @@
   --ring: oklch(0.55 0.22 30);
   --gold: oklch(0.78 0.15 80);
   --blood: oklch(0.42 0.22 25);
+  --qr-surface: oklch(1 0 0);
+  --qr-ink: oklch(0.14 0.02 25);
   --chart-1: oklch(0.55 0.22 25);
   --chart-2: oklch(0.72 0.15 80);
   --chart-3: oklch(0.6 0.15 200);
@@ -125,6 +127,10 @@
 @utility bg-blood { background-color: var(--blood); }
 @utility border-gold { border-color: var(--gold); }
 @utility border-blood { border-color: var(--blood); }
+@utility qr-code-surface {
+  background-color: var(--qr-surface);
+  color: var(--qr-ink);
+}
 @utility scroll-panel {
   background: linear-gradient(180deg, oklch(0.18 0.03 25) 0%, oklch(0.14 0.02 25) 100%);
   border: 1px solid oklch(0.3 0.05 30);
