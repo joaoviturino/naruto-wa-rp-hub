@@ -101,10 +101,12 @@ function ChatPage() {
     }
     loadInvites(); loadPartyMembers(); checkCombat();
     const ch = supabase.channel(`invites-${character.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "party_invites", filter: `to_character_id=eq.${character.id}` }, loadInvites)
+      .on("postgres_changes", { event: "*", schema: "public", table: "party_invites" }, loadInvites)
       .on("postgres_changes", { event: "*", schema: "public", table: "party_members" }, loadPartyMembers)
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    // Fallback de polling (caso realtime falhe por rede/RLS)
+    const poll = setInterval(() => { loadInvites(); loadPartyMembers(); }, 8000);
+    return () => { supabase.removeChannel(ch); clearInterval(poll); };
   }, [character?.id]);
 
   // Polling de spawn na danger zone
