@@ -2,24 +2,33 @@ import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { NINJA_BAG_CAPACITY, SECONDARY_SLOTS } from "@/lib/game";
 import { ImageUpload } from "@/components/ImageUpload";
-import { ShieldHalf, Shirt, Footprints, Swords, Sword, Backpack, Lock } from "lucide-react";
+import { ShieldHalf, Shirt, Footprints, Swords, Sword, Backpack, Lock, HelpCircle, ArrowRightLeft } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { useServerFn } from "@tanstack/react-start";
-import { equipItem, unequipItem, consumeItem, dropItem } from "@/lib/character.functions";
+import { equipItem, unequipItem, consumeItem, dropItem, moveItemBetweenBags } from "@/lib/character.functions";
 import { toast } from "sonner";
 
-type Item = { id: string; name: string; type: string; slot_size: number; image_url?: string | null; description?: string | null };
+type Item = { id: string; name: string; type: string; slot_size: number; image_url?: string | null; description?: string | null; rank?: string };
+type BagEntry = { item_id: string; qty: number };
 type Inv = {
   character_id: string;
-  ninja_bag: { item_id: string; qty: number }[];
-  secondary_slots: (string | null)[];
+  ninja_bag: BagEntry[];
+  secondary_slots: BagEntry[];
   helmet_id: string | null; vest_id: string | null; pants_id: string | null; boots_id: string | null;
   primary_weapon_id: string | null; primary_unlocked: boolean;
   secondary_weapon_id: string | null; secondary_unlocked: boolean;
 };
 
 type SlotKey = "helmet_id" | "vest_id" | "pants_id" | "boots_id" | "primary_weapon_id" | "secondary_weapon_id";
+type BagSource = "ninja_bag" | "secondary_slots";
+
+function normalizeBag(raw: any): BagEntry[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((e: any) => e && e.item_id)
+    .map((e: any) => ({ item_id: e.item_id, qty: typeof e.qty === "number" && e.qty > 0 ? e.qty : 1 }));
+}
 
 export function InventoryView({ characterId, userId, bgUrl, onBgChange }: {
   characterId: string; userId: string; bgUrl: string | null; onBgChange: (url: string) => void;
@@ -30,10 +39,12 @@ export function InventoryView({ characterId, userId, bgUrl, onBgChange }: {
   const load = useCallback(async () => {
     const { data: iv } = await supabase.from("inventory").select("*").eq("character_id", characterId).maybeSingle();
     const { data: it } = await supabase.from("items").select("*");
-    const bag = Array.isArray((iv as any)?.ninja_bag)
-      ? (iv as any).ninja_bag.map((e: any) => ({ item_id: e.item_id, qty: typeof e.qty === "number" && e.qty > 0 ? e.qty : 1 }))
-      : [];
-    setInv({ ...(iv as any), ninja_bag: bag });
+    const raw = (iv as any) ?? {};
+    setInv({
+      ...raw,
+      ninja_bag: normalizeBag(raw.ninja_bag),
+      secondary_slots: normalizeBag(raw.secondary_slots),
+    });
     setItems(Object.fromEntries((it ?? []).map((i) => [i.id, i as Item])));
   }, [characterId]);
 
@@ -43,6 +54,7 @@ export function InventoryView({ characterId, userId, bgUrl, onBgChange }: {
   const unequip = useServerFn(unequipItem);
   const consume = useServerFn(consumeItem);
   const drop = useServerFn(dropItem);
+  const move = useServerFn(moveItemBetweenBags);
 
   async function run(fn: () => Promise<any>, okMsg: string) {
     try { await fn(); toast.success(okMsg); await load(); }
@@ -52,7 +64,30 @@ export function InventoryView({ characterId, userId, bgUrl, onBgChange }: {
   if (!inv) return <div className="p-6 text-muted-foreground">Sem inventário ainda.</div>;
 
   const bagUsed = inv.ninja_bag.reduce((s, e) => s + (items[e.item_id]?.slot_size ?? 1) * e.qty, 0);
-  const secondary = Array.from({ length: SECONDARY_SLOTS }, (_, i) => inv.secondary_slots[i] ?? null);
+  const secondaryUsed = inv.secondary_slots.reduce((s, e) => s + (items[e.item_id]?.slot_size ?? 1) * e.qty, 0);
+
+  function renderCells(source: BagSource, capacity: number, entries: BagEntry[]) {
+    type Cell = { item: Item | null; entry: BagEntry | null };
+    const cells: Cell[] = [];
+    for (const entry of entries) {
+      const it = items[entry.item_id] ?? null;
+      const size = it?.slot_size ?? 1;
+      for (let q = 0; q < entry.qty; q++) for (let s = 0; s < size; s++) cells.push({ item: it, entry });
+    }
+    while (cells.length < capacity) cells.push({ item: null, entry: null });
+    return cells.slice(0, capacity).map((c, i) => (
+      <BagCell key={`${source}-${i}`} item={c.item} entry={c.entry}
+        onEquip={() => c.entry && run(() => equip({ data: { item_id: c.entry!.item_id, source } } as any), `Item equipado.`)}
+        onConsume={() => c.entry && run(() => consume({ data: { item_id: c.entry!.item_id, source } } as any), `Item consumido.`)}
+        onDrop={() => c.entry && run(() => drop({ data: { item_id: c.entry!.item_id, source } } as any), `Item descartado.`)}
+        onMove={() => c.entry && run(() =>
+          move({ data: { item_id: c.entry!.item_id, from: source, to: source === "ninja_bag" ? "secondary_slots" : "ninja_bag" } } as any),
+          source === "ninja_bag" ? "Movido para slots secundários." : "Movido para a bolsa."
+        )}
+        moveLabel={source === "ninja_bag" ? "Mover para slots secundários" : "Mover para bolsa ninja"}
+      />
+    ));
+  }
 
   return (
     <div className="scroll-panel rounded-lg p-6">
@@ -98,34 +133,18 @@ export function InventoryView({ characterId, userId, bgUrl, onBgChange }: {
           <span className="text-xs text-muted-foreground">{bagUsed} / {NINJA_BAG_CAPACITY}</span>
         </div>
         <div className="grid grid-cols-10 gap-1">
-          {(() => {
-            const cells: (Item | null)[] = [];
-            for (const entry of inv.ninja_bag) {
-              const it = items[entry.item_id];
-              const size = it?.slot_size ?? 1;
-              for (let q = 0; q < entry.qty; q++) for (let s = 0; s < size; s++) cells.push(it ?? null);
-            }
-            while (cells.length < NINJA_BAG_CAPACITY) cells.push(null);
-            return cells.slice(0, NINJA_BAG_CAPACITY).map((it, i) => (
-              <BagCell key={i} item={it}
-                onEquip={() => it && run(() => equip({ data: { item_id: it.id } } as any), `${it.name} equipado.`)}
-                onConsume={() => it && run(() => consume({ data: { item_id: it.id } } as any), `${it.name} usado.`)}
-                onDrop={() => it && run(() => drop({ data: { item_id: it.id } } as any), `${it.name} descartado.`)}
-              />
-            ));
-          })()}
+          {renderCells("ninja_bag", NINJA_BAG_CAPACITY, inv.ninja_bag)}
         </div>
       </div>
 
       {/* Slots secundários */}
       <div className="mt-6">
-        <h3 className="font-display text-lg text-gold mb-2">Slots Secundários</h3>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-display text-lg text-gold">Slots Secundários</h3>
+          <span className="text-xs text-muted-foreground">{secondaryUsed} / {SECONDARY_SLOTS}</span>
+        </div>
         <div className="grid grid-cols-10 gap-1">
-          {secondary.map((sid, i) => (
-            <div key={i} className="aspect-square rounded border border-border bg-input/40 flex items-center justify-center text-[10px] p-1">
-              {sid ? items[sid]?.name ?? "?" : ""}
-            </div>
-          ))}
+          {renderCells("secondary_slots", SECONDARY_SLOTS, inv.secondary_slots)}
         </div>
       </div>
     </div>
@@ -160,31 +179,65 @@ function EquipSlot({ icon, label, slot, itemId, items, locked, onUnequip }: {
   );
 }
 
-function BagCell({ item, onEquip, onConsume, onDrop }: {
-  item: Item | null; onEquip: () => void; onConsume: () => void; onDrop: () => void;
+function BagCell({ item, entry, onEquip, onConsume, onDrop, onMove, moveLabel }: {
+  item: Item | null;
+  entry: BagEntry | null;
+  onEquip: () => void;
+  onConsume: () => void;
+  onDrop: () => void;
+  onMove: () => void;
+  moveLabel: string;
 }) {
-  if (!item) {
+  // Célula vazia
+  if (!entry) {
     return <div className="aspect-square rounded border border-border bg-input/40" />;
+  }
+  // Célula com item desconhecido (deletado pelo admin)
+  if (!item) {
+    return (
+      <Popover>
+        <PopoverTrigger asChild>
+          <button className="aspect-square rounded border border-dashed border-blood/60 bg-blood/10 flex items-center justify-center text-blood" title="Item desconhecido">
+            <HelpCircle size={18} />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-56 p-2 space-y-1">
+          <div className="text-xs font-semibold px-2 py-1">Item desconhecido</div>
+          <div className="text-[11px] text-muted-foreground px-2 pb-1">Este item foi removido do jogo. Descarte para liberar o slot.</div>
+          <Button variant="destructive" size="sm" className="w-full justify-start" onClick={onDrop}>Descartar</Button>
+        </PopoverContent>
+      </Popover>
+    );
   }
   const canEquip = item.type?.startsWith("armor_") || item.type === "weapon_primary" || item.type === "weapon_secondary";
   const canConsume = item.type === "consumable";
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button className="aspect-square rounded border border-border bg-input/60 hover:border-gold hover:bg-input flex items-center justify-center text-[10px] text-center p-1 overflow-hidden transition"
+        <button className="relative aspect-square rounded border border-border bg-input/60 hover:border-gold hover:bg-input flex items-center justify-center text-[10px] text-center p-1 overflow-hidden transition"
           title={item.name}>
           {item.image_url ? (
             <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
           ) : (
-            <span className="truncate">{item.name}</span>
+            <span className="truncate leading-tight">{item.name}</span>
+          )}
+          {entry.qty > 1 && (
+            <span className="absolute bottom-0 right-0 bg-background/80 text-[10px] px-1 rounded-tl font-bold text-gold">{entry.qty}</span>
           )}
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-56 p-2 space-y-1">
-        <div className="text-xs font-semibold px-2 py-1">{item.name}</div>
+        <div className="text-xs font-semibold px-2 py-1 flex items-center justify-between">
+          <span>{item.name}</span>
+          {item.rank && <span className="text-[10px] text-gold">{item.rank}</span>}
+        </div>
+        <div className="text-[10px] text-muted-foreground px-2 -mt-1 capitalize">{item.type?.replace(/_/g, " ")}</div>
         {item.description && <div className="text-[11px] text-muted-foreground px-2 pb-1">{item.description}</div>}
         {canEquip && <Button variant="secondary" size="sm" className="w-full justify-start" onClick={onEquip}>Equipar</Button>}
         {canConsume && <Button variant="secondary" size="sm" className="w-full justify-start" onClick={onConsume}>Consumir</Button>}
+        <Button variant="ghost" size="sm" className="w-full justify-start" onClick={onMove}>
+          <ArrowRightLeft size={12} className="mr-1" /> {moveLabel}
+        </Button>
         <Button variant="destructive" size="sm" className="w-full justify-start" onClick={onDrop}>Descartar</Button>
       </PopoverContent>
     </Popover>
