@@ -9,12 +9,15 @@ import { useServerFn } from "@tanstack/react-start";
 import { upsertNpc, deleteNpc, setNpcSkills } from "@/lib/npc.functions";
 import { toast } from "sonner";
 
-type Npc = { id: string; name: string; image_url: string | null; description: string | null; hp_max: number; xp: number; energy_max: number };
+type DropRow = { item_id: string; qty: number; chance: number };
+type Npc = { id: string; name: string; image_url: string | null; description: string | null; hp_max: number; xp: number; energy_max: number; reward_xp: number; reward_ryo: number; drop_table: DropRow[] };
 type Skill = { id: string; name: string; rank: string };
+type Item = { id: string; name: string; type: string };
 
 export function NpcManager() {
   const [npcs, setNpcs] = useState<Npc[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
+  const [items, setItems] = useState<Item[]>([]);
   const [assigned, setAssigned] = useState<Record<string, Set<string>>>({});
   const [selected, setSelected] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -24,13 +27,15 @@ export function NpcManager() {
   const setSkillsFn = useServerFn(setNpcSkills);
 
   async function load() {
-    const [n, s, ns] = await Promise.all([
+    const [n, s, ns, it] = await Promise.all([
       supabase.from("npcs").select("*").order("name"),
       supabase.from("skills").select("id,name,rank").order("name"),
       supabase.from("npc_skills").select("npc_id,skill_id"),
+      supabase.from("items").select("id,name,type").order("name"),
     ]);
-    setNpcs((n.data as Npc[]) ?? []);
+    setNpcs(((n.data as any[]) ?? []).map((r) => ({ ...r, drop_table: Array.isArray(r.drop_table) ? r.drop_table : [] })));
     setSkills((s.data as Skill[]) ?? []);
+    setItems((it.data as Item[]) ?? []);
     const map: Record<string, Set<string>> = {};
     (ns.data ?? []).forEach((r: any) => {
       if (!map[r.npc_id]) map[r.npc_id] = new Set();
@@ -43,7 +48,7 @@ export function NpcManager() {
   async function create() {
     if (!name.trim()) return;
     try {
-      const { id } = await save({ data: { name: name.trim(), hp_max: 100, xp: 100, energy_max: 100 } } as any);
+      const { id } = await save({ data: { name: name.trim(), hp_max: 100, xp: 100, energy_max: 100, reward_xp: 50, reward_ryo: 20, drop_table: [] } } as any);
       setName(""); toast.success("NPC criado."); setSelected(id); load();
     } catch (e: any) { toast.error(e.message); }
   }
@@ -117,9 +122,54 @@ export function NpcManager() {
               <NumField label="XP (define stats)" value={sel.xp} onSave={(v) => save({ data: { ...sel, xp: v } } as any).then(load)} />
               <NumField label="Energia máxima" value={sel.energy_max} onSave={(v) => save({ data: { ...sel, energy_max: v } } as any).then(load)} />
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <NumField label="Recompensa XP" value={sel.reward_xp ?? 0} onSave={(v) => save({ data: { ...sel, reward_xp: v } } as any).then(load)} />
+              <NumField label="Recompensa Ryo" value={sel.reward_ryo ?? 0} onSave={(v) => save({ data: { ...sel, reward_ryo: v } } as any).then(load)} />
+            </div>
             <p className="text-xs text-muted-foreground">
               XP {sel.xp} → EF {Math.floor(sel.xp/2)}, EM {sel.xp - Math.floor(sel.xp/2)}, Chakra {sel.xp}.
             </p>
+          </div>
+
+          <div className="scroll-panel rounded-lg p-4 space-y-2">
+            <h4 className="font-display text-lg text-gold">Tabela de drop</h4>
+            <div className="space-y-2">
+              {(sel.drop_table ?? []).map((d, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <select value={d.item_id}
+                    onChange={async (e) => {
+                      const next = [...sel.drop_table]; next[i] = { ...d, item_id: e.target.value };
+                      await save({ data: { ...sel, drop_table: next } } as any); load();
+                    }}
+                    className="flex-1 bg-input border border-border rounded px-2 py-1 text-sm">
+                    {items.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
+                  </select>
+                  <Input type="number" min={1} className="w-20" defaultValue={d.qty}
+                    onBlur={async (e) => {
+                      const v = Math.max(1, Number(e.target.value));
+                      const next = [...sel.drop_table]; next[i] = { ...d, qty: v };
+                      await save({ data: { ...sel, drop_table: next } } as any); load();
+                    }} />
+                  <Input type="number" min={0} max={100} step={0.1} className="w-24" defaultValue={d.chance}
+                    onBlur={async (e) => {
+                      const v = Math.max(0, Math.min(100, Number(e.target.value)));
+                      const next = [...sel.drop_table]; next[i] = { ...d, chance: v };
+                      await save({ data: { ...sel, drop_table: next } } as any); load();
+                    }} />
+                  <span className="text-xs text-muted-foreground">% chance</span>
+                  <Button variant="ghost" size="icon" onClick={async () => {
+                    const next = sel.drop_table.filter((_, j) => j !== i);
+                    await save({ data: { ...sel, drop_table: next } } as any); load();
+                  }}><Trash2 size={14} /></Button>
+                </div>
+              ))}
+              {(sel.drop_table ?? []).length === 0 && <p className="text-xs text-muted-foreground">Sem drops configurados.</p>}
+            </div>
+            <Button size="sm" variant="outline" onClick={async () => {
+              if (!items.length) { toast.error("Cadastre um item primeiro."); return; }
+              const next = [...(sel.drop_table ?? []), { item_id: items[0].id, qty: 1, chance: 25 }];
+              await save({ data: { ...sel, drop_table: next } } as any); load();
+            }}><Plus size={14} className="mr-1" /> Adicionar drop</Button>
           </div>
 
           <div className="scroll-panel rounded-lg p-4 space-y-2">
