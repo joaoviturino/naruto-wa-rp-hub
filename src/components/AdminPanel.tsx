@@ -8,22 +8,40 @@ import { Label } from "@/components/ui/label";
 import { useServerFn } from "@tanstack/react-start";
 import { enqueueMessage, resetBotSession, requestBotQr, setUserXp } from "@/lib/admin.functions";
 import { toast } from "sonner";
+import { PlayerEditor } from "@/components/admin/PlayerEditor";
+import { ItemManager } from "@/components/admin/ItemManager";
+import { SkillManager } from "@/components/admin/SkillManager";
+import { MissionManager } from "@/components/admin/MissionManager";
+import { ClanTreeManager } from "@/components/admin/ClanTreeManager";
+import { AdminUsers } from "@/components/admin/AdminUsers";
+import { NINJA_RANKS } from "@/components/admin/shared";
+import { Pencil } from "lucide-react";
 
 export function AdminPanel() {
+  const [adminUserId, setAdminUserId] = useState<string>("");
+  useEffect(() => { supabase.auth.getUser().then(({ data }) => setAdminUserId(data.user?.id ?? "")); }, []);
   return (
     <div className="mx-auto max-w-6xl p-6">
       <h1 className="font-display text-3xl font-black mb-6">Painel do Kage <span className="text-gold">影</span></h1>
       <Tabs defaultValue="dashboard">
-        <TabsList>
+        <TabsList className="flex flex-wrap h-auto">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="players">Jogadores</TabsTrigger>
+          <TabsTrigger value="items">Itens</TabsTrigger>
+          <TabsTrigger value="skills">Habilidades</TabsTrigger>
+          <TabsTrigger value="missions">Missões</TabsTrigger>
+          <TabsTrigger value="clans">Árvore de Clã</TabsTrigger>
+          <TabsTrigger value="admins">Admins</TabsTrigger>
           <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
-          <TabsTrigger value="catalog">Catálogo</TabsTrigger>
         </TabsList>
         <TabsContent value="dashboard" className="mt-4"><Dashboard /></TabsContent>
         <TabsContent value="players" className="mt-4"><Players /></TabsContent>
+        <TabsContent value="items" className="mt-4">{adminUserId && <ItemManager adminUserId={adminUserId} />}</TabsContent>
+        <TabsContent value="skills" className="mt-4">{adminUserId && <SkillManager adminUserId={adminUserId} />}</TabsContent>
+        <TabsContent value="missions" className="mt-4"><MissionManager /></TabsContent>
+        <TabsContent value="clans" className="mt-4"><ClanTreeManager /></TabsContent>
+        <TabsContent value="admins" className="mt-4"><AdminUsers /></TabsContent>
         <TabsContent value="whatsapp" className="mt-4"><BotPanel /></TabsContent>
-        <TabsContent value="catalog" className="mt-4"><Catalog /></TabsContent>
       </Tabs>
     </div>
   );
@@ -60,22 +78,26 @@ function Stat({ label, value }: { label: string; value: number }) {
 
 function Players() {
   const [chars, setChars] = useState<any[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const setXpFn = useServerFn(setUserXp);
   async function load() {
     const { data } = await supabase.from("characters")
-      .select("id,nickname,phone_e164,village,xp,user_id,clan:clans(name,rarity)")
+      .select("id,nickname,phone_e164,village,xp,rank,user_id,clan:clans(name,rarity)")
       .order("created_at", { ascending: false });
     setChars(data ?? []);
   }
   useEffect(() => { load(); }, []);
   return (
+    <>
     <div className="scroll-panel rounded-lg overflow-hidden">
       <table className="w-full text-sm">
         <thead className="bg-secondary/50">
           <tr>
             <th className="text-left p-3">Nickname</th><th className="text-left p-3">Vila</th>
-            <th className="text-left p-3">Clã</th><th className="text-left p-3">WhatsApp</th>
-            <th className="text-left p-3">XP</th>
+            <th className="text-left p-3">Clã</th><th className="text-left p-3">Patente</th>
+            <th className="text-left p-3">WhatsApp</th><th className="text-left p-3">XP</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -84,6 +106,7 @@ function Players() {
               <td className="p-3 font-semibold">{c.nickname}</td>
               <td className="p-3">{c.village}</td>
               <td className="p-3">{c.clan?.name ?? "—"}</td>
+              <td className="p-3 text-xs">{NINJA_RANKS.find((r) => r.value === c.rank)?.label ?? c.rank}</td>
               <td className="p-3 text-muted-foreground">{c.phone_e164}</td>
               <td className="p-3">
                 <input type="number" className="w-20 bg-input rounded px-2 py-1 text-sm" defaultValue={c.xp}
@@ -94,12 +117,19 @@ function Players() {
                     catch (err: any) { toast.error(err.message); }
                   }} />
               </td>
+              <td className="p-3 text-right">
+                <Button size="sm" variant="outline" onClick={() => { setEditingId(c.id); setOpen(true); }}>
+                  <Pencil size={14} /> Editar
+                </Button>
+              </td>
             </tr>
           ))}
-          {chars.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">Nenhum personagem ainda.</td></tr>}
+          {chars.length === 0 && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">Nenhum personagem ainda.</td></tr>}
         </tbody>
       </table>
     </div>
+    <PlayerEditor characterId={editingId} open={open} onOpenChange={setOpen} onSaved={load} />
+    </>
   );
 }
 
