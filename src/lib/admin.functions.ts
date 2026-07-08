@@ -364,6 +364,24 @@ export const revokeRole = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/** Presenteia (ou remove) Ryo de um personagem. Use valor negativo para descontar. */
+export const giftRyo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    character_id: z.string().uuid(),
+    amount: z.number().int().min(-10000000).max(10000000),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: c } = await supabaseAdmin.from("characters").select("ryo").eq("id", data.character_id).maybeSingle();
+    if (!c) throw new Error("Personagem não encontrado.");
+    const next = Math.max(0, Number(c.ryo ?? 0) + data.amount);
+    await supabaseAdmin.from("characters").update({ ryo: next }).eq("id", data.character_id);
+    await supabaseAdmin.from("audit_log").insert({ admin_id: context.userId, action: "gift_ryo", target: data.character_id, meta: { amount: data.amount, new_balance: next } });
+    return { ok: true };
+  });
+
 /* ---------- UPLOAD SIGNED URL ---------- */
 
 export const createUploadUrl = createServerFn({ method: "POST" })
