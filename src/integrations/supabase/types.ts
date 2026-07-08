@@ -176,6 +176,8 @@ export type Database = {
           history: string | null
           id: string
           inventory_bg_url: string | null
+          last_spawn_roll_at: string | null
+          location_entered_at: string | null
           nickname: string
           personality: string | null
           phone_e164: string
@@ -200,6 +202,8 @@ export type Database = {
           history?: string | null
           id?: string
           inventory_bg_url?: string | null
+          last_spawn_roll_at?: string | null
+          location_entered_at?: string | null
           nickname: string
           personality?: string | null
           phone_e164: string
@@ -224,6 +228,8 @@ export type Database = {
           history?: string | null
           id?: string
           inventory_bg_url?: string | null
+          last_spawn_roll_at?: string | null
+          location_entered_at?: string | null
           nickname?: string
           personality?: string | null
           phone_e164?: string
@@ -316,6 +322,97 @@ export type Database = {
           weight?: number
         }
         Relationships: []
+      }
+      combat_participants: {
+        Row: {
+          character_id: string
+          session_id: string
+        }
+        Insert: {
+          character_id: string
+          session_id: string
+        }
+        Update: {
+          character_id?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "combat_participants_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "combat_participants_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "combat_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      combat_sessions: {
+        Row: {
+          created_at: string
+          ended_at: string | null
+          id: string
+          location_id: string
+          log: Json
+          npc_id: string
+          party_id: string | null
+          state: Json
+          status: string
+          turn: string
+        }
+        Insert: {
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          location_id: string
+          log?: Json
+          npc_id: string
+          party_id?: string | null
+          state?: Json
+          status?: string
+          turn?: string
+        }
+        Update: {
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          location_id?: string
+          log?: Json
+          npc_id?: string
+          party_id?: string | null
+          state?: Json
+          status?: string
+          turn?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "combat_sessions_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "combat_sessions_npc_id_fkey"
+            columns: ["npc_id"]
+            isOneToOne: false
+            referencedRelation: "npcs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "combat_sessions_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "parties"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inventory: {
         Row: {
@@ -580,13 +677,49 @@ export type Database = {
           },
         ]
       }
+      location_npcs: {
+        Row: {
+          location_id: string
+          npc_id: string
+          weight: number
+        }
+        Insert: {
+          location_id: string
+          npc_id: string
+          weight?: number
+        }
+        Update: {
+          location_id?: string
+          npc_id?: string
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_npcs_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_npcs_npc_id_fkey"
+            columns: ["npc_id"]
+            isOneToOne: false
+            referencedRelation: "npcs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       locations: {
         Row: {
           created_at: string
           description: string | null
           id: string
           image_url: string | null
+          is_danger_zone: boolean
           name: string
+          spawn_chance: number
+          spawn_tick_seconds: number
           updated_at: string
         }
         Insert: {
@@ -594,7 +727,10 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
+          is_danger_zone?: boolean
           name: string
+          spawn_chance?: number
+          spawn_tick_seconds?: number
           updated_at?: string
         }
         Update: {
@@ -602,7 +738,10 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
+          is_danger_zone?: boolean
           name?: string
+          spawn_chance?: number
+          spawn_tick_seconds?: number
           updated_at?: string
         }
         Relationships: []
@@ -631,6 +770,72 @@ export type Database = {
           name?: string
           rank?: Database["public"]["Enums"]["ninja_rank"]
           reward_xp?: number
+        }
+        Relationships: []
+      }
+      npc_skills: {
+        Row: {
+          npc_id: string
+          skill_id: string
+        }
+        Insert: {
+          npc_id: string
+          skill_id: string
+        }
+        Update: {
+          npc_id?: string
+          skill_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "npc_skills_npc_id_fkey"
+            columns: ["npc_id"]
+            isOneToOne: false
+            referencedRelation: "npcs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "npc_skills_skill_id_fkey"
+            columns: ["skill_id"]
+            isOneToOne: false
+            referencedRelation: "skills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      npcs: {
+        Row: {
+          created_at: string
+          description: string | null
+          energy_max: number
+          hp_max: number
+          id: string
+          image_url: string | null
+          name: string
+          updated_at: string
+          xp: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          energy_max?: number
+          hp_max?: number
+          id?: string
+          image_url?: string | null
+          name: string
+          updated_at?: string
+          xp?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          energy_max?: number
+          hp_max?: number
+          id?: string
+          image_url?: string | null
+          name?: string
+          updated_at?: string
+          xp?: number
         }
         Relationships: []
       }
@@ -663,6 +868,114 @@ export type Database = {
           to_phone?: string
         }
         Relationships: []
+      }
+      parties: {
+        Row: {
+          created_at: string
+          id: string
+          leader_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          leader_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          leader_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parties_leader_id_fkey"
+            columns: ["leader_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      party_invites: {
+        Row: {
+          created_at: string
+          from_character_id: string
+          id: string
+          party_id: string
+          status: string
+          to_character_id: string
+        }
+        Insert: {
+          created_at?: string
+          from_character_id: string
+          id?: string
+          party_id: string
+          status?: string
+          to_character_id: string
+        }
+        Update: {
+          created_at?: string
+          from_character_id?: string
+          id?: string
+          party_id?: string
+          status?: string
+          to_character_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "party_invites_from_character_id_fkey"
+            columns: ["from_character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "party_invites_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "parties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "party_invites_to_character_id_fkey"
+            columns: ["to_character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      party_members: {
+        Row: {
+          character_id: string
+          joined_at: string
+          party_id: string
+        }
+        Insert: {
+          character_id: string
+          joined_at?: string
+          party_id: string
+        }
+        Update: {
+          character_id?: string
+          joined_at?: string
+          party_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "party_members_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: true
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "party_members_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "parties"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -719,12 +1032,17 @@ export type Database = {
       }
       skills: {
         Row: {
+          base_cost: number
+          bonus_critical: number
+          bonus_energetic: number
+          bonus_speed: number
           clan_id: string | null
           classification:
             | Database["public"]["Enums"]["skill_classification"]
             | null
           description: string | null
           element: Database["public"]["Enums"]["element"] | null
+          energy_type: string
           id: string
           image_url: string | null
           name: string
@@ -741,12 +1059,17 @@ export type Database = {
           type: string | null
         }
         Insert: {
+          base_cost?: number
+          bonus_critical?: number
+          bonus_energetic?: number
+          bonus_speed?: number
           clan_id?: string | null
           classification?:
             | Database["public"]["Enums"]["skill_classification"]
             | null
           description?: string | null
           element?: Database["public"]["Enums"]["element"] | null
+          energy_type?: string
           id?: string
           image_url?: string | null
           name: string
@@ -763,12 +1086,17 @@ export type Database = {
           type?: string | null
         }
         Update: {
+          base_cost?: number
+          bonus_critical?: number
+          bonus_energetic?: number
+          bonus_speed?: number
           clan_id?: string | null
           classification?:
             | Database["public"]["Enums"]["skill_classification"]
             | null
           description?: string | null
           element?: Database["public"]["Enums"]["element"] | null
+          energy_type?: string
           id?: string
           image_url?: string | null
           name?: string
