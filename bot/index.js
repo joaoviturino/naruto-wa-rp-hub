@@ -5,7 +5,7 @@ import {
   DisconnectReason,
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
-} from "@itsukichann/baileys";
+} from "@whiskeysockets/baileys";
 import { Boom } from "@hapi/boom";
 import { createClient } from "@supabase/supabase-js";
 import { rm } from "node:fs/promises";
