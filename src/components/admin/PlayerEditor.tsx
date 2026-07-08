@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useServerFn } from "@tanstack/react-start";
-import { updatePlayer, grantSkill, revokeSkill, grantItem, revokeItem, completeMission, uncompleteMission } from "@/lib/admin.functions";
+import { updatePlayer, grantSkill, revokeSkill, grantItem, revokeItem, completeMission, uncompleteMission, giftRyo } from "@/lib/admin.functions";
 import { toast } from "sonner";
 import { NINJA_RANKS, PROFICIENCIES, VILLAGES, ELEMENTS, labelize } from "./shared";
 import { X, Plus } from "lucide-react";
@@ -31,6 +31,8 @@ export function PlayerEditor({ characterId, open, onOpenChange, onSaved }: {
   const rItem = useServerFn(revokeItem);
   const cMission = useServerFn(completeMission);
   const uMission = useServerFn(uncompleteMission);
+  const gift = useServerFn(giftRyo);
+  const [ryoDelta, setRyoDelta] = useState<number>(100);
 
   async function load() {
     if (!characterId) return;
@@ -109,6 +111,17 @@ export function PlayerEditor({ characterId, open, onOpenChange, onSaved }: {
                   toast.success("Ficha atualizada."); onSaved();
                 } catch (e: any) { toast.error(e.message); }
               }}>Salvar ficha</Button>
+            </div>
+            <div className="sm:col-span-2 border-t border-border pt-3">
+              <Label className="text-gold">Ryo (moeda) — saldo atual: {char.ryo ?? 0}</Label>
+              <div className="flex gap-2 mt-1">
+                <Input type="number" value={ryoDelta} onChange={(e) => setRyoDelta(Number(e.target.value))} className="w-32" />
+                <Button variant="secondary" onClick={async () => {
+                  try { await gift({ data: { character_id: char.id, amount: ryoDelta } } as any); toast.success(`${ryoDelta >= 0 ? "Presenteado" : "Removido"}: ${Math.abs(ryoDelta)} Ryo`); load(); }
+                  catch (e: any) { toast.error(e.message); }
+                }}>Aplicar</Button>
+                <span className="text-xs text-muted-foreground self-center">Use valor negativo para descontar.</span>
+              </div>
             </div>
           </TabsContent>
 
