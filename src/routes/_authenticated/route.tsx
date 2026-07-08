@@ -2,6 +2,8 @@ import { createFileRoute, Outlet, redirect, Link, useNavigate } from "@tanstack/
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useServerFn } from "@tanstack/react-start";
+import { bootstrapAdmin } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -18,10 +20,15 @@ export const Route = createFileRoute("/_authenticated")({
 function AuthedLayout() {
   const { user, isAdmin } = Route.useRouteContext();
   const navigate = useNavigate();
+  const bootstrap = useServerFn(bootstrapAdmin);
   async function signOut() {
     await supabase.auth.signOut();
     toast.success("Até a próxima, shinobi.");
     navigate({ to: "/auth", replace: true });
+  }
+  async function tryBootstrap() {
+    try { await bootstrap({}); toast.success("Você é o Kage. Recarregando..."); location.reload(); }
+    catch (e: any) { toast.error(e.message); }
   }
   return (
     <div className="min-h-screen">
@@ -36,6 +43,11 @@ function AuthedLayout() {
               <Link to="/admin" className="px-3 py-1.5 rounded hover:bg-secondary [&.active]:text-gold" activeProps={{ className: "active" }}>
                 Admin
               </Link>
+            )}
+            {!isAdmin && (
+              <button onClick={tryBootstrap} className="px-3 py-1.5 rounded text-xs text-muted-foreground hover:text-gold" title="Só funciona se ainda não existir nenhum admin.">
+                Virar Kage
+              </button>
             )}
             <span className="mx-3 text-muted-foreground text-xs">{user.email}</span>
             <Button variant="outline" size="sm" onClick={signOut}>Sair</Button>
