@@ -269,36 +269,3 @@ function BotPanel() {
     </div>
   );
 }
-
-function Catalog() {
-  const [clans, setClans] = useState<any[]>([]);
-  const [items, setItems] = useState<any[]>([]);
-  const [skills, setSkills] = useState<any[]>([]);
-  useEffect(() => {
-    (async () => {
-      const [c, i, s] = await Promise.all([
-        supabase.from("clans").select("*").order("rarity"),
-        supabase.from("items").select("*").order("type"),
-        supabase.from("skills").select("*").order("rank"),
-      ]);
-      setClans(c.data ?? []); setItems(i.data ?? []); setSkills(s.data ?? []);
-    })();
-  }, []);
-  return (
-    <div className="grid gap-6 lg:grid-cols-3">
-      <CatCol title="Clãs" rows={clans.map((c) => `${c.name} · ${c.village} · ${c.rarity}`)} />
-      <CatCol title="Itens" rows={items.map((i) => `${i.name} · ${i.type}`)} />
-      <CatCol title="Skills" rows={skills.map((s) => `${s.name} (${s.rank})`)} />
-    </div>
-  );
-}
-function CatCol({ title, rows }: { title: string; rows: string[] }) {
-  return (
-    <div className="scroll-panel rounded-lg p-6">
-      <h3 className="font-display text-lg text-gold mb-3">{title} ({rows.length})</h3>
-      <ul className="space-y-1 text-sm max-h-96 overflow-y-auto">
-        {rows.map((r, i) => <li key={i} className="border-b border-border/50 py-1">{r}</li>)}
-      </ul>
-    </div>
-  );
-}
