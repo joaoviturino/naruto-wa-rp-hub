@@ -51,7 +51,10 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const state = session.state as any;
   const me = state.players.find((p: any) => p.character_id === myCharId);
   const activePlayer = state.players[state.active];
-  const myTurn = session.status === "active" && activePlayer?.character_id === myCharId && me?.alive;
+  const aliveMe = !!me?.alive;
+  const solo = state.players.length <= 1;
+  const onlyAlivePlayer = state.players.filter((p: any) => p.alive).length === 1 && aliveMe;
+  const myTurn = session.status === "active" && aliveMe && (solo || onlyAlivePlayer || activePlayer?.character_id === myCharId);
   const currentSkill = skills.find((s) => s.id === skillId);
 
   async function doAttack() {
