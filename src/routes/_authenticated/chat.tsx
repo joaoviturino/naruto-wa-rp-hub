@@ -215,6 +215,21 @@ function ChatPage() {
           {currentLoc?.description && <p className="text-xs text-muted-foreground mt-1">{currentLoc.description}</p>}
         </div>
 
+        {currentLoc && (
+          <div className="border border-border rounded p-2 space-y-1">
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1">
+              <Users size={11} /> {presentHere.length} {presentHere.length === 1 ? "pessoa" : "pessoas"} no local
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {presentHere.map((p) => (
+                <div key={p.id} title={p.nickname} className="w-6 h-6 rounded-full bg-secondary overflow-hidden ring-1 ring-border">
+                  {p.avatar_url && <img src={p.avatar_url} className="w-full h-full object-cover" alt={p.nickname} />}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div>
           <div className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1 mb-2"><Compass size={12} /> {character.current_location_id ? "Locais próximos" : "Escolha onde iniciar"}</div>
           <div className="space-y-1">
