@@ -256,6 +256,11 @@ const skillPayload = z.object({
   req_proficiency_level: z.number().int().min(0).max(100).nullable().optional(),
   req_mission_id: z.string().uuid().nullable().optional(),
   req_prereq_skill_id: z.string().uuid().nullable().optional(),
+  energy_type: z.enum(["ef","em","chakra"]).default("chakra"),
+  base_cost: z.number().int().min(0).max(100000).default(10),
+  bonus_speed: z.number().min(0).max(100).default(1),
+  bonus_critical: z.number().min(0).max(100).default(1),
+  bonus_energetic: z.number().min(0).max(100).default(1),
 });
 
 export const upsertSkill = createServerFn({ method: "POST" })
