@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useServerFn } from "@tanstack/react-start";
-import { bootstrapAdmin, enqueueMessage, resetBotSession, setUserXp } from "@/lib/admin.functions";
+import { bootstrapAdmin, enqueueMessage, resetBotSession, requestBotQr, setUserXp } from "@/lib/admin.functions";
 import { toast } from "sonner";
 
 export function AdminPanel() {
@@ -110,6 +110,8 @@ function BotPanel() {
   const [body, setBody] = useState("");
   const enqueue = useServerFn(enqueueMessage);
   const reset = useServerFn(resetBotSession);
+  const askQr = useServerFn(requestBotQr);
+  const [asking, setAsking] = useState(false);
 
   async function load() {
     const { data: s } = await supabase.from("bot_sessions").select("*").eq("id", "default").maybeSingle();
@@ -140,12 +142,20 @@ function BotPanel() {
           </div>
         )}
         <div className="mt-6 flex gap-2">
+          <Button onClick={async () => {
+            setAsking(true);
+            try { await askQr({}); toast.success("QR solicitado. Aguardando o serviço /bot gerar."); load(); }
+            catch (err: any) { toast.error(err.message); }
+            finally { setAsking(false); }
+          }} disabled={asking}>
+            {asking ? "Solicitando..." : "Gerar novo QR"}
+          </Button>
           <Button variant="outline" onClick={async () => { await reset({}); toast.success("Sessão resetada."); load(); }}>
             Resetar sessão
           </Button>
         </div>
         <p className="mt-4 text-xs text-muted-foreground">
-          O bot roda em um serviço Node separado (pasta <code>/bot</code>). Deploy em VPS/Railway/Fly. Ele lê a fila abaixo e envia via Baileys.
+          O QR é gerado pelo serviço Node em <code>/bot</code> (Baileys) — rode <code>npm start</code> na pasta, em VPS/Railway/Fly. Sem o serviço rodando, nenhum QR aparece aqui.
         </p>
       </div>
 

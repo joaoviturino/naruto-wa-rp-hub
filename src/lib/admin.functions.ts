@@ -44,6 +44,22 @@ export const resetBotSession = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/** Request a fresh QR code from the bot service. */
+export const requestBotQr = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await requireAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.from("bot_sessions").upsert({
+      id: "default",
+      status: "connecting",
+      qr: null,
+      phone: null,
+      updated_at: new Date().toISOString(),
+    });
+    return { ok: true };
+  });
+
 /** Grant / revoke roles, adjust xp. */
 export const setUserXp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
