@@ -17,43 +17,61 @@ type Props = {
 };
 
 const STORAGE_KEY = "party-popup-pos";
+const MOBILE_BREAKPOINT = 768;
+const POPUP_WIDTH = 256; // w-64
+const MOBILE_TOP = 52;   // altura da barra sticky
+const MOBILE_MARGIN = 8;
+
+function isMobile() {
+  return typeof window !== "undefined" && window.innerWidth < MOBILE_BREAKPOINT;
+}
+function mobileAnchor() {
+  return { x: Math.max(MOBILE_MARGIN, window.innerWidth - POPUP_WIDTH - MOBILE_MARGIN), y: MOBILE_TOP };
+}
 
 export function PartyPopup({ myCharId, myLocationId, members, leaderId, invites }: Props) {
   const respond = useServerFn(respondPartyInvite);
   const leave = useServerFn(leaveParty);
   const [pos, setPos] = useState<{ x: number; y: number }>(() => {
     if (typeof window === "undefined") return { x: 16, y: 16 };
+    if (isMobile()) return mobileAnchor();
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) return JSON.parse(raw);
     } catch { /* noop */ }
-    const isMobile = window.innerWidth < 768;
-    if (isMobile) {
-      // Ancorado logo abaixo da barra sticky, alinhado à direita perto do contador
-      return { x: Math.max(8, window.innerWidth - 256 - 8), y: 52 };
-    }
-    return { x: Math.max(16, window.innerWidth - 280), y: Math.max(16, window.innerHeight - 260) };
+    return { x: Math.max(16, window.innerWidth - POPUP_WIDTH - 16), y: Math.max(16, window.innerHeight - 260) };
   });
-  const [collapsed, setCollapsed] = useState(() => (typeof window !== "undefined" && window.innerWidth < 768));
+  const [collapsed, setCollapsed] = useState(() => isMobile());
   const dragRef = useRef<{ dx: number; dy: number } | null>(null);
 
   useEffect(() => {
+    // Só persiste posição em desktop; no mobile a posição é sempre calculada
+    if (isMobile()) return;
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(pos)); } catch { /* noop */ }
   }, [pos]);
 
-  // Mantém o popup dentro da viewport em resize/rotação
+  // Em resize/rotação: mobile re-ancora próximo ao contador; desktop apenas garante que fica dentro da viewport
   useEffect(() => {
-    function clamp() {
-      setPos((p) => ({
-        x: Math.min(Math.max(0, p.x), window.innerWidth - 80),
-        y: Math.min(Math.max(0, p.y), window.innerHeight - 40),
-      }));
+    function onResize() {
+      if (isMobile()) {
+        setPos(mobileAnchor());
+      } else {
+        setPos((p) => ({
+          x: Math.min(Math.max(0, p.x), window.innerWidth - 80),
+          y: Math.min(Math.max(0, p.y), window.innerHeight - 40),
+        }));
+      }
     }
-    window.addEventListener("resize", clamp);
-    return () => window.removeEventListener("resize", clamp);
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
+    };
   }, []);
 
   function onPointerDown(e: React.PointerEvent) {
+    if (isMobile()) return; // mobile: posição fixa próxima ao contador, não arrasta
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
     dragRef.current = { dx: e.clientX - pos.x, dy: e.clientY - pos.y };
   }
