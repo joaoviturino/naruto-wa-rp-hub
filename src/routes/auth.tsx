@@ -28,8 +28,10 @@ function AuthPage() {
           options: { emailRedirectTo: window.location.origin },
         });
         if (error) throw error;
-        toast.success("Conta criada. Verifique seu e-mail (se necessário) e entre.");
-        setMode("signin");
+        toast.success("Conta criada. Entrando...");
+        const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
+        if (signInErr) { setMode("signin"); return; }
+        navigate({ to: "/character" });
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;

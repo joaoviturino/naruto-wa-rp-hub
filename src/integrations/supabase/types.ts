@@ -95,6 +95,39 @@ export type Database = {
           },
         ]
       }
+      character_missions: {
+        Row: {
+          character_id: string
+          completed_at: string
+          mission_id: string
+        }
+        Insert: {
+          character_id: string
+          completed_at?: string
+          mission_id: string
+        }
+        Update: {
+          character_id?: string
+          completed_at?: string
+          mission_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "character_missions_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "character_missions_mission_id_fkey"
+            columns: ["mission_id"]
+            isOneToOne: false
+            referencedRelation: "missions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       character_skills: {
         Row: {
           character_id: string
@@ -145,6 +178,8 @@ export type Database = {
           nickname: string
           personality: string | null
           phone_e164: string
+          proficiencies: Json
+          rank: Database["public"]["Enums"]["ninja_rank"]
           updated_at: string
           user_id: string
           village: Database["public"]["Enums"]["village"]
@@ -166,6 +201,8 @@ export type Database = {
           nickname: string
           personality?: string | null
           phone_e164: string
+          proficiencies?: Json
+          rank?: Database["public"]["Enums"]["ninja_rank"]
           updated_at?: string
           user_id: string
           village: Database["public"]["Enums"]["village"]
@@ -187,6 +224,8 @@ export type Database = {
           nickname?: string
           personality?: string | null
           phone_e164?: string
+          proficiencies?: Json
+          rank?: Database["public"]["Enums"]["ninja_rank"]
           updated_at?: string
           user_id?: string
           village?: Database["public"]["Enums"]["village"]
@@ -198,6 +237,39 @@ export type Database = {
             columns: ["clan_id"]
             isOneToOne: false
             referencedRelation: "clans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clan_skills: {
+        Row: {
+          clan_id: string
+          position: number
+          skill_id: string
+        }
+        Insert: {
+          clan_id: string
+          position: number
+          skill_id: string
+        }
+        Update: {
+          clan_id?: string
+          position?: number
+          skill_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clan_skills_clan_id_fkey"
+            columns: ["clan_id"]
+            isOneToOne: false
+            referencedRelation: "clans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clan_skills_skill_id_fkey"
+            columns: ["skill_id"]
+            isOneToOne: false
+            referencedRelation: "skills"
             referencedColumns: ["id"]
           },
         ]
@@ -333,29 +405,74 @@ export type Database = {
       items: {
         Row: {
           description: string | null
+          durability: number | null
           id: string
+          image_url: string | null
           meta: Json
           name: string
+          rank: Database["public"]["Enums"]["skill_rank"]
+          req_mission_id: string | null
+          req_proficiency_kind:
+            | Database["public"]["Enums"]["proficiency_kind"]
+            | null
+          req_proficiency_level: number | null
+          req_rank: Database["public"]["Enums"]["ninja_rank"] | null
+          req_skill_id: string | null
           slot_size: number
           type: Database["public"]["Enums"]["item_type"]
         }
         Insert: {
           description?: string | null
+          durability?: number | null
           id?: string
+          image_url?: string | null
           meta?: Json
           name: string
+          rank?: Database["public"]["Enums"]["skill_rank"]
+          req_mission_id?: string | null
+          req_proficiency_kind?:
+            | Database["public"]["Enums"]["proficiency_kind"]
+            | null
+          req_proficiency_level?: number | null
+          req_rank?: Database["public"]["Enums"]["ninja_rank"] | null
+          req_skill_id?: string | null
           slot_size?: number
           type: Database["public"]["Enums"]["item_type"]
         }
         Update: {
           description?: string | null
+          durability?: number | null
           id?: string
+          image_url?: string | null
           meta?: Json
           name?: string
+          rank?: Database["public"]["Enums"]["skill_rank"]
+          req_mission_id?: string | null
+          req_proficiency_kind?:
+            | Database["public"]["Enums"]["proficiency_kind"]
+            | null
+          req_proficiency_level?: number | null
+          req_rank?: Database["public"]["Enums"]["ninja_rank"] | null
+          req_skill_id?: string | null
           slot_size?: number
           type?: Database["public"]["Enums"]["item_type"]
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "items_req_mission_id_fkey"
+            columns: ["req_mission_id"]
+            isOneToOne: false
+            referencedRelation: "missions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "items_req_skill_id_fkey"
+            columns: ["req_skill_id"]
+            isOneToOne: false
+            referencedRelation: "skills"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       knowledges: {
         Row: {
@@ -372,6 +489,33 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+        }
+        Relationships: []
+      }
+      missions: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          rank: Database["public"]["Enums"]["ninja_rank"]
+          reward_xp: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          rank?: Database["public"]["Enums"]["ninja_rank"]
+          reward_xp?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          rank?: Database["public"]["Enums"]["ninja_rank"]
+          reward_xp?: number
         }
         Relationships: []
       }
@@ -428,30 +572,94 @@ export type Database = {
       }
       skills: {
         Row: {
+          clan_id: string | null
+          classification:
+            | Database["public"]["Enums"]["skill_classification"]
+            | null
           description: string | null
           element: Database["public"]["Enums"]["element"] | null
           id: string
+          image_url: string | null
           name: string
+          range: Database["public"]["Enums"]["skill_range"] | null
           rank: Database["public"]["Enums"]["skill_rank"]
+          req_mission_id: string | null
+          req_prereq_skill_id: string | null
+          req_proficiency_kind:
+            | Database["public"]["Enums"]["proficiency_kind"]
+            | null
+          req_proficiency_level: number | null
+          req_rank: Database["public"]["Enums"]["ninja_rank"] | null
+          skill_class: string | null
           type: string | null
         }
         Insert: {
+          clan_id?: string | null
+          classification?:
+            | Database["public"]["Enums"]["skill_classification"]
+            | null
           description?: string | null
           element?: Database["public"]["Enums"]["element"] | null
           id?: string
+          image_url?: string | null
           name: string
+          range?: Database["public"]["Enums"]["skill_range"] | null
           rank?: Database["public"]["Enums"]["skill_rank"]
+          req_mission_id?: string | null
+          req_prereq_skill_id?: string | null
+          req_proficiency_kind?:
+            | Database["public"]["Enums"]["proficiency_kind"]
+            | null
+          req_proficiency_level?: number | null
+          req_rank?: Database["public"]["Enums"]["ninja_rank"] | null
+          skill_class?: string | null
           type?: string | null
         }
         Update: {
+          clan_id?: string | null
+          classification?:
+            | Database["public"]["Enums"]["skill_classification"]
+            | null
           description?: string | null
           element?: Database["public"]["Enums"]["element"] | null
           id?: string
+          image_url?: string | null
           name?: string
+          range?: Database["public"]["Enums"]["skill_range"] | null
           rank?: Database["public"]["Enums"]["skill_rank"]
+          req_mission_id?: string | null
+          req_prereq_skill_id?: string | null
+          req_proficiency_kind?:
+            | Database["public"]["Enums"]["proficiency_kind"]
+            | null
+          req_proficiency_level?: number | null
+          req_rank?: Database["public"]["Enums"]["ninja_rank"] | null
+          skill_class?: string | null
           type?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "skills_clan_id_fkey"
+            columns: ["clan_id"]
+            isOneToOne: false
+            referencedRelation: "clans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "skills_req_mission_id_fkey"
+            columns: ["req_mission_id"]
+            isOneToOne: false
+            referencedRelation: "missions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "skills_req_prereq_skill_id_fkey"
+            columns: ["req_prereq_skill_id"]
+            isOneToOne: false
+            referencedRelation: "skills"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
@@ -499,6 +707,25 @@ export type Database = {
         | "weapon_primary"
         | "weapon_secondary"
       msg_status: "pending" | "sent" | "failed"
+      ninja_rank:
+        | "estudante"
+        | "genin"
+        | "chunin"
+        | "tokubetsu_jonin"
+        | "jonin"
+        | "anbu"
+        | "sannin"
+        | "kage"
+      proficiency_kind:
+        | "kenjutsu"
+        | "shurikenjutsu"
+        | "taijutsu"
+        | "ninjutsu"
+        | "genjutsu"
+        | "fuinjutsu"
+        | "iryo"
+      skill_classification: "ofensivo" | "defensivo" | "suplementar"
+      skill_range: "curto" | "medio" | "longo"
       skill_rank: "E" | "D" | "C" | "B" | "A" | "S"
       village:
         | "konoha"
@@ -655,6 +882,27 @@ export const Constants = {
         "weapon_secondary",
       ],
       msg_status: ["pending", "sent", "failed"],
+      ninja_rank: [
+        "estudante",
+        "genin",
+        "chunin",
+        "tokubetsu_jonin",
+        "jonin",
+        "anbu",
+        "sannin",
+        "kage",
+      ],
+      proficiency_kind: [
+        "kenjutsu",
+        "shurikenjutsu",
+        "taijutsu",
+        "ninjutsu",
+        "genjutsu",
+        "fuinjutsu",
+        "iryo",
+      ],
+      skill_classification: ["ofensivo", "defensivo", "suplementar"],
+      skill_range: ["curto", "medio", "longo"],
       skill_rank: ["E", "D", "C", "B", "A", "S"],
       village: [
         "konoha",
