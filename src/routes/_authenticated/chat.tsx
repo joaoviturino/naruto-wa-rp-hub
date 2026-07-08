@@ -85,7 +85,7 @@ function ChatPage() {
         async (payload) => {
           const raw = payload.new as any;
           const { data: c } = await supabase.from("characters").select("nickname,avatar_url").eq("id", raw.character_id).maybeSingle();
-          setMessages((prev) => [...prev, { ...raw, character: c } as Msg]);
+          setMessages((prev) => (prev.some((m) => m.id === raw.id) ? prev : [...prev, { ...raw, character: c } as Msg]));
           setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
         })
       .subscribe();
