@@ -52,7 +52,7 @@ export const requestBotQr = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("bot_sessions").upsert({
       id: "default",
-      status: "disconnected",
+      status: "connecting",
       qr: `__REQUEST_QR__:${Date.now()}`,
       phone: null,
       updated_at: new Date().toISOString(),

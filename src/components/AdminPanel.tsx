@@ -138,8 +138,9 @@ function BotPanel() {
       }
 
       try {
-        const QRCode = await import("qrcode");
-        const toDataUrl = QRCode.toDataURL ?? QRCode.default.toDataURL;
+        const QRCode = await import("qrcode") as typeof import("qrcode") & { default?: typeof import("qrcode") };
+        const toDataUrl = QRCode.toDataURL ?? QRCode.default?.toDataURL;
+        if (!toDataUrl) throw new Error("QR renderer unavailable");
         const styles = getComputedStyle(document.documentElement);
         const dataUrl = await toDataUrl(session.qr, {
           width: 280,
