@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useServerFn } from "@tanstack/react-start";
-import { bootstrapAdmin, enqueueMessage, resetBotSession, requestBotQr, setUserXp } from "@/lib/admin.functions";
+import { enqueueMessage, resetBotSession, requestBotQr, setUserXp } from "@/lib/admin.functions";
 import { toast } from "sonner";
 
 export function AdminPanel() {

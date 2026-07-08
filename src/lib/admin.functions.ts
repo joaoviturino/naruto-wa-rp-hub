@@ -13,7 +13,7 @@ const skillRank = z.enum(["E","D","C","B","A","S"]);
 const profKind = z.enum(["kenjutsu","shurikenjutsu","taijutsu","ninjutsu","genjutsu","fuinjutsu","iryo"]);
 const skillClassification = z.enum(["ofensivo","defensivo","suplementar"]);
 const skillRange = z.enum(["curto","medio","longo"]);
-const itemType = z.enum(["consumable","tool","armor_helmet","armor_vest","armor_pants","armor_boots","weapon"]);
+const itemType = z.enum(["consumable","tool","armor_helmet","armor_vest","armor_pants","armor_boots","weapon_primary","weapon_secondary"]);
 const villageEnum = z.enum(["konoha","suna","kiri","kumo","iwa","ame","kusa","taki","oto","yuki","hoshi","nomad"]);
 const elementEnum = z.enum(["katon","suiton","fuuton","doton","raiton"]);
 
@@ -144,9 +144,10 @@ export const grantItem = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: inv } = await supabaseAdmin.from("inventory").select("ninja_bag,secondary_slots").eq("character_id", data.character_id).maybeSingle();
     if (!inv) throw new Error("Inventário não encontrado.");
-    const current = (inv[data.slot] as any[]) ?? [];
+    const current = ((inv as any)[data.slot] as any[]) ?? [];
     const next = [...current, { item_id: data.item_id, added_at: new Date().toISOString() }];
-    await supabaseAdmin.from("inventory").update({ [data.slot]: next }).eq("character_id", data.character_id);
+    const patch: any = { [data.slot]: next };
+    await supabaseAdmin.from("inventory").update(patch).eq("character_id", data.character_id);
     return { ok: true };
   });
 
@@ -158,9 +159,10 @@ export const revokeItem = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: inv } = await supabaseAdmin.from("inventory").select("ninja_bag,secondary_slots").eq("character_id", data.character_id).maybeSingle();
     if (!inv) throw new Error("Inventário não encontrado.");
-    const current = ([...(inv[data.slot] as any[])] ?? []);
+    const current = [...(((inv as any)[data.slot] as any[]) ?? [])];
     current.splice(data.index, 1);
-    await supabaseAdmin.from("inventory").update({ [data.slot]: current }).eq("character_id", data.character_id);
+    const patch: any = { [data.slot]: current };
+    await supabaseAdmin.from("inventory").update(patch).eq("character_id", data.character_id);
     return { ok: true };
   });
 
