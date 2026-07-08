@@ -111,32 +111,43 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
         </div>
 
         {session.status === "active" ? (
-          <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto_auto_auto] items-end">
-            <div>
-              <div className="text-xs text-muted-foreground mb-1">Habilidade {myTurn ? "" : `(vez de ${activePlayer?.nickname ?? "…"})`}</div>
-              <select value={skillId}
-                onChange={(e) => { setSkillId(e.target.value); const s = skills.find((x) => x.id === e.target.value); if (s) setEnergy(s.base_cost); }}
-                className="w-full bg-input border border-border rounded px-2 py-2 text-sm">
-                {skills.length === 0 && <option value="">Você não conhece nenhuma habilidade.</option>}
-                {skills.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} — {s.energy_type.toUpperCase()} • ×{s.bonus_energetic} energ • ×{s.bonus_critical} crit • ×{s.bonus_speed} spd
-                  </option>
-                ))}
-              </select>
+          myTurn ? (
+            <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto_auto_auto] items-end">
+              <div>
+                <div className="text-xs text-gold mb-1">Sua vez — escolha uma habilidade</div>
+                <select value={skillId}
+                  onChange={(e) => { setSkillId(e.target.value); const s = skills.find((x) => x.id === e.target.value); if (s) setEnergy(s.base_cost); }}
+                  className="w-full bg-input border border-border rounded px-2 py-2 text-sm">
+                  {skills.length === 0 && <option value="">Você não conhece nenhuma habilidade.</option>}
+                  {skills.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} — {s.energy_type.toUpperCase()} • ×{s.bonus_energetic} energ • ×{s.bonus_critical} crit • ×{s.bonus_speed} spd
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground mb-1">Energia ({currentSkill?.energy_type.toUpperCase() ?? "—"})</div>
+                <Input type="number" min={currentSkill?.base_cost ?? 1} value={energy}
+                  onChange={(e) => setEnergy(Math.max(1, Number(e.target.value)))} className="w-28" />
+              </div>
+              <Button onClick={doAttack} disabled={!currentSkill || attacking}>
+                <Sword size={14} className="mr-1" /> {attacking ? "..." : "Atacar"}
+              </Button>
+              <Button variant="outline" onClick={() => flee({ data: { session_id: sessionId } })}>
+                <Flag size={14} className="mr-1" /> Fugir
+              </Button>
             </div>
-            <div>
-              <div className="text-xs text-muted-foreground mb-1">Energia ({currentSkill?.energy_type.toUpperCase() ?? "—"})</div>
-              <Input type="number" min={currentSkill?.base_cost ?? 1} value={energy}
-                onChange={(e) => setEnergy(Math.max(1, Number(e.target.value)))} className="w-28" />
+          ) : (
+            <div className="mt-3 flex items-center justify-between border border-border rounded p-3 bg-input/30">
+              <div className="text-sm text-muted-foreground">
+                Aguardando <span className="text-gold font-display">{activePlayer?.nickname ?? "…"}</span> agir…
+              </div>
+              <Button variant="outline" size="sm" onClick={() => flee({ data: { session_id: sessionId } })}>
+                <Flag size={14} className="mr-1" /> Fugir
+              </Button>
             </div>
-            <Button onClick={doAttack} disabled={!myTurn || !currentSkill || attacking}>
-              <Sword size={14} className="mr-1" /> {attacking ? "..." : "Atacar"}
-            </Button>
-            <Button variant="outline" onClick={() => flee({ data: { session_id: sessionId } })}>
-              <Flag size={14} className="mr-1" /> Fugir
-            </Button>
-          </div>
+          )
         ) : (
           <div className="mt-3 flex items-center justify-between">
             <div className="text-sm">

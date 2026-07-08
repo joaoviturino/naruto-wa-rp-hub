@@ -69,7 +69,7 @@ function damageTargetPlayer(p: Player, dmg: number): { pool: Pool; taken: number
 
 async function loadMyChar(context: { supabase: any; userId: string }) {
   const { data, error } = await context.supabase
-    .from("characters").select("id,nickname,avatar_url,xp,current_location_id").eq("user_id", context.userId).maybeSingle();
+    .from("characters").select("id,nickname,avatar_url,xp,current_location_id,ef_current,em_current,chakra_current").eq("user_id", context.userId).maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Sem personagem.");
   return data;
@@ -129,22 +129,27 @@ export const rollSpawn = createServerFn({ method: "POST" })
     if (myParty) {
       partyId = myParty.party_id;
       const { data } = await supabaseAdmin
-        .from("party_members").select("character_id,character:characters(id,nickname,avatar_url,xp,current_location_id)").eq("party_id", partyId);
+        .from("party_members").select("character_id,character:characters(id,nickname,avatar_url,xp,current_location_id,ef_current,em_current,chakra_current)").eq("party_id", partyId);
       members = ((data as any[]) ?? [])
         .map((m: any) => m.character)
         .filter((c: any) => c && c.current_location_id === loc.id);
     } else {
-      members = [{ id: me.id, nickname: me.nickname, avatar_url: me.avatar_url, xp: me.xp }];
+      members = [{ id: me.id, nickname: me.nickname, avatar_url: me.avatar_url, xp: me.xp,
+        ef_current: me.ef_current, em_current: me.em_current, chakra_current: me.chakra_current }];
     }
-    if (!members.some((c: any) => c.id === me.id)) members.push({ id: me.id, nickname: me.nickname, avatar_url: me.avatar_url, xp: me.xp });
+    if (!members.some((c: any) => c.id === me.id)) members.push({ id: me.id, nickname: me.nickname, avatar_url: me.avatar_url, xp: me.xp,
+      ef_current: me.ef_current, em_current: me.em_current, chakra_current: me.chakra_current });
 
     const players: Player[] = members.map((c: any) => {
       const s = computeStats(c.xp ?? 0);
+      const ef = c.ef_current == null ? s.ef : Math.min(s.ef, c.ef_current);
+      const em = c.em_current == null ? s.em : Math.min(s.em, c.em_current);
+      const ck = c.chakra_current == null ? s.chakra : Math.min(s.chakra, c.chakra_current);
       return {
         character_id: c.id, nickname: c.nickname, avatar_url: c.avatar_url,
-        ef: s.ef, em: s.em, chakra: s.chakra,
+        ef, em, chakra: ck,
         ef_max: s.ef, em_max: s.em, chakra_max: s.chakra,
-        alive: true,
+        alive: (ef + em + ck) > 0,
       };
     });
     const state: CombatState = {
@@ -242,9 +247,67 @@ export const playerAttack = createServerFn({ method: "POST" })
       }
     }
 
+    // Persistir pools atuais em characters
+    await persistPools(supabaseAdmin, state);
+
+    // Recompensas ao vencer
+    let rewards: any = null;
+    if (status === "won") {
+      rewards = await applyRewards(supabaseAdmin, sess.npc_id, state, log);
+    }
+
     await supabaseAdmin.from("combat_sessions").update({ state, log, status, ended_at, turn: "player" }).eq("id", sess.id);
     return { ok: true, status };
   });
+
+async function persistPools(supabaseAdmin: any, state: CombatState) {
+  for (const p of state.players) {
+    await supabaseAdmin.from("characters").update({
+      ef_current: p.ef, em_current: p.em, chakra_current: p.chakra,
+    }).eq("id", p.character_id);
+  }
+}
+
+async function applyRewards(supabaseAdmin: any, npcId: string, state: CombatState, log: LogEntry[]) {
+  const { data: npc } = await supabaseAdmin.from("npcs").select("reward_xp,reward_ryo,drop_table").eq("id", npcId).maybeSingle();
+  if (!npc) return null;
+  const xpGain = Number(npc.reward_xp ?? 0);
+  const ryoGain = Number(npc.reward_ryo ?? 0);
+  const drops = Array.isArray(npc.drop_table) ? npc.drop_table : [];
+  const rolled: { item_id: string; qty: number }[] = [];
+  for (const d of drops) {
+    if (!d?.item_id) continue;
+    const chance = Number(d.chance ?? 0);
+    if (Math.random() * 100 < chance) rolled.push({ item_id: d.item_id, qty: Number(d.qty ?? 1) });
+  }
+  // Entrega pra cada jogador vivo (ou todos participantes se ninguém sobreviveu — mas won implica ao menos 1 vivo).
+  const receivers = state.players.filter((p) => p.alive);
+  for (const p of receivers) {
+    if (xpGain > 0 || ryoGain > 0) {
+      const { data: c } = await supabaseAdmin.from("characters").select("xp,ryo").eq("id", p.character_id).maybeSingle();
+      await supabaseAdmin.from("characters").update({
+        xp: Number(c?.xp ?? 0) + xpGain,
+        ryo: Number(c?.ryo ?? 0) + ryoGain,
+      }).eq("id", p.character_id);
+    }
+    if (rolled.length) {
+      const { data: inv } = await supabaseAdmin.from("inventory").select("ninja_bag").eq("character_id", p.character_id).maybeSingle();
+      const bag = (Array.isArray(inv?.ninja_bag) ? inv!.ninja_bag : []).map((e: any) => ({ item_id: e.item_id, qty: Number(e.qty ?? 1) }));
+      for (const r of rolled) {
+        const idx = bag.findIndex((e: any) => e.item_id === r.item_id);
+        if (idx >= 0) bag[idx].qty += r.qty; else bag.push({ item_id: r.item_id, qty: r.qty });
+      }
+      await supabaseAdmin.from("inventory").update({ ninja_bag: bag }).eq("character_id", p.character_id);
+    }
+  }
+  const dropNames = rolled.length ? ` + ${rolled.length} item(ns)` : "";
+  log.push({
+    seq: log.length + 1, actor: "npc", actor_name: state.npc.name, target_name: "time",
+    skill_name: "recompensa", energy_type: "chakra", energy_used: 0, effective: 0, damage: 0, speed: 0, crit_mul: 0,
+    msg: `Recompensa: +${xpGain} XP, +${ryoGain} Ryo${dropNames} (por jogador).`,
+  });
+  return { xp: xpGain, ryo: ryoGain, drops: rolled };
+}
 
 async function runNpcTurn(supabaseAdmin: any, npcId: string, state: CombatState, log: LogEntry[], incomingSpeed: number) {
   const { data: skills } = await supabaseAdmin
@@ -291,6 +354,8 @@ export const fleeCombat = createServerFn({ method: "POST" })
     const { data: cp } = await supabaseAdmin
       .from("combat_participants").select("session_id").eq("session_id", data.session_id).eq("character_id", me.id).maybeSingle();
     if (!cp) throw new Error("Você não está neste combate.");
+    const { data: sess } = await supabaseAdmin.from("combat_sessions").select("state").eq("id", data.session_id).maybeSingle();
+    if (sess?.state) await persistPools(supabaseAdmin, sess.state as any);
     await supabaseAdmin.from("combat_sessions").update({ status: "fled", ended_at: new Date().toISOString() }).eq("id", data.session_id);
     return { ok: true };
   });

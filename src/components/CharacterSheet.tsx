@@ -16,7 +16,9 @@ type Character = {
   village: keyof typeof VILLAGES_MAP; element_primary: string; age: number | null;
   appearance: string | null; personality: string | null; history: string | null; bio: string | null;
   avatar_url: string | null; banner_url: string | null; inventory_bg_url: string | null;
-  xp: number; clan: { name: string; rarity: string; element_bonus: string | null } | null;
+  xp: number; ryo: number | null;
+  ef_current: number | null; em_current: number | null; chakra_current: number | null;
+  clan: { name: string; rarity: string; element_bonus: string | null } | null;
 };
 const VILLAGES_MAP = Object.fromEntries(VILLAGES.map((v) => [v.id, v]));
 const ELEMENTS_MAP = Object.fromEntries(ELEMENTS.map((e) => [e.id, e]));
@@ -28,7 +30,7 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
   async function load() {
     const { data } = await supabase
       .from("characters")
-      .select("id,user_id,nickname,phone_e164,village,element_primary,age,appearance,personality,history,bio,avatar_url,banner_url,inventory_bg_url,xp,clan:clans(name,rarity,element_bonus)")
+      .select("id,user_id,nickname,phone_e164,village,element_primary,age,appearance,personality,history,bio,avatar_url,banner_url,inventory_bg_url,xp,ryo,ef_current,em_current,chakra_current,clan:clans(name,rarity,element_bonus)")
       .eq("id", characterId).single();
     setChar(data as any);
   }
@@ -41,6 +43,9 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
   const s = stats(char.xp);
   const nextLevel = Math.max(100, Math.pow(Math.floor(char.xp / 100) + 1, 2) * 100);
   const rarity = ((char.clan?.rarity as Rarity) ?? "common");
+  const efCur = char.ef_current == null ? s.ef : Math.min(s.ef, char.ef_current);
+  const emCur = char.em_current == null ? s.em : Math.min(s.em, char.em_current);
+  const ckCur = char.chakra_current == null ? s.chakra : Math.min(s.chakra, char.chakra_current);
 
   async function updateField(field: string, url: string) {
     try {
@@ -89,13 +94,14 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
 
       {/* Status */}
       <div className="grid grid-cols-3 gap-4 p-6">
-        <StatBlock label="Energia Física (EF)" value={s.ef} accent="oklch(0.55 0.22 25)" />
-        <StatBlock label="Energia Mental (EM)" value={s.em} accent="oklch(0.6 0.15 220)" />
-        <StatBlock label="Chakra total" value={s.chakra} accent="oklch(0.78 0.15 80)" />
+        <StatBlock label="Energia Física (EF)" value={`${efCur} / ${s.ef}`} accent="oklch(0.55 0.22 25)" />
+        <StatBlock label="Energia Mental (EM)" value={`${emCur} / ${s.em}`} accent="oklch(0.6 0.15 220)" />
+        <StatBlock label="Chakra total" value={`${ckCur} / ${s.chakra}`} accent="oklch(0.78 0.15 80)" />
       </div>
       <div className="px-6">
         <div className="text-xs text-muted-foreground mb-1">XP: {char.xp} / {nextLevel}</div>
         <Progress value={(char.xp / nextLevel) * 100} />
+        <div className="text-xs text-gold mt-2">Ryo: {char.ryo ?? 0} 💰</div>
       </div>
 
       <Tabs defaultValue="ficha" className="p-6">
@@ -129,7 +135,7 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
   );
 }
 
-function StatBlock({ label, value, accent }: { label: string; value: number; accent: string }) {
+function StatBlock({ label, value, accent }: { label: string; value: number | string; accent: string }) {
   return (
     <div className="scroll-panel rounded-lg p-4">
       <div className="text-xs uppercase tracking-widest text-muted-foreground">{label}</div>

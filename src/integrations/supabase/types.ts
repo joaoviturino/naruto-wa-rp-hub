@@ -168,11 +168,14 @@ export type Database = {
           avatar_url: string | null
           banner_url: string | null
           bio: string | null
+          chakra_current: number | null
           clan_id: string | null
           clan_rerolls_used: number
           created_at: string
           current_location_id: string | null
+          ef_current: number | null
           element_primary: Database["public"]["Enums"]["element"]
+          em_current: number | null
           history: string | null
           id: string
           inventory_bg_url: string | null
@@ -183,6 +186,7 @@ export type Database = {
           phone_e164: string
           proficiencies: Json
           rank: Database["public"]["Enums"]["ninja_rank"]
+          ryo: number
           updated_at: string
           user_id: string
           village: Database["public"]["Enums"]["village"]
@@ -194,11 +198,14 @@ export type Database = {
           avatar_url?: string | null
           banner_url?: string | null
           bio?: string | null
+          chakra_current?: number | null
           clan_id?: string | null
           clan_rerolls_used?: number
           created_at?: string
           current_location_id?: string | null
+          ef_current?: number | null
           element_primary: Database["public"]["Enums"]["element"]
+          em_current?: number | null
           history?: string | null
           id?: string
           inventory_bg_url?: string | null
@@ -209,6 +216,7 @@ export type Database = {
           phone_e164: string
           proficiencies?: Json
           rank?: Database["public"]["Enums"]["ninja_rank"]
+          ryo?: number
           updated_at?: string
           user_id: string
           village: Database["public"]["Enums"]["village"]
@@ -220,11 +228,14 @@ export type Database = {
           avatar_url?: string | null
           banner_url?: string | null
           bio?: string | null
+          chakra_current?: number | null
           clan_id?: string | null
           clan_rerolls_used?: number
           created_at?: string
           current_location_id?: string | null
+          ef_current?: number | null
           element_primary?: Database["public"]["Enums"]["element"]
+          em_current?: number | null
           history?: string | null
           id?: string
           inventory_bg_url?: string | null
@@ -235,6 +246,7 @@ export type Database = {
           phone_e164?: string
           proficiencies?: Json
           rank?: Database["public"]["Enums"]["ninja_rank"]
+          ryo?: number
           updated_at?: string
           user_id?: string
           village?: Database["public"]["Enums"]["village"]
@@ -807,33 +819,42 @@ export type Database = {
         Row: {
           created_at: string
           description: string | null
+          drop_table: Json
           energy_max: number
           hp_max: number
           id: string
           image_url: string | null
           name: string
+          reward_ryo: number
+          reward_xp: number
           updated_at: string
           xp: number
         }
         Insert: {
           created_at?: string
           description?: string | null
+          drop_table?: Json
           energy_max?: number
           hp_max?: number
           id?: string
           image_url?: string | null
           name: string
+          reward_ryo?: number
+          reward_xp?: number
           updated_at?: string
           xp?: number
         }
         Update: {
           created_at?: string
           description?: string | null
+          drop_table?: Json
           energy_max?: number
           hp_max?: number
           id?: string
           image_url?: string | null
           name?: string
+          reward_ryo?: number
+          reward_xp?: number
           updated_at?: string
           xp?: number
         }

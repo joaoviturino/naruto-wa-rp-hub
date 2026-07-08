@@ -217,14 +217,33 @@ export const consumeItem = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ item_id: z.string().uuid(), source: bagSource }).parse(i))
   .handler(async ({ data, context }) => {
     const { char, inv } = await loadOwnInventory(context);
-    const { data: item } = await context.supabase.from("items").select("type,name").eq("id", data.item_id).maybeSingle();
+    const { data: item } = await context.supabase.from("items").select("type,name,meta").eq("id", data.item_id).maybeSingle();
     if (!item) throw new Error("Item inexistente.");
     if (item.type !== "consumable") throw new Error("Este item não é consumível.");
     const src = removeOneFromBag(normalizeBag(inv[data.source]), data.item_id);
     const patch: any = { [data.source]: src };
     const { error } = await context.supabase.from("inventory").update(patch).eq("character_id", char.id);
     if (error) throw new Error(error.message);
-    return { ok: true, consumed: item.name };
+
+    // Aplica restauros de energia definidos em meta.restore = { ef?, em?, chakra? }
+    const restore = (item as any).meta?.restore ?? {};
+    if (restore && (restore.ef || restore.em || restore.chakra)) {
+      const { data: c } = await context.supabase
+        .from("characters").select("xp,ef_current,em_current,chakra_current").eq("id", char.id).maybeSingle();
+      if (c) {
+        const xp = c.xp ?? 0;
+        const efMax = Math.floor(xp / 2);
+        const emMax = xp - efMax;
+        const ckMax = xp;
+        const ef = Math.min(efMax, (c.ef_current ?? efMax) + Number(restore.ef ?? 0));
+        const em = Math.min(emMax, (c.em_current ?? emMax) + Number(restore.em ?? 0));
+        const ck = Math.min(ckMax, (c.chakra_current ?? ckMax) + Number(restore.chakra ?? 0));
+        await context.supabase.from("characters")
+          .update({ ef_current: ef, em_current: em, chakra_current: ck })
+          .eq("id", char.id);
+      }
+    }
+    return { ok: true, consumed: item.name, restored: restore };
   });
 
 /** Descarta 1 unidade de um item da bolsa. */

@@ -312,6 +312,26 @@ function ChatPage() {
       {combatId && character && (
         <CombatDialog sessionId={combatId} myCharId={character.id} onClose={() => setCombatId(null)} />
       )}
+
+      {partyMembers.length > 1 && (
+        <div className="fixed bottom-4 right-4 z-40 w-60 scroll-panel rounded-lg border border-gold/50 p-3 shadow-xl bg-card/95 backdrop-blur">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-display text-gold flex items-center gap-1"><Users size={12} /> Meu time</div>
+            <Button variant="ghost" size="sm" className="h-6 text-[11px]" onClick={async () => { try { await partyLeave({}); toast.success("Você saiu do time."); } catch (e: any) { toast.error(e.message); } }}>Sair</Button>
+          </div>
+          <div className="space-y-1 max-h-52 overflow-y-auto">
+            {partyMembers.map((m: any) => (
+              <div key={m.id} className="flex items-center gap-2 text-xs">
+                <div className="w-6 h-6 rounded-full bg-secondary overflow-hidden shrink-0">
+                  {m.avatar_url && <img src={m.avatar_url} className="w-full h-full object-cover" alt="" />}
+                </div>
+                <span className="truncate flex-1">{m.nickname}</span>
+                {m.id === character.id && <span className="text-[10px] text-gold">você</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

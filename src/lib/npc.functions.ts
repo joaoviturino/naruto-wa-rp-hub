@@ -16,6 +16,13 @@ const npcPayload = z.object({
   hp_max: z.number().int().min(1).max(100000),
   xp: z.number().int().min(0).max(100000),
   energy_max: z.number().int().min(1).max(100000),
+  reward_xp: z.number().int().min(0).max(1000000).optional(),
+  reward_ryo: z.number().int().min(0).max(10000000).optional(),
+  drop_table: z.array(z.object({
+    item_id: z.string().uuid(),
+    qty: z.number().int().min(1).max(99).default(1),
+    chance: z.number().min(0).max(100), // percentual
+  })).optional(),
 });
 
 export const upsertNpc = createServerFn({ method: "POST" })
