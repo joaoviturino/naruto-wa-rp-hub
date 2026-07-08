@@ -15,6 +15,7 @@ import { MissionManager } from "@/components/admin/MissionManager";
 import { ClanTreeManager } from "@/components/admin/ClanTreeManager";
 import { AdminUsers } from "@/components/admin/AdminUsers";
 import { LocationManager } from "@/components/admin/LocationManager";
+import { NpcManager } from "@/components/admin/NpcManager";
 import { NINJA_RANKS } from "@/components/admin/shared";
 import { Pencil } from "lucide-react";
 
@@ -33,6 +34,7 @@ export function AdminPanel() {
           <TabsTrigger value="missions">Missões</TabsTrigger>
           <TabsTrigger value="clans">Árvore de Clã</TabsTrigger>
           <TabsTrigger value="locations">Locais</TabsTrigger>
+          <TabsTrigger value="npcs">NPCs</TabsTrigger>
           <TabsTrigger value="admins">Admins</TabsTrigger>
           <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
         </TabsList>
@@ -43,6 +45,7 @@ export function AdminPanel() {
         <TabsContent value="missions" className="mt-4"><MissionManager /></TabsContent>
         <TabsContent value="clans" className="mt-4"><ClanTreeManager /></TabsContent>
         <TabsContent value="locations" className="mt-4"><LocationManager /></TabsContent>
+        <TabsContent value="npcs" className="mt-4"><NpcManager /></TabsContent>
         <TabsContent value="admins" className="mt-4"><AdminUsers /></TabsContent>
         <TabsContent value="whatsapp" className="mt-4"><BotPanel /></TabsContent>
       </Tabs>

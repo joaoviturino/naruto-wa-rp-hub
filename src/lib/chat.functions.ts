@@ -21,7 +21,11 @@ export const moveCharacter = createServerFn({ method: "POST" })
       if (!conn) throw new Error("Este local não é acessível a partir da sua posição atual.");
     }
     const { error } = await context.supabase
-      .from("characters").update({ current_location_id: data.locationId }).eq("id", char.id);
+      .from("characters").update({
+        current_location_id: data.locationId,
+        location_entered_at: new Date().toISOString(),
+        last_spawn_roll_at: null,
+      }).eq("id", char.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });

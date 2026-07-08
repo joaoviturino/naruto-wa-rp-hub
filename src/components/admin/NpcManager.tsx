@@ -1,0 +1,159 @@
+import { useEffect, useRef, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Trash2, Upload, Plus } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { upsertNpc, deleteNpc, setNpcSkills } from "@/lib/npc.functions";
+import { toast } from "sonner";
+
+type Npc = { id: string; name: string; image_url: string | null; description: string | null; hp_max: number; xp: number; energy_max: number };
+type Skill = { id: string; name: string; rank: string };
+
+export function NpcManager() {
+  const [npcs, setNpcs] = useState<Npc[]>([]);
+  const [skills, setSkills] = useState<Skill[]>([]);
+  const [assigned, setAssigned] = useState<Record<string, Set<string>>>({});
+  const [selected, setSelected] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+  const save = useServerFn(upsertNpc);
+  const del = useServerFn(deleteNpc);
+  const setSkillsFn = useServerFn(setNpcSkills);
+
+  async function load() {
+    const [n, s, ns] = await Promise.all([
+      supabase.from("npcs").select("*").order("name"),
+      supabase.from("skills").select("id,name,rank").order("name"),
+      supabase.from("npc_skills").select("npc_id,skill_id"),
+    ]);
+    setNpcs((n.data as Npc[]) ?? []);
+    setSkills((s.data as Skill[]) ?? []);
+    const map: Record<string, Set<string>> = {};
+    (ns.data ?? []).forEach((r: any) => {
+      if (!map[r.npc_id]) map[r.npc_id] = new Set();
+      map[r.npc_id].add(r.skill_id);
+    });
+    setAssigned(map);
+  }
+  useEffect(() => { load(); }, []);
+
+  async function create() {
+    if (!name.trim()) return;
+    try {
+      const { id } = await save({ data: { name: name.trim(), hp_max: 100, xp: 100, energy_max: 100 } } as any);
+      setName(""); toast.success("NPC criado."); setSelected(id); load();
+    } catch (e: any) { toast.error(e.message); }
+  }
+  async function remove(id: string) {
+    if (!confirm("Remover este NPC?")) return;
+    try { await del({ data: { id } }); if (selected === id) setSelected(null); load(); }
+    catch (e: any) { toast.error(e.message); }
+  }
+
+  async function uploadImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f || !selected) return;
+    if (f.size > 5 * 1024 * 1024) return toast.error("Máx 5MB.");
+    const ext = f.name.split(".").pop() ?? "png";
+    const path = `${selected}/${Date.now()}.${ext}`;
+    const up = await supabase.storage.from("npcs").upload(path, f, { upsert: true, contentType: f.type });
+    if (up.error) return toast.error(up.error.message);
+    const signed = await supabase.storage.from("npcs").createSignedUrl(path, 60 * 60 * 24 * 365);
+    if (!signed.data?.signedUrl) return;
+    const npc = npcs.find((x) => x.id === selected)!;
+    await save({ data: { ...npc, image_url: signed.data.signedUrl } } as any);
+    if (fileRef.current) fileRef.current.value = "";
+    load();
+  }
+
+  const sel = npcs.find((n) => n.id === selected);
+  const selSkills = selected ? assigned[selected] ?? new Set<string>() : new Set<string>();
+
+  return (
+    <div className="grid gap-4 md:grid-cols-[320px_1fr]">
+      <div className="space-y-3">
+        <div className="scroll-panel rounded-lg p-4 space-y-2">
+          <h3 className="font-display text-lg text-gold">Novo NPC</h3>
+          <Input placeholder="Nome" value={name} onChange={(e) => setName(e.target.value)} />
+          <Button onClick={create} className="w-full"><Plus size={14} className="mr-1" /> Criar</Button>
+        </div>
+        <div className="scroll-panel rounded-lg p-2 max-h-[500px] overflow-y-auto">
+          {npcs.map((n) => (
+            <div key={n.id} className={`flex items-center gap-2 p-2 rounded cursor-pointer ${selected===n.id?"bg-secondary":"hover:bg-secondary/50"}`}
+              onClick={() => setSelected(n.id)}>
+              <div className="w-8 h-8 rounded bg-input overflow-hidden shrink-0">
+                {n.image_url && <img src={n.image_url} alt="" className="w-full h-full object-cover" />}
+              </div>
+              <div className="flex-1 text-sm truncate">{n.name}</div>
+              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); remove(n.id); }}><Trash2 size={14} /></Button>
+            </div>
+          ))}
+          {npcs.length === 0 && <div className="text-xs text-muted-foreground p-3">Nenhum NPC ainda.</div>}
+        </div>
+      </div>
+
+      {sel ? (
+        <div className="space-y-4">
+          <div className="scroll-panel rounded-lg p-4 space-y-3">
+            <div className="flex items-start gap-4">
+              <div className="w-40 h-40 rounded bg-secondary overflow-hidden shrink-0">
+                {sel.image_url && <img src={sel.image_url} className="w-full h-full object-cover" alt="" />}
+              </div>
+              <div className="flex-1 space-y-2">
+                <Input value={sel.name} onChange={async (e) => { await save({ data: { ...sel, name: e.target.value } } as any); load(); }} />
+                <Textarea defaultValue={sel.description ?? ""} rows={2} placeholder="Descrição"
+                  onBlur={async (e) => { await save({ data: { ...sel, description: e.target.value } } as any); load(); }} />
+                <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+                  <Upload size={14} className="mr-1" /> PNG do NPC (aparece no combate)
+                </Button>
+                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={uploadImage} />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <NumField label="HP máximo" value={sel.hp_max} onSave={(v) => save({ data: { ...sel, hp_max: v } } as any).then(load)} />
+              <NumField label="XP (define stats)" value={sel.xp} onSave={(v) => save({ data: { ...sel, xp: v } } as any).then(load)} />
+              <NumField label="Energia máxima" value={sel.energy_max} onSave={(v) => save({ data: { ...sel, energy_max: v } } as any).then(load)} />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              XP {sel.xp} → EF {Math.floor(sel.xp/2)}, EM {sel.xp - Math.floor(sel.xp/2)}, Chakra {sel.xp}.
+            </p>
+          </div>
+
+          <div className="scroll-panel rounded-lg p-4 space-y-2">
+            <h4 className="font-display text-lg text-gold">Habilidades ({selSkills.size})</h4>
+            <div className="grid gap-1 max-h-[300px] overflow-y-auto pr-2">
+              {skills.map((s) => (
+                <label key={s.id} className="flex items-center gap-2 text-sm p-1 hover:bg-secondary/40 rounded">
+                  <input type="checkbox" checked={selSkills.has(s.id)}
+                    onChange={async (e) => {
+                      const next = new Set(selSkills);
+                      if (e.target.checked) next.add(s.id); else next.delete(s.id);
+                      await setSkillsFn({ data: { npc_id: sel.id, skill_ids: Array.from(next) } });
+                      load();
+                    }} />
+                  <span className="flex-1">{s.name}</span>
+                  <span className="text-xs text-muted-foreground">{s.rank}</span>
+                </label>
+              ))}
+              {skills.length === 0 && <p className="text-xs text-muted-foreground">Nenhuma habilidade cadastrada.</p>}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="text-muted-foreground text-sm p-6">Selecione um NPC à esquerda para editar HP, XP, imagem e habilidades.</div>
+      )}
+    </div>
+  );
+}
+
+function NumField({ label, value, onSave }: { label: string; value: number; onSave: (v: number) => void }) {
+  return (
+    <div>
+      <Label>{label}</Label>
+      <Input type="number" defaultValue={value} onBlur={(e) => { const v = Number(e.target.value); if (v !== value) onSave(v); }} />
+    </div>
+  );
+}
