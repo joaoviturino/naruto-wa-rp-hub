@@ -165,23 +165,34 @@ function ChatPage() {
     return () => { supabase.removeChannel(ch); };
   }, [currentLoc?.id]);
 
-  // Presença: quem está no local atual (atualiza quando personagens se movem)
+  // Presença em tempo real via Realtime Presence — instantâneo, sem depender de publication
   useEffect(() => {
-    if (!currentLoc) { setPresentHere([]); return; }
-    async function loadPresence() {
-      const { data } = await supabase
-        .from("characters")
-        .select("id,nickname,avatar_url")
-        .eq("current_location_id", currentLoc!.id);
-      setPresentHere((data as any[]) ?? []);
-    }
-    loadPresence();
-    const ch = supabase.channel(`presence-${currentLoc.id}`)
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "characters" }, loadPresence)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "characters" }, loadPresence)
-      .subscribe();
+    if (!currentLoc || !character) { setPresentHere([]); return; }
+    const ch = supabase.channel(`presence-${currentLoc.id}`, {
+      config: { presence: { key: character.id } },
+    });
+    ch.on("presence", { event: "sync" }, () => {
+      const state = ch.presenceState() as Record<string, any[]>;
+      const list: { id: string; nickname: string; avatar_url: string | null }[] = [];
+      const seen = new Set<string>();
+      Object.values(state).flat().forEach((p: any) => {
+        if (p?.id && !seen.has(p.id)) { seen.add(p.id); list.push({ id: p.id, nickname: p.nickname, avatar_url: p.avatar_url }); }
+      });
+      setPresentHere(list);
+      // Também atualiza posição dos membros da party quando eles estão neste local
+      setPartyLocations((prev) => {
+        const next = { ...prev };
+        list.forEach((p) => { next[p.id] = currentLoc.id; });
+        return next;
+      });
+    });
+    ch.subscribe(async (status) => {
+      if (status === "SUBSCRIBED") {
+        await ch.track({ id: character.id, nickname: character.nickname, avatar_url: character.avatar_url });
+      }
+    });
     return () => { supabase.removeChannel(ch); };
-  }, [currentLoc?.id]);
+  }, [currentLoc?.id, character?.id]);
 
   async function doMove(locId: string) {
     try {
