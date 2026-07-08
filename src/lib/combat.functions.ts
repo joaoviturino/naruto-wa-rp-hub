@@ -53,9 +53,13 @@ function computeStats(xp: number) {
 
 function damageTargetPlayer(p: Player, dmg: number): { pool: Pool; taken: number } {
   // Retira do maior pool primeiro.
-  const pools: { key: Pool; v: number }[] = [
-    { key: "ef", v: p.ef }, { key: "em", v: p.em }, { key: "chakra", v: p.chakra },
-  ].sort((a, b) => b.v - a.v);
+  const pools: { key: Pool; v: number }[] = (
+    [
+      { key: "ef" as const, v: p.ef },
+      { key: "em" as const, v: p.em },
+      { key: "chakra" as const, v: p.chakra },
+    ]
+  ).sort((a, b) => b.v - a.v);
   const target = pools[0];
   const taken = Math.min(dmg, target.v);
   p[target.key] = target.v - taken;
