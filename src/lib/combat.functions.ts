@@ -354,6 +354,8 @@ export const fleeCombat = createServerFn({ method: "POST" })
     const { data: cp } = await supabaseAdmin
       .from("combat_participants").select("session_id").eq("session_id", data.session_id).eq("character_id", me.id).maybeSingle();
     if (!cp) throw new Error("Você não está neste combate.");
+    const { data: sess } = await supabaseAdmin.from("combat_sessions").select("state").eq("id", data.session_id).maybeSingle();
+    if (sess?.state) await persistPools(supabaseAdmin, sess.state as any);
     await supabaseAdmin.from("combat_sessions").update({ status: "fled", ended_at: new Date().toISOString() }).eq("id", data.session_id);
     return { ok: true };
   });
