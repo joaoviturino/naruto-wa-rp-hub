@@ -196,34 +196,6 @@ function ChatPage() {
           {currentLoc?.description && <p className="text-xs text-muted-foreground mt-1">{currentLoc.description}</p>}
         </div>
 
-        {invites.length > 0 && (
-          <div className="border border-gold/40 rounded p-2 space-y-2">
-            <div className="text-xs font-display text-gold">Convites de time</div>
-            {invites.map((iv: any) => (
-              <div key={iv.id} className="flex items-center gap-2 text-sm">
-                <span className="flex-1 truncate">{iv.from_character?.nickname}</span>
-                <Button size="sm" variant="secondary" onClick={async () => { await respondInvite({ data: { invite_id: iv.id, accept: true } }); toast.success("Você entrou no time."); }}>Aceitar</Button>
-                <Button size="sm" variant="ghost" onClick={async () => { await respondInvite({ data: { invite_id: iv.id, accept: false } }); }}>Recusar</Button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {partyMembers.length > 1 && (
-          <div className="border border-border rounded p-2 space-y-1">
-            <div className="text-xs font-display text-gold flex items-center gap-1"><Users size={12} /> Seu time</div>
-            {partyMembers.map((m: any) => (
-              <div key={m.id} className="text-xs flex items-center gap-1">
-                <div className="w-5 h-5 rounded-full bg-secondary overflow-hidden">
-                  {m.avatar_url && <img src={m.avatar_url} className="w-full h-full object-cover" alt="" />}
-                </div>
-                {m.nickname}
-              </div>
-            ))}
-            <Button size="sm" variant="ghost" className="w-full text-xs h-6" onClick={async () => { await partyLeave({}); toast.success("Você saiu do time."); }}>Sair do time</Button>
-          </div>
-        )}
-
         <div>
           <div className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1 mb-2"><Compass size={12} /> {character.current_location_id ? "Locais próximos" : "Escolha onde iniciar"}</div>
           <div className="space-y-1">
