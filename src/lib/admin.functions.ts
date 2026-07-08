@@ -2,12 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-async function requireAdmin(ctx: { supabase: any; userId: string }) {
-  const { data, error } = await ctx.supabase.rpc("has_role", { _user_id: ctx.userId, _role: "admin" });
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error("Forbidden");
-}
-
 /** Auto-promote the first authenticated user to admin (bootstrap). */
 export const bootstrapAdmin = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -26,7 +20,9 @@ export const enqueueMessage = createServerFn({ method: "POST" })
     z.object({ to_phone: z.string().min(6), body: z.string().min(1).max(4000) }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    await requireAdmin(context);
+    const { data: isAdmin, error: roleError } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
+    if (roleError) throw new Error(roleError.message);
+    if (!isAdmin) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const phone = data.to_phone.startsWith("+") ? data.to_phone : `+${data.to_phone}`;
     const { error } = await supabaseAdmin.from("outbound_messages").insert({ to_phone: phone, body: data.body });
@@ -38,7 +34,9 @@ export const enqueueMessage = createServerFn({ method: "POST" })
 export const resetBotSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await requireAdmin(context);
+    const { data: isAdmin, error: roleError } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
+    if (roleError) throw new Error(roleError.message);
+    if (!isAdmin) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("bot_sessions").upsert({ id: "default", status: "disconnected", qr: null, phone: null });
     return { ok: true };
@@ -48,12 +46,14 @@ export const resetBotSession = createServerFn({ method: "POST" })
 export const requestBotQr = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await requireAdmin(context);
+    const { data: isAdmin, error: roleError } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
+    if (roleError) throw new Error(roleError.message);
+    if (!isAdmin) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("bot_sessions").upsert({
       id: "default",
       status: "connecting",
-      qr: null,
+      qr: `__REQUEST_QR__:${Date.now()}`,
       phone: null,
       updated_at: new Date().toISOString(),
     });
@@ -66,7 +66,9 @@ export const setUserXp = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z.object({ character_id: z.string().uuid(), xp: z.number().int().min(0) }).parse(input))
   .handler(async ({ data, context }) => {
-    await requireAdmin(context);
+    const { data: isAdmin, error: roleError } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
+    if (roleError) throw new Error(roleError.message);
+    if (!isAdmin) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("characters").update({ xp: data.xp }).eq("id", data.character_id);
     await supabaseAdmin.from("audit_log").insert({ admin_id: context.userId, action: "set_xp", target: data.character_id, meta: { xp: data.xp } });
@@ -78,7 +80,9 @@ export const grantRole = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z.object({ user_id: z.string().uuid(), role: z.enum(["admin","user"]) }).parse(input))
   .handler(async ({ data, context }) => {
-    await requireAdmin(context);
+    const { data: isAdmin, error: roleError } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
+    if (roleError) throw new Error(roleError.message);
+    if (!isAdmin) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("user_roles").upsert({ user_id: data.user_id, role: data.role });
     return { ok: true };
