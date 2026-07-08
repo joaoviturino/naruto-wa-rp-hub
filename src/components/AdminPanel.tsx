@@ -108,6 +108,7 @@ function BotPanel() {
   const [msgs, setMsgs] = useState<any[]>([]);
   const [phone, setPhone] = useState("");
   const [body, setBody] = useState("");
+  const [qrDataUrl, setQrDataUrl] = useState("");
   const enqueue = useServerFn(enqueueMessage);
   const reset = useServerFn(resetBotSession);
   const askQr = useServerFn(requestBotQr);
@@ -127,6 +128,32 @@ function BotPanel() {
     return () => { supabase.removeChannel(ch); };
   }, []);
 
+  useEffect(() => {
+    let alive = true;
+
+    async function renderQr() {
+      if (session?.status !== "qr" || !session?.qr || String(session.qr).startsWith("__REQUEST_QR__")) {
+        setQrDataUrl("");
+        return;
+      }
+
+      try {
+        const QRCode = await import("qrcode");
+        const dataUrl = await QRCode.toDataURL(session.qr, {
+          width: 280,
+          margin: 2,
+          color: { dark: "#111827", light: "#ffffff" },
+        });
+        if (alive) setQrDataUrl(dataUrl);
+      } catch {
+        if (alive) setQrDataUrl("");
+      }
+    }
+
+    renderQr();
+    return () => { alive = false; };
+  }, [session?.status, session?.qr]);
+
   const statusColor: Record<string,string> = { connected: "text-emerald-400", qr: "text-gold", connecting: "text-sky-400", disconnected: "text-red-400" };
 
   return (
@@ -135,28 +162,35 @@ function BotPanel() {
         <h3 className="font-display text-xl text-gold">Sessão do Bot</h3>
         <div className="mt-2 text-sm">Status: <span className={statusColor[session?.status ?? "disconnected"]}>{session?.status ?? "—"}</span></div>
         {session?.phone && <div className="text-xs text-muted-foreground">Conectado como: {session.phone}</div>}
-        {session?.status === "qr" && session?.qr && (
+        {session?.status === "qr" && session?.qr && !String(session.qr).startsWith("__REQUEST_QR__") && (
           <div className="mt-4 flex flex-col items-center">
-            <img alt="QR Code" src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(session.qr)}`} className="rounded bg-white p-2" />
+            {qrDataUrl ? (
+              <img alt="QR Code do WhatsApp" src={qrDataUrl} className="h-72 w-72 rounded bg-white p-2" />
+            ) : (
+              <div className="grid h-72 w-72 place-items-center rounded bg-white p-4 text-center text-sm text-slate-900">Montando QR...</div>
+            )}
             <p className="text-xs text-muted-foreground mt-2">Abra o WhatsApp → Dispositivos conectados → Conectar dispositivo.</p>
+          </div>
+        )}
+        {(session?.status === "connecting" || String(session?.qr ?? "").startsWith("__REQUEST_QR__")) && (
+          <div className="mt-4 rounded-md border border-border bg-secondary/30 p-4 text-sm text-muted-foreground">
+            Gerando QR novo. Assim que o WhatsApp liberar o código, ele aparece aqui automaticamente.
           </div>
         )}
         <div className="mt-6 flex gap-2">
           <Button onClick={async () => {
             setAsking(true);
-            try { await askQr({}); toast.success("QR solicitado. Aguardando o serviço /bot gerar."); load(); }
+            try { await askQr({}); toast.success("QR solicitado. Aguarde aparecer aqui."); load(); }
             catch (err: any) { toast.error(err.message); }
             finally { setAsking(false); }
           }} disabled={asking}>
-            {asking ? "Solicitando..." : "Gerar novo QR"}
+            {asking ? "Solicitando..." : "Gerar QR agora"}
           </Button>
           <Button variant="outline" onClick={async () => { await reset({}); toast.success("Sessão resetada."); load(); }}>
             Resetar sessão
           </Button>
         </div>
-        <p className="mt-4 text-xs text-muted-foreground">
-          O QR é gerado pelo serviço Node em <code>/bot</code> (Baileys) — rode <code>npm start</code> na pasta, em VPS/Railway/Fly. Sem o serviço rodando, nenhum QR aparece aqui.
-        </p>
+        <p className="mt-4 text-xs text-muted-foreground">O painel renderiza o QR direto aqui, sem depender de serviço externo de imagem.</p>
       </div>
 
       <div className="scroll-panel rounded-lg p-6">
