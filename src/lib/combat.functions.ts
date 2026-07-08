@@ -247,9 +247,67 @@ export const playerAttack = createServerFn({ method: "POST" })
       }
     }
 
+    // Persistir pools atuais em characters
+    await persistPools(supabaseAdmin, state);
+
+    // Recompensas ao vencer
+    let rewards: any = null;
+    if (status === "won") {
+      rewards = await applyRewards(supabaseAdmin, sess.npc_id, state, log);
+    }
+
     await supabaseAdmin.from("combat_sessions").update({ state, log, status, ended_at, turn: "player" }).eq("id", sess.id);
     return { ok: true, status };
   });
+
+async function persistPools(supabaseAdmin: any, state: CombatState) {
+  for (const p of state.players) {
+    await supabaseAdmin.from("characters").update({
+      ef_current: p.ef, em_current: p.em, chakra_current: p.chakra,
+    }).eq("id", p.character_id);
+  }
+}
+
+async function applyRewards(supabaseAdmin: any, npcId: string, state: CombatState, log: LogEntry[]) {
+  const { data: npc } = await supabaseAdmin.from("npcs").select("reward_xp,reward_ryo,drop_table").eq("id", npcId).maybeSingle();
+  if (!npc) return null;
+  const xpGain = Number(npc.reward_xp ?? 0);
+  const ryoGain = Number(npc.reward_ryo ?? 0);
+  const drops = Array.isArray(npc.drop_table) ? npc.drop_table : [];
+  const rolled: { item_id: string; qty: number }[] = [];
+  for (const d of drops) {
+    if (!d?.item_id) continue;
+    const chance = Number(d.chance ?? 0);
+    if (Math.random() * 100 < chance) rolled.push({ item_id: d.item_id, qty: Number(d.qty ?? 1) });
+  }
+  // Entrega pra cada jogador vivo (ou todos participantes se ninguém sobreviveu — mas won implica ao menos 1 vivo).
+  const receivers = state.players.filter((p) => p.alive);
+  for (const p of receivers) {
+    if (xpGain > 0 || ryoGain > 0) {
+      const { data: c } = await supabaseAdmin.from("characters").select("xp,ryo").eq("id", p.character_id).maybeSingle();
+      await supabaseAdmin.from("characters").update({
+        xp: Number(c?.xp ?? 0) + xpGain,
+        ryo: Number(c?.ryo ?? 0) + ryoGain,
+      }).eq("id", p.character_id);
+    }
+    if (rolled.length) {
+      const { data: inv } = await supabaseAdmin.from("inventory").select("ninja_bag").eq("character_id", p.character_id).maybeSingle();
+      const bag = (Array.isArray(inv?.ninja_bag) ? inv!.ninja_bag : []).map((e: any) => ({ item_id: e.item_id, qty: Number(e.qty ?? 1) }));
+      for (const r of rolled) {
+        const idx = bag.findIndex((e: any) => e.item_id === r.item_id);
+        if (idx >= 0) bag[idx].qty += r.qty; else bag.push({ item_id: r.item_id, qty: r.qty });
+      }
+      await supabaseAdmin.from("inventory").update({ ninja_bag: bag }).eq("character_id", p.character_id);
+    }
+  }
+  const dropNames = rolled.length ? ` + ${rolled.length} item(ns)` : "";
+  log.push({
+    seq: log.length + 1, actor: "npc", actor_name: state.npc.name, target_name: "time",
+    skill_name: "recompensa", energy_type: "chakra", energy_used: 0, effective: 0, damage: 0, speed: 0, crit_mul: 0,
+    msg: `Recompensa: +${xpGain} XP, +${ryoGain} Ryo${dropNames} (por jogador).`,
+  });
+  return { xp: xpGain, ryo: ryoGain, drops: rolled };
+}
 
 async function runNpcTurn(supabaseAdmin: any, npcId: string, state: CombatState, log: LogEntry[], incomingSpeed: number) {
   const { data: skills } = await supabaseAdmin
