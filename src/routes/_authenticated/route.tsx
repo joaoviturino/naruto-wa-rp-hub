@@ -32,6 +32,7 @@ function AuthedLayout() {
           </Link>
           <nav className="flex items-center gap-2 text-sm">
             <Link to="/character" className="px-3 py-1.5 rounded hover:bg-secondary [&.active]:text-gold" activeProps={{ className: "active" }}>Ficha</Link>
+            <Link to="/chat" className="px-3 py-1.5 rounded hover:bg-secondary [&.active]:text-gold" activeProps={{ className: "active" }}>Chat</Link>
             {isAdmin && (
               <Link to="/admin" className="px-3 py-1.5 rounded hover:bg-secondary [&.active]:text-gold" activeProps={{ className: "active" }}>
                 Admin

@@ -171,6 +171,7 @@ export type Database = {
           clan_id: string | null
           clan_rerolls_used: number
           created_at: string
+          current_location_id: string | null
           element_primary: Database["public"]["Enums"]["element"]
           history: string | null
           id: string
@@ -194,6 +195,7 @@ export type Database = {
           clan_id?: string | null
           clan_rerolls_used?: number
           created_at?: string
+          current_location_id?: string | null
           element_primary: Database["public"]["Enums"]["element"]
           history?: string | null
           id?: string
@@ -217,6 +219,7 @@ export type Database = {
           clan_id?: string | null
           clan_rerolls_used?: number
           created_at?: string
+          current_location_id?: string | null
           element_primary?: Database["public"]["Enums"]["element"]
           history?: string | null
           id?: string
@@ -237,6 +240,13 @@ export type Database = {
             columns: ["clan_id"]
             isOneToOne: false
             referencedRelation: "clans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "characters_current_location_id_fkey"
+            columns: ["current_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
             referencedColumns: ["id"]
           },
         ]
@@ -492,6 +502,111 @@ export type Database = {
         }
         Relationships: []
       }
+      location_connections: {
+        Row: {
+          a_id: string
+          b_id: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          a_id: string
+          b_id: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          a_id?: string
+          b_id?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_connections_a_id_fkey"
+            columns: ["a_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_connections_b_id_fkey"
+            columns: ["b_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      location_messages: {
+        Row: {
+          character_id: string
+          content: string
+          created_at: string
+          id: string
+          image_url: string | null
+          location_id: string
+        }
+        Insert: {
+          character_id: string
+          content?: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          location_id: string
+        }
+        Update: {
+          character_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          location_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_messages_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_messages_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      locations: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       missions: {
         Row: {
           created_at: string
@@ -569,6 +684,38 @@ export type Database = {
           id?: string
         }
         Relationships: []
+      }
+      scene_images: {
+        Row: {
+          character_id: string
+          created_at: string
+          id: string
+          image_url: string
+          label: string | null
+        }
+        Insert: {
+          character_id: string
+          created_at?: string
+          id?: string
+          image_url: string
+          label?: string | null
+        }
+        Update: {
+          character_id?: string
+          created_at?: string
+          id?: string
+          image_url?: string
+          label?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scene_images_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       skills: {
         Row: {
@@ -691,6 +838,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      user_at_location: { Args: { _loc: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "user"
