@@ -11,7 +11,7 @@ import { upsertSkill, deleteSkill } from "@/lib/admin.functions";
 import { toast } from "sonner";
 import { ImageUpload } from "@/components/ImageUpload";
 import { NINJA_RANKS, SKILL_RANKS, PROFICIENCIES, ELEMENTS, CLASSIFICATIONS, RANGES, SKILL_CLASSES, labelize } from "./shared";
-import { Trash2, Pencil, Plus } from "lucide-react";
+import { Trash2, Pencil, Plus, Swords } from "lucide-react";
 
 export function SkillManager({ adminUserId }: { adminUserId: string }) {
   const [skills, setSkills] = useState<any[]>([]);
@@ -146,6 +146,32 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
             <Label>Descrição</Label>
             <Textarea rows={3} value={f.description ?? ""} onChange={(e) => up("description", e.target.value)} />
           </div>
+
+          <div className="sm:col-span-2 mt-2 border-t border-border pt-3">
+            <div className="text-xs font-display text-gold flex items-center gap-1"><Swords size={14} /> Combate</div>
+          </div>
+          <Field label="Tipo de energia">
+            <Select value={f.energy_type ?? "chakra"} onValueChange={(v: any) => up("energy_type", v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ef">EF (Física)</SelectItem>
+                <SelectItem value="em">EM (Mental)</SelectItem>
+                <SelectItem value="chakra">Chakra</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Custo mínimo (energia)">
+            <Input type="number" min={0} value={f.base_cost ?? 10} onChange={(e) => up("base_cost", Number(e.target.value))} />
+          </Field>
+          <Field label="Bônus de velocidade">
+            <Input type="number" step="0.1" min={0} value={f.bonus_speed ?? 1} onChange={(e) => up("bonus_speed", Number(e.target.value))} />
+          </Field>
+          <Field label="Bônus crítico (multiplica dano)">
+            <Input type="number" step="0.1" min={0} value={f.bonus_critical ?? 1} onChange={(e) => up("bonus_critical", Number(e.target.value))} />
+          </Field>
+          <Field label="Bônus energético (multiplica energia usada)">
+            <Input type="number" step="0.1" min={0} value={f.bonus_energetic ?? 1} onChange={(e) => up("bonus_energetic", Number(e.target.value))} />
+          </Field>
         </div>
         <div className="flex justify-end gap-2 mt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
@@ -156,6 +182,11 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
                 description: f.description || null,
                 image_url: f.image_url || null,
                 skill_class: f.skill_class || null,
+                energy_type: f.energy_type ?? "chakra",
+                base_cost: Number(f.base_cost ?? 10),
+                bonus_speed: Number(f.bonus_speed ?? 1),
+                bonus_critical: Number(f.bonus_critical ?? 1),
+                bonus_energetic: Number(f.bonus_energetic ?? 1),
               } } as any);
               toast.success("Habilidade salva."); onSaved();
             } catch (e: any) { toast.error(e.message); }
