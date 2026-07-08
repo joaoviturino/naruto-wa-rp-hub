@@ -1,7 +1,7 @@
 // New Era Shinobi — WhatsApp bridge (Baileys da Itsuki)
 // Roda em VPS/Railway/Fly. Não é hospedado na web da Lovable.
 import {
-  default as makeWASocket,
+  makeWASocket,
   DisconnectReason,
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
