@@ -324,20 +324,30 @@ function ChatPage() {
       {partyMembers.length > 1 && (
         <div className="fixed bottom-4 right-4 z-40 w-60 scroll-panel rounded-lg border border-gold/50 p-3 shadow-xl bg-card/95 backdrop-blur">
           <div className="flex items-center justify-between mb-2">
-            <div className="text-xs font-display text-gold flex items-center gap-1"><Users size={12} /> Meu time</div>
+            <div className="text-xs font-display text-gold flex items-center gap-1"><Users size={12} /> Meu time ({partyMembers.length}/3)</div>
             <Button variant="ghost" size="sm" className="h-6 text-[11px]" onClick={async () => { try { await partyLeave({}); toast.success("Você saiu do time."); } catch (e: any) { toast.error(e.message); } }}>Sair</Button>
           </div>
           <div className="space-y-1 max-h-52 overflow-y-auto">
-            {partyMembers.map((m: any) => (
+            {partyMembers.map((m: any) => {
+              const here = character.current_location_id && partyLocations[m.id] === character.current_location_id;
+              return (
               <div key={m.id} className="flex items-center gap-2 text-xs">
                 <div className="w-6 h-6 rounded-full bg-secondary overflow-hidden shrink-0">
                   {m.avatar_url && <img src={m.avatar_url} className="w-full h-full object-cover" alt="" />}
                 </div>
                 <span className="truncate flex-1">{m.nickname}</span>
+                {m.id === partyLeaderId && <span className="text-[10px] text-gold" title="Líder">★</span>}
+                <span className={`w-1.5 h-1.5 rounded-full ${here ? "bg-green-500" : "bg-muted-foreground/50"}`} title={here ? "Presente" : "Ausente"} />
                 {m.id === character.id && <span className="text-[10px] text-gold">você</span>}
               </div>
-            ))}
+              );
+            })}
           </div>
+          {partyLeaderId === character.id && (
+            <div className="text-[10px] text-muted-foreground mt-2 leading-tight">
+              Você é o líder. NPCs só aparecem se todos os membros estiverem no mesmo local.
+            </div>
+          )}
         </div>
       )}
     </div>
