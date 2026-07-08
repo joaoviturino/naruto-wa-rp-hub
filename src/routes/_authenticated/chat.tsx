@@ -7,11 +7,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useServerFn } from "@tanstack/react-start";
 import { moveCharacter, sendLocationMessage } from "@/lib/chat.functions";
 import { rollSpawn, getMyActiveCombat } from "@/lib/combat.functions";
-import { MapPin, Send, ImagePlus, X, Compass, Skull, Users } from "lucide-react";
+import { MapPin, Send, ImagePlus, X, Compass, Skull, Users, Menu } from "lucide-react";
 import { toast } from "sonner";
 import { CombatDialog } from "@/components/chat/CombatDialog";
 import { PlayerActionMenu } from "@/components/chat/PlayerActionMenu";
 import { PartyPopup } from "@/components/chat/PartyPopup";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 export const Route = createFileRoute("/_authenticated/chat")({ component: ChatPage });
 
@@ -215,59 +216,85 @@ function ChatPage() {
 
   if (!character) return <div className="p-10 text-center text-muted-foreground">Você precisa criar um personagem primeiro.</div>;
 
-  return (
-    <div className="mx-auto max-w-6xl grid gap-4 md:grid-cols-[280px_1fr] p-4">
-      {/* Mapa lateral */}
-      <aside className="scroll-panel rounded-lg p-4 space-y-3 md:h-[calc(100vh-8rem)] md:overflow-y-auto">
-        <div>
-          <div className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1"><MapPin size={12} /> Você está em</div>
-          <div className="font-display text-xl text-gold flex items-center gap-2">
-            {currentLoc?.name ?? "— nenhum local —"}
-            {currentLoc?.is_danger_zone && <span title="Zona de perigo — NPCs podem aparecer"><Skull size={16} className="text-blood" /></span>}
-          </div>
-          {currentLoc?.description && <p className="text-xs text-muted-foreground mt-1">{currentLoc.description}</p>}
+  const sidebar = (
+    <div className="space-y-3">
+      <div>
+        <div className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1"><MapPin size={12} /> Você está em</div>
+        <div className="font-display text-xl text-gold flex items-center gap-2 min-w-0">
+          <span className="truncate">{currentLoc?.name ?? "— nenhum local —"}</span>
+          {currentLoc?.is_danger_zone && <span title="Zona de perigo — NPCs podem aparecer" className="shrink-0"><Skull size={16} className="text-blood" /></span>}
         </div>
+        {currentLoc?.description && <p className="text-xs text-muted-foreground mt-1">{currentLoc.description}</p>}
+      </div>
 
-        {currentLoc && (
-          <div className="border border-border rounded p-2 space-y-1">
-            <div className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1">
-              <Users size={11} /> {presentHere.length} {presentHere.length === 1 ? "pessoa" : "pessoas"} no local
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {presentHere.map((p) => (
-                <div key={p.id} title={p.nickname} className="w-6 h-6 rounded-full bg-secondary overflow-hidden ring-1 ring-border">
-                  {p.avatar_url && <img src={p.avatar_url} className="w-full h-full object-cover" alt={p.nickname} />}
-                </div>
-              ))}
-            </div>
+      {currentLoc && (
+        <div className="border border-border rounded p-2 space-y-1">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1">
+            <Users size={11} /> {presentHere.length} {presentHere.length === 1 ? "pessoa" : "pessoas"} no local
           </div>
-        )}
-
-        <div>
-          <div className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1 mb-2"><Compass size={12} /> {character.current_location_id ? "Locais próximos" : "Escolha onde iniciar"}</div>
-          <div className="space-y-1">
-            {availableToMove.length === 0 && <div className="text-xs text-muted-foreground">Sem locais acessíveis daqui.</div>}
-            {availableToMove.map((l) => (
-              <button key={l.id} onClick={() => doMove(l.id)}
-                className="w-full text-left p-2 rounded hover:bg-secondary text-sm flex items-center gap-2">
-                {l.image_url && <img src={l.image_url} className="w-8 h-8 rounded object-cover" alt="" />}
-                <span className="flex-1">{l.name}</span>
-                {l.is_danger_zone && <Skull size={12} className="text-blood" />}
-              </button>
+          <div className="flex flex-wrap gap-1">
+            {presentHere.map((p) => (
+              <div key={p.id} title={p.nickname} className="w-6 h-6 rounded-full bg-secondary overflow-hidden ring-1 ring-border">
+                {p.avatar_url && <img src={p.avatar_url} className="w-full h-full object-cover" alt={p.nickname} />}
+              </div>
             ))}
           </div>
         </div>
+      )}
+
+      <div>
+        <div className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1 mb-2"><Compass size={12} /> {character.current_location_id ? "Locais próximos" : "Escolha onde iniciar"}</div>
+        <div className="space-y-1">
+          {availableToMove.length === 0 && <div className="text-xs text-muted-foreground">Sem locais acessíveis daqui.</div>}
+          {availableToMove.map((l) => (
+            <button key={l.id} onClick={() => { doMove(l.id); setNavOpen(false); }}
+              className="w-full text-left p-2 rounded hover:bg-secondary text-sm flex items-center gap-2 min-w-0">
+              {l.image_url && <img src={l.image_url} className="w-8 h-8 rounded object-cover shrink-0" alt="" />}
+              <span className="flex-1 truncate">{l.name}</span>
+              {l.is_danger_zone && <Skull size={12} className="text-blood shrink-0" />}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="mx-auto max-w-6xl md:grid md:gap-4 md:grid-cols-[280px_1fr] md:p-4">
+      {/* Barra mobile */}
+      <div className="md:hidden sticky top-0 z-30 flex items-center gap-2 border-b border-border bg-card/95 backdrop-blur px-3 py-2">
+        <Sheet open={navOpen} onOpenChange={setNavOpen}>
+          <SheetTrigger asChild>
+            <Button variant="outline" size="icon" className="h-8 w-8"><Menu size={16} /></Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="w-[85vw] max-w-sm overflow-y-auto">
+            <div className="pt-6">{sidebar}</div>
+          </SheetContent>
+        </Sheet>
+        <div className="min-w-0 flex-1">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Local</div>
+          <div className="font-display text-sm text-gold truncate flex items-center gap-1">
+            <span className="truncate">{currentLoc?.name ?? "— nenhum —"}</span>
+            {currentLoc?.is_danger_zone && <Skull size={12} className="text-blood shrink-0" />}
+          </div>
+        </div>
+        <div className="shrink-0 text-[10px] text-muted-foreground flex items-center gap-1"><Users size={11} /> {presentHere.length}</div>
+      </div>
+
+      {/* Mapa lateral desktop */}
+      <aside className="hidden md:block scroll-panel rounded-lg p-4 md:h-[calc(100vh-8rem)] md:overflow-y-auto">
+        {sidebar}
       </aside>
 
       {/* Chat */}
-      <section className="scroll-panel rounded-lg flex flex-col md:h-[calc(100vh-8rem)]">
+      <section className="scroll-panel md:rounded-lg flex flex-col h-[calc(100dvh-8rem)] md:h-[calc(100vh-8rem)]">
         {!currentLoc ? (
           <div className="flex-1 flex items-center justify-center text-muted-foreground p-10 text-center">
             Escolha um local ao lado para começar a interagir.
           </div>
         ) : (
           <>
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3">
               {messages.length === 0 && <div className="text-center text-xs text-muted-foreground py-10">Silêncio. Seja o primeiro a agir.</div>}
               {messages.map((m) => {
                 const mine = m.character_id === character.id;
