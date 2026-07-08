@@ -61,12 +61,11 @@ export function PartyPopup({ myCharId, myLocationId, members, leaderId, invites 
   function onPointerUp() { dragRef.current = null; }
 
   const inParty = members.length > 0;
-  if (!inParty && invites.length === 0) return null;
 
   return (
     <div
-      className="fixed z-50 w-64 scroll-panel rounded-lg border border-gold/50 shadow-xl bg-card/95 backdrop-blur select-none"
-      style={{ left: pos.x, top: pos.y }}
+      className="fixed w-64 scroll-panel rounded-lg border border-gold/50 shadow-xl bg-card/95 backdrop-blur select-none"
+      style={{ left: pos.x, top: pos.y, zIndex: 999 }}
     >
       <div
         className="flex items-center gap-1 px-2 py-1.5 border-b border-border cursor-grab active:cursor-grabbing"
@@ -106,7 +105,7 @@ export function PartyPopup({ myCharId, myLocationId, members, leaderId, invites 
             </div>
           )}
 
-          {inParty && (
+          {inParty ? (
             <>
               <div className="space-y-1">
                 {members.map((m) => {
@@ -134,6 +133,12 @@ export function PartyPopup({ myCharId, myLocationId, members, leaderId, invites 
                 Sair do time
               </Button>
             </>
+          ) : (
+            invites.length === 0 && (
+              <div className="text-[11px] text-muted-foreground leading-snug">
+                Você não está em nenhum time. Clique no avatar de outro jogador no chat para convidá-lo (precisa estar no mesmo local).
+              </div>
+            )
           )}
         </div>
       )}
