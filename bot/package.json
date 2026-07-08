@@ -9,7 +9,8 @@
     "pm2": "pm2 start ecosystem.config.cjs",
     "pm2:logs": "pm2 logs new-era-shinobi-bot",
     "pm2:restart": "pm2 restart new-era-shinobi-bot",
-    "pm2:stop": "pm2 stop new-era-shinobi-bot"
+    "pm2:stop": "pm2 stop new-era-shinobi-bot",
+    "install:24-7": "bash install.sh"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

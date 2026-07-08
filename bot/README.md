@@ -31,6 +31,28 @@ A sessão fica salva em `bot/auth_state/` — não commite essa pasta.
 
 ## Rodar 24/7 com PM2 (recomendado)
 
+### Instalador automático (uma linha só)
+
+No seu VPS (ou qualquer host Linux/macOS com Node 20+):
+
+```bash
+cd bot
+export SUPABASE_URL="https://<seu-projeto>.supabase.co"
+export SUPABASE_SERVICE_ROLE_KEY="<service-role-key>"
+bash install.sh
+```
+
+O `install.sh`:
+1. Instala dependências;
+2. Salva as envs em `bot/.env` (permissão 600);
+3. Instala o PM2 global se faltar;
+4. Sobe o bot com `pm2 start ecosystem.config.cjs`;
+5. Roda `pm2 save` + `pm2 startup systemd` — **o bot religa sozinho até quando você reinicia a máquina**.
+
+A partir daí, o botão **"Gerar QR agora"** no painel Admin funciona instantaneamente: ele grava um pedido no banco, o bot (que está sempre de pé) lê em ~2s, limpa a sessão antiga e emite o QR novo.
+
+### Comandos manuais
+
 PM2 mantém o processo vivo, religa em qualquer crash e reinicia automaticamente
 quando você altera `index.js`.
 
@@ -42,6 +64,9 @@ npx pm2 logs new-era-shinobi-bot        # acompanha
 npx pm2 restart new-era-shinobi-bot     # reinicia manualmente
 npx pm2 save && npx pm2 startup         # (VPS Linux) auto-start no boot
 ```
+
+> **Por que não posso iniciar o PM2 clicando no botão da web?**
+> O painel roda no navegador e a Lovable Cloud não tem acesso ao seu VPS. O bot precisa rodar num host seu (VPS/Railway/Fly), e o PM2 garante que ele nunca morra. Uma vez instalado com `install.sh`, o botão sempre encontra o bot vivo.
 
 Configuração incluída (`ecosystem.config.cjs`):
 - `autorestart: true` + backoff exponencial (`exp_backoff_restart_delay`)
