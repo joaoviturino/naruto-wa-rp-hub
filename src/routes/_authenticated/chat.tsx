@@ -6,14 +6,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useServerFn } from "@tanstack/react-start";
 import { moveCharacter, sendLocationMessage } from "@/lib/chat.functions";
-import { MapPin, Send, ImagePlus, X, Compass } from "lucide-react";
+import { rollSpawn, getMyActiveCombat } from "@/lib/combat.functions";
+import { respondPartyInvite, leaveParty } from "@/lib/party.functions";
+import { MapPin, Send, ImagePlus, X, Compass, Skull, Users } from "lucide-react";
 import { toast } from "sonner";
+import { CombatDialog } from "@/components/chat/CombatDialog";
+import { PlayerActionMenu } from "@/components/chat/PlayerActionMenu";
 
 export const Route = createFileRoute("/_authenticated/chat")({ component: ChatPage });
 
 const HISTORY_LIMIT = 80;
 
-type Loc = { id: string; name: string; description: string | null; image_url: string | null };
+type Loc = { id: string; name: string; description: string | null; image_url: string | null;
+  is_danger_zone?: boolean; spawn_chance?: number; spawn_tick_seconds?: number };
 type Conn = { a_id: string; b_id: string };
 type Character = { id: string; nickname: string; avatar_url: string | null; current_location_id: string | null };
 type Scene = { id: string; image_url: string; label: string | null };
@@ -38,11 +43,20 @@ function ChatPage() {
 
   const move = useServerFn(moveCharacter);
   const sendMsg = useServerFn(sendLocationMessage);
+  const roll = useServerFn(rollSpawn);
+  const getCombat = useServerFn(getMyActiveCombat);
+  const respondInvite = useServerFn(respondPartyInvite);
+  const partyLeave = useServerFn(leaveParty);
+  const [combatId, setCombatId] = useState<string | null>(null);
+  const [target, setTarget] = useState<{ id: string; nickname: string; avatar_url: string | null } | null>(null);
+  const [targetOpen, setTargetOpen] = useState(false);
+  const [invites, setInvites] = useState<any[]>([]);
+  const [partyMembers, setPartyMembers] = useState<any[]>([]);
 
   async function loadCore() {
     const [{ data: c }, { data: l }, { data: cn }] = await Promise.all([
       supabase.from("characters").select("id,nickname,avatar_url,current_location_id").eq("user_id", user.id).maybeSingle(),
-      supabase.from("locations").select("id,name,description,image_url").order("name"),
+      supabase.from("locations").select("id,name,description,image_url,is_danger_zone,spawn_chance,spawn_tick_seconds").order("name"),
       supabase.from("location_connections").select("a_id,b_id"),
     ]);
     setCharacter(c as Character | null);
@@ -54,6 +68,56 @@ function ChatPage() {
     }
   }
   useEffect(() => { loadCore(); }, [user.id]);
+
+  // Convites de party e checagem inicial de combate
+  useEffect(() => {
+    if (!character) return;
+    async function loadInvites() {
+      const { data } = await supabase
+        .from("party_invites")
+        .select("id,party_id,from_character:characters!party_invites_from_character_id_fkey(id,nickname,avatar_url)")
+        .eq("to_character_id", character!.id).eq("status", "pending");
+      setInvites((data as any[]) ?? []);
+    }
+    async function loadPartyMembers() {
+      const { data: mem } = await supabase.from("party_members").select("party_id").eq("character_id", character!.id).maybeSingle();
+      if (!mem) { setPartyMembers([]); return; }
+      const { data } = await supabase
+        .from("party_members")
+        .select("character:characters(id,nickname,avatar_url)")
+        .eq("party_id", (mem as any).party_id);
+      setPartyMembers(((data as any[]) ?? []).map((r) => r.character));
+    }
+    async function checkCombat() {
+      try { const r = await getCombat({}); if (r.session) setCombatId(r.session.id); }
+      catch { /* noop */ }
+    }
+    loadInvites(); loadPartyMembers(); checkCombat();
+    const ch = supabase.channel(`invites-${character.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "party_invites", filter: `to_character_id=eq.${character.id}` }, loadInvites)
+      .on("postgres_changes", { event: "*", schema: "public", table: "party_members" }, loadPartyMembers)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [character?.id]);
+
+  // Polling de spawn na danger zone
+  useEffect(() => {
+    if (!character?.current_location_id) return;
+    const cur = locs.find((l) => l.id === character.current_location_id);
+    if (!cur?.is_danger_zone || !cur?.spawn_chance) return;
+    let alive = true;
+    async function tick() {
+      if (!alive) return;
+      try {
+        const r = await roll({});
+        if (r.session_id) setCombatId(r.session_id);
+      } catch { /* noop */ }
+    }
+    tick();
+    const tickMs = Math.max(15, cur.spawn_tick_seconds ?? 60) * 1000;
+    const id = setInterval(tick, tickMs);
+    return () => { alive = false; clearInterval(id); };
+  }, [character?.current_location_id, locs.map((l) => `${l.id}:${l.spawn_chance}:${l.spawn_tick_seconds}:${l.is_danger_zone}`).join(",")]);
 
   const currentLoc = character?.current_location_id ? locs.find((l) => l.id === character.current_location_id) ?? null : null;
   const neighbors = currentLoc
@@ -119,9 +183,41 @@ function ChatPage() {
       <aside className="scroll-panel rounded-lg p-4 space-y-3 md:h-[calc(100vh-8rem)] md:overflow-y-auto">
         <div>
           <div className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1"><MapPin size={12} /> Você está em</div>
-          <div className="font-display text-xl text-gold">{currentLoc?.name ?? "— nenhum local —"}</div>
+          <div className="font-display text-xl text-gold flex items-center gap-2">
+            {currentLoc?.name ?? "— nenhum local —"}
+            {currentLoc?.is_danger_zone && <span title="Zona de perigo — NPCs podem aparecer"><Skull size={16} className="text-blood" /></span>}
+          </div>
           {currentLoc?.description && <p className="text-xs text-muted-foreground mt-1">{currentLoc.description}</p>}
         </div>
+
+        {invites.length > 0 && (
+          <div className="border border-gold/40 rounded p-2 space-y-2">
+            <div className="text-xs font-display text-gold">Convites de time</div>
+            {invites.map((iv: any) => (
+              <div key={iv.id} className="flex items-center gap-2 text-sm">
+                <span className="flex-1 truncate">{iv.from_character?.nickname}</span>
+                <Button size="sm" variant="secondary" onClick={async () => { await respondInvite({ data: { invite_id: iv.id, accept: true } }); toast.success("Você entrou no time."); }}>Aceitar</Button>
+                <Button size="sm" variant="ghost" onClick={async () => { await respondInvite({ data: { invite_id: iv.id, accept: false } }); }}>Recusar</Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {partyMembers.length > 1 && (
+          <div className="border border-border rounded p-2 space-y-1">
+            <div className="text-xs font-display text-gold flex items-center gap-1"><Users size={12} /> Seu time</div>
+            {partyMembers.map((m: any) => (
+              <div key={m.id} className="text-xs flex items-center gap-1">
+                <div className="w-5 h-5 rounded-full bg-secondary overflow-hidden">
+                  {m.avatar_url && <img src={m.avatar_url} className="w-full h-full object-cover" alt="" />}
+                </div>
+                {m.nickname}
+              </div>
+            ))}
+            <Button size="sm" variant="ghost" className="w-full text-xs h-6" onClick={async () => { await partyLeave({}); toast.success("Você saiu do time."); }}>Sair do time</Button>
+          </div>
+        )}
+
         <div>
           <div className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1 mb-2"><Compass size={12} /> {character.current_location_id ? "Locais próximos" : "Escolha onde iniciar"}</div>
           <div className="space-y-1">
@@ -130,7 +226,8 @@ function ChatPage() {
               <button key={l.id} onClick={() => doMove(l.id)}
                 className="w-full text-left p-2 rounded hover:bg-secondary text-sm flex items-center gap-2">
                 {l.image_url && <img src={l.image_url} className="w-8 h-8 rounded object-cover" alt="" />}
-                <span>{l.name}</span>
+                <span className="flex-1">{l.name}</span>
+                {l.is_danger_zone && <Skull size={12} className="text-blood" />}
               </button>
             ))}
           </div>
@@ -151,9 +248,13 @@ function ChatPage() {
                 const mine = m.character_id === character.id;
                 return (
                   <div key={m.id} className={`flex gap-2 ${mine ? "flex-row-reverse" : ""}`}>
-                    <div className="w-8 h-8 rounded-full bg-secondary overflow-hidden shrink-0">
+                    <button
+                      className="w-8 h-8 rounded-full bg-secondary overflow-hidden shrink-0 hover:ring-2 hover:ring-gold transition"
+                      title={mine ? "Você" : `Interagir com ${m.character?.nickname ?? ""}`}
+                      disabled={mine}
+                      onClick={() => { if (mine) return; setTarget({ id: m.character_id, nickname: m.character?.nickname ?? "?", avatar_url: m.character?.avatar_url ?? null }); setTargetOpen(true); }}>
                       {m.character?.avatar_url && <img src={m.character.avatar_url} className="w-full h-full object-cover" alt="" />}
-                    </div>
+                    </button>
                     <div className={`max-w-[75%] rounded-lg p-2 ${mine ? "bg-primary text-primary-foreground" : "bg-secondary"}`}>
                       <div className={`text-[10px] font-display ${mine ? "text-primary-foreground/70" : "text-gold"}`}>{m.character?.nickname ?? "?"}</div>
                       {m.image_url && <img src={m.image_url} className="mt-1 rounded max-h-64 object-cover" alt="" />}
@@ -206,6 +307,11 @@ function ChatPage() {
           </>
         )}
       </section>
+
+      <PlayerActionMenu target={target} open={targetOpen} onOpenChange={setTargetOpen} />
+      {combatId && character && (
+        <CombatDialog sessionId={combatId} myCharId={character.id} onClose={() => setCombatId(null)} />
+      )}
     </div>
   );
 }
