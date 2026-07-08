@@ -7,11 +7,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useServerFn } from "@tanstack/react-start";
 import { moveCharacter, sendLocationMessage } from "@/lib/chat.functions";
 import { rollSpawn, getMyActiveCombat } from "@/lib/combat.functions";
-import { respondPartyInvite, leaveParty } from "@/lib/party.functions";
-import { MapPin, Send, ImagePlus, X, Compass, Skull, Users } from "lucide-react";
+import { MapPin, Send, ImagePlus, X, Compass, Skull } from "lucide-react";
 import { toast } from "sonner";
 import { CombatDialog } from "@/components/chat/CombatDialog";
 import { PlayerActionMenu } from "@/components/chat/PlayerActionMenu";
+import { PartyPopup } from "@/components/chat/PartyPopup";
 
 export const Route = createFileRoute("/_authenticated/chat")({ component: ChatPage });
 
@@ -45,8 +45,6 @@ function ChatPage() {
   const sendMsg = useServerFn(sendLocationMessage);
   const roll = useServerFn(rollSpawn);
   const getCombat = useServerFn(getMyActiveCombat);
-  const respondInvite = useServerFn(respondPartyInvite);
-  const partyLeave = useServerFn(leaveParty);
   const [combatId, setCombatId] = useState<string | null>(null);
   const [target, setTarget] = useState<{ id: string; nickname: string; avatar_url: string | null } | null>(null);
   const [targetOpen, setTargetOpen] = useState(false);
@@ -198,34 +196,6 @@ function ChatPage() {
           {currentLoc?.description && <p className="text-xs text-muted-foreground mt-1">{currentLoc.description}</p>}
         </div>
 
-        {invites.length > 0 && (
-          <div className="border border-gold/40 rounded p-2 space-y-2">
-            <div className="text-xs font-display text-gold">Convites de time</div>
-            {invites.map((iv: any) => (
-              <div key={iv.id} className="flex items-center gap-2 text-sm">
-                <span className="flex-1 truncate">{iv.from_character?.nickname}</span>
-                <Button size="sm" variant="secondary" onClick={async () => { await respondInvite({ data: { invite_id: iv.id, accept: true } }); toast.success("Você entrou no time."); }}>Aceitar</Button>
-                <Button size="sm" variant="ghost" onClick={async () => { await respondInvite({ data: { invite_id: iv.id, accept: false } }); }}>Recusar</Button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {partyMembers.length > 1 && (
-          <div className="border border-border rounded p-2 space-y-1">
-            <div className="text-xs font-display text-gold flex items-center gap-1"><Users size={12} /> Seu time</div>
-            {partyMembers.map((m: any) => (
-              <div key={m.id} className="text-xs flex items-center gap-1">
-                <div className="w-5 h-5 rounded-full bg-secondary overflow-hidden">
-                  {m.avatar_url && <img src={m.avatar_url} className="w-full h-full object-cover" alt="" />}
-                </div>
-                {m.nickname}
-              </div>
-            ))}
-            <Button size="sm" variant="ghost" className="w-full text-xs h-6" onClick={async () => { await partyLeave({}); toast.success("Você saiu do time."); }}>Sair do time</Button>
-          </div>
-        )}
-
         <div>
           <div className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1 mb-2"><Compass size={12} /> {character.current_location_id ? "Locais próximos" : "Escolha onde iniciar"}</div>
           <div className="space-y-1">
@@ -321,35 +291,13 @@ function ChatPage() {
         <CombatDialog sessionId={combatId} myCharId={character.id} onClose={() => setCombatId(null)} />
       )}
 
-      {partyMembers.length > 1 && (
-        <div className="fixed bottom-4 right-4 z-40 w-60 scroll-panel rounded-lg border border-gold/50 p-3 shadow-xl bg-card/95 backdrop-blur">
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-xs font-display text-gold flex items-center gap-1"><Users size={12} /> Meu time ({partyMembers.length}/3)</div>
-            <Button variant="ghost" size="sm" className="h-6 text-[11px]" onClick={async () => { try { await partyLeave({}); toast.success("Você saiu do time."); } catch (e: any) { toast.error(e.message); } }}>Sair</Button>
-          </div>
-          <div className="space-y-1 max-h-52 overflow-y-auto">
-            {partyMembers.map((m: any) => {
-              const here = character.current_location_id && partyLocations[m.id] === character.current_location_id;
-              return (
-              <div key={m.id} className="flex items-center gap-2 text-xs">
-                <div className="w-6 h-6 rounded-full bg-secondary overflow-hidden shrink-0">
-                  {m.avatar_url && <img src={m.avatar_url} className="w-full h-full object-cover" alt="" />}
-                </div>
-                <span className="truncate flex-1">{m.nickname}</span>
-                {m.id === partyLeaderId && <span className="text-[10px] text-gold" title="Líder">★</span>}
-                <span className={`w-1.5 h-1.5 rounded-full ${here ? "bg-green-500" : "bg-muted-foreground/50"}`} title={here ? "Presente" : "Ausente"} />
-                {m.id === character.id && <span className="text-[10px] text-gold">você</span>}
-              </div>
-              );
-            })}
-          </div>
-          {partyLeaderId === character.id && (
-            <div className="text-[10px] text-muted-foreground mt-2 leading-tight">
-              Você é o líder. NPCs só aparecem se todos os membros estiverem no mesmo local.
-            </div>
-          )}
-        </div>
-      )}
+      <PartyPopup
+        myCharId={character.id}
+        myLocationId={character.current_location_id}
+        members={partyMembers.map((m: any) => ({ ...m, current_location_id: partyLocations[m.id] ?? null }))}
+        leaderId={partyLeaderId}
+        invites={invites}
+      />
     </div>
   );
 }

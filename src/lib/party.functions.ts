@@ -34,12 +34,10 @@ export const invitePartyMember = createServerFn({ method: "POST" })
       // Apenas o líder pode convidar
       const { data: party } = await supabaseAdmin.from("parties").select("leader_id").eq("id", partyId).maybeSingle();
       if (!party || party.leader_id !== me.id) throw new Error("Apenas o líder do time pode convidar novos membros.");
-      // Cap de 3 slots
+      // Cap de 3 slots (apenas membros preenchidos contam)
       const { count: memberCount } = await supabaseAdmin
         .from("party_members").select("*", { count: "exact", head: true }).eq("party_id", partyId);
-      const { count: pendingCount } = await supabaseAdmin
-        .from("party_invites").select("*", { count: "exact", head: true }).eq("party_id", partyId).eq("status", "pending");
-      if ((memberCount ?? 0) + (pendingCount ?? 0) >= 3) throw new Error("O time já está cheio (3 slots).");
+      if ((memberCount ?? 0) >= 3) throw new Error("O time já está cheio (3 slots).");
     } else {
       const { data: p, error: pe } = await supabaseAdmin.from("parties").insert({ leader_id: me.id }).select("id").single();
       if (pe) throw new Error(pe.message);
