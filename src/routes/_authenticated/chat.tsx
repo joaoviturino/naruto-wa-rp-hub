@@ -7,11 +7,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useServerFn } from "@tanstack/react-start";
 import { moveCharacter, sendLocationMessage } from "@/lib/chat.functions";
 import { rollSpawn, getMyActiveCombat } from "@/lib/combat.functions";
-import { respondPartyInvite, leaveParty } from "@/lib/party.functions";
-import { MapPin, Send, ImagePlus, X, Compass, Skull, Users } from "lucide-react";
+import { MapPin, Send, ImagePlus, X, Compass, Skull } from "lucide-react";
 import { toast } from "sonner";
 import { CombatDialog } from "@/components/chat/CombatDialog";
 import { PlayerActionMenu } from "@/components/chat/PlayerActionMenu";
+import { PartyPopup } from "@/components/chat/PartyPopup";
 
 export const Route = createFileRoute("/_authenticated/chat")({ component: ChatPage });
 
@@ -45,8 +45,6 @@ function ChatPage() {
   const sendMsg = useServerFn(sendLocationMessage);
   const roll = useServerFn(rollSpawn);
   const getCombat = useServerFn(getMyActiveCombat);
-  const respondInvite = useServerFn(respondPartyInvite);
-  const partyLeave = useServerFn(leaveParty);
   const [combatId, setCombatId] = useState<string | null>(null);
   const [target, setTarget] = useState<{ id: string; nickname: string; avatar_url: string | null } | null>(null);
   const [targetOpen, setTargetOpen] = useState(false);
