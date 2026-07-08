@@ -6,6 +6,7 @@ import { Databook } from "@/components/Databook";
 import { RARITY_COLOR, RARITY_LABEL, VILLAGES, ELEMENTS, stats, type Rarity } from "@/lib/game";
 import { Progress } from "@/components/ui/progress";
 import { ImageUpload } from "@/components/ImageUpload";
+import { SceneImagesManager } from "@/components/SceneImagesManager";
 import { updateCharacter } from "@/lib/character.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -105,6 +106,9 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
         </TabsList>
         <TabsContent value="ficha" className="mt-4">
           <div className="scroll-panel rounded-lg p-6 space-y-4">
+            <div className="flex justify-end">
+              <SceneImagesManager characterId={characterId} userId={char.user_id} />
+            </div>
             {char.bio && <p className="italic text-gold">"{char.bio}"</p>}
             <FichaBlock title="Aparência" text={char.appearance} />
             <FichaBlock title="Personalidade" text={char.personality} />
