@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useServerFn } from "@tanstack/react-start";
 import { moveCharacter, sendLocationMessage } from "@/lib/chat.functions";
 import { rollSpawn, getMyActiveCombat } from "@/lib/combat.functions";
-import { MapPin, Send, ImagePlus, X, Compass, Skull } from "lucide-react";
+import { MapPin, Send, ImagePlus, X, Compass, Skull, Users } from "lucide-react";
 import { toast } from "sonner";
 import { CombatDialog } from "@/components/chat/CombatDialog";
 import { PlayerActionMenu } from "@/components/chat/PlayerActionMenu";
@@ -52,6 +52,7 @@ function ChatPage() {
   const [partyMembers, setPartyMembers] = useState<any[]>([]);
   const [partyLeaderId, setPartyLeaderId] = useState<string | null>(null);
   const [partyLocations, setPartyLocations] = useState<Record<string, string | null>>({});
+  const [presentHere, setPresentHere] = useState<{ id: string; nickname: string; avatar_url: string | null }[]>([]);
 
   async function loadCore() {
     const [{ data: c }, { data: l }, { data: cn }] = await Promise.all([
@@ -162,6 +163,24 @@ function ChatPage() {
     return () => { supabase.removeChannel(ch); };
   }, [currentLoc?.id]);
 
+  // Presença: quem está no local atual (atualiza quando personagens se movem)
+  useEffect(() => {
+    if (!currentLoc) { setPresentHere([]); return; }
+    async function loadPresence() {
+      const { data } = await supabase
+        .from("characters")
+        .select("id,nickname,avatar_url")
+        .eq("current_location_id", currentLoc!.id);
+      setPresentHere((data as any[]) ?? []);
+    }
+    loadPresence();
+    const ch = supabase.channel(`presence-${currentLoc.id}`)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "characters" }, loadPresence)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "characters" }, loadPresence)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [currentLoc?.id]);
+
   async function doMove(locId: string) {
     try {
       await move({ data: { locationId: locId } });
@@ -195,6 +214,21 @@ function ChatPage() {
           </div>
           {currentLoc?.description && <p className="text-xs text-muted-foreground mt-1">{currentLoc.description}</p>}
         </div>
+
+        {currentLoc && (
+          <div className="border border-border rounded p-2 space-y-1">
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1">
+              <Users size={11} /> {presentHere.length} {presentHere.length === 1 ? "pessoa" : "pessoas"} no local
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {presentHere.map((p) => (
+                <div key={p.id} title={p.nickname} className="w-6 h-6 rounded-full bg-secondary overflow-hidden ring-1 ring-border">
+                  {p.avatar_url && <img src={p.avatar_url} className="w-full h-full object-cover" alt={p.nickname} />}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div>
           <div className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1 mb-2"><Compass size={12} /> {character.current_location_id ? "Locais próximos" : "Escolha onde iniciar"}</div>
