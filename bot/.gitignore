@@ -1,3 +1,5 @@
 node_modules/
 auth_state/
 .env
+logs/
+.pm2/
