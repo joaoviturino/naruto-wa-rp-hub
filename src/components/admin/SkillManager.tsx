@@ -10,7 +10,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { upsertSkill, deleteSkill } from "@/lib/admin.functions";
 import { toast } from "sonner";
 import { ImageUpload } from "@/components/ImageUpload";
-import { NINJA_RANKS, SKILL_RANKS, PROFICIENCIES, ELEMENTS, CLASSIFICATIONS, RANGES, labelize } from "./shared";
+import { NINJA_RANKS, SKILL_RANKS, PROFICIENCIES, ELEMENTS, CLASSIFICATIONS, RANGES, SKILL_CLASSES, labelize } from "./shared";
 import { Trash2, Pencil, Plus } from "lucide-react";
 
 export function SkillManager({ adminUserId }: { adminUserId: string }) {
@@ -101,7 +101,18 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
           <Field label="Classificação">
             <NullableSelect value={f.classification} onChange={(v: any) => up("classification", v)} options={CLASSIFICATIONS.map((c) => ({ value: c, label: labelize(c) }))} />
           </Field>
-          <Field label="Classe (livre)"><Input placeholder="Elemental, Ninpô, Kekkei Genkai..." value={f.skill_class ?? ""} onChange={(e) => up("skill_class", e.target.value)} /></Field>
+          <Field label="Classe">
+            <NullableSelect
+              value={f.skill_class}
+              onChange={(v: any) => up("skill_class", v)}
+              options={SKILL_CLASSES.map((c) => ({ value: c.value, label: c.label }))}
+            />
+            {f.skill_class && (
+              <p className="text-[11px] text-muted-foreground mt-1">
+                {SKILL_CLASSES.find((c) => c.value === f.skill_class)?.desc}
+              </p>
+            )}
+          </Field>
           <Field label="Alcance">
             <NullableSelect value={f.range} onChange={(v: any) => up("range", v)} options={RANGES.map((r) => ({ value: r, label: labelize(r) }))} />
           </Field>
