@@ -139,8 +139,9 @@ function BotPanel() {
 
       try {
         const QRCode = await import("qrcode");
+        const toDataUrl = QRCode.toDataURL ?? QRCode.default.toDataURL;
         const styles = getComputedStyle(document.documentElement);
-        const dataUrl = await QRCode.toDataURL(session.qr, {
+        const dataUrl = await toDataUrl(session.qr, {
           width: 280,
           margin: 2,
           color: {

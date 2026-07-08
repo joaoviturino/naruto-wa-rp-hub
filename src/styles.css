@@ -79,8 +79,8 @@
   --ring: oklch(0.55 0.22 30);
   --gold: oklch(0.78 0.15 80);
   --blood: oklch(0.42 0.22 25);
-  --qr-surface: oklch(1 0 0);
-  --qr-ink: oklch(0.14 0.02 25);
+  --qr-surface: #ffffff;
+  --qr-ink: #1c1716;
   --chart-1: oklch(0.55 0.22 25);
   --chart-2: oklch(0.72 0.15 80);
   --chart-3: oklch(0.6 0.15 200);
