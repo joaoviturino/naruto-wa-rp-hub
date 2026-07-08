@@ -82,9 +82,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "New Era Shinobi — Revolution" },
       { name: "description", content: "RPG shinobi baseado em Naruto: crie seu personagem na web e jogue no WhatsApp." },
       { property: "og:title", content: "New Era Shinobi — Revolution" },
-      { property: "og:description", content: "Vilas, clãs, chakra e batalhas — o RPG shinobi acontece no WhatsApp." },
+      { property: "og:description", content: "RPG shinobi baseado em Naruto: crie seu personagem na web e jogue no WhatsApp." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "New Era Shinobi — Revolution" },
+      { name: "twitter:description", content: "RPG shinobi baseado em Naruto: crie seu personagem na web e jogue no WhatsApp." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/6932a559-16c2-489b-87f7-af0308de4cd3/id-preview-b2e40a32--fc4388b0-a3a0-4026-8467-92b3eac2a359.lovable.app-1783473057379.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/6932a559-16c2-489b-87f7-af0308de4cd3/id-preview-b2e40a32--fc4388b0-a3a0-4026-8467-92b3eac2a359.lovable.app-1783473057379.png" },
     ],
     links: [
       {
