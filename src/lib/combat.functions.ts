@@ -140,11 +140,14 @@ export const rollSpawn = createServerFn({ method: "POST" })
 
     const players: Player[] = members.map((c: any) => {
       const s = computeStats(c.xp ?? 0);
+      const ef = c.ef_current == null ? s.ef : Math.min(s.ef, c.ef_current);
+      const em = c.em_current == null ? s.em : Math.min(s.em, c.em_current);
+      const ck = c.chakra_current == null ? s.chakra : Math.min(s.chakra, c.chakra_current);
       return {
         character_id: c.id, nickname: c.nickname, avatar_url: c.avatar_url,
-        ef: s.ef, em: s.em, chakra: s.chakra,
+        ef, em, chakra: ck,
         ef_max: s.ef, em_max: s.em, chakra_max: s.chakra,
-        alive: true,
+        alive: (ef + em + ck) > 0,
       };
     });
     const state: CombatState = {
