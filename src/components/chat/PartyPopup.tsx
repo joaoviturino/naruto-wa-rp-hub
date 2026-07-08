@@ -36,6 +36,18 @@ export function PartyPopup({ myCharId, myLocationId, members, leaderId, invites 
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(pos)); } catch { /* noop */ }
   }, [pos]);
 
+  // Mantém o popup dentro da viewport em resize/rotação
+  useEffect(() => {
+    function clamp() {
+      setPos((p) => ({
+        x: Math.min(Math.max(0, p.x), window.innerWidth - 80),
+        y: Math.min(Math.max(0, p.y), window.innerHeight - 40),
+      }));
+    }
+    window.addEventListener("resize", clamp);
+    return () => window.removeEventListener("resize", clamp);
+  }, []);
+
   function onPointerDown(e: React.PointerEvent) {
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
     dragRef.current = { dx: e.clientX - pos.x, dy: e.clientY - pos.y };
