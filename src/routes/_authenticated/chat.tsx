@@ -54,6 +54,7 @@ function ChatPage() {
   const [partyLeaderId, setPartyLeaderId] = useState<string | null>(null);
   const [partyLocations, setPartyLocations] = useState<Record<string, string | null>>({});
   const [presentHere, setPresentHere] = useState<{ id: string; nickname: string; avatar_url: string | null }[]>([]);
+  const [navOpen, setNavOpen] = useState(false);
 
   async function loadCore() {
     const [{ data: c }, { data: l }, { data: cn }] = await Promise.all([
