@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Upload } from "lucide-react";
 
 export function ImageUpload({ label, bucket, userId, onUploaded, compact }: {
-  label: string; bucket: "avatars" | "banners" | "inventory"; userId: string;
+  label: string; bucket: "avatars" | "banners" | "inventory" | "items" | "skills"; userId: string;
   onUploaded: (url: string) => void; compact?: boolean;
 }) {
   const ref = useRef<HTMLInputElement>(null);
