@@ -7,11 +7,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useServerFn } from "@tanstack/react-start";
 import { moveCharacter, sendLocationMessage } from "@/lib/chat.functions";
 import { rollSpawn, getMyActiveCombat } from "@/lib/combat.functions";
-import { MapPin, Send, ImagePlus, X, Compass, Skull, Users, Menu } from "lucide-react";
+import { MapPin, Send, ImagePlus, X, Compass, Skull, Users, Menu, Gamepad2 } from "lucide-react";
 import { toast } from "sonner";
 import { CombatDialog } from "@/components/chat/CombatDialog";
 import { PlayerActionMenu } from "@/components/chat/PlayerActionMenu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { listMinigamesForMyLocation } from "@/lib/minigame.functions";
+import { MinigameDialog } from "@/components/minigame/MinigameDialog";
 
 export const Route = createFileRoute("/_authenticated/chat")({ component: ChatPage });
 
@@ -52,6 +54,9 @@ function ChatPage() {
   const [partyMemberCount, setPartyMemberCount] = useState<number>(0);
   const [presentHere, setPresentHere] = useState<{ id: string; nickname: string; avatar_url: string | null }[]>([]);
   const [navOpen, setNavOpen] = useState(false);
+  const [availableMinigames, setAvailableMinigames] = useState<any[]>([]);
+  const [activeMinigame, setActiveMinigame] = useState<any | null>(null);
+  const listMg = useServerFn(listMinigamesForMyLocation);
 
   async function loadCore() {
     const [{ data: c }, { data: l }, { data: cn }] = await Promise.all([
@@ -68,6 +73,12 @@ function ChatPage() {
     }
   }
   useEffect(() => { loadCore(); }, [user.id]);
+
+  async function refreshMinigames() {
+    try { const r = await listMg({}); setAvailableMinigames(r.minigames ?? []); }
+    catch { setAvailableMinigames([]); }
+  }
+  useEffect(() => { refreshMinigames(); }, [character?.current_location_id]);
 
   // Convites de party e checagem inicial de combate
   async function loadInvites() {
@@ -375,6 +386,10 @@ function ChatPage() {
       <PlayerActionMenu target={target} open={targetOpen} onOpenChange={setTargetOpen} />
       {combatId && character && (
         <CombatDialog sessionId={combatId} myCharId={character.id} onClose={() => setCombatId(null)} />
+      )}
+      {activeMinigame && (
+        <MinigameDialog minigame={activeMinigame} open onOpenChange={(v) => { if (!v) setActiveMinigame(null); }}
+          onCompleted={refreshMinigames} />
       )}
     </div>
   );
