@@ -396,3 +396,97 @@ export const fleeCombat = createServerFn({ method: "POST" })
     await supabaseAdmin.from("combat_sessions").update({ status: "fled", ended_at: new Date().toISOString() }).eq("id", data.session_id);
     return { ok: true };
   });
+
+/**
+ * Usa um item consumível durante o combate. Aplica restore no jogador ativo,
+ * consome 1 unidade da bolsa e passa para o próximo turno (NPC responde).
+ */
+export const useCombatItem = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    session_id: z.string().uuid(),
+    item_id: z.string().uuid(),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    const me = await loadMyChar(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: sess } = await supabaseAdmin.from("combat_sessions").select("*").eq("id", data.session_id).maybeSingle();
+    if (!sess || sess.status !== "active") throw new Error("Combate encerrado.");
+    const state: CombatState = sess.state as any;
+    const log: LogEntry[] = sess.log as any;
+    const activeIdx = state.active;
+    const activePlayer = state.players[activeIdx];
+    if (!activePlayer || activePlayer.character_id !== me.id) throw new Error("Não é sua vez.");
+
+    // Retira 1 da bolsa (ninja_bag OU secondary_bag)
+    const { data: inv } = await supabaseAdmin.from("inventory").select("ninja_bag,secondary_bag").eq("character_id", me.id).maybeSingle();
+    if (!inv) throw new Error("Sem inventário.");
+    const removeOne = (arr: any[]) => {
+      const b = Array.isArray(arr) ? arr.map((e: any) => ({ item_id: e.item_id, qty: Number(e.qty ?? 1) })) : [];
+      const idx = b.findIndex((e) => e.item_id === data.item_id);
+      if (idx < 0) return null;
+      b[idx].qty -= 1;
+      if (b[idx].qty <= 0) b.splice(idx, 1);
+      return b;
+    };
+    let patch: any = null;
+    const nb = removeOne(inv.ninja_bag as any);
+    if (nb) patch = { ninja_bag: nb };
+    else {
+      const sb = removeOne(inv.secondary_bag as any);
+      if (sb) patch = { secondary_bag: sb };
+    }
+    if (!patch) throw new Error("Você não tem este item.");
+
+    const { data: item } = await supabaseAdmin.from("items").select("name,type,meta").eq("id", data.item_id).maybeSingle();
+    if (!item) throw new Error("Item inexistente.");
+    if (item.type !== "consumable") throw new Error("Só itens consumíveis podem ser usados em combate.");
+
+    await supabaseAdmin.from("inventory").update(patch).eq("character_id", me.id);
+
+    const restore = (item as any).meta?.restore as
+      | { pool: "ef" | "em" | "chakra" | "all"; mode: "flat" | "percent"; amount: number } | null | undefined;
+    let restoredMsg = "";
+    if (restore && restore.amount > 0) {
+      const pools: Pool[] = restore.pool === "all" ? ["ef","em","chakra"] : [restore.pool as Pool];
+      const maxOf = { ef: activePlayer.ef_max, em: activePlayer.em_max, chakra: activePlayer.chakra_max } as const;
+      const gains: string[] = [];
+      for (const p of pools) {
+        const gain = restore.mode === "percent"
+          ? Math.round((maxOf[p] * restore.amount) / 100)
+          : Math.round(restore.amount);
+        const before = activePlayer[p];
+        activePlayer[p] = Math.min(maxOf[p], before + gain);
+        gains.push(`${p.toUpperCase()} +${activePlayer[p] - before}`);
+      }
+      restoredMsg = ` (${gains.join(", ")})`;
+      activePlayer.alive = (activePlayer.ef + activePlayer.em + activePlayer.chakra) > 0;
+    }
+
+    log.push({
+      seq: log.length + 1, actor: "player", actor_name: activePlayer.nickname, target_name: activePlayer.nickname,
+      skill_name: `Item: ${item.name}`, energy_type: "chakra", energy_used: 0,
+      effective: 0, damage: 0, speed: 0, crit_mul: 0,
+      msg: `${activePlayer.nickname} usa ${item.name}${restoredMsg}.`,
+    });
+
+    // NPC responde (comportamento igual ao ataque)
+    const npcTurn = await runNpcTurn(supabaseAdmin, sess.npc_id, state, log, 0);
+    state.npc.energy = npcTurn.energyRemaining;
+
+    let status = sess.status as string;
+    let ended_at: string | null = null;
+    if (state.players.every((p) => !p.alive)) { status = "lost"; ended_at = new Date().toISOString(); }
+    else {
+      const total = state.players.length;
+      let next = (activeIdx + 1) % total;
+      for (let i = 0; i < total; i++) { if (state.players[next].alive) break; next = (next + 1) % total; }
+      state.active = next;
+      const np = state.players[next];
+      if (np.cooldowns) for (const k of Object.keys(np.cooldowns)) np.cooldowns[k] = Math.max(0, (np.cooldowns[k] ?? 0) - 1);
+    }
+
+    await persistPools(supabaseAdmin, state);
+    await supabaseAdmin.from("combat_sessions").update({ state, log, status, ended_at }).eq("id", sess.id);
+    return { ok: true };
+  });
