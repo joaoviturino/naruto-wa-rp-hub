@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,6 @@ import { MapPin, Send, ImagePlus, X, Compass, Skull, Users, Menu } from "lucide-
 import { toast } from "sonner";
 import { CombatDialog } from "@/components/chat/CombatDialog";
 import { PlayerActionMenu } from "@/components/chat/PlayerActionMenu";
-import { PartyPopup } from "@/components/chat/PartyPopup";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 export const Route = createFileRoute("/_authenticated/chat")({ component: ChatPage });
@@ -50,9 +49,7 @@ function ChatPage() {
   const [target, setTarget] = useState<{ id: string; nickname: string; avatar_url: string | null } | null>(null);
   const [targetOpen, setTargetOpen] = useState(false);
   const [invites, setInvites] = useState<any[]>([]);
-  const [partyMembers, setPartyMembers] = useState<any[]>([]);
-  const [partyLeaderId, setPartyLeaderId] = useState<string | null>(null);
-  const [partyLocations, setPartyLocations] = useState<Record<string, string | null>>({});
+  const [partyMemberCount, setPartyMemberCount] = useState<number>(0);
   const [presentHere, setPresentHere] = useState<{ id: string; nickname: string; avatar_url: string | null }[]>([]);
   const [navOpen, setNavOpen] = useState(false);
 
@@ -83,43 +80,19 @@ function ChatPage() {
   }
   async function loadPartyMembers() {
     if (!character) return;
-    // Encontra a party do personagem: como membro OU como líder (fallback caso
-    // party_members não tenha o líder inserido).
     let partyId: string | null = null;
-    let leaderId: string | null = null;
     const { data: mem } = await supabase
       .from("party_members").select("party_id").eq("character_id", character.id).maybeSingle();
     if (mem) partyId = (mem as any).party_id;
     if (!partyId) {
       const { data: led } = await supabase
-        .from("parties").select("id,leader_id").eq("leader_id", character.id).maybeSingle();
-      if (led) { partyId = (led as any).id; leaderId = (led as any).leader_id; }
+        .from("parties").select("id").eq("leader_id", character.id).maybeSingle();
+      if (led) partyId = (led as any).id;
     }
-    if (!partyId) { setPartyMembers([]); setPartyLeaderId(null); setPartyLocations({}); return; }
-    if (!leaderId) {
-      const { data: party } = await supabase.from("parties").select("leader_id").eq("id", partyId).maybeSingle();
-      leaderId = (party as any)?.leader_id ?? null;
-    }
-    setPartyLeaderId(leaderId);
-    const { data } = await supabase
-      .from("party_members")
-      .select("character:characters(id,nickname,avatar_url,current_location_id)")
-      .eq("party_id", partyId);
-    let chars = ((data as any[]) ?? []).map((r) => r.character).filter(Boolean);
-    // Garante que o líder apareça mesmo que não esteja em party_members
-    if (leaderId && !chars.some((c: any) => c.id === leaderId)) {
-      const { data: lc } = await supabase
-        .from("characters").select("id,nickname,avatar_url,current_location_id").eq("id", leaderId).maybeSingle();
-      if (lc) chars = [lc, ...chars];
-    }
-    setPartyMembers(chars);
-    const map: Record<string, string | null> = {};
-    chars.forEach((c: any) => { map[c.id] = c.current_location_id; });
-    setPartyLocations(map);
-  }
-  async function refreshParty() {
-    await loadInvites();
-    await loadPartyMembers();
+    if (!partyId) { setPartyMemberCount(0); return; }
+    const { count } = await supabase
+      .from("party_members").select("*", { count: "exact", head: true }).eq("party_id", partyId);
+    setPartyMemberCount(count ?? 0);
   }
   useEffect(() => {
     if (!character) return;
@@ -208,12 +181,6 @@ function ChatPage() {
         if (p?.id && !seen.has(p.id)) { seen.add(p.id); list.push({ id: p.id, nickname: p.nickname, avatar_url: p.avatar_url }); }
       });
       setPresentHere(list);
-      // Também atualiza posição dos membros da party quando eles estão neste local
-      setPartyLocations((prev) => {
-        const next = { ...prev };
-        list.forEach((p) => { next[p.id] = currentLoc.id; });
-        return next;
-      });
     });
     ch.subscribe(async (status) => {
       if (status === "SUBSCRIBED") {
@@ -246,6 +213,12 @@ function ChatPage() {
 
   const sidebar = (
     <div className="space-y-3">
+      <Button asChild variant="outline" size="sm" className="w-full justify-between">
+        <Link to="/party">
+          <span className="flex items-center gap-1"><Users size={14} /> Meu time{partyMemberCount > 0 ? ` (${partyMemberCount})` : ""}</span>
+          {invites.length > 0 && <span className="text-[10px] bg-blood text-white rounded-full px-1.5">{invites.length}</span>}
+        </Link>
+      </Button>
       <div>
         <div className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1"><MapPin size={12} /> Você está em</div>
         <div className="font-display text-xl text-gold flex items-center gap-2 min-w-0">
@@ -312,6 +285,12 @@ function ChatPage() {
           </div>
         </div>
         <div className="shrink-0 text-[10px] text-muted-foreground flex items-center gap-1"><Users size={11} /> {presentHere.length}</div>
+        <Button asChild variant="outline" size="sm" className="h-8">
+          <Link to="/party">
+            <Users size={12} className="mr-1" /> Time{partyMemberCount > 0 ? ` ${partyMemberCount}` : ""}
+            {invites.length > 0 && <span className="ml-1 text-[10px] bg-blood text-white rounded-full px-1.5">{invites.length}</span>}
+          </Link>
+        </Button>
       </div>
 
       {/* Mapa lateral desktop */}
@@ -397,15 +376,6 @@ function ChatPage() {
       {combatId && character && (
         <CombatDialog sessionId={combatId} myCharId={character.id} onClose={() => setCombatId(null)} />
       )}
-
-      <PartyPopup
-        myCharId={character.id}
-        myLocationId={character.current_location_id}
-        members={partyMembers.map((m: any) => ({ ...m, current_location_id: partyLocations[m.id] ?? null }))}
-        leaderId={partyLeaderId}
-        invites={invites}
-        onRefresh={refreshParty}
-      />
     </div>
   );
 }

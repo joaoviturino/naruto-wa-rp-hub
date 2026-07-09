@@ -9,7 +9,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useServerFn } from "@tanstack/react-start";
 import { updatePlayer, grantSkill, revokeSkill, grantItem, revokeItem, completeMission, uncompleteMission, giftRyo } from "@/lib/admin.functions";
 import { toast } from "sonner";
-import { NINJA_RANKS, PROFICIENCIES, VILLAGES, ELEMENTS, labelize } from "./shared";
+import { NINJA_RANKS, SKILL_RANKS, SKILL_CLASSES, VILLAGES, ELEMENTS, labelize } from "./shared";
 import { X, Plus } from "lucide-react";
 
 export function PlayerEditor({ characterId, open, onOpenChange, onSaved }: {
@@ -56,7 +56,15 @@ export function PlayerEditor({ characterId, open, onOpenChange, onSaved }: {
   );
 
   function up(k: string, v: any) { setChar((p: any) => ({ ...p, [k]: v })); }
-  function upProf(k: string, v: number) { setChar((p: any) => ({ ...p, proficiencies: { ...p.proficiencies, [k]: v } })); }
+  function upProf(k: string, field: "nivel" | "maestria", v: string | null) {
+    setChar((p: any) => ({
+      ...p,
+      proficiencies: {
+        ...(p.proficiencies ?? {}),
+        [k]: { ...((p.proficiencies ?? {})[k] ?? {}), [field]: v },
+      },
+    }));
+  }
 
   const skillIds = new Set(charSkills.map((s) => s.skill_id));
   const missionIds = new Set(charMissions.map((m) => m.mission_id));
@@ -126,19 +134,32 @@ export function PlayerEditor({ characterId, open, onOpenChange, onSaved }: {
           </TabsContent>
 
           <TabsContent value="prof" className="mt-4">
-            <div className="grid gap-3 sm:grid-cols-2">
-              {PROFICIENCIES.map((p) => (
-                <div key={p}>
-                  <Label className="capitalize">{p}</Label>
-                  <Input type="number" min={0} max={100} value={char.proficiencies?.[p] ?? 0}
-                    onChange={(e) => upProf(p, Number(e.target.value))} />
-                </div>
-              ))}
+            <p className="text-xs text-muted-foreground mb-2">
+              Cada classe tem <b>Nível</b> (proficiência geral) e <b>Rank de Maestria</b> (domínio prático). Deixe em branco se o jogador não pratica a classe.
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2 max-h-[60vh] overflow-y-auto pr-2">
+              {SKILL_CLASSES.map((c) => {
+                const entry = char.proficiencies?.[c.value] ?? {};
+                return (
+                  <div key={c.value} className="border border-border rounded p-2">
+                    <div className="text-sm font-semibold">{c.label}</div>
+                    <div className="grid grid-cols-2 gap-2 mt-1">
+                      <LetterRankSelect label="Nível" value={entry.nivel ?? null} onChange={(v) => upProf(c.value, "nivel", v)} />
+                      <LetterRankSelect label="Maestria" value={entry.maestria ?? null} onChange={(v) => upProf(c.value, "maestria", v)} />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
             <div className="mt-4 flex justify-end">
               <Button onClick={async () => {
                 try {
-                  await save({ data: { character_id: char.id, proficiencies: char.proficiencies } } as any);
+                  // Limpa entradas vazias antes de enviar
+                  const cleaned: any = {};
+                  Object.entries(char.proficiencies ?? {}).forEach(([k, v]: any) => {
+                    if (v && (v.nivel || v.maestria)) cleaned[k] = { nivel: v.nivel ?? null, maestria: v.maestria ?? null };
+                  });
+                  await save({ data: { character_id: char.id, proficiencies: cleaned } } as any);
                   toast.success("Proficiências atualizadas."); onSaved();
                 } catch (e: any) { toast.error(e.message); }
               }}>Salvar proficiências</Button>
@@ -220,6 +241,21 @@ function GrantPicker({ placeholder, options, onPick }: { placeholder: string; op
         <SelectContent>{options.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
       </Select>
       <Button size="sm" disabled={!value} onClick={async () => { if (value) { await onPick(value); setValue(""); } }}><Plus size={14} /></Button>
+    </div>
+  );
+}
+
+function LetterRankSelect({ label, value, onChange }: { label: string; value: string | null; onChange: (v: string | null) => void }) {
+  return (
+    <div>
+      <Label className="text-[10px] uppercase tracking-widest">{label}</Label>
+      <Select value={value ?? "__none__"} onValueChange={(v) => onChange(v === "__none__" ? null : v)}>
+        <SelectTrigger className="h-8"><SelectValue placeholder="—" /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__none__">—</SelectItem>
+          {SKILL_RANKS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+        </SelectContent>
+      </Select>
     </div>
   );
 }

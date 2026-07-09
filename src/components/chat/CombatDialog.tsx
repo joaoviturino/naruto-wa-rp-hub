@@ -12,6 +12,7 @@ import { Sword, Flag } from "lucide-react";
 type Skill = {
   id: string; name: string; energy_type: "ef" | "em" | "chakra"; base_cost: number;
   bonus_speed: number; bonus_critical: number; bonus_energetic: number;
+  cooldown_turns?: number;
 };
 
 export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: string; myCharId: string; onClose: () => void }) {
@@ -30,7 +31,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   async function loadSkills() {
     const { data } = await supabase
       .from("character_skills")
-      .select("skill:skills(id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic)")
+      .select("skill:skills(id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns)")
       .eq("character_id", myCharId);
     const list = ((data as any[]) ?? []).map((r) => r.skill).filter(Boolean) as Skill[];
     setSkills(list);
@@ -56,6 +57,8 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const onlyAlivePlayer = state.players.filter((p: any) => p.alive).length === 1 && aliveMe;
   const myTurn = session.status === "active" && aliveMe && (solo || onlyAlivePlayer || activePlayer?.character_id === myCharId);
   const currentSkill = skills.find((s) => s.id === skillId);
+  const myCooldowns: Record<string, number> = (me?.cooldowns as any) ?? {};
+  const currentCd = currentSkill ? (myCooldowns[currentSkill.id] ?? 0) : 0;
 
   async function doAttack() {
     if (!currentSkill) return;
@@ -122,11 +125,15 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                   onChange={(e) => { setSkillId(e.target.value); const s = skills.find((x) => x.id === e.target.value); if (s) setEnergy(s.base_cost); }}
                   className="w-full bg-input border border-border rounded px-2 py-2 text-sm">
                   {skills.length === 0 && <option value="">Você não conhece nenhuma habilidade.</option>}
-                  {skills.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} — {s.energy_type.toUpperCase()} • ×{s.bonus_energetic} energ • ×{s.bonus_critical} crit • ×{s.bonus_speed} spd
-                    </option>
-                  ))}
+                  {skills.map((s) => {
+                    const cd = myCooldowns[s.id] ?? 0;
+                    return (
+                      <option key={s.id} value={s.id} disabled={cd > 0}>
+                        {s.name} — {s.energy_type.toUpperCase()} • ×{s.bonus_energetic} energ • ×{s.bonus_critical} crit • ×{s.bonus_speed} spd
+                        {cd > 0 ? ` • ⏳ ${cd}` : (s.cooldown_turns ? ` • CD ${s.cooldown_turns}` : "")}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
               <div>
@@ -134,7 +141,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                 <Input type="number" min={currentSkill?.base_cost ?? 1} value={energy}
                   onChange={(e) => setEnergy(Math.max(1, Number(e.target.value)))} className="w-28" />
               </div>
-              <Button onClick={doAttack} disabled={!currentSkill || attacking}>
+              <Button onClick={doAttack} disabled={!currentSkill || attacking || currentCd > 0}>
                 <Sword size={14} className="mr-1" /> {attacking ? "..." : "Atacar"}
               </Button>
               <Button variant="outline" onClick={() => flee({ data: { session_id: sessionId } })}>
