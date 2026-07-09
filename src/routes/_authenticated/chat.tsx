@@ -105,9 +105,10 @@ function ChatPage() {
     const ch = supabase.channel(`invites-${character.id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "party_invites" }, loadInvites)
       .on("postgres_changes", { event: "*", schema: "public", table: "party_members" }, loadPartyMembers)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "characters" }, loadPartyMembers)
       .subscribe();
     // Fallback de polling (caso realtime falhe por rede/RLS)
-    const poll = setInterval(() => { loadInvites(); loadPartyMembers(); }, 8000);
+    const poll = setInterval(() => { loadInvites(); loadPartyMembers(); }, 3000);
     return () => { supabase.removeChannel(ch); clearInterval(poll); };
   }, [character?.id]);
 

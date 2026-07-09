@@ -225,9 +225,12 @@ export const consumeItem = createServerFn({ method: "POST" })
     const { error } = await context.supabase.from("inventory").update(patch).eq("character_id", char.id);
     if (error) throw new Error(error.message);
 
-    // Aplica restauros de energia definidos em meta.restore = { ef?, em?, chakra? }
-    const restore = (item as any).meta?.restore ?? {};
-    if (restore && (restore.ef || restore.em || restore.chakra)) {
+    // Aplica restauro conforme meta.restore = { pool: "ef"|"em"|"chakra"|"all", mode: "flat"|"percent", amount }
+    const restore = (item as any).meta?.restore as
+      | { pool: "ef" | "em" | "chakra" | "all"; mode: "flat" | "percent"; amount: number }
+      | null | undefined;
+    let restored: Record<string, number> = {};
+    if (restore && restore.amount > 0) {
       const { data: c } = await context.supabase
         .from("characters").select("xp,ef_current,em_current,chakra_current").eq("id", char.id).maybeSingle();
       if (c) {
@@ -235,15 +238,28 @@ export const consumeItem = createServerFn({ method: "POST" })
         const efMax = Math.floor(xp / 2);
         const emMax = xp - efMax;
         const ckMax = xp;
-        const ef = Math.min(efMax, (c.ef_current ?? efMax) + Number(restore.ef ?? 0));
-        const em = Math.min(emMax, (c.em_current ?? emMax) + Number(restore.em ?? 0));
-        const ck = Math.min(ckMax, (c.chakra_current ?? ckMax) + Number(restore.chakra ?? 0));
-        await context.supabase.from("characters")
-          .update({ ef_current: ef, em_current: em, chakra_current: ck })
-          .eq("id", char.id);
+        const efCur = c.ef_current ?? efMax;
+        const emCur = c.em_current ?? emMax;
+        const ckCur = c.chakra_current ?? ckMax;
+        const pools: Array<"ef" | "em" | "chakra"> =
+          restore.pool === "all" ? ["ef", "em", "chakra"] : [restore.pool];
+        const maxOf = { ef: efMax, em: emMax, chakra: ckMax } as const;
+        const curOf = { ef: efCur, em: emCur, chakra: ckCur } as const;
+        const patch: any = {};
+        for (const p of pools) {
+          const gain = restore.mode === "percent"
+            ? Math.round((maxOf[p] * restore.amount) / 100)
+            : Math.round(restore.amount);
+          const next = Math.min(maxOf[p], Math.max(0, curOf[p] + gain));
+          patch[`${p === "chakra" ? "chakra" : p}_current`] = next;
+          restored[p] = next - curOf[p];
+        }
+        if (Object.keys(patch).length > 0) {
+          await context.supabase.from("characters").update(patch).eq("id", char.id);
+        }
       }
     }
-    return { ok: true, consumed: item.name, restored: restore };
+    return { ok: true, consumed: item.name, restored };
   });
 
 /** Descarta 1 unidade de um item da bolsa. */
