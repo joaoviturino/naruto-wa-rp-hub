@@ -85,6 +85,19 @@ export function PartyPopup({ myCharId, myLocationId, members, leaderId, invites,
   }
   function onPointerUp() { dragRef.current = null; }
 
+  async function handleRefresh() {
+    if (!onRefresh || refreshing) return;
+    setRefreshing(true);
+    try {
+      await onRefresh();
+      toast.success("Lista de time atualizada.");
+    } catch (e: any) {
+      toast.error(e.message || "Falha ao atualizar time.");
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   const inParty = members.length > 0;
 
   return (
