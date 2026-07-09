@@ -83,15 +83,35 @@ function ChatPage() {
   }
   async function loadPartyMembers() {
     if (!character) return;
-    const { data: mem } = await supabase.from("party_members").select("party_id").eq("character_id", character.id).maybeSingle();
-    if (!mem) { setPartyMembers([]); setPartyLeaderId(null); setPartyLocations({}); return; }
-    const { data: party } = await supabase.from("parties").select("leader_id").eq("id", (mem as any).party_id).maybeSingle();
-    setPartyLeaderId((party as any)?.leader_id ?? null);
+    // Encontra a party do personagem: como membro OU como líder (fallback caso
+    // party_members não tenha o líder inserido).
+    let partyId: string | null = null;
+    let leaderId: string | null = null;
+    const { data: mem } = await supabase
+      .from("party_members").select("party_id").eq("character_id", character.id).maybeSingle();
+    if (mem) partyId = (mem as any).party_id;
+    if (!partyId) {
+      const { data: led } = await supabase
+        .from("parties").select("id,leader_id").eq("leader_id", character.id).maybeSingle();
+      if (led) { partyId = (led as any).id; leaderId = (led as any).leader_id; }
+    }
+    if (!partyId) { setPartyMembers([]); setPartyLeaderId(null); setPartyLocations({}); return; }
+    if (!leaderId) {
+      const { data: party } = await supabase.from("parties").select("leader_id").eq("id", partyId).maybeSingle();
+      leaderId = (party as any)?.leader_id ?? null;
+    }
+    setPartyLeaderId(leaderId);
     const { data } = await supabase
       .from("party_members")
       .select("character:characters(id,nickname,avatar_url,current_location_id)")
-      .eq("party_id", (mem as any).party_id);
-    const chars = ((data as any[]) ?? []).map((r) => r.character);
+      .eq("party_id", partyId);
+    let chars = ((data as any[]) ?? []).map((r) => r.character).filter(Boolean);
+    // Garante que o líder apareça mesmo que não esteja em party_members
+    if (leaderId && !chars.some((c: any) => c.id === leaderId)) {
+      const { data: lc } = await supabase
+        .from("characters").select("id,nickname,avatar_url,current_location_id").eq("id", leaderId).maybeSingle();
+      if (lc) chars = [lc, ...chars];
+    }
     setPartyMembers(chars);
     const map: Record<string, string | null> = {};
     chars.forEach((c: any) => { map[c.id] = c.current_location_id; });
