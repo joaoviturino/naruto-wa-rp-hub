@@ -18,8 +18,6 @@ export function CleanupGame({
     target_score: Math.max(1, Math.min(40, config?.target_score ?? 8)),
   };
   const [tileCount, setTileCount] = useState(3);
-  const [tileW, setTileW] = useState(1);
-  const [tileH, setTileH] = useState(1);
   const stageRef = useRef<HTMLDivElement>(null);
   const [remaining, setRemaining] = useState(cfg.duration_seconds);
   const [spots, setSpots] = useState<Spot[]>([]);
@@ -35,8 +33,6 @@ export function CleanupGame({
       const w = img.naturalWidth || 1;
       const count = Math.max(1, Math.round(w / h));
       setTileCount(count);
-      setTileW(w);
-      setTileH(h);
     };
     img.src = tileset;
   }, [tileset]);
@@ -113,5 +109,3 @@ export function CleanupGame({
     </div>
   );
 }
-// Suppress unused warning for setters used only in future extensions
-void tileW; void tileH;
