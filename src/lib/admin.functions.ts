@@ -17,6 +17,16 @@ const itemType = z.enum(["consumable","tool","armor_helmet","armor_vest","armor_
 const villageEnum = z.enum(["konoha","suna","kiri","kumo","iwa","ame","kusa","taki","oto","yuki","hoshi","nomad"]);
 const elementEnum = z.enum(["katon","suiton","fuuton","doton","raiton"]);
 
+/** Efeito reutilizável de restauração de energia (itens consumíveis e habilidades suplementares). */
+const restoreEffect = z.object({
+  pool: z.enum(["ef","em","chakra","all"]),
+  mode: z.enum(["flat","percent"]),
+  amount: z.number().min(0).max(100000),
+}).nullable().optional();
+const metaSchema = z.object({
+  restore: restoreEffect,
+}).partial().nullable().optional();
+
 /** Send a test message via the bot queue. */
 export const enqueueMessage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -77,6 +87,26 @@ export const setUserXp = createServerFn({ method: "POST" })
     await supabaseAdmin.from("characters").update({ xp: data.xp }).eq("id", data.character_id);
     await supabaseAdmin.from("audit_log").insert({ admin_id: context.userId, action: "set_xp", target: data.character_id, meta: { xp: data.xp } });
     return { ok: true };
+  });
+
+/** Restaura energias (ef/em/chakra) do personagem ao máximo derivado do xp. */
+export const restoreEnergies = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ character_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: c, error: cErr } = await supabaseAdmin.from("characters").select("xp").eq("id", data.character_id).maybeSingle();
+    if (cErr) throw new Error(cErr.message);
+    if (!c) throw new Error("Personagem não encontrado.");
+    const xp = c.xp ?? 0;
+    const half = Math.floor(xp / 2);
+    const patch = { ef_current: half, em_current: xp - half, chakra_current: xp };
+    const { error } = await supabaseAdmin.from("characters").update(patch).eq("id", data.character_id);
+    if (error) throw new Error(error.message);
+    await supabaseAdmin.from("audit_log").insert({ admin_id: context.userId, action: "restore_energies", target: data.character_id, meta: patch });
+    return { ok: true, ...patch };
   });
 
 export const grantRole = createServerFn({ method: "POST" })
@@ -214,6 +244,7 @@ const itemPayload = z.object({
   req_proficiency_level: z.number().int().min(0).max(100).nullable().optional(),
   req_mission_id: z.string().uuid().nullable().optional(),
   req_skill_id: z.string().uuid().nullable().optional(),
+  meta: metaSchema,
 });
 
 export const upsertItem = createServerFn({ method: "POST" })
@@ -261,6 +292,7 @@ const skillPayload = z.object({
   bonus_speed: z.number().min(0).max(100).default(1),
   bonus_critical: z.number().min(0).max(100).default(1),
   bonus_energetic: z.number().min(0).max(100).default(1),
+  meta: metaSchema,
 });
 
 export const upsertSkill = createServerFn({ method: "POST" })

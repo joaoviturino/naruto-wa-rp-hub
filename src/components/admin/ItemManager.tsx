@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { ImageUpload } from "@/components/ImageUpload";
 import { NINJA_RANKS, SKILL_RANKS, ITEM_TYPES, PROFICIENCIES, labelize } from "./shared";
 import { Trash2, Pencil, Plus } from "lucide-react";
+import { RestoreEffectFields } from "./RestoreEffectFields";
 
 type Item = any;
 
@@ -124,12 +125,19 @@ function ItemDialog({ open, onOpenChange, initial, missions, skills, adminUserId
             <Label>Descrição</Label>
             <Textarea rows={3} value={f.description ?? ""} onChange={(e) => up("description", e.target.value)} />
           </div>
+          {f.type === "consumable" && (
+            <RestoreEffectFields
+              value={f.meta?.restore ?? null}
+              onChange={(r) => up("meta", { ...(f.meta ?? {}), restore: r })}
+              title="Restauração de energia (consumível)"
+            />
+          )}
         </div>
         <div className="flex justify-end gap-2 mt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button onClick={async () => {
             try {
-              await save({ data: { ...f, description: f.description || null, image_url: f.image_url || null } } as any);
+              await save({ data: { ...f, description: f.description || null, image_url: f.image_url || null, meta: f.meta ?? {} } } as any);
               toast.success("Item salvo."); onSaved();
             } catch (e: any) { toast.error(e.message); }
           }}>Salvar</Button>
