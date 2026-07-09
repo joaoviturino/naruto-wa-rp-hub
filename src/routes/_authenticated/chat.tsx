@@ -14,6 +14,7 @@ import { PlayerActionMenu } from "@/components/chat/PlayerActionMenu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { listMinigamesForMyLocation } from "@/lib/minigame.functions";
 import { MinigameDialog } from "@/components/minigame/MinigameDialog";
+import { NpcInteractPanel } from "@/components/chat/NpcInteractPanel";
 
 export const Route = createFileRoute("/_authenticated/chat")({ component: ChatPage });
 
@@ -281,6 +282,8 @@ function ChatPage() {
           </div>
         </div>
       )}
+
+      {currentLoc && <NpcInteractPanel locationId={currentLoc.id} />}
 
       <div>
         <div className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1 mb-2"><Compass size={12} /> {character.current_location_id ? "Locais próximos" : "Escolha onde iniciar"}</div>

@@ -10,7 +10,16 @@ import { upsertNpc, deleteNpc, setNpcSkills } from "@/lib/npc.functions";
 import { toast } from "sonner";
 
 type DropRow = { item_id: string; qty: number; chance: number };
-type Npc = { id: string; name: string; image_url: string | null; description: string | null; hp_max: number; xp: number; energy_max: number; reward_xp: number; reward_ryo: number; drop_table: DropRow[] };
+type ShopRow = { item_id: string; price: number; stock: number };
+type RewardRow = { item_id: string; qty: number };
+type NpcKind = "aggressive" | "shop" | "reward";
+type Npc = {
+  id: string; name: string; image_url: string | null; description: string | null;
+  hp_max: number; xp: number; energy_max: number;
+  reward_xp: number; reward_ryo: number; drop_table: DropRow[];
+  kind: NpcKind; dialog_intro: string | null; dialog_outro: string | null;
+  shop_items: ShopRow[]; reward_items: RewardRow[]; reward_cooldown_hours: number;
+};
 type Skill = { id: string; name: string; rank: string };
 type Item = { id: string; name: string; type: string };
 
@@ -33,7 +42,14 @@ export function NpcManager() {
       supabase.from("npc_skills").select("npc_id,skill_id"),
       supabase.from("items").select("id,name,type").order("name"),
     ]);
-    setNpcs(((n.data as any[]) ?? []).map((r) => ({ ...r, drop_table: Array.isArray(r.drop_table) ? r.drop_table : [] })));
+    setNpcs(((n.data as any[]) ?? []).map((r) => ({
+      ...r,
+      kind: (r.kind ?? "aggressive") as NpcKind,
+      drop_table: Array.isArray(r.drop_table) ? r.drop_table : [],
+      shop_items: Array.isArray(r.shop_items) ? r.shop_items : [],
+      reward_items: Array.isArray(r.reward_items) ? r.reward_items : [],
+      reward_cooldown_hours: Number(r.reward_cooldown_hours ?? 24),
+    })));
     setSkills((s.data as Skill[]) ?? []);
     setItems((it.data as Item[]) ?? []);
     const map: Record<string, Set<string>> = {};
@@ -130,6 +146,106 @@ export function NpcManager() {
               XP {sel.xp} → EF {Math.floor(sel.xp/2)}, EM {sel.xp - Math.floor(sel.xp/2)}, Chakra {sel.xp}.
             </p>
           </div>
+
+          <div className="scroll-panel rounded-lg p-4 space-y-3">
+            <h4 className="font-display text-lg text-gold">Classe do NPC</h4>
+            <div className="flex gap-2 flex-wrap">
+              {(["aggressive","shop","reward"] as NpcKind[]).map((k) => (
+                <Button key={k} size="sm" variant={sel.kind === k ? "default" : "outline"}
+                  onClick={async () => { await save({ data: { ...sel, kind: k } } as any); load(); }}>
+                  {k === "aggressive" ? "Agressivo" : k === "shop" ? "Loja" : "Recompensa"}
+                </Button>
+              ))}
+            </div>
+            {sel.kind !== "aggressive" && (
+              <div className="grid gap-2">
+                <Label>Diálogo de introdução</Label>
+                <Textarea rows={2} defaultValue={sel.dialog_intro ?? ""}
+                  onBlur={async (e) => { await save({ data: { ...sel, dialog_intro: e.target.value } } as any); load(); }} />
+                <Label>Diálogo de despedida</Label>
+                <Textarea rows={2} defaultValue={sel.dialog_outro ?? ""}
+                  onBlur={async (e) => { await save({ data: { ...sel, dialog_outro: e.target.value } } as any); load(); }} />
+              </div>
+            )}
+          </div>
+
+          {sel.kind === "shop" && (
+            <div className="scroll-panel rounded-lg p-4 space-y-2">
+              <h4 className="font-display text-lg text-gold">Itens da loja</h4>
+              {(sel.shop_items ?? []).map((s, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <select value={s.item_id}
+                    onChange={async (e) => {
+                      const next = [...sel.shop_items]; next[i] = { ...s, item_id: e.target.value };
+                      await save({ data: { ...sel, shop_items: next } } as any); load();
+                    }}
+                    className="flex-1 bg-input border border-border rounded px-2 py-1 text-sm">
+                    {items.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
+                  </select>
+                  <Input type="number" min={0} className="w-24" defaultValue={s.price}
+                    onBlur={async (e) => {
+                      const next = [...sel.shop_items]; next[i] = { ...s, price: Math.max(0, Number(e.target.value)) };
+                      await save({ data: { ...sel, shop_items: next } } as any); load();
+                    }} />
+                  <span className="text-xs text-muted-foreground">Ryo</span>
+                  <Input type="number" min={-1} className="w-20" defaultValue={s.stock}
+                    title="-1 = ilimitado"
+                    onBlur={async (e) => {
+                      const next = [...sel.shop_items]; next[i] = { ...s, stock: Number(e.target.value) };
+                      await save({ data: { ...sel, shop_items: next } } as any); load();
+                    }} />
+                  <span className="text-xs text-muted-foreground">estoque</span>
+                  <Button variant="ghost" size="icon" onClick={async () => {
+                    const next = sel.shop_items.filter((_, j) => j !== i);
+                    await save({ data: { ...sel, shop_items: next } } as any); load();
+                  }}><Trash2 size={14} /></Button>
+                </div>
+              ))}
+              <Button size="sm" variant="outline" onClick={async () => {
+                if (!items.length) return toast.error("Cadastre um item primeiro.");
+                const next = [...(sel.shop_items ?? []), { item_id: items[0].id, price: 100, stock: -1 }];
+                await save({ data: { ...sel, shop_items: next } } as any); load();
+              }}><Plus size={14} className="mr-1" /> Adicionar item</Button>
+              <p className="text-xs text-muted-foreground">Use estoque -1 para vender ilimitado.</p>
+            </div>
+          )}
+
+          {sel.kind === "reward" && (
+            <div className="scroll-panel rounded-lg p-4 space-y-2">
+              <h4 className="font-display text-lg text-gold">Recompensas</h4>
+              <div className="grid grid-cols-3 gap-3">
+                <NumField label="XP" value={sel.reward_xp ?? 0} onSave={(v) => save({ data: { ...sel, reward_xp: v } } as any).then(load)} />
+                <NumField label="Ryo" value={sel.reward_ryo ?? 0} onSave={(v) => save({ data: { ...sel, reward_ryo: v } } as any).then(load)} />
+                <NumField label="Cooldown (h)" value={sel.reward_cooldown_hours ?? 24} onSave={(v) => save({ data: { ...sel, reward_cooldown_hours: v } } as any).then(load)} />
+              </div>
+              {(sel.reward_items ?? []).map((r, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <select value={r.item_id}
+                    onChange={async (e) => {
+                      const next = [...sel.reward_items]; next[i] = { ...r, item_id: e.target.value };
+                      await save({ data: { ...sel, reward_items: next } } as any); load();
+                    }}
+                    className="flex-1 bg-input border border-border rounded px-2 py-1 text-sm">
+                    {items.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
+                  </select>
+                  <Input type="number" min={1} className="w-20" defaultValue={r.qty}
+                    onBlur={async (e) => {
+                      const next = [...sel.reward_items]; next[i] = { ...r, qty: Math.max(1, Number(e.target.value)) };
+                      await save({ data: { ...sel, reward_items: next } } as any); load();
+                    }} />
+                  <Button variant="ghost" size="icon" onClick={async () => {
+                    const next = sel.reward_items.filter((_, j) => j !== i);
+                    await save({ data: { ...sel, reward_items: next } } as any); load();
+                  }}><Trash2 size={14} /></Button>
+                </div>
+              ))}
+              <Button size="sm" variant="outline" onClick={async () => {
+                if (!items.length) return toast.error("Cadastre um item primeiro.");
+                const next = [...(sel.reward_items ?? []), { item_id: items[0].id, qty: 1 }];
+                await save({ data: { ...sel, reward_items: next } } as any); load();
+              }}><Plus size={14} className="mr-1" /> Adicionar item</Button>
+            </div>
+          )}
 
           <div className="scroll-panel rounded-lg p-4 space-y-2">
             <h4 className="font-display text-lg text-gold">Tabela de drop</h4>
