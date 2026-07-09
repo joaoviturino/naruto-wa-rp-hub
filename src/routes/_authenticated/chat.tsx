@@ -213,6 +213,12 @@ function ChatPage() {
 
   const sidebar = (
     <div className="space-y-3">
+      <Button asChild variant="outline" size="sm" className="w-full justify-between">
+        <Link to="/party">
+          <span className="flex items-center gap-1"><Users size={14} /> Meu time{partyMemberCount > 0 ? ` (${partyMemberCount})` : ""}</span>
+          {invites.length > 0 && <span className="text-[10px] bg-blood text-white rounded-full px-1.5">{invites.length}</span>}
+        </Link>
+      </Button>
       <div>
         <div className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1"><MapPin size={12} /> Você está em</div>
         <div className="font-display text-xl text-gold flex items-center gap-2 min-w-0">
