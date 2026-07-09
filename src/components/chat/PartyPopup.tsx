@@ -14,6 +14,7 @@ type Props = {
   members: Member[];
   leaderId: string | null;
   invites: Invite[];
+  onRefresh?: () => void | Promise<void>;
 };
 
 const STORAGE_KEY = "party-popup-pos";
