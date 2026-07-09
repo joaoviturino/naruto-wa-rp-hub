@@ -181,12 +181,6 @@ function ChatPage() {
         if (p?.id && !seen.has(p.id)) { seen.add(p.id); list.push({ id: p.id, nickname: p.nickname, avatar_url: p.avatar_url }); }
       });
       setPresentHere(list);
-      // Também atualiza posição dos membros da party quando eles estão neste local
-      setPartyLocations((prev) => {
-        const next = { ...prev };
-        list.forEach((p) => { next[p.id] = currentLoc.id; });
-        return next;
-      });
     });
     ch.subscribe(async (status) => {
       if (status === "SUBSCRIBED") {
