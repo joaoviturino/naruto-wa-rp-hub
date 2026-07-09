@@ -109,6 +109,86 @@ export const restoreEnergies = createServerFn({ method: "POST" })
     return { ok: true, ...patch };
   });
 
+/* ---------- PARTIES (admin) ---------- */
+
+export const listParties = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: parties } = await supabaseAdmin
+      .from("parties")
+      .select("id,leader_id,created_at,leader:characters!parties_leader_id_fkey(id,nickname,avatar_url)")
+      .order("created_at", { ascending: false });
+    const { data: members } = await supabaseAdmin
+      .from("party_members")
+      .select("party_id,joined_at,character:characters(id,nickname,avatar_url)");
+    const byParty = new Map<string, any[]>();
+    (members ?? []).forEach((m: any) => {
+      const arr = byParty.get(m.party_id) ?? [];
+      arr.push(m);
+      byParty.set(m.party_id, arr);
+    });
+    return (parties ?? []).map((p: any) => ({ ...p, members: byParty.get(p.id) ?? [] }));
+  });
+
+export const listPartyInvites = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("party_invites")
+      .select("id,party_id,status,created_at,from:characters!party_invites_from_character_id_fkey(id,nickname,avatar_url),to:characters!party_invites_to_character_id_fkey(id,nickname,avatar_url)")
+      .order("created_at", { ascending: false })
+      .limit(200);
+    return data ?? [];
+  });
+
+export const deleteParty = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ party_id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("parties").delete().eq("id", data.party_id);
+    if (error) throw new Error(error.message);
+    await supabaseAdmin.from("audit_log").insert({ admin_id: context.userId, action: "delete_party", target: data.party_id, meta: {} });
+    return { ok: true };
+  });
+
+export const deletePartyInvite = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ invite_id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("party_invites").delete().eq("id", data.invite_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/** Reset total: apaga todos os invites e todas as parties (cascata remove membros). */
+export const resetAllParties = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    scope: z.enum(["invites","parties","all"]).default("all"),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    if (data.scope === "invites" || data.scope === "all") {
+      const { error } = await supabaseAdmin.from("party_invites").delete().not("id", "is", null);
+      if (error) throw new Error(error.message);
+    }
+    if (data.scope === "parties" || data.scope === "all") {
+      const { error } = await supabaseAdmin.from("parties").delete().not("id", "is", null);
+      if (error) throw new Error(error.message);
+    }
+    await supabaseAdmin.from("audit_log").insert({ admin_id: context.userId, action: "reset_parties", target: null, meta: { scope: data.scope } });
+    return { ok: true };
+  });
+
 export const grantRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
