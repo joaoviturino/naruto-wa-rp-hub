@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { ImageUpload } from "@/components/ImageUpload";
 import { NINJA_RANKS, SKILL_RANKS, PROFICIENCIES, ELEMENTS, CLASSIFICATIONS, RANGES, SKILL_CLASSES, labelize } from "./shared";
 import { Trash2, Pencil, Plus, Swords } from "lucide-react";
+import { RestoreEffectFields } from "./RestoreEffectFields";
 
 export function SkillManager({ adminUserId }: { adminUserId: string }) {
   const [skills, setSkills] = useState<any[]>([]);
@@ -172,6 +173,13 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
           <Field label="Bônus energético (multiplica energia usada)">
             <Input type="number" step="0.1" min={0} value={f.bonus_energetic ?? 1} onChange={(e) => up("bonus_energetic", Number(e.target.value))} />
           </Field>
+          {f.classification === "suplementar" && (
+            <RestoreEffectFields
+              value={f.meta?.restore ?? null}
+              onChange={(r) => up("meta", { ...(f.meta ?? {}), restore: r })}
+              title="Restauração de energia (habilidade suplementar)"
+            />
+          )}
         </div>
         <div className="flex justify-end gap-2 mt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
@@ -187,6 +195,7 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
                 bonus_speed: Number(f.bonus_speed ?? 1),
                 bonus_critical: Number(f.bonus_critical ?? 1),
                 bonus_energetic: Number(f.bonus_energetic ?? 1),
+                meta: f.meta ?? {},
               } } as any);
               toast.success("Habilidade salva."); onSaved();
             } catch (e: any) { toast.error(e.message); }
