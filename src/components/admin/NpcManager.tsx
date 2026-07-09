@@ -10,7 +10,16 @@ import { upsertNpc, deleteNpc, setNpcSkills } from "@/lib/npc.functions";
 import { toast } from "sonner";
 
 type DropRow = { item_id: string; qty: number; chance: number };
-type Npc = { id: string; name: string; image_url: string | null; description: string | null; hp_max: number; xp: number; energy_max: number; reward_xp: number; reward_ryo: number; drop_table: DropRow[] };
+type ShopRow = { item_id: string; price: number; stock: number };
+type RewardRow = { item_id: string; qty: number };
+type NpcKind = "aggressive" | "shop" | "reward";
+type Npc = {
+  id: string; name: string; image_url: string | null; description: string | null;
+  hp_max: number; xp: number; energy_max: number;
+  reward_xp: number; reward_ryo: number; drop_table: DropRow[];
+  kind: NpcKind; dialog_intro: string | null; dialog_outro: string | null;
+  shop_items: ShopRow[]; reward_items: RewardRow[]; reward_cooldown_hours: number;
+};
 type Skill = { id: string; name: string; rank: string };
 type Item = { id: string; name: string; type: string };
 
@@ -33,7 +42,14 @@ export function NpcManager() {
       supabase.from("npc_skills").select("npc_id,skill_id"),
       supabase.from("items").select("id,name,type").order("name"),
     ]);
-    setNpcs(((n.data as any[]) ?? []).map((r) => ({ ...r, drop_table: Array.isArray(r.drop_table) ? r.drop_table : [] })));
+    setNpcs(((n.data as any[]) ?? []).map((r) => ({
+      ...r,
+      kind: (r.kind ?? "aggressive") as NpcKind,
+      drop_table: Array.isArray(r.drop_table) ? r.drop_table : [],
+      shop_items: Array.isArray(r.shop_items) ? r.shop_items : [],
+      reward_items: Array.isArray(r.reward_items) ? r.reward_items : [],
+      reward_cooldown_hours: Number(r.reward_cooldown_hours ?? 24),
+    })));
     setSkills((s.data as Skill[]) ?? []);
     setItems((it.data as Item[]) ?? []);
     const map: Record<string, Set<string>> = {};
