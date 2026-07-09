@@ -133,8 +133,8 @@ export const rollSpawn = createServerFn({ method: "POST" })
 
     // Escolhe um NPC do local
     const { data: pool } = await context.supabase
-      .from("location_npcs").select("npc_id,weight,npc:npcs(id,name,image_url,hp_max,energy_max,xp)").eq("location_id", loc.id);
-    const rows = (pool as any[]) ?? [];
+      .from("location_npcs").select("npc_id,weight,npc:npcs(id,name,image_url,hp_max,energy_max,xp,kind)").eq("location_id", loc.id);
+    const rows = ((pool as any[]) ?? []).filter((r) => (r.npc?.kind ?? "aggressive") === "aggressive");
     if (!rows.length) return { session_id: null };
     const total = rows.reduce((s, r) => s + (r.weight ?? 1), 0);
     let r = Math.random() * total;
