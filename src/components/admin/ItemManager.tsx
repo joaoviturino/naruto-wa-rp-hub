@@ -60,7 +60,7 @@ export function ItemManager({ adminUserId }: { adminUserId: string }) {
                 <td className="p-2">{it.rank}</td>
                 <td className="p-2 text-xs text-muted-foreground">
                   {it.req_rank && <>Patente ≥ {labelize(it.req_rank)} </>}
-                  {it.req_proficiency_kind && <>· {it.req_proficiency_kind} ≥ {it.req_proficiency_level ?? 0} </>}
+                  {it.req_class && <>· {it.req_class} N{it.req_nivel ?? "—"}/M{it.req_maestria ?? "—"} </>}
                 </td>
                 <td className="p-2 text-right">
                   <Button size="icon" variant="ghost" onClick={() => { setEditing(it); setOpen(true); }}><Pencil size={14} /></Button>
