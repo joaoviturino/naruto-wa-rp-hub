@@ -793,6 +793,7 @@ export type Database = {
           character_id: string
           completed_at: string
           id: string
+          location_id: string | null
           minigame_id: string
           rewards_applied: Json
           score: number
@@ -802,6 +803,7 @@ export type Database = {
           character_id: string
           completed_at?: string
           id?: string
+          location_id?: string | null
           minigame_id: string
           rewards_applied?: Json
           score?: number
@@ -811,6 +813,7 @@ export type Database = {
           character_id?: string
           completed_at?: string
           id?: string
+          location_id?: string | null
           minigame_id?: string
           rewards_applied?: Json
           score?: number
@@ -822,6 +825,13 @@ export type Database = {
             columns: ["character_id"]
             isOneToOne: false
             referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "minigame_runs_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
             referencedColumns: ["id"]
           },
           {

@@ -1,0 +1,2 @@
+ALTER TABLE public.minigame_runs ADD COLUMN IF NOT EXISTS location_id uuid REFERENCES public.locations(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_minigame_runs_location_id ON public.minigame_runs(location_id);
