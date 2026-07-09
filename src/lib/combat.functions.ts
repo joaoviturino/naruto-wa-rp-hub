@@ -419,7 +419,7 @@ export const useCombatItem = createServerFn({ method: "POST" })
     if (!activePlayer || activePlayer.character_id !== me.id) throw new Error("Não é sua vez.");
 
     // Retira 1 da bolsa (ninja_bag OU secondary_bag)
-    const { data: inv } = await supabaseAdmin.from("inventory").select("ninja_bag,secondary_bag").eq("character_id", me.id).maybeSingle();
+    const { data: inv } = await supabaseAdmin.from("inventory").select("ninja_bag,secondary_slots").eq("character_id", me.id).maybeSingle();
     if (!inv) throw new Error("Sem inventário.");
     const removeOne = (arr: any[]) => {
       const b = Array.isArray(arr) ? arr.map((e: any) => ({ item_id: e.item_id, qty: Number(e.qty ?? 1) })) : [];
@@ -433,8 +433,8 @@ export const useCombatItem = createServerFn({ method: "POST" })
     const nb = removeOne(inv.ninja_bag as any);
     if (nb) patch = { ninja_bag: nb };
     else {
-      const sb = removeOne(inv.secondary_bag as any);
-      if (sb) patch = { secondary_bag: sb };
+      const sb = removeOne(inv.secondary_slots as any);
+      if (sb) patch = { secondary_slots: sb };
     }
     if (!patch) throw new Error("Você não tem este item.");
 
