@@ -401,7 +401,7 @@ export const fleeCombat = createServerFn({ method: "POST" })
  * Usa um item consumível durante o combate. Aplica restore no jogador ativo,
  * consome 1 unidade da bolsa e passa para o próximo turno (NPC responde).
  */
-export const useCombatItem = createServerFn({ method: "POST" })
+export const consumeInCombat = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({
     session_id: z.string().uuid(),

@@ -7,7 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useServerFn } from "@tanstack/react-start";
-import { playerAttack, fleeCombat, useCombatItem } from "@/lib/combat.functions";
+import { playerAttack, fleeCombat, consumeInCombat } from "@/lib/combat.functions";
 import { toast } from "sonner";
 import { Sword, Flag, Zap, FlaskConical, Users } from "lucide-react";
 
@@ -30,7 +30,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const [avatars, setAvatars] = useState<Record<string, string | null>>({});
   const attack = useServerFn(playerAttack);
   const flee = useServerFn(fleeCombat);
-  const useItem = useServerFn(useCombatItem);
+  const consume = useServerFn(consumeInCombat);
 
   async function load() {
     const { data } = await supabase.from("combat_sessions").select("*").eq("id", sessionId).maybeSingle();
@@ -84,12 +84,15 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   }, [session?.id]);
 
   if (!session) return null;
-  const state = session.state as any;
-  const me = state.players.find((p: any) => p.character_id === myCharId);
-  const activePlayer = state.players[state.active];
+  const state = (session.state ?? {}) as any;
+  const players: any[] = Array.isArray(state.players) ? state.players : [];
+  const npc = state.npc ?? { name: "?", image_url: null, hp: 0, hp_max: 1, energy: 0, energy_max: 1 };
+  const log: any[] = Array.isArray(session.log) ? session.log : [];
+  const me = players.find((p: any) => p.character_id === myCharId);
+  const activePlayer = players[state.active ?? 0];
   const aliveMe = !!me?.alive;
-  const solo = state.players.length <= 1;
-  const onlyAlivePlayer = state.players.filter((p: any) => p.alive).length === 1 && aliveMe;
+  const solo = players.length <= 1;
+  const onlyAlivePlayer = players.filter((p: any) => p.alive).length === 1 && aliveMe;
   const myTurn = session.status === "active" && aliveMe && (solo || onlyAlivePlayer || activePlayer?.character_id === myCharId);
   const currentSkill = skills.find((s) => s.id === selectedSkill);
   const myCooldowns: Record<string, number> = (me?.cooldowns as any) ?? {};
@@ -107,7 +110,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   async function doItem(itemId: string) {
     setBusy(true);
     try {
-      await useItem({ data: { session_id: sessionId, item_id: itemId } });
+      await consume({ data: { session_id: sessionId, item_id: itemId } });
       await loadBag();
     } catch (e: any) { toast.error(e.message); }
     finally { setBusy(false); }
@@ -120,7 +123,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
       <DialogContent className="max-w-4xl p-0 overflow-hidden border-blood/30">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 px-4 pt-4">
-            <Sword size={16} /> Combate: {state.npc.name}
+            <Sword size={16} /> Combate: {npc.name}
             {session.status !== "active" && <span className="ml-2 text-xs uppercase text-gold">{session.status}</span>}
           </DialogTitle>
         </DialogHeader>
@@ -128,9 +131,9 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
         {/* Turn order strip */}
         <div className="flex items-center gap-1 px-3 py-2 border-b border-border bg-input/40 overflow-x-auto">
           <span className="text-[10px] uppercase text-muted-foreground mr-2 shrink-0">Turno</span>
-          {[state.npc, ...state.players].map((entity: any, i: number) => {
+          {[npc, ...players].map((entity: any, i: number) => {
             const isNpc = i === 0;
-            const active = !isNpc && state.players[state.active]?.character_id === entity.character_id;
+            const active = !isNpc && players[state.active ?? 0]?.character_id === entity.character_id;
             const img = isNpc ? entity.image_url : avatars[entity.character_id];
             return (
               <div key={i} className={`w-10 h-10 rounded-md overflow-hidden shrink-0 border-2 ${active ? "border-gold ring-2 ring-gold/40" : isNpc ? "border-blood/60" : "border-border"} bg-secondary`}>
@@ -145,14 +148,14 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
           <div className="flex justify-center">
             <div className="text-center">
               <div className="w-full aspect-square max-w-[240px] mx-auto rounded-lg bg-secondary overflow-hidden border-2 border-blood/40 shadow-lg shadow-blood/20">
-                {state.npc.image_url && <img src={state.npc.image_url} className="w-full h-full object-cover" alt="" />}
+                {npc.image_url && <img src={npc.image_url} className="w-full h-full object-cover" alt="" />}
               </div>
-              <div className="mt-2 font-display text-xl">{state.npc.name}</div>
+              <div className="mt-2 font-display text-xl">{npc.name}</div>
               <div className="mx-auto max-w-[240px]">
-                <div className="flex justify-between text-[10px] mt-1"><span className="text-blood">HP</span><span>{state.npc.hp}/{state.npc.hp_max}</span></div>
-                <Progress value={(state.npc.hp / state.npc.hp_max) * 100} />
-                <div className="flex justify-between text-[10px] mt-1"><span className="text-gold">Energia</span><span>{state.npc.energy}/{state.npc.energy_max}</span></div>
-                <Progress value={(state.npc.energy / state.npc.energy_max) * 100} />
+                <div className="flex justify-between text-[10px] mt-1"><span className="text-blood">HP</span><span>{npc.hp}/{npc.hp_max}</span></div>
+                <Progress value={npc.hp_max ? (npc.hp / npc.hp_max) * 100 : 0} />
+                <div className="flex justify-between text-[10px] mt-1"><span className="text-gold">Energia</span><span>{npc.energy}/{npc.energy_max}</span></div>
+                <Progress value={npc.energy_max ? (npc.energy / npc.energy_max) * 100 : 0} />
               </div>
             </div>
           </div>
@@ -160,9 +163,9 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
 
         {/* Party bar */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 px-3 py-2 border-y border-border bg-background/60">
-          {state.players.map((p: any) => {
+          {players.map((p: any) => {
             const isMe = p.character_id === myCharId;
-            const active = state.players[state.active]?.character_id === p.character_id;
+            const active = players[state.active ?? 0]?.character_id === p.character_id;
             return (
               <div key={p.character_id} className={`rounded-md border p-2 ${active ? "border-gold" : "border-border"} ${!p.alive ? "opacity-40" : ""} ${isMe ? "bg-gold/10" : "bg-input/30"}`}>
                 <div className="flex items-center gap-2">
@@ -190,12 +193,12 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
 
         {/* Log */}
         <div className="mx-3 mt-2 border border-border rounded p-2 max-h-28 overflow-y-auto text-xs space-y-1 bg-input/40">
-          {(session.log as any[]).slice(-8).map((l) => (
+          {log.slice(-8).map((l: any) => (
             <div key={l.seq} className={l.actor === "player" ? "text-emerald-300" : "text-red-300"}>
               #{l.seq} {l.msg}
             </div>
           ))}
-          {(!session.log || session.log.length === 0) && <div className="text-muted-foreground">O combate começou. Escolha uma habilidade.</div>}
+          {log.length === 0 && <div className="text-muted-foreground">O combate começou. Escolha uma habilidade.</div>}
         </div>
 
         <div className="p-3">
@@ -281,7 +284,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
         ) : (
           <div className="flex items-center justify-between">
             <div className="text-sm">
-              {session.status === "won" && <span className="text-emerald-400">Vitória! {state.npc.name} foi derrotado.</span>}
+              {session.status === "won" && <span className="text-emerald-400">Vitória! {npc.name} foi derrotado.</span>}
               {session.status === "lost" && <span className="text-blood">Derrota. Você saiu enfraquecido, mas sem penalidades.</span>}
               {session.status === "fled" && <span className="text-muted-foreground">Fuga registrada.</span>}
             </div>
