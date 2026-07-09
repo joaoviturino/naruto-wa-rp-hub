@@ -30,9 +30,10 @@ function mobileAnchor() {
   return { x: Math.max(MOBILE_MARGIN, window.innerWidth - POPUP_WIDTH - MOBILE_MARGIN), y: MOBILE_TOP };
 }
 
-export function PartyPopup({ myCharId, myLocationId, members, leaderId, invites }: Props) {
+export function PartyPopup({ myCharId, myLocationId, members, leaderId, invites, onRefresh }: Props) {
   const respond = useServerFn(respondPartyInvite);
   const leave = useServerFn(leaveParty);
+  const [refreshing, setRefreshing] = useState(false);
   const [pos, setPos] = useState<{ x: number; y: number }>(() => {
     if (typeof window === "undefined") return { x: 16, y: 16 };
     if (isMobile()) return mobileAnchor();
