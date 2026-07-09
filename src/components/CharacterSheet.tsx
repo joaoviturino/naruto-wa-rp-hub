@@ -59,7 +59,7 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
   return (
     <div className="mx-auto max-w-6xl">
       {/* Banner */}
-      <div className="relative h-56 sm:h-72 overflow-hidden bg-secondary">
+      <div className="relative h-44 sm:h-72 overflow-hidden bg-secondary">
         {char.banner_url ? (
           <img src={char.banner_url} className="w-full h-full object-cover opacity-70" alt="" />
         ) : (
@@ -69,9 +69,9 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
           <ImageUpload label="Trocar banner" bucket="banners" userId={char.user_id}
             onUploaded={(url) => updateField("banner_url", url)} />
         </div>
-        <div className="absolute bottom-0 left-0 right-0 p-6 flex items-end gap-4">
+        <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-6 flex items-end gap-3 sm:gap-4">
           <div className="relative">
-            <div className="h-28 w-28 rounded-lg border-2 border-gold overflow-hidden bg-card">
+            <div className="h-20 w-20 sm:h-28 sm:w-28 rounded-lg border-2 border-gold overflow-hidden bg-card shrink-0">
               {char.avatar_url && <img src={char.avatar_url} className="w-full h-full object-cover" alt="" />}
             </div>
             <div className="absolute -bottom-2 -right-2">
@@ -79,10 +79,10 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
                 onUploaded={(url) => updateField("avatar_url", url)} />
             </div>
           </div>
-          <div>
-            <div className="text-xs uppercase tracking-widest text-gold">{village?.name} · {village?.kanji}</div>
-            <h1 className="font-display text-4xl font-black">{char.nickname}</h1>
-            <div className="mt-1 text-sm">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] sm:text-xs uppercase tracking-widest text-gold truncate">{village?.name} · {village?.kanji}</div>
+            <h1 className="font-display text-2xl sm:text-4xl font-black truncate">{char.nickname}</h1>
+            <div className="mt-1 text-xs sm:text-sm truncate">
               <span className={RARITY_COLOR[rarity]}>{RARITY_LABEL[rarity]}</span>
               {" · "}
               <span className="text-gold">{char.clan?.name ?? "Sem clã"}</span>
@@ -94,25 +94,25 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
       </div>
 
       {/* Status */}
-      <div className="grid grid-cols-3 gap-4 p-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 p-4 sm:p-6">
         <StatBlock label="Energia Física (EF)" value={`${efCur} / ${s.ef}`} accent="oklch(0.55 0.22 25)" />
         <StatBlock label="Energia Mental (EM)" value={`${emCur} / ${s.em}`} accent="oklch(0.6 0.15 220)" />
         <StatBlock label="Chakra total" value={`${ckCur} / ${s.chakra}`} accent="oklch(0.78 0.15 80)" />
       </div>
-      <div className="px-6">
+      <div className="px-4 sm:px-6">
         <div className="text-xs text-muted-foreground mb-1">XP: {char.xp} / {nextLevel}</div>
         <Progress value={(char.xp / nextLevel) * 100} />
         <div className="text-xs text-gold mt-2">Ryo: {char.ryo ?? 0} 💰</div>
       </div>
 
-      <Tabs defaultValue="ficha" className="p-6">
-        <TabsList>
-          <TabsTrigger value="ficha">Ficha</TabsTrigger>
-          <TabsTrigger value="inventario">Inventário</TabsTrigger>
-          <TabsTrigger value="databook">Databook</TabsTrigger>
+      <Tabs defaultValue="ficha" className="p-4 sm:p-6">
+        <TabsList className="w-full sm:w-auto grid grid-cols-3 sm:inline-flex">
+          <TabsTrigger value="ficha" className="text-xs sm:text-sm">Ficha</TabsTrigger>
+          <TabsTrigger value="inventario" className="text-xs sm:text-sm">Inventário</TabsTrigger>
+          <TabsTrigger value="databook" className="text-xs sm:text-sm">Databook</TabsTrigger>
         </TabsList>
         <TabsContent value="ficha" className="mt-4">
-          <div className="scroll-panel rounded-lg p-6 space-y-4">
+          <div className="scroll-panel rounded-lg p-4 sm:p-6 space-y-4">
             <div className="flex justify-end">
               <SceneImagesManager characterId={characterId} userId={char.user_id} />
             </div>
@@ -120,7 +120,7 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
             <FichaBlock title="Aparência" text={char.appearance} />
             <FichaBlock title="Personalidade" text={char.personality} />
             <FichaBlock title="História" text={char.history} />
-            <div className="text-xs text-muted-foreground">Idade: {char.age ?? "—"} · WhatsApp: {char.phone_e164}</div>
+            <div className="text-xs text-muted-foreground break-words">Idade: {char.age ?? "—"} · WhatsApp: {char.phone_e164}</div>
           </div>
           <div className="mt-4"><DailyMissionsPanel characterId={characterId} /></div>
         </TabsContent>
@@ -139,9 +139,9 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
 
 function StatBlock({ label, value, accent }: { label: string; value: number | string; accent: string }) {
   return (
-    <div className="scroll-panel rounded-lg p-4">
-      <div className="text-xs uppercase tracking-widest text-muted-foreground">{label}</div>
-      <div className="mt-1 font-display text-3xl font-black" style={{ color: accent }}>{value}</div>
+    <div className="scroll-panel rounded-lg p-3 sm:p-4">
+      <div className="text-[10px] sm:text-xs uppercase tracking-widest text-muted-foreground">{label}</div>
+      <div className="mt-1 font-display text-xl sm:text-3xl font-black" style={{ color: accent }}>{value}</div>
     </div>
   );
 }

@@ -90,10 +90,10 @@ export function InventoryView({ characterId, userId, bgUrl, onBgChange }: {
   }
 
   return (
-    <div className="scroll-panel rounded-lg p-6">
+    <div className="scroll-panel rounded-lg p-4 sm:p-6">
       {/* Equipamentos ao redor do personagem */}
-      <div className="grid grid-cols-[1fr_auto_1fr] gap-4 items-stretch">
-        <div className="space-y-3">
+      <div className="grid grid-cols-2 sm:grid-cols-[1fr_auto_1fr] gap-3 sm:gap-4 items-stretch">
+        <div className="space-y-3 order-2 sm:order-1">
           <EquipSlot icon={<ShieldHalf />} label="Elmo / Bandana" slot="helmet_id" itemId={inv.helmet_id} items={items}
             onUnequip={() => run(() => unequip({ data: { slot: "helmet_id" } } as any), "Desequipado.")} />
           <EquipSlot icon={<Shirt />} label="Colete" slot="vest_id" itemId={inv.vest_id} items={items}
@@ -102,7 +102,7 @@ export function InventoryView({ characterId, userId, bgUrl, onBgChange }: {
             onUnequip={() => run(() => unequip({ data: { slot: "primary_weapon_id" } } as any), "Desequipado.")} />
         </div>
 
-        <div className="relative w-64 h-80 border-2 border-gold/50 rounded-lg overflow-hidden bg-gradient-to-b from-secondary to-background flex items-center justify-center">
+        <div className="relative col-span-2 sm:col-span-1 mx-auto w-full max-w-xs sm:w-64 h-64 sm:h-80 border-2 border-gold/50 rounded-lg overflow-hidden bg-gradient-to-b from-secondary to-background flex items-center justify-center order-1 sm:order-2">
           {bgUrl ? (
             <img src={bgUrl} alt="Personagem" className="max-h-full max-w-full object-contain" />
           ) : (
@@ -116,7 +116,7 @@ export function InventoryView({ characterId, userId, bgUrl, onBgChange }: {
           </div>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-3 order-3">
           <EquipSlot icon={<Shirt className="rotate-180" />} label="Calça" slot="pants_id" itemId={inv.pants_id} items={items}
             onUnequip={() => run(() => unequip({ data: { slot: "pants_id" } } as any), "Desequipado.")} />
           <EquipSlot icon={<Footprints />} label="Botas" slot="boots_id" itemId={inv.boots_id} items={items}
@@ -132,7 +132,7 @@ export function InventoryView({ characterId, userId, bgUrl, onBgChange }: {
           <h3 className="font-display text-lg text-gold flex items-center gap-2"><Backpack size={18} /> Bolsa Ninja</h3>
           <span className="text-xs text-muted-foreground">{bagUsed} / {NINJA_BAG_CAPACITY}</span>
         </div>
-        <div className="grid grid-cols-10 gap-1">
+        <div className="grid grid-cols-6 sm:grid-cols-10 gap-1">
           {renderCells("ninja_bag", NINJA_BAG_CAPACITY, inv.ninja_bag)}
         </div>
       </div>
@@ -143,7 +143,7 @@ export function InventoryView({ characterId, userId, bgUrl, onBgChange }: {
           <h3 className="font-display text-lg text-gold">Slots Secundários</h3>
           <span className="text-xs text-muted-foreground">{secondaryUsed} / {SECONDARY_SLOTS}</span>
         </div>
-        <div className="grid grid-cols-10 gap-1">
+        <div className="grid grid-cols-6 sm:grid-cols-10 gap-1">
           {renderCells("secondary_slots", SECONDARY_SLOTS, inv.secondary_slots)}
         </div>
       </div>
