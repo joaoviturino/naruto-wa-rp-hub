@@ -10,7 +10,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { upsertSkill, deleteSkill } from "@/lib/admin.functions";
 import { toast } from "sonner";
 import { ImageUpload } from "@/components/ImageUpload";
-import { NINJA_RANKS, SKILL_RANKS, PROFICIENCIES, ELEMENTS, CLASSIFICATIONS, RANGES, SKILL_CLASSES, labelize } from "./shared";
+import { NINJA_RANKS, SKILL_RANKS, ELEMENTS, CLASSIFICATIONS, RANGES, SKILL_CLASSES, labelize } from "./shared";
 import { Trash2, Pencil, Plus, Swords } from "lucide-react";
 import { RestoreEffectFields } from "./RestoreEffectFields";
 
@@ -132,10 +132,15 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
           <Field label="Patente mínima">
             <NullableSelect value={f.req_rank} onChange={(v: any) => up("req_rank", v)} options={NINJA_RANKS.map((r) => ({ value: r.value, label: r.label }))} />
           </Field>
-          <Field label="Proficiência requerida">
-            <NullableSelect value={f.req_proficiency_kind} onChange={(v: any) => up("req_proficiency_kind", v)} options={PROFICIENCIES.map((p) => ({ value: p, label: p }))} />
+          <Field label="Classe requerida">
+            <NullableSelect value={f.req_class} onChange={(v: any) => up("req_class", v)} options={SKILL_CLASSES.map((c) => ({ value: c.value, label: c.label }))} />
           </Field>
-          <Field label="Nível mínimo"><Input type="number" min={0} max={100} value={f.req_proficiency_level ?? ""} onChange={(e) => up("req_proficiency_level", e.target.value === "" ? null : Number(e.target.value))} /></Field>
+          <Field label="Nível mínimo">
+            <NullableSelect value={f.req_nivel} onChange={(v: any) => up("req_nivel", v)} options={SKILL_RANKS.map((r) => ({ value: r, label: r }))} />
+          </Field>
+          <Field label="Maestria mínima">
+            <NullableSelect value={f.req_maestria} onChange={(v: any) => up("req_maestria", v)} options={SKILL_RANKS.map((r) => ({ value: r, label: r }))} />
+          </Field>
           <Field label="Requer missão">
             <NullableSelect value={f.req_mission_id} onChange={(v: any) => up("req_mission_id", v)} options={missions.map((m: any) => ({ value: m.id, label: m.name }))} />
           </Field>
@@ -173,6 +178,9 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
           <Field label="Bônus energético (multiplica energia usada)">
             <Input type="number" step="0.1" min={0} value={f.bonus_energetic ?? 1} onChange={(e) => up("bonus_energetic", Number(e.target.value))} />
           </Field>
+          <Field label="Cooldown (turnos)">
+            <Input type="number" min={0} max={50} value={f.cooldown_turns ?? 0} onChange={(e) => up("cooldown_turns", Number(e.target.value))} />
+          </Field>
           {f.classification === "suplementar" && (
             <RestoreEffectFields
               value={f.meta?.restore ?? null}
@@ -195,6 +203,7 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
                 bonus_speed: Number(f.bonus_speed ?? 1),
                 bonus_critical: Number(f.bonus_critical ?? 1),
                 bonus_energetic: Number(f.bonus_energetic ?? 1),
+                cooldown_turns: Number(f.cooldown_turns ?? 0),
                 meta: f.meta ?? {},
               } } as any);
               toast.success("Habilidade salva."); onSaved();
