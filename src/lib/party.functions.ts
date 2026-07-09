@@ -92,19 +92,39 @@ export const leaveParty = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     const me = await myChar(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Descobre a party (como membro ou como líder solo)
+    let partyId: string | null = null;
     const { data: mem } = await supabaseAdmin.from("party_members").select("party_id").eq("character_id", me.id).maybeSingle();
-    if (!mem) return { ok: true };
-    const { data: party } = await supabaseAdmin.from("parties").select("leader_id").eq("id", mem.party_id).maybeSingle();
+    if (mem) partyId = mem.party_id;
+    if (!partyId) {
+      const { data: led } = await supabaseAdmin.from("parties").select("id").eq("leader_id", me.id).maybeSingle();
+      if (led) partyId = led.id;
+    }
+    if (!partyId) return { ok: true };
+    const { data: party } = await supabaseAdmin.from("parties").select("leader_id").eq("id", partyId).maybeSingle();
     await supabaseAdmin.from("party_members").delete().eq("character_id", me.id);
     // Se o líder saiu, transfere para outro membro (ou apaga se ficar vazia)
     if (party?.leader_id === me.id) {
       const { data: next } = await supabaseAdmin
-        .from("party_members").select("character_id").eq("party_id", mem.party_id).limit(1).maybeSingle();
+        .from("party_members").select("character_id").eq("party_id", partyId).limit(1).maybeSingle();
       if (next) {
-        await supabaseAdmin.from("parties").update({ leader_id: next.character_id }).eq("id", mem.party_id);
+        await supabaseAdmin.from("parties").update({ leader_id: next.character_id }).eq("id", partyId);
       }
     }
-    const { count } = await supabaseAdmin.from("party_members").select("*", { count: "exact", head: true }).eq("party_id", mem.party_id);
-    if (!count) await supabaseAdmin.from("parties").delete().eq("id", mem.party_id);
+    const { count } = await supabaseAdmin.from("party_members").select("*", { count: "exact", head: true }).eq("party_id", partyId);
+    if (!count) await supabaseAdmin.from("parties").delete().eq("id", partyId);
+    return { ok: true };
+  });
+
+/** Líder dissolve o time (remove membros e a party). */
+export const disbandParty = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const me = await myChar(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: led } = await supabaseAdmin.from("parties").select("id").eq("leader_id", me.id).maybeSingle();
+    if (!led) throw new Error("Você não lidera nenhum time.");
+    const { error } = await supabaseAdmin.from("parties").delete().eq("id", led.id);
+    if (error) throw new Error(error.message);
     return { ok: true };
   });
