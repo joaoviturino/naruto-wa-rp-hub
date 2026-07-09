@@ -118,6 +118,11 @@ export function PartyPopup({ myCharId, myLocationId, members, leaderId, invites,
           Time {inParty ? `(${members.length}/3)` : ""}
           {invites.length > 0 && <span className="ml-1 text-[10px] bg-blood text-white rounded-full px-1.5">{invites.length}</span>}
         </div>
+        {onRefresh && (
+          <Button variant="ghost" size="icon" className={`h-5 w-5 ${refreshing ? "animate-spin" : ""}`} onClick={handleRefresh}>
+            <RefreshCw size={12} />
+          </Button>
+        )}
         <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setCollapsed((v) => !v)}>
           {collapsed ? <Plus size={12} /> : <Minus size={12} />}
         </Button>
