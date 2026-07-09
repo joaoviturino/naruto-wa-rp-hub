@@ -130,9 +130,12 @@ export const startMinigameRun = createServerFn({ method: "POST" })
       const next = new Date(last.completed_at).getTime() + (game.cooldown_hours * 3600 * 1000);
       if (next > Date.now()) throw new Error("Missão em recarga. Volte mais tarde.");
     }
-    const { data: row, error } = await context.supabase.from("minigame_runs").insert({
-      character_id: char.id, minigame_id: data.minigame_id, location_id: char.current_location_id,
-    }).select("id").single();
+    const insertRow: any = {
+      character_id: char.id,
+      minigame_id: data.minigame_id,
+      location_id: char.current_location_id,
+    };
+    const { data: row, error } = await context.supabase.from("minigame_runs").insert(insertRow).select("id").single();
     if (error) throw new Error(error.message);
     return { run_id: row.id, game };
   });
