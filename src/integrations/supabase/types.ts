@@ -530,11 +530,10 @@ export type Database = {
           meta: Json
           name: string
           rank: Database["public"]["Enums"]["skill_rank"]
+          req_class: Database["public"]["Enums"]["skill_class"] | null
+          req_maestria: Database["public"]["Enums"]["skill_rank"] | null
           req_mission_id: string | null
-          req_proficiency_kind:
-            | Database["public"]["Enums"]["proficiency_kind"]
-            | null
-          req_proficiency_level: number | null
+          req_nivel: Database["public"]["Enums"]["skill_rank"] | null
           req_rank: Database["public"]["Enums"]["ninja_rank"] | null
           req_skill_id: string | null
           slot_size: number
@@ -548,11 +547,10 @@ export type Database = {
           meta?: Json
           name: string
           rank?: Database["public"]["Enums"]["skill_rank"]
+          req_class?: Database["public"]["Enums"]["skill_class"] | null
+          req_maestria?: Database["public"]["Enums"]["skill_rank"] | null
           req_mission_id?: string | null
-          req_proficiency_kind?:
-            | Database["public"]["Enums"]["proficiency_kind"]
-            | null
-          req_proficiency_level?: number | null
+          req_nivel?: Database["public"]["Enums"]["skill_rank"] | null
           req_rank?: Database["public"]["Enums"]["ninja_rank"] | null
           req_skill_id?: string | null
           slot_size?: number
@@ -566,11 +564,10 @@ export type Database = {
           meta?: Json
           name?: string
           rank?: Database["public"]["Enums"]["skill_rank"]
+          req_class?: Database["public"]["Enums"]["skill_class"] | null
+          req_maestria?: Database["public"]["Enums"]["skill_rank"] | null
           req_mission_id?: string | null
-          req_proficiency_kind?:
-            | Database["public"]["Enums"]["proficiency_kind"]
-            | null
-          req_proficiency_level?: number | null
+          req_nivel?: Database["public"]["Enums"]["skill_rank"] | null
           req_rank?: Database["public"]["Enums"]["ninja_rank"] | null
           req_skill_id?: string | null
           slot_size?: number
@@ -1061,6 +1058,7 @@ export type Database = {
           classification:
             | Database["public"]["Enums"]["skill_classification"]
             | null
+          cooldown_turns: number
           description: string | null
           element: Database["public"]["Enums"]["element"] | null
           energy_type: string
@@ -1070,12 +1068,11 @@ export type Database = {
           name: string
           range: Database["public"]["Enums"]["skill_range"] | null
           rank: Database["public"]["Enums"]["skill_rank"]
+          req_class: Database["public"]["Enums"]["skill_class"] | null
+          req_maestria: Database["public"]["Enums"]["skill_rank"] | null
           req_mission_id: string | null
+          req_nivel: Database["public"]["Enums"]["skill_rank"] | null
           req_prereq_skill_id: string | null
-          req_proficiency_kind:
-            | Database["public"]["Enums"]["proficiency_kind"]
-            | null
-          req_proficiency_level: number | null
           req_rank: Database["public"]["Enums"]["ninja_rank"] | null
           skill_class: string | null
           type: string | null
@@ -1089,6 +1086,7 @@ export type Database = {
           classification?:
             | Database["public"]["Enums"]["skill_classification"]
             | null
+          cooldown_turns?: number
           description?: string | null
           element?: Database["public"]["Enums"]["element"] | null
           energy_type?: string
@@ -1098,12 +1096,11 @@ export type Database = {
           name: string
           range?: Database["public"]["Enums"]["skill_range"] | null
           rank?: Database["public"]["Enums"]["skill_rank"]
+          req_class?: Database["public"]["Enums"]["skill_class"] | null
+          req_maestria?: Database["public"]["Enums"]["skill_rank"] | null
           req_mission_id?: string | null
+          req_nivel?: Database["public"]["Enums"]["skill_rank"] | null
           req_prereq_skill_id?: string | null
-          req_proficiency_kind?:
-            | Database["public"]["Enums"]["proficiency_kind"]
-            | null
-          req_proficiency_level?: number | null
           req_rank?: Database["public"]["Enums"]["ninja_rank"] | null
           skill_class?: string | null
           type?: string | null
@@ -1117,6 +1114,7 @@ export type Database = {
           classification?:
             | Database["public"]["Enums"]["skill_classification"]
             | null
+          cooldown_turns?: number
           description?: string | null
           element?: Database["public"]["Enums"]["element"] | null
           energy_type?: string
@@ -1126,12 +1124,11 @@ export type Database = {
           name?: string
           range?: Database["public"]["Enums"]["skill_range"] | null
           rank?: Database["public"]["Enums"]["skill_rank"]
+          req_class?: Database["public"]["Enums"]["skill_class"] | null
+          req_maestria?: Database["public"]["Enums"]["skill_rank"] | null
           req_mission_id?: string | null
+          req_nivel?: Database["public"]["Enums"]["skill_rank"] | null
           req_prereq_skill_id?: string | null
-          req_proficiency_kind?:
-            | Database["public"]["Enums"]["proficiency_kind"]
-            | null
-          req_proficiency_level?: number | null
           req_rank?: Database["public"]["Enums"]["ninja_rank"] | null
           skill_class?: string | null
           type?: string | null
@@ -1224,6 +1221,46 @@ export type Database = {
         | "genjutsu"
         | "fuinjutsu"
         | "iryo"
+      skill_class:
+        | "genjutsu"
+        | "ninjutsu"
+        | "taijutsu"
+        | "shinjutsu"
+        | "armadilha"
+        | "boujutsu"
+        | "bukijutsu"
+        | "bunshinjutsu"
+        | "doujutsu"
+        | "fluxo_de_chakra"
+        | "formacao"
+        | "estilo_de_luta"
+        | "fuuinjutsu"
+        | "gijutsu"
+        | "hiden"
+        | "juinjutsu"
+        | "jujutsu"
+        | "jutsu_basico"
+        | "kaijutsu"
+        | "kekkaijutsu"
+        | "kekkei_genkai"
+        | "kekkei_moura"
+        | "kekkei_touta"
+        | "kenjutsu"
+        | "kinjutsu"
+        | "kinkojutsu"
+        | "konbijutsu"
+        | "kugutsujutsu"
+        | "kyuuinjutsu"
+        | "ninjutsu_espaco_tempo"
+        | "ninjutsu_medico"
+        | "nintaijutsu"
+        | "saiseijutsu"
+        | "senjutsu"
+        | "shurikenjutsu"
+        | "tansakujutsu"
+        | "tenseijutsu"
+        | "tonjutsu"
+        | "yuugoujutsu"
       skill_classification: "ofensivo" | "defensivo" | "suplementar"
       skill_range: "curto" | "medio" | "longo"
       skill_rank: "E" | "D" | "C" | "B" | "A" | "S"
@@ -1400,6 +1437,47 @@ export const Constants = {
         "genjutsu",
         "fuinjutsu",
         "iryo",
+      ],
+      skill_class: [
+        "genjutsu",
+        "ninjutsu",
+        "taijutsu",
+        "shinjutsu",
+        "armadilha",
+        "boujutsu",
+        "bukijutsu",
+        "bunshinjutsu",
+        "doujutsu",
+        "fluxo_de_chakra",
+        "formacao",
+        "estilo_de_luta",
+        "fuuinjutsu",
+        "gijutsu",
+        "hiden",
+        "juinjutsu",
+        "jujutsu",
+        "jutsu_basico",
+        "kaijutsu",
+        "kekkaijutsu",
+        "kekkei_genkai",
+        "kekkei_moura",
+        "kekkei_touta",
+        "kenjutsu",
+        "kinjutsu",
+        "kinkojutsu",
+        "konbijutsu",
+        "kugutsujutsu",
+        "kyuuinjutsu",
+        "ninjutsu_espaco_tempo",
+        "ninjutsu_medico",
+        "nintaijutsu",
+        "saiseijutsu",
+        "senjutsu",
+        "shurikenjutsu",
+        "tansakujutsu",
+        "tenseijutsu",
+        "tonjutsu",
+        "yuugoujutsu",
       ],
       skill_classification: ["ofensivo", "defensivo", "suplementar"],
       skill_range: ["curto", "medio", "longo"],
