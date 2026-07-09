@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Users, GripVertical, Minus, Plus } from "lucide-react";
+import { Users, GripVertical, Minus, Plus, RefreshCw } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { respondPartyInvite, leaveParty } from "@/lib/party.functions";
 import { toast } from "sonner";
