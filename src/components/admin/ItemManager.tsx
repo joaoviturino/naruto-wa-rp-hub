@@ -10,7 +10,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { upsertItem, deleteItem } from "@/lib/admin.functions";
 import { toast } from "sonner";
 import { ImageUpload } from "@/components/ImageUpload";
-import { NINJA_RANKS, SKILL_RANKS, ITEM_TYPES, PROFICIENCIES, labelize } from "./shared";
+import { NINJA_RANKS, SKILL_RANKS, ITEM_TYPES, SKILL_CLASSES, labelize } from "./shared";
 import { Trash2, Pencil, Plus } from "lucide-react";
 import { RestoreEffectFields } from "./RestoreEffectFields";
 
@@ -111,10 +111,15 @@ function ItemDialog({ open, onOpenChange, initial, missions, skills, adminUserId
           <Field label="Patente mínima">
             <NullableSelect value={f.req_rank} onChange={(v: any) => up("req_rank", v)} options={NINJA_RANKS.map((r) => ({ value: r.value, label: r.label }))} />
           </Field>
-          <Field label="Proficiência requerida">
-            <NullableSelect value={f.req_proficiency_kind} onChange={(v: any) => up("req_proficiency_kind", v)} options={PROFICIENCIES.map((p) => ({ value: p, label: p }))} />
+          <Field label="Classe requerida">
+            <NullableSelect value={f.req_class} onChange={(v: any) => up("req_class", v)} options={SKILL_CLASSES.map((c) => ({ value: c.value, label: c.label }))} />
           </Field>
-          <Field label="Nível mínimo dessa proficiência"><Input type="number" min={0} max={100} value={f.req_proficiency_level ?? ""} onChange={(e) => up("req_proficiency_level", e.target.value === "" ? null : Number(e.target.value))} /></Field>
+          <Field label="Nível mínimo">
+            <NullableSelect value={f.req_nivel} onChange={(v: any) => up("req_nivel", v)} options={SKILL_RANKS.map((r) => ({ value: r, label: r }))} />
+          </Field>
+          <Field label="Maestria mínima">
+            <NullableSelect value={f.req_maestria} onChange={(v: any) => up("req_maestria", v)} options={SKILL_RANKS.map((r) => ({ value: r, label: r }))} />
+          </Field>
           <Field label="Requer missão">
             <NullableSelect value={f.req_mission_id} onChange={(v: any) => up("req_mission_id", v)} options={missions.map((m: any) => ({ value: m.id, label: m.name }))} />
           </Field>
