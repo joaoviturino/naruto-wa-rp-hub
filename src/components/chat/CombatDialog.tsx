@@ -7,7 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useServerFn } from "@tanstack/react-start";
-import { playerAttack, fleeCombat, useCombatItem } from "@/lib/combat.functions";
+import { playerAttack, fleeCombat, consumeInCombat } from "@/lib/combat.functions";
 import { toast } from "sonner";
 import { Sword, Flag, Zap, FlaskConical, Users } from "lucide-react";
 
@@ -30,7 +30,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const [avatars, setAvatars] = useState<Record<string, string | null>>({});
   const attack = useServerFn(playerAttack);
   const flee = useServerFn(fleeCombat);
-  const useItem = useServerFn(useCombatItem);
+  const consume = useServerFn(consumeInCombat);
 
   async function load() {
     const { data } = await supabase.from("combat_sessions").select("*").eq("id", sessionId).maybeSingle();
@@ -107,7 +107,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   async function doItem(itemId: string) {
     setBusy(true);
     try {
-      await useItem({ data: { session_id: sessionId, item_id: itemId } });
+      await consume({ data: { session_id: sessionId, item_id: itemId } });
       await loadBag();
     } catch (e: any) { toast.error(e.message); }
     finally { setBusy(false); }
