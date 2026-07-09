@@ -11,9 +11,16 @@ export const NINJA_RANKS = [
 
 export const SKILL_RANKS = ["E","D","C","B","A","S"] as const;
 
+// Legado — mantido apenas para código antigo. O novo sistema usa SKILL_CLASSES
+// com Nível + Maestria em letras (E→S).
 export const PROFICIENCIES = [
   "kenjutsu","shurikenjutsu","taijutsu","ninjutsu","genjutsu","fuinjutsu","iryo",
 ] as const;
+
+export function rankIndex(r: string | null | undefined): number {
+  if (!r) return -1;
+  return SKILL_RANKS.indexOf(r as any);
+}
 
 export const VILLAGES = [
   "konoha","suna","kiri","kumo","iwa","ame","kusa","taki","oto","yuki","hoshi","nomad",
