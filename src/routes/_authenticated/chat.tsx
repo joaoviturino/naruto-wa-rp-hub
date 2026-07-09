@@ -384,6 +384,7 @@ function ChatPage() {
         members={partyMembers.map((m: any) => ({ ...m, current_location_id: partyLocations[m.id] ?? null }))}
         leaderId={partyLeaderId}
         invites={invites}
+        onRefresh={refreshParty}
       />
     </div>
   );
