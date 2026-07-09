@@ -30,8 +30,8 @@ export function Databook({ characterId }: { characterId: string }) {
   }, [characterId]);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-3">
-      <div className="lg:col-span-2 scroll-panel rounded-lg p-6">
+    <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
+      <div className="lg:col-span-2 scroll-panel rounded-lg p-4 sm:p-6">
         <h3 className="font-display text-lg text-gold mb-4">Habilidades aprendidas</h3>
         {skills.length === 0 && <p className="text-sm text-muted-foreground">Nenhuma técnica aprendida ainda. Elas serão liberadas pelo mestre no WhatsApp.</p>}
         <div className="space-y-4">
@@ -57,7 +57,7 @@ export function Databook({ characterId }: { characterId: string }) {
           })}
         </div>
       </div>
-      <div className="scroll-panel rounded-lg p-6">
+      <div className="scroll-panel rounded-lg p-4 sm:p-6">
         <h3 className="font-display text-lg text-gold mb-4">Conhecimentos</h3>
         {knowledges.length === 0 && <p className="text-sm text-muted-foreground">Nenhum conhecimento registrado.</p>}
         <ul className="space-y-2">
