@@ -1,28 +1,36 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { useServerFn } from "@tanstack/react-start";
-import { playerAttack, fleeCombat } from "@/lib/combat.functions";
+import { playerAttack, fleeCombat, useCombatItem } from "@/lib/combat.functions";
 import { toast } from "sonner";
-import { Sword, Flag } from "lucide-react";
+import { Sword, Flag, Zap, FlaskConical, Users } from "lucide-react";
 
 type Skill = {
   id: string; name: string; energy_type: "ef" | "em" | "chakra"; base_cost: number;
   bonus_speed: number; bonus_critical: number; bonus_energetic: number;
-  cooldown_turns?: number;
+  cooldown_turns?: number; description?: string | null;
 };
+type BagEntry = { item_id: string; qty: number };
+type Item = { id: string; name: string; image_url: string | null; type: string };
 
 export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: string; myCharId: string; onClose: () => void }) {
   const [session, setSession] = useState<any>(null);
   const [skills, setSkills] = useState<Skill[]>([]);
-  const [skillId, setSkillId] = useState<string>("");
+  const [selectedSkill, setSelectedSkill] = useState<string>("");
   const [energy, setEnergy] = useState<number>(10);
-  const [attacking, setAttacking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [bag, setBag] = useState<BagEntry[]>([]);
+  const [itemMap, setItemMap] = useState<Record<string, Item>>({});
+  const [avatars, setAvatars] = useState<Record<string, string | null>>({});
   const attack = useServerFn(playerAttack);
   const flee = useServerFn(fleeCombat);
+  const useItem = useServerFn(useCombatItem);
 
   async function load() {
     const { data } = await supabase.from("combat_sessions").select("*").eq("id", sessionId).maybeSingle();
@@ -31,15 +39,30 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   async function loadSkills() {
     const { data } = await supabase
       .from("character_skills")
-      .select("skill:skills(id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns)")
+      .select("skill:skills(id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,description)")
       .eq("character_id", myCharId);
     const list = ((data as any[]) ?? []).map((r) => r.skill).filter(Boolean) as Skill[];
     setSkills(list);
-    if (list.length && !skillId) { setSkillId(list[0].id); setEnergy(list[0].base_cost); }
+    if (list.length && !selectedSkill) { setSelectedSkill(list[0].id); setEnergy(list[0].base_cost); }
+  }
+  async function loadBag() {
+    const { data: inv } = await supabase.from("inventory").select("ninja_bag,secondary_slots").eq("character_id", myCharId).maybeSingle();
+    const b: BagEntry[] = [];
+    for (const src of [inv?.ninja_bag, inv?.secondary_slots]) {
+      if (Array.isArray(src)) for (const e of src as any[]) b.push({ item_id: e.item_id, qty: Number(e.qty ?? 1) });
+    }
+    setBag(b);
+    if (b.length) {
+      const ids = Array.from(new Set(b.map((x) => x.item_id)));
+      const { data: its } = await supabase.from("items").select("id,name,image_url,type").in("id", ids);
+      const map: Record<string, Item> = {};
+      for (const it of (its as Item[]) ?? []) map[it.id] = it;
+      setItemMap(map);
+    }
   }
 
   useEffect(() => {
-    load(); loadSkills();
+    load(); loadSkills(); loadBag();
     const ch = supabase.channel(`combat-${sessionId}`)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "combat_sessions", filter: `id=eq.${sessionId}` },
         (payload) => setSession(payload.new))
@@ -47,6 +70,18 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
     return () => { supabase.removeChannel(ch); };
      
   }, [sessionId]);
+
+  useEffect(() => {
+    // Carrega avatares dos participantes
+    if (!session) return;
+    const ids = (session.state?.players ?? []).map((p: any) => p.character_id);
+    if (!ids.length) return;
+    supabase.from("characters").select("id,avatar_url").in("id", ids).then(({ data }) => {
+      const map: Record<string, string | null> = {};
+      for (const c of (data as any[]) ?? []) map[c.id] = c.avatar_url;
+      setAvatars(map);
+    });
+  }, [session?.id]);
 
   if (!session) return null;
   const state = session.state as any;
@@ -56,58 +91,105 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const solo = state.players.length <= 1;
   const onlyAlivePlayer = state.players.filter((p: any) => p.alive).length === 1 && aliveMe;
   const myTurn = session.status === "active" && aliveMe && (solo || onlyAlivePlayer || activePlayer?.character_id === myCharId);
-  const currentSkill = skills.find((s) => s.id === skillId);
+  const currentSkill = skills.find((s) => s.id === selectedSkill);
   const myCooldowns: Record<string, number> = (me?.cooldowns as any) ?? {};
   const currentCd = currentSkill ? (myCooldowns[currentSkill.id] ?? 0) : 0;
+  const consumables = useMemo(() => bag.filter((e) => itemMap[e.item_id]?.type === "consumable"), [bag, itemMap]);
 
   async function doAttack() {
     if (!currentSkill) return;
-    setAttacking(true);
+    setBusy(true);
     try {
       await attack({ data: { session_id: sessionId, skill_id: currentSkill.id, energy_used: energy } });
     } catch (e: any) { toast.error(e.message); }
-    finally { setAttacking(false); }
+    finally { setBusy(false); }
   }
+  async function doItem(itemId: string) {
+    setBusy(true);
+    try {
+      await useItem({ data: { session_id: sessionId, item_id: itemId } });
+      await loadBag();
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBusy(false); }
+  }
+
+  const poolColor: Record<string, string> = { ef: "oklch(0.55 0.22 25)", em: "oklch(0.6 0.15 220)", chakra: "oklch(0.78 0.15 80)" };
 
   return (
     <Dialog open onOpenChange={(v) => !v && session.status !== "active" && onClose()}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-4xl p-0 overflow-hidden border-blood/30">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 px-4 pt-4">
             <Sword size={16} /> Combate: {state.npc.name}
             {session.status !== "active" && <span className="ml-2 text-xs uppercase text-gold">{session.status}</span>}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="grid grid-cols-[1fr_auto_1fr] gap-4 items-center">
-          {/* NPC */}
-          <div className="text-center">
-            <div className="w-full aspect-square max-w-[220px] mx-auto rounded-lg bg-secondary overflow-hidden border-2 border-blood/40">
-              {state.npc.image_url && <img src={state.npc.image_url} className="w-full h-full object-cover" alt="" />}
-            </div>
-            <div className="mt-2 font-display text-lg">{state.npc.name}</div>
-            <div className="text-xs text-blood">HP {state.npc.hp} / {state.npc.hp_max}</div>
-            <Progress value={(state.npc.hp / state.npc.hp_max) * 100} className="mt-1" />
-          </div>
-
-          <div className="text-2xl font-display text-gold">VS</div>
-
-          {/* Meus stats */}
-          <div className="space-y-1">
-            <div className="font-display text-lg">{me?.nickname}</div>
-            <PoolBar label="EF"  v={me?.ef ?? 0}  m={me?.ef_max ?? 1} color="oklch(0.55 0.22 25)" />
-            <PoolBar label="EM"  v={me?.em ?? 0}  m={me?.em_max ?? 1} color="oklch(0.6 0.15 220)" />
-            <PoolBar label="CK"  v={me?.chakra ?? 0} m={me?.chakra_max ?? 1} color="oklch(0.78 0.15 80)" />
-            {state.players.length > 1 && (
-              <div className="mt-2 text-xs text-muted-foreground">
-                Time: {state.players.filter((p: any) => p.character_id !== myCharId).map((p: any) => `${p.nickname} (${p.alive ? "vivo" : "fora"})`).join(", ")}
+        {/* Turn order strip */}
+        <div className="flex items-center gap-1 px-3 py-2 border-b border-border bg-input/40 overflow-x-auto">
+          <span className="text-[10px] uppercase text-muted-foreground mr-2 shrink-0">Turno</span>
+          {[state.npc, ...state.players].map((entity: any, i: number) => {
+            const isNpc = i === 0;
+            const active = !isNpc && state.players[state.active]?.character_id === entity.character_id;
+            const img = isNpc ? entity.image_url : avatars[entity.character_id];
+            return (
+              <div key={i} className={`w-10 h-10 rounded-md overflow-hidden shrink-0 border-2 ${active ? "border-gold ring-2 ring-gold/40" : isNpc ? "border-blood/60" : "border-border"} bg-secondary`}>
+                {img && <img src={img} className="w-full h-full object-cover" alt="" />}
               </div>
-            )}
+            );
+          })}
+        </div>
+
+        {/* Battle stage */}
+        <div className="relative bg-gradient-to-b from-background to-secondary/40 px-4 py-6">
+          <div className="flex justify-center">
+            <div className="text-center">
+              <div className="w-full aspect-square max-w-[240px] mx-auto rounded-lg bg-secondary overflow-hidden border-2 border-blood/40 shadow-lg shadow-blood/20">
+                {state.npc.image_url && <img src={state.npc.image_url} className="w-full h-full object-cover" alt="" />}
+              </div>
+              <div className="mt-2 font-display text-xl">{state.npc.name}</div>
+              <div className="mx-auto max-w-[240px]">
+                <div className="flex justify-between text-[10px] mt-1"><span className="text-blood">HP</span><span>{state.npc.hp}/{state.npc.hp_max}</span></div>
+                <Progress value={(state.npc.hp / state.npc.hp_max) * 100} />
+                <div className="flex justify-between text-[10px] mt-1"><span className="text-gold">Energia</span><span>{state.npc.energy}/{state.npc.energy_max}</span></div>
+                <Progress value={(state.npc.energy / state.npc.energy_max) * 100} />
+              </div>
+            </div>
           </div>
         </div>
 
+        {/* Party bar */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 px-3 py-2 border-y border-border bg-background/60">
+          {state.players.map((p: any) => {
+            const isMe = p.character_id === myCharId;
+            const active = state.players[state.active]?.character_id === p.character_id;
+            return (
+              <div key={p.character_id} className={`rounded-md border p-2 ${active ? "border-gold" : "border-border"} ${!p.alive ? "opacity-40" : ""} ${isMe ? "bg-gold/10" : "bg-input/30"}`}>
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 rounded overflow-hidden bg-secondary shrink-0">
+                    {avatars[p.character_id] && <img src={avatars[p.character_id]!} className="w-full h-full object-cover" alt="" />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-display truncate">{p.nickname} {isMe && "(você)"}</div>
+                    <div className="grid grid-cols-3 gap-0.5">
+                      {(["ef","em","chakra"] as const).map((k) => {
+                        const v = p[k]; const m = p[`${k}_max` as const];
+                        return (
+                          <div key={k} title={`${k.toUpperCase()} ${v}/${m}`} className="h-1 rounded overflow-hidden bg-input">
+                            <div className="h-full" style={{ width: `${m > 0 ? (v/m)*100 : 0}%`, background: poolColor[k] }} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
         {/* Log */}
-        <div className="mt-3 border border-border rounded p-2 max-h-32 overflow-y-auto text-xs space-y-1 bg-input/40">
+        <div className="mx-3 mt-2 border border-border rounded p-2 max-h-28 overflow-y-auto text-xs space-y-1 bg-input/40">
           {(session.log as any[]).slice(-8).map((l) => (
             <div key={l.seq} className={l.actor === "player" ? "text-emerald-300" : "text-red-300"}>
               #{l.seq} {l.msg}
@@ -116,42 +198,80 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
           {(!session.log || session.log.length === 0) && <div className="text-muted-foreground">O combate começou. Escolha uma habilidade.</div>}
         </div>
 
+        <div className="p-3">
         {session.status === "active" ? (
           myTurn ? (
-            <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto_auto_auto] items-end">
-              <div>
-                <div className="text-xs text-gold mb-1">Sua vez — escolha uma habilidade</div>
-                <select value={skillId}
-                  onChange={(e) => { setSkillId(e.target.value); const s = skills.find((x) => x.id === e.target.value); if (s) setEnergy(s.base_cost); }}
-                  className="w-full bg-input border border-border rounded px-2 py-2 text-sm">
-                  {skills.length === 0 && <option value="">Você não conhece nenhuma habilidade.</option>}
+            <Tabs defaultValue="skills">
+              <TabsList className="w-full grid grid-cols-3">
+                <TabsTrigger value="skills"><Zap size={12} className="mr-1"/>Habilidades</TabsTrigger>
+                <TabsTrigger value="items"><FlaskConical size={12} className="mr-1"/>Itens ({consumables.length})</TabsTrigger>
+                <TabsTrigger value="flee"><Flag size={12} className="mr-1"/>Fugir</TabsTrigger>
+              </TabsList>
+              <TabsContent value="skills" className="mt-2">
+                {skills.length === 0 && <p className="text-sm text-muted-foreground p-4 text-center">Você não conhece nenhuma habilidade.</p>}
+                <div className="grid gap-2 sm:grid-cols-2 max-h-56 overflow-y-auto pr-1">
                   {skills.map((s) => {
                     const cd = myCooldowns[s.id] ?? 0;
+                    const chosen = s.id === selectedSkill;
                     return (
-                      <option key={s.id} value={s.id} disabled={cd > 0}>
-                        {s.name} — {s.energy_type.toUpperCase()} • ×{s.bonus_energetic} energ • ×{s.bonus_critical} crit • ×{s.bonus_speed} spd
-                        {cd > 0 ? ` • ⏳ ${cd}` : (s.cooldown_turns ? ` • CD ${s.cooldown_turns}` : "")}
-                      </option>
+                      <button key={s.id} disabled={cd > 0}
+                        onClick={() => { setSelectedSkill(s.id); setEnergy(s.base_cost); }}
+                        className={`text-left rounded-md border p-2 transition ${chosen ? "border-gold bg-gold/10" : "border-border hover:border-gold/60"} ${cd > 0 ? "opacity-40 cursor-not-allowed" : ""}`}>
+                        <div className="flex items-center justify-between">
+                          <span className="font-display text-sm">{s.name}</span>
+                          <Badge variant="outline" className="text-[9px]">{s.energy_type.toUpperCase()}</Badge>
+                        </div>
+                        <div className="text-[10px] text-muted-foreground mt-1">
+                          ×{s.bonus_energetic} energ • ×{s.bonus_critical} crit • ×{s.bonus_speed} spd
+                          {cd > 0 ? ` • ⏳ ${cd}` : (s.cooldown_turns ? ` • CD ${s.cooldown_turns}` : "")}
+                        </div>
+                      </button>
                     );
                   })}
-                </select>
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground mb-1">Energia ({currentSkill?.energy_type.toUpperCase() ?? "—"})</div>
-                <Input type="number" min={currentSkill?.base_cost ?? 1} value={energy}
-                  onChange={(e) => setEnergy(Math.max(1, Number(e.target.value)))} className="w-28" />
-              </div>
-              <Button onClick={doAttack} disabled={!currentSkill || attacking || currentCd > 0}>
-                <Sword size={14} className="mr-1" /> {attacking ? "..." : "Atacar"}
-              </Button>
-              <Button variant="outline" onClick={() => flee({ data: { session_id: sessionId } })}>
-                <Flag size={14} className="mr-1" /> Fugir
-              </Button>
-            </div>
+                </div>
+                <div className="flex items-end gap-2 mt-3">
+                  <div className="flex-1">
+                    <div className="text-xs text-muted-foreground mb-1">Energia ({currentSkill?.energy_type.toUpperCase() ?? "—"})</div>
+                    <Input type="number" min={currentSkill?.base_cost ?? 1} value={energy}
+                      onChange={(e) => setEnergy(Math.max(1, Number(e.target.value)))} />
+                  </div>
+                  <Button onClick={doAttack} disabled={!currentSkill || busy || currentCd > 0} className="shrink-0">
+                    <Sword size={14} className="mr-1" /> {busy ? "..." : "Atacar"}
+                  </Button>
+                </div>
+              </TabsContent>
+              <TabsContent value="items" className="mt-2">
+                {consumables.length === 0 && <p className="text-sm text-muted-foreground p-4 text-center">Sem consumíveis na bolsa.</p>}
+                <div className="grid gap-2 sm:grid-cols-2 max-h-56 overflow-y-auto pr-1">
+                  {consumables.map((e) => {
+                    const it = itemMap[e.item_id];
+                    return (
+                      <button key={e.item_id} disabled={busy}
+                        onClick={() => doItem(e.item_id)}
+                        className="text-left rounded-md border border-border p-2 hover:border-gold/60 transition flex items-center gap-2">
+                        <div className="w-10 h-10 rounded bg-secondary overflow-hidden shrink-0">
+                          {it?.image_url && <img src={it.image_url} className="w-full h-full object-cover" alt="" />}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-display truncate">{it?.name ?? "?"}</div>
+                          <div className="text-[10px] text-muted-foreground">×{e.qty}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </TabsContent>
+              <TabsContent value="flee" className="mt-2">
+                <div className="text-sm text-muted-foreground mb-2">Fugir encerra o combate para você e o time sem recompensas.</div>
+                <Button variant="outline" onClick={() => flee({ data: { session_id: sessionId } })}>
+                  <Flag size={14} className="mr-1" /> Confirmar fuga
+                </Button>
+              </TabsContent>
+            </Tabs>
           ) : (
-            <div className="mt-3 flex items-center justify-between border border-border rounded p-3 bg-input/30">
+            <div className="flex items-center justify-between border border-border rounded p-3 bg-input/30">
               <div className="text-sm text-muted-foreground">
-                Aguardando <span className="text-gold font-display">{activePlayer?.nickname ?? "…"}</span> agir…
+                <Users size={12} className="inline mr-1"/> Aguardando <span className="text-gold font-display">{activePlayer?.nickname ?? "…"}</span> agir…
               </div>
               <Button variant="outline" size="sm" onClick={() => flee({ data: { session_id: sessionId } })}>
                 <Flag size={14} className="mr-1" /> Fugir
@@ -159,7 +279,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
             </div>
           )
         ) : (
-          <div className="mt-3 flex items-center justify-between">
+          <div className="flex items-center justify-between">
             <div className="text-sm">
               {session.status === "won" && <span className="text-emerald-400">Vitória! {state.npc.name} foi derrotado.</span>}
               {session.status === "lost" && <span className="text-blood">Derrota. Você saiu enfraquecido, mas sem penalidades.</span>}
@@ -168,19 +288,8 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
             <Button onClick={onClose}>Fechar</Button>
           </div>
         )}
+        </div>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function PoolBar({ label, v, m, color }: { label: string; v: number; m: number; color: string }) {
-  const pct = m > 0 ? (v / m) * 100 : 0;
-  return (
-    <div>
-      <div className="flex justify-between text-[10px]"><span>{label}</span><span>{v}/{m}</span></div>
-      <div className="h-2 rounded bg-input overflow-hidden">
-        <div className="h-full rounded transition-all" style={{ width: `${pct}%`, background: color }} />
-      </div>
-    </div>
   );
 }
