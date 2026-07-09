@@ -1188,6 +1188,10 @@ export type Database = {
         Returns: boolean
       }
       user_at_location: { Args: { _loc: string }; Returns: boolean }
+      user_in_party: {
+        Args: { _party: string; _user: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "user"
