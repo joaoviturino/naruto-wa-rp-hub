@@ -15,11 +15,14 @@ type Pool = "ef" | "em" | "chakra";
 
 type Player = {
   character_id: string;
+  user_id?: string | null;
   nickname: string;
   avatar_url: string | null;
   ef: number; em: number; chakra: number;
   ef_max: number; em_max: number; chakra_max: number;
   alive: boolean;
+  /** Cooldown restante por habilidade (turnos). */
+  cooldowns?: Record<string, number>;
 };
 type NpcState = {
   id: string; name: string; image_url: string | null;
@@ -156,6 +159,7 @@ export const rollSpawn = createServerFn({ method: "POST" })
         ef, em, chakra: ck,
         ef_max: s.ef, em_max: s.em, chakra_max: s.chakra,
         alive: (ef + em + ck) > 0,
+        cooldowns: {},
       };
     });
     const state: CombatState = {
@@ -206,12 +210,17 @@ export const playerAttack = createServerFn({ method: "POST" })
     if (!activePlayer || activePlayer.character_id !== me.id) throw new Error("Não é sua vez.");
     if (!activePlayer.alive) throw new Error("Você está fora de combate.");
 
+    // Cooldown check
+    activePlayer.cooldowns = activePlayer.cooldowns ?? {};
+    const cd = activePlayer.cooldowns[data.skill_id] ?? 0;
+    if (cd > 0) throw new Error(`Habilidade em cooldown por mais ${cd} turno(s).`);
+
     // Habilidade precisa pertencer ao jogador
     const { data: owned } = await context.supabase
       .from("character_skills").select("skill_id").eq("character_id", me.id).eq("skill_id", data.skill_id).maybeSingle();
     if (!owned) throw new Error("Você não conhece essa habilidade.");
     const { data: skill } = await context.supabase.from("skills")
-      .select("id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic").eq("id", data.skill_id).maybeSingle();
+      .select("id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class").eq("id", data.skill_id).maybeSingle();
     if (!skill) throw new Error("Habilidade inexistente.");
     if (data.energy_used < skill.base_cost) throw new Error(`Custo mínimo: ${skill.base_cost}.`);
 
@@ -219,15 +228,30 @@ export const playerAttack = createServerFn({ method: "POST" })
     if (activePlayer[pool] < data.energy_used) throw new Error(`Energia insuficiente (${pool.toUpperCase()}).`);
     activePlayer[pool] -= data.energy_used;
 
+    // Bônus de maestria: se a skill tem classe e o personagem tem maestria nela,
+    // aumenta o dano proporcionalmente (E=0%, D=10%, C=20%, B=30%, A=40%, S=50%).
+    let masteryMul = 1;
+    if (skill.req_class) {
+      const { data: c } = await context.supabase
+        .from("characters").select("proficiencies").eq("id", me.id).maybeSingle();
+      const m = (c?.proficiencies as any)?.[skill.req_class]?.maestria as string | undefined;
+      const idx = ["E","D","C","B","A","S"].indexOf(m ?? "");
+      if (idx >= 0) masteryMul = 1 + idx * 0.1;
+    }
     const effective = data.energy_used * Number(skill.bonus_energetic);
     const speed = effective * Number(skill.bonus_speed);
-    const damage = Math.round(effective * Number(skill.bonus_critical));
+    const damage = Math.round(effective * Number(skill.bonus_critical) * masteryMul);
+
+    // Aplica cooldown
+    if (Number(skill.cooldown_turns ?? 0) > 0) {
+      activePlayer.cooldowns[data.skill_id] = Number(skill.cooldown_turns);
+    }
 
     log.push({
       seq: log.length + 1, actor: "player", actor_name: activePlayer.nickname, target_name: state.npc.name,
       skill_name: skill.name, energy_type: pool, energy_used: data.energy_used,
       effective, damage, speed, crit_mul: Number(skill.bonus_critical),
-      msg: `${activePlayer.nickname} usa ${skill.name} (${pool.toUpperCase()} ${data.energy_used}) → ${damage} de dano.`,
+      msg: `${activePlayer.nickname} usa ${skill.name} (${pool.toUpperCase()} ${data.energy_used})${masteryMul > 1 ? ` [Maestria ×${masteryMul.toFixed(1)}]` : ""} → ${damage} de dano.`,
     });
     state.npc.hp = Math.max(0, state.npc.hp - damage);
 
@@ -250,6 +274,13 @@ export const playerAttack = createServerFn({ method: "POST" })
           next = (next + 1) % total;
         }
         state.active = next;
+        // Decrementa cooldowns do jogador que agora vai agir
+        const np = state.players[next];
+        if (np.cooldowns) {
+          for (const k of Object.keys(np.cooldowns)) {
+            np.cooldowns[k] = Math.max(0, (np.cooldowns[k] ?? 0) - 1);
+          }
+        }
       }
     }
 
