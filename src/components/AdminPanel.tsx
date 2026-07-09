@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useServerFn } from "@tanstack/react-start";
-import { enqueueMessage, resetBotSession, requestBotQr, setUserXp } from "@/lib/admin.functions";
+import { enqueueMessage, resetBotSession, requestBotQr, setUserXp, restoreEnergies } from "@/lib/admin.functions";
 import { toast } from "sonner";
 import { PlayerEditor } from "@/components/admin/PlayerEditor";
 import { ItemManager } from "@/components/admin/ItemManager";
@@ -17,7 +17,7 @@ import { AdminUsers } from "@/components/admin/AdminUsers";
 import { LocationManager } from "@/components/admin/LocationManager";
 import { NpcManager } from "@/components/admin/NpcManager";
 import { NINJA_RANKS } from "@/components/admin/shared";
-import { Pencil } from "lucide-react";
+import { Pencil, BatteryCharging } from "lucide-react";
 
 export function AdminPanel() {
   const [adminUserId, setAdminUserId] = useState<string>("");
@@ -87,6 +87,7 @@ function Players() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const setXpFn = useServerFn(setUserXp);
+  const restoreFn = useServerFn(restoreEnergies);
   async function load() {
     const { data } = await supabase.from("characters")
       .select("id,nickname,phone_e164,village,xp,rank,user_id,clan:clans(name,rarity)")
@@ -124,9 +125,18 @@ function Players() {
                   }} />
               </td>
               <td className="p-3 text-right">
-                <Button size="sm" variant="outline" onClick={() => { setEditingId(c.id); setOpen(true); }}>
-                  <Pencil size={14} /> Editar
-                </Button>
+                <div className="flex items-center justify-end gap-1">
+                  <Button size="sm" variant="outline" title="Renovar energias (EF/EM/Chakra ao máximo)"
+                    onClick={async () => {
+                      try { await restoreFn({ data: { character_id: c.id } }); toast.success(`Energias de ${c.nickname} renovadas.`); }
+                      catch (err: any) { toast.error(err.message); }
+                    }}>
+                    <BatteryCharging size={14} /> Renovar
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => { setEditingId(c.id); setOpen(true); }}>
+                    <Pencil size={14} /> Editar
+                  </Button>
+                </div>
               </td>
             </tr>
           ))}
