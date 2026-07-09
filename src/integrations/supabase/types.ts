@@ -1066,6 +1066,7 @@ export type Database = {
           energy_type: string
           id: string
           image_url: string | null
+          meta: Json
           name: string
           range: Database["public"]["Enums"]["skill_range"] | null
           rank: Database["public"]["Enums"]["skill_rank"]
@@ -1093,6 +1094,7 @@ export type Database = {
           energy_type?: string
           id?: string
           image_url?: string | null
+          meta?: Json
           name: string
           range?: Database["public"]["Enums"]["skill_range"] | null
           rank?: Database["public"]["Enums"]["skill_rank"]
@@ -1120,6 +1122,7 @@ export type Database = {
           energy_type?: string
           id?: string
           image_url?: string | null
+          meta?: Json
           name?: string
           range?: Database["public"]["Enums"]["skill_range"] | null
           rank?: Database["public"]["Enums"]["skill_rank"]
