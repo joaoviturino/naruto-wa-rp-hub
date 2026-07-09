@@ -244,3 +244,18 @@ function GrantPicker({ placeholder, options, onPick }: { placeholder: string; op
     </div>
   );
 }
+
+function LetterRankSelect({ label, value, onChange }: { label: string; value: string | null; onChange: (v: string | null) => void }) {
+  return (
+    <div>
+      <Label className="text-[10px] uppercase tracking-widest">{label}</Label>
+      <Select value={value ?? "__none__"} onValueChange={(v) => onChange(v === "__none__" ? null : v)}>
+        <SelectTrigger className="h-8"><SelectValue placeholder="—" /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__none__">—</SelectItem>
+          {SKILL_RANKS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
