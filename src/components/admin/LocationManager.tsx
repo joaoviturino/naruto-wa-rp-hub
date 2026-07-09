@@ -4,21 +4,25 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Trash2, Upload, Link2, Plus, Skull } from "lucide-react";
+import { Trash2, Upload, Link2, Plus, Skull, Gamepad2 } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { updateLocationDangerZone, setLocationNpcs } from "@/lib/npc.functions";
+import { setLocationMinigames } from "@/lib/minigame.functions";
 
 type Loc = { id: string; name: string; description: string | null; image_url: string | null;
   is_danger_zone?: boolean; spawn_chance?: number; spawn_tick_seconds?: number };
 type Conn = { id: string; a_id: string; b_id: string };
 type Npc = { id: string; name: string };
+type Minigame = { id: string; name: string; active: boolean };
 
 export function LocationManager() {
   const [locs, setLocs] = useState<Loc[]>([]);
   const [conns, setConns] = useState<Conn[]>([]);
   const [npcs, setNpcs] = useState<Npc[]>([]);
   const [locNpcs, setLocNpcs] = useState<Record<string, Set<string>>>({});
+  const [minigames, setMinigames] = useState<Minigame[]>([]);
+  const [locMinigames, setLocMinigames] = useState<Record<string, Set<string>>>({});
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
@@ -26,23 +30,33 @@ export function LocationManager() {
   const fileRef = useRef<HTMLInputElement>(null);
   const updateDz = useServerFn(updateLocationDangerZone);
   const setLocNpcsFn = useServerFn(setLocationNpcs);
+  const setLocMgFn = useServerFn(setLocationMinigames);
 
   async function load() {
-    const [l, c, n, ln] = await Promise.all([
+    const [l, c, n, ln, mg, lmg] = await Promise.all([
       supabase.from("locations").select("id,name,description,image_url,is_danger_zone,spawn_chance,spawn_tick_seconds").order("name"),
       supabase.from("location_connections").select("id,a_id,b_id"),
       supabase.from("npcs").select("id,name").order("name"),
       supabase.from("location_npcs").select("location_id,npc_id"),
+      supabase.from("minigames").select("id,name,active").eq("active", true).order("name"),
+      supabase.from("location_minigames").select("location_id,minigame_id"),
     ]);
     setLocs((l.data as Loc[]) ?? []);
     setConns((c.data as Conn[]) ?? []);
     setNpcs((n.data as Npc[]) ?? []);
+    setMinigames((mg.data as Minigame[]) ?? []);
     const map: Record<string, Set<string>> = {};
     (ln.data ?? []).forEach((r: any) => {
       if (!map[r.location_id]) map[r.location_id] = new Set();
       map[r.location_id].add(r.npc_id);
     });
     setLocNpcs(map);
+    const map2: Record<string, Set<string>> = {};
+    (lmg.data ?? []).forEach((r: any) => {
+      if (!map2[r.location_id]) map2[r.location_id] = new Set();
+      map2[r.location_id].add(r.minigame_id);
+    });
+    setLocMinigames(map2);
   }
   useEffect(() => { load(); }, []);
 
@@ -89,6 +103,7 @@ export function LocationManager() {
   const neighborIds = new Set(conns.filter((c) => c.a_id === selected || c.b_id === selected).map((c) => c.a_id === selected ? c.b_id : c.a_id));
   const availableToLink = locs.filter((l) => l.id !== selected && !neighborIds.has(l.id));
   const selNpcs = selected ? locNpcs[selected] ?? new Set<string>() : new Set<string>();
+  const selMg = selected ? locMinigames[selected] ?? new Set<string>() : new Set<string>();
   const avgSpawnSec = sel?.is_danger_zone && (sel.spawn_chance ?? 0) > 0
     ? Math.round((sel.spawn_tick_seconds ?? 60) / ((sel.spawn_chance ?? 0) / 100))
     : null;
@@ -213,6 +228,25 @@ export function LocationManager() {
                 </div>
               </>
             )}
+          </div>
+
+          <div className="scroll-panel rounded-lg p-4 space-y-3">
+            <h4 className="font-display text-lg text-gold flex items-center gap-2"><Gamepad2 size={16} /> Minigames disponíveis aqui</h4>
+            <div className="grid gap-1 max-h-[220px] overflow-y-auto pr-2">
+              {minigames.map((m) => (
+                <label key={m.id} className="flex items-center gap-2 text-sm p-1 hover:bg-secondary/40 rounded">
+                  <input type="checkbox" checked={selMg.has(m.id)}
+                    onChange={async (e) => {
+                      const next = new Set(selMg);
+                      if (e.target.checked) next.add(m.id); else next.delete(m.id);
+                      await setLocMgFn({ data: { location_id: sel.id, minigame_ids: Array.from(next) } });
+                      load();
+                    }} />
+                  <span>{m.name}</span>
+                </label>
+              ))}
+              {minigames.length === 0 && <p className="text-xs text-muted-foreground">Crie minigames ativos na aba Minigames primeiro.</p>}
+            </div>
           </div>
         </div>
       ) : (

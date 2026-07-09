@@ -7,6 +7,7 @@ import { RARITY_COLOR, RARITY_LABEL, VILLAGES, ELEMENTS, stats, type Rarity } fr
 import { Progress } from "@/components/ui/progress";
 import { ImageUpload } from "@/components/ImageUpload";
 import { SceneImagesManager } from "@/components/SceneImagesManager";
+import { DailyMissionsPanel } from "@/components/DailyMissionsPanel";
 import { updateCharacter } from "@/lib/character.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -121,6 +122,7 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
             <FichaBlock title="História" text={char.history} />
             <div className="text-xs text-muted-foreground">Idade: {char.age ?? "—"} · WhatsApp: {char.phone_e164}</div>
           </div>
+          <div className="mt-4"><DailyMissionsPanel characterId={characterId} /></div>
         </TabsContent>
         <TabsContent value="inventario" className="mt-4">
           <InventoryView characterId={characterId} userId={char.user_id}

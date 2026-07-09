@@ -686,6 +686,39 @@ export type Database = {
           },
         ]
       }
+      location_minigames: {
+        Row: {
+          created_at: string
+          location_id: string
+          minigame_id: string
+        }
+        Insert: {
+          created_at?: string
+          location_id: string
+          minigame_id: string
+        }
+        Update: {
+          created_at?: string
+          location_id?: string
+          minigame_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_minigames_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_minigames_minigame_id_fkey"
+            columns: ["minigame_id"]
+            isOneToOne: false
+            referencedRelation: "minigames"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       location_npcs: {
         Row: {
           location_id: string
@@ -751,6 +784,111 @@ export type Database = {
           name?: string
           spawn_chance?: number
           spawn_tick_seconds?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      minigame_runs: {
+        Row: {
+          character_id: string
+          completed_at: string
+          id: string
+          minigame_id: string
+          rewards_applied: Json
+          score: number
+          success: boolean
+        }
+        Insert: {
+          character_id: string
+          completed_at?: string
+          id?: string
+          minigame_id: string
+          rewards_applied?: Json
+          score?: number
+          success?: boolean
+        }
+        Update: {
+          character_id?: string
+          completed_at?: string
+          id?: string
+          minigame_id?: string
+          rewards_applied?: Json
+          score?: number
+          success?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "minigame_runs_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "minigame_runs_minigame_id_fkey"
+            columns: ["minigame_id"]
+            isOneToOne: false
+            referencedRelation: "minigames"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      minigames: {
+        Row: {
+          active: boolean
+          background_url: string | null
+          config: Json
+          cooldown_hours: number
+          created_at: string
+          description: string | null
+          dialog_intro: string | null
+          dialog_outro: string | null
+          id: string
+          kind: Database["public"]["Enums"]["minigame_kind"]
+          name: string
+          npc_name: string | null
+          npc_portrait_url: string | null
+          rewards: Json
+          slug: string
+          tileset_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          background_url?: string | null
+          config?: Json
+          cooldown_hours?: number
+          created_at?: string
+          description?: string | null
+          dialog_intro?: string | null
+          dialog_outro?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["minigame_kind"]
+          name: string
+          npc_name?: string | null
+          npc_portrait_url?: string | null
+          rewards?: Json
+          slug: string
+          tileset_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          background_url?: string | null
+          config?: Json
+          cooldown_hours?: number
+          created_at?: string
+          description?: string | null
+          dialog_intro?: string | null
+          dialog_outro?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["minigame_kind"]
+          name?: string
+          npc_name?: string | null
+          npc_portrait_url?: string | null
+          rewards?: Json
+          slug?: string
+          tileset_url?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -1207,6 +1345,7 @@ export type Database = {
         | "armor_boots"
         | "weapon_primary"
         | "weapon_secondary"
+      minigame_kind: "cleanup"
       msg_status: "pending" | "sent" | "failed"
       ninja_rank:
         | "estudante"
@@ -1422,6 +1561,7 @@ export const Constants = {
         "weapon_primary",
         "weapon_secondary",
       ],
+      minigame_kind: ["cleanup"],
       msg_status: ["pending", "sent", "failed"],
       ninja_rank: [
         "estudante",
