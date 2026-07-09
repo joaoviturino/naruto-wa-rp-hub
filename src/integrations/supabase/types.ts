@@ -128,6 +128,42 @@ export type Database = {
           },
         ]
       }
+      character_npc_rewards: {
+        Row: {
+          character_id: string
+          claimed_at: string
+          id: string
+          npc_id: string
+        }
+        Insert: {
+          character_id: string
+          claimed_at?: string
+          id?: string
+          npc_id: string
+        }
+        Update: {
+          character_id?: string
+          claimed_at?: string
+          id?: string
+          npc_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "character_npc_rewards_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "character_npc_rewards_npc_id_fkey"
+            columns: ["npc_id"]
+            isOneToOne: false
+            referencedRelation: "npcs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       character_skills: {
         Row: {
           character_id: string
@@ -964,42 +1000,60 @@ export type Database = {
         Row: {
           created_at: string
           description: string | null
+          dialog_intro: string | null
+          dialog_outro: string | null
           drop_table: Json
           energy_max: number
           hp_max: number
           id: string
           image_url: string | null
+          kind: Database["public"]["Enums"]["npc_kind"]
           name: string
+          reward_cooldown_hours: number
+          reward_items: Json
           reward_ryo: number
           reward_xp: number
+          shop_items: Json
           updated_at: string
           xp: number
         }
         Insert: {
           created_at?: string
           description?: string | null
+          dialog_intro?: string | null
+          dialog_outro?: string | null
           drop_table?: Json
           energy_max?: number
           hp_max?: number
           id?: string
           image_url?: string | null
+          kind?: Database["public"]["Enums"]["npc_kind"]
           name: string
+          reward_cooldown_hours?: number
+          reward_items?: Json
           reward_ryo?: number
           reward_xp?: number
+          shop_items?: Json
           updated_at?: string
           xp?: number
         }
         Update: {
           created_at?: string
           description?: string | null
+          dialog_intro?: string | null
+          dialog_outro?: string | null
           drop_table?: Json
           energy_max?: number
           hp_max?: number
           id?: string
           image_url?: string | null
+          kind?: Database["public"]["Enums"]["npc_kind"]
           name?: string
+          reward_cooldown_hours?: number
+          reward_items?: Json
           reward_ryo?: number
           reward_xp?: number
+          shop_items?: Json
           updated_at?: string
           xp?: number
         }
@@ -1366,6 +1420,7 @@ export type Database = {
         | "anbu"
         | "sannin"
         | "kage"
+      npc_kind: "aggressive" | "shop" | "reward"
       proficiency_kind:
         | "kenjutsu"
         | "shurikenjutsu"
@@ -1583,6 +1638,7 @@ export const Constants = {
         "sannin",
         "kage",
       ],
+      npc_kind: ["aggressive", "shop", "reward"],
       proficiency_kind: [
         "kenjutsu",
         "shurikenjutsu",
