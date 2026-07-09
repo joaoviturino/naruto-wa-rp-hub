@@ -14,6 +14,7 @@ import { PlayerActionMenu } from "@/components/chat/PlayerActionMenu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { listMinigamesForMyLocation } from "@/lib/minigame.functions";
 import { MinigameDialog } from "@/components/minigame/MinigameDialog";
+import { NpcInteractPanel } from "@/components/chat/NpcInteractPanel";
 
 export const Route = createFileRoute("/_authenticated/chat")({ component: ChatPage });
 
