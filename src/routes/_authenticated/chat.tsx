@@ -279,6 +279,12 @@ function ChatPage() {
           </div>
         </div>
         <div className="shrink-0 text-[10px] text-muted-foreground flex items-center gap-1"><Users size={11} /> {presentHere.length}</div>
+        <Button asChild variant="outline" size="sm" className="h-8">
+          <Link to="/party">
+            <Users size={12} className="mr-1" /> Time{partyMemberCount > 0 ? ` ${partyMemberCount}` : ""}
+            {invites.length > 0 && <span className="ml-1 text-[10px] bg-blood text-white rounded-full px-1.5">{invites.length}</span>}
+          </Link>
+        </Button>
       </div>
 
       {/* Mapa lateral desktop */}
