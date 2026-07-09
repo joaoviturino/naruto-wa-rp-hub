@@ -1,91 +1,115 @@
-# New Era Shinobi - Revolution — Plano do MVP
+## Escopo
 
-O RPG acontece no WhatsApp. A web serve para: (1) cadastrar o personagem, (2) ver ficha/inventário/databook, (3) painel admin controlar tudo e conectar o bot WhatsApp (Baileys da Itsuki).
+Três mudanças interligadas: nova rota de Time, cooldown de habilidades em combate, e reestruturação total de proficiências (letra + Maestria E–S).
 
-## 1. Stack e infra
-- Frontend: TanStack Start (já configurado), Tailwind v4, shadcn.
-- Backend: Lovable Cloud (Supabase gerenciado) para auth, DB e storage de imagens (perfil, banner, PNG do inventário).
-- Bot WhatsApp Baileys: **não roda na web** (Cloudflare Workers não suporta sockets persistentes do Baileys). Fornecerei um serviço Node separado (`/bot`) que:
-  - usa `@itsukichann/baileys` (repo indicado),
-  - autentica via QR code,
-  - lê fila de mensagens do Supabase (tabela `outbound_messages`) e envia (mensagem de boas-vindas etc.),
-  - guarda sessão local + status no Supabase (`bot_sessions`).
-- A web (painel admin) mostra QR/status e enfileira mensagens. Instruções de deploy do bot ficam em `bot/README.md` (rodar em VPS/Railway/Fly — Lovable hospeda só a web).
+---
 
-## 2. Fluxo do jogador (web)
-1. **Login/Cadastro**: email + senha (Supabase Auth).
-2. **Criação de personagem** (wizard):
-   1. Nickname + telefone (input numérico com máscara internacional, validado como MSISDN).
-   2. Escolha da vila (Konoha, Suna, Kiri, Kumo, Iwa, além de menores — Ame, Kusa, Taki, Oto, Yuki, Hoshi).
-   3. **Sorteio de clã**: pool ponderado por raridade (Comum → Lendário). Clãs top (Uchiha, Senju, Uzumaki, Hyuuga, Kaguya, Jugo etc.) têm peso muito baixo. Filtrado pela vila. Jogador tem **2 rerolls** (total 3 tentativas) — mantém o último.
-   4. **Afinidade elemental**: sorteio 1 elemento base (Katon, Suiton, Fuuton, Doton, Raiton) + regra de bônus por clã (ex.: Uchiha começa Katon).
-   5. **Ficha** estilo Akatsuki RPG (nome, idade, aparência, personalidade, história, ninjutsus iniciais em texto livre — habilidades reais entram pelo databook via admin).
-3. Ao concluir → enfileira mensagem de boas-vindas no WhatsApp.
+## 1. Sessão /party (substitui o popup)
 
-## 3. Modelo de dados (Supabase)
+**Novo:** `src/routes/_authenticated/party.tsx`
+- Lista membros do time (com líder marcado), status de HP/energias em tempo real
+- Lista de convites pendentes (aceitar/recusar)
+- Botão **"Sair do time"** (membros) — chama `leaveParty`
+- Botão **"Dissolver time"** (só líder) — nova server fn `disbandParty` que apaga `parties` + `party_members` + `party_invites` do time
+- Botão de atualização manual mantido
+- Realtime em `characters`, `party_members`, `party_invites`
+
+**Chat:** troca o botão que abria o `PartyPopup` por `<Link to="/party">`. Remove `PartyPopup.tsx` e a state relacionada em `chat.tsx`.
+
+**Backend:** adiciona `disbandParty` em `src/lib/party.functions.ts` (verifica que o chamador é o líder via `requireSupabaseAuth`).
+
+---
+
+## 2. Cooldown de habilidades (turnos de combate)
+
+**Migration:**
+```sql
+ALTER TABLE public.skills ADD COLUMN cooldown_turns int NOT NULL DEFAULT 0;
 ```
-profiles(id=auth.uid, email, is_admin)
-characters(id, user_id, nickname, phone_e164, village, clan_id, element_primary,
-           bio, appearance, personality, history,
-           avatar_url, banner_url, inventory_bg_url,
-           xp int default 0, created_at)
-clans(id, name, village, rarity enum[common,uncommon,rare,epic,legendary],
-      element_bonus, description)
-inventory(character_id pk, ninja_bag jsonb, secondary jsonb,   -- slots
-          helmet_id, vest_id, pants_id, boots_id,
-          primary_weapon_id, primary_unlocked bool,
-          secondary_weapon_id, secondary_unlocked bool)
-items(id, name, type enum[consumable,tool,armor_helmet,armor_vest,armor_pants,armor_boots,weapon], slot_size int, meta jsonb)
-skills(id, name, rank enum[E,D,C,B,A,S], type, element, description)
-character_skills(character_id, skill_id, learned_at)
-knowledges(id, name, description)
-character_knowledges(character_id, knowledge_id)
-outbound_messages(id, to_phone, body, status enum[pending,sent,failed], created_at, sent_at)
-bot_sessions(id, status enum[disconnected,qr,connected], qr text, updated_at)
-audit_log(id, admin_id, action, target, meta, created_at)
-user_roles(user_id, role enum[admin,user])  -- padrão has_role()
+
+O estado de cooldown por combate vive no `combat_sessions.state.players[i].cooldowns: { [skill_id]: turns_remaining }` (JSON, sem schema change adicional).
+
+**Admin (`SkillManager.tsx`):** novo campo "Cooldown (turnos)" no dialog de skill.
+
+**Combate (`src/lib/combat.functions.ts` → `playerAttack`):**
+- Antes de gastar energia: se `player.cooldowns?[skill_id] > 0` → erro "Habilidade em cooldown".
+- Após o ataque: `player.cooldowns[skill_id] = skill.cooldown_turns`.
+- No fim de cada turno do jogador (após ataque/turno do NPC), decrementa todos os cooldowns dele em 1 (mínimo 0).
+- Análogo aplica ao NPC (`npcAttack` interno) se ele usar skills com cooldown.
+
+**UI (`CombatDialog.tsx`):** desabilita `<option>` de skill com cooldown > 0 e mostra `(CD n)` no label; mensagem no log quando bloqueado.
+
+---
+
+## 3. Proficiências: Nível E–S + Maestria E–S por classe
+
+**Modelo novo:** cada classe de `SKILL_CLASSES` (39 classes) é uma proficiência. Cada personagem tem, por classe:
+- `nivel`: `E|D|C|B|A|S|null`  (grau de treino/uso)
+- `maestria`: `E|D|C|B|A|S|null` (domínio da classe)
+
+**Enum SQL:** reutiliza `SKILL_RANKS` (`E,D,C,B,A,S`). Novo enum `skill_class` com todos os 39 valores de `SKILL_CLASSES`.
+
+**Migration (schema):**
+```sql
+CREATE TYPE skill_class AS ENUM ('genjutsu','ninjutsu',... /* 39 */);
+
+-- characters.proficiencies passa a ser JSONB no formato:
+--   { "<classe>": { "nivel": "C", "maestria": "B" }, ... }
+-- Como já é JSONB, só migramos os dados existentes:
+UPDATE public.characters SET proficiencies = '{}'::jsonb WHERE proficiencies IS NULL;
+
+-- items/skills: substituir req_proficiency_kind + level (int) por:
+ALTER TABLE public.items
+  DROP COLUMN req_proficiency_kind,
+  DROP COLUMN req_proficiency_level,
+  ADD COLUMN req_class skill_class,
+  ADD COLUMN req_nivel skill_rank,
+  ADD COLUMN req_maestria skill_rank;
+
+ALTER TABLE public.skills  -- mesmo tratamento
+  DROP COLUMN req_proficiency_kind,
+  DROP COLUMN req_proficiency_level,
+  ADD COLUMN req_class skill_class,
+  ADD COLUMN req_nivel skill_rank,
+  ADD COLUMN req_maestria skill_rank;
+
+-- Enum antigo pode ser dropado depois; deixamos por segurança.
 ```
-RLS: jogador lê/edita só seu character/inventory. Admin (via `has_role`) lê tudo. `outbound_messages` e `bot_sessions` só admin + service_role (bot usa service key).
 
-### Bolsa ninja e slots
-- **Bolsa ninja**: 20 unidades de capacidade (itens ocupam `slot_size`, ex.: shuriken=1, pergaminho=2, kunai=1, bomba=3).
-- **Slots secundários**: 10 espaços fixos (1 item por espaço, itens raros/quest).
-- Equipamentos: 4 slots fixos (elmo/bandana, colete, calça, botas) + arma primária (bloqueada por padrão) + arma secundária (bloqueada).
-- UI do inventário: PNG do personagem centralizado, equipamentos ao redor (RPG clássico), bolsa embaixo.
+**shared.ts:** exporta `PROFICIENCY_CLASSES` = `SKILL_CLASSES` (rename semântico) e helpers `rankToNum`/`numToRank`.
 
-## 4. Ficha / Databook
-Página do personagem em abas: **Ficha** (texto livre estilo Akatsuki, sem databook clássico), **Inventário** (visual), **Databook** (habilidades por rank + conhecimentos), **Status** (XP total, EF = XP/2, EM = XP/2, Chakra = EF+EM). Sem bônus de clã ainda (campo preparado no schema).
+**PlayerEditor.tsx (admin):** tabela com 3 colunas por classe: **Classe | Nível (Select E–S) | Maestria (Select E–S)**. Envia `{ character_id, proficiencies }` no novo formato.
 
-## 5. Painel Admin (`/admin`, gate por `has_role('admin')`)
-- Dashboard: nº jogadores, personagens por vila/clã, status do bot.
-- CRUD: clãs, itens, skills, conhecimentos.
-- Jogadores: listar, ver ficha, editar XP, dar/remover skills e itens, banir.
-- **WhatsApp Bot**: mostra status (`bot_sessions`), QR code para parear, botão "reiniciar sessão", envio manual de mensagem de teste, fila `outbound_messages` com retry.
-- Log de auditoria.
+**CharacterWizard.tsx:** durante criação, permite escolher **até 3 classes iniciais** com Nível E e Maestria E (valores default). Configurável.
 
-## 6. Serviço Baileys (pasta `/bot`, deploy separado)
-- `package.json` com `@itsukichann/baileys`, `@supabase/supabase-js`, `qrcode`.
-- Loop: conecta → publica QR/status no Supabase → escuta `outbound_messages` (Realtime ou polling) → envia → marca `sent`.
-- README explica: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `npm start`, deploy VPS/Railway.
+**CharacterSheet.tsx:** exibe todas as classes com nível/maestria != null como badges "Katon E/D".
 
-## 7. Escopo desta primeira entrega
-Vou entregar de uma vez:
-1. Habilitar Lovable Cloud + migrations (todas as tabelas acima, RLS, seed de clãs de todas as vilas e itens básicos).
-2. Auth (email/senha) + rota `/auth`.
-3. Wizard de criação de personagem (5 passos) com sorteio de clã e elemento.
-4. Página do personagem (Ficha / Inventário / Databook / Status).
-5. Painel admin completo (com abas acima).
-6. Server functions: enfileirar mensagem de boas-vindas, atualizar status bot, publicar QR.
-7. Pasta `/bot` com serviço Baileys pronto pra rodar + README.
-8. Design system dark ninja (não roxo genérico) — vermelho sangue + preto + dourado, tipografia forte.
+**Admin Skill/Item Manager:** trocam os dois Selects (`req_class` + `req_nivel` + `req_maestria`) usando `PROFICIENCY_CLASSES` e `SKILL_RANKS`.
 
-## 8. Fora do escopo agora (posso fazer depois)
-- Combate/dados/mestre no WhatsApp (lógica de RPG in-chat).
-- Bônus de XP por clã.
-- Sistema de missões, economia, ryo.
-- Notificações push web.
+**admin.functions.ts:**
+- `upsertPlayer` schema: `proficiencies: z.record(className, z.object({ nivel: rank.nullable(), maestria: rank.nullable() })).optional()`
+- `upsertSkill` / `upsertItem`: substitui os dois campos antigos pelos três novos.
 
-## Perguntas rápidas antes de codar
-1. Confirma email/senha no login web? (ou prefere só nickname+telefone, com OTP via WhatsApp depois — mais complexo)
-2. Posso seguir com a paleta ninja **preto + vermelho sangue + dourado** ou prefere outra?
-3. Tudo bem o bot Baileys rodar fora da Lovable (VPS/Railway) com instruções prontas? É obrigatório pela natureza do Baileys.
+**Efeito da Maestria em combate (`combat.functions.ts` → `playerAttack`):**
+- Após calcular dano da skill: se personagem tem `maestria[skill.class]`, aplica bônus multiplicativo:
+  - E: ×1.00, D: ×1.05, C: ×1.10, B: ×1.20, A: ×1.35, S: ×1.55
+- Também soma bônus de acerto crítico proporcional ao Nível (E:+0, D:+1, ..., S:+5).
+
+---
+
+## Detalhes técnicos
+
+**Ordem de execução:**
+1. Migration schema (skills.cooldown_turns + skill_class enum + req_class/req_nivel/req_maestria em skills e items).
+2. Após aprovação, atualizar `admin.functions.ts`, `shared.ts`, admin UIs, wizard, sheet, combate, party route/fn.
+3. Remover `PartyPopup.tsx` e referências.
+
+**Compatibilidade:** proficiências antigas em `characters.proficiencies` no formato `{kind: number}` ficam ignoradas (viram objeto vazio quando o admin salvar). Não há dado crítico a preservar (jogo em desenvolvimento).
+
+**Arquivos tocados (~14):**
+- Migração SQL nova
+- `src/lib/party.functions.ts`, `src/lib/combat.functions.ts`, `src/lib/admin.functions.ts`
+- `src/routes/_authenticated/party.tsx` (novo), `src/routes/_authenticated/chat.tsx`
+- `src/components/admin/{shared.ts,PlayerEditor.tsx,SkillManager.tsx,ItemManager.tsx}`
+- `src/components/{CharacterSheet.tsx,CharacterWizard.tsx,chat/CombatDialog.tsx}`
+- Deletar `src/components/chat/PartyPopup.tsx`
