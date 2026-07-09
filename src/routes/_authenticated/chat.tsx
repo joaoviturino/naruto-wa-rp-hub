@@ -283,6 +283,8 @@ function ChatPage() {
         </div>
       )}
 
+      {currentLoc && <NpcInteractPanel locationId={currentLoc.id} />}
+
       <div>
         <div className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1 mb-2"><Compass size={12} /> {character.current_location_id ? "Locais próximos" : "Escolha onde iniciar"}</div>
         <div className="space-y-1">
