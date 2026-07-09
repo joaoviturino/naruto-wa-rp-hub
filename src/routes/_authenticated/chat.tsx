@@ -259,6 +259,29 @@ function ChatPage() {
         </div>
       )}
 
+      {currentLoc && availableMinigames.length > 0 && (
+        <div className="border border-border rounded p-2 space-y-2">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1">
+            <Gamepad2 size={11} /> Missões neste local
+          </div>
+          <div className="space-y-1">
+            {availableMinigames.map((m: any) => {
+              const ready = (m.cooldown_remaining_ms ?? 0) <= 0;
+              const remH = Math.ceil((m.cooldown_remaining_ms ?? 0) / 3600000);
+              const remM = Math.ceil((m.cooldown_remaining_ms ?? 0) / 60000);
+              return (
+                <Button key={m.id} size="sm" variant={ready ? "default" : "outline"} className="w-full justify-start"
+                  disabled={!ready} onClick={() => setActiveMinigame(m)}>
+                  <Gamepad2 size={12} className="mr-1" />
+                  <span className="truncate flex-1 text-left">{m.name}</span>
+                  {!ready && <span className="text-[10px] text-muted-foreground ml-1">{remH >= 1 ? `${remH}h` : `${remM}m`}</span>}
+                </Button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div>
         <div className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1 mb-2"><Compass size={12} /> {character.current_location_id ? "Locais próximos" : "Escolha onde iniciar"}</div>
         <div className="space-y-1">
