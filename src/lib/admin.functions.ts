@@ -16,6 +16,21 @@ const skillRange = z.enum(["curto","medio","longo"]);
 const itemType = z.enum(["consumable","tool","armor_helmet","armor_vest","armor_pants","armor_boots","weapon_primary","weapon_secondary"]);
 const villageEnum = z.enum(["konoha","suna","kiri","kumo","iwa","ame","kusa","taki","oto","yuki","hoshi","nomad"]);
 const elementEnum = z.enum(["katon","suiton","fuuton","doton","raiton"]);
+const skillClassEnum = z.enum([
+  "genjutsu","ninjutsu","taijutsu","shinjutsu","armadilha","boujutsu","bukijutsu","bunshinjutsu",
+  "doujutsu","fluxo_de_chakra","formacao","estilo_de_luta","fuuinjutsu","gijutsu","hiden","juinjutsu",
+  "jujutsu","jutsu_basico","kaijutsu","kekkaijutsu","kekkei_genkai","kekkei_moura","kekkei_touta",
+  "kenjutsu","kinjutsu","kinkojutsu","konbijutsu","kugutsujutsu","kyuuinjutsu","ninjutsu_espaco_tempo",
+  "ninjutsu_medico","nintaijutsu","saiseijutsu","senjutsu","shurikenjutsu","tansakujutsu",
+  "tenseijutsu","tonjutsu","yuugoujutsu",
+]);
+
+/** Proficiências por classe: cada classe tem Nível e Maestria em letras (E→S). */
+const proficiencyEntry = z.object({
+  nivel: skillRank.nullable().optional(),
+  maestria: skillRank.nullable().optional(),
+});
+const proficienciesMap = z.record(skillClassEnum, proficiencyEntry);
 
 /** Efeito reutilizável de restauração de energia (itens consumíveis e habilidades suplementares). */
 const restoreEffect = z.object({
@@ -213,7 +228,7 @@ export const updatePlayer = createServerFn({ method: "POST" })
     village: villageEnum.optional(),
     clan_id: z.string().uuid().nullable().optional(),
     element_primary: elementEnum.optional(),
-    proficiencies: z.record(profKind, z.number().int().min(0).max(100)).optional(),
+    proficiencies: proficienciesMap.optional(),
   }).parse(input))
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
@@ -320,8 +335,9 @@ const itemPayload = z.object({
   description: z.string().max(2000).nullable().optional(),
   image_url: z.string().url().nullable().optional(),
   req_rank: ninjaRank.nullable().optional(),
-  req_proficiency_kind: profKind.nullable().optional(),
-  req_proficiency_level: z.number().int().min(0).max(100).nullable().optional(),
+  req_class: skillClassEnum.nullable().optional(),
+  req_nivel: skillRank.nullable().optional(),
+  req_maestria: skillRank.nullable().optional(),
   req_mission_id: z.string().uuid().nullable().optional(),
   req_skill_id: z.string().uuid().nullable().optional(),
   meta: metaSchema,
@@ -363,8 +379,9 @@ const skillPayload = z.object({
   image_url: z.string().url().nullable().optional(),
   clan_id: z.string().uuid().nullable().optional(),
   req_rank: ninjaRank.nullable().optional(),
-  req_proficiency_kind: profKind.nullable().optional(),
-  req_proficiency_level: z.number().int().min(0).max(100).nullable().optional(),
+  req_class: skillClassEnum.nullable().optional(),
+  req_nivel: skillRank.nullable().optional(),
+  req_maestria: skillRank.nullable().optional(),
   req_mission_id: z.string().uuid().nullable().optional(),
   req_prereq_skill_id: z.string().uuid().nullable().optional(),
   energy_type: z.enum(["ef","em","chakra"]).default("chakra"),
@@ -372,6 +389,7 @@ const skillPayload = z.object({
   bonus_speed: z.number().min(0).max(100).default(1),
   bonus_critical: z.number().min(0).max(100).default(1),
   bonus_energetic: z.number().min(0).max(100).default(1),
+  cooldown_turns: z.number().int().min(0).max(50).default(0),
   meta: metaSchema,
 });
 
