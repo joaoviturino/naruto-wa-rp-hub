@@ -73,30 +73,36 @@ function ChatPage() {
   useEffect(() => { loadCore(); }, [user.id]);
 
   // Convites de party e checagem inicial de combate
+  async function loadInvites() {
+    if (!character) return;
+    const { data } = await supabase
+      .from("party_invites")
+      .select("id,party_id,from_character:characters!party_invites_from_character_id_fkey(id,nickname,avatar_url)")
+      .eq("to_character_id", character.id).eq("status", "pending");
+    setInvites((data as any[]) ?? []);
+  }
+  async function loadPartyMembers() {
+    if (!character) return;
+    const { data: mem } = await supabase.from("party_members").select("party_id").eq("character_id", character.id).maybeSingle();
+    if (!mem) { setPartyMembers([]); setPartyLeaderId(null); setPartyLocations({}); return; }
+    const { data: party } = await supabase.from("parties").select("leader_id").eq("id", (mem as any).party_id).maybeSingle();
+    setPartyLeaderId((party as any)?.leader_id ?? null);
+    const { data } = await supabase
+      .from("party_members")
+      .select("character:characters(id,nickname,avatar_url,current_location_id)")
+      .eq("party_id", (mem as any).party_id);
+    const chars = ((data as any[]) ?? []).map((r) => r.character);
+    setPartyMembers(chars);
+    const map: Record<string, string | null> = {};
+    chars.forEach((c: any) => { map[c.id] = c.current_location_id; });
+    setPartyLocations(map);
+  }
+  async function refreshParty() {
+    await loadInvites();
+    await loadPartyMembers();
+  }
   useEffect(() => {
     if (!character) return;
-    async function loadInvites() {
-      const { data } = await supabase
-        .from("party_invites")
-        .select("id,party_id,from_character:characters!party_invites_from_character_id_fkey(id,nickname,avatar_url)")
-        .eq("to_character_id", character!.id).eq("status", "pending");
-      setInvites((data as any[]) ?? []);
-    }
-    async function loadPartyMembers() {
-      const { data: mem } = await supabase.from("party_members").select("party_id").eq("character_id", character!.id).maybeSingle();
-      if (!mem) { setPartyMembers([]); setPartyLeaderId(null); setPartyLocations({}); return; }
-      const { data: party } = await supabase.from("parties").select("leader_id").eq("id", (mem as any).party_id).maybeSingle();
-      setPartyLeaderId((party as any)?.leader_id ?? null);
-      const { data } = await supabase
-        .from("party_members")
-        .select("character:characters(id,nickname,avatar_url,current_location_id)")
-        .eq("party_id", (mem as any).party_id);
-      const chars = ((data as any[]) ?? []).map((r) => r.character);
-      setPartyMembers(chars);
-      const map: Record<string, string | null> = {};
-      chars.forEach((c: any) => { map[c.id] = c.current_location_id; });
-      setPartyLocations(map);
-    }
     async function checkCombat() {
       try { const r = await getCombat({}); if (r.session) setCombatId(r.session.id); }
       catch { /* noop */ }
@@ -378,6 +384,7 @@ function ChatPage() {
         members={partyMembers.map((m: any) => ({ ...m, current_location_id: partyLocations[m.id] ?? null }))}
         leaderId={partyLeaderId}
         invites={invites}
+        onRefresh={refreshParty}
       />
     </div>
   );

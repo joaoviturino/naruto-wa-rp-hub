@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Users, GripVertical, Minus, Plus } from "lucide-react";
+import { Users, GripVertical, Minus, Plus, RefreshCw } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { respondPartyInvite, leaveParty } from "@/lib/party.functions";
 import { toast } from "sonner";
@@ -14,6 +14,7 @@ type Props = {
   members: Member[];
   leaderId: string | null;
   invites: Invite[];
+  onRefresh?: () => void | Promise<void>;
 };
 
 const STORAGE_KEY = "party-popup-pos";
@@ -29,9 +30,10 @@ function mobileAnchor() {
   return { x: Math.max(MOBILE_MARGIN, window.innerWidth - POPUP_WIDTH - MOBILE_MARGIN), y: MOBILE_TOP };
 }
 
-export function PartyPopup({ myCharId, myLocationId, members, leaderId, invites }: Props) {
+export function PartyPopup({ myCharId, myLocationId, members, leaderId, invites, onRefresh }: Props) {
   const respond = useServerFn(respondPartyInvite);
   const leave = useServerFn(leaveParty);
+  const [refreshing, setRefreshing] = useState(false);
   const [pos, setPos] = useState<{ x: number; y: number }>(() => {
     if (typeof window === "undefined") return { x: 16, y: 16 };
     if (isMobile()) return mobileAnchor();
@@ -83,6 +85,19 @@ export function PartyPopup({ myCharId, myLocationId, members, leaderId, invites 
   }
   function onPointerUp() { dragRef.current = null; }
 
+  async function handleRefresh() {
+    if (!onRefresh || refreshing) return;
+    setRefreshing(true);
+    try {
+      await onRefresh();
+      toast.success("Lista de time atualizada.");
+    } catch (e: any) {
+      toast.error(e.message || "Falha ao atualizar time.");
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   const inParty = members.length > 0;
 
   return (
@@ -103,6 +118,11 @@ export function PartyPopup({ myCharId, myLocationId, members, leaderId, invites 
           Time {inParty ? `(${members.length}/3)` : ""}
           {invites.length > 0 && <span className="ml-1 text-[10px] bg-blood text-white rounded-full px-1.5">{invites.length}</span>}
         </div>
+        {onRefresh && (
+          <Button variant="ghost" size="icon" className={`h-5 w-5 ${refreshing ? "animate-spin" : ""}`} onClick={handleRefresh}>
+            <RefreshCw size={12} />
+          </Button>
+        )}
         <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setCollapsed((v) => !v)}>
           {collapsed ? <Plus size={12} /> : <Minus size={12} />}
         </Button>
