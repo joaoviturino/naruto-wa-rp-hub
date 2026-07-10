@@ -138,6 +138,14 @@ export function NpcManager() {
       {sel ? (
         <div className="space-y-4">
           <div className="scroll-panel rounded-lg p-4 space-y-3">
+            <div className="flex flex-wrap gap-2">
+              {(["aggressive","shop","reward"] as NpcKind[]).map((k) => (
+                <Button key={k} size="sm" variant={sel.kind === k ? "default" : "outline"}
+                  onClick={async () => { await save({ data: { ...sel, kind: k } } as any); load(); }}>
+                  {k === "aggressive" ? "Agressivo" : k === "shop" ? "Loja" : "Recompensa"}
+                </Button>
+              ))}
+            </div>
             <div className="flex items-start gap-4">
               <div className="w-40 h-40 rounded bg-secondary overflow-hidden shrink-0">
                 {sel.image_url && <img src={sel.image_url} className="w-full h-full object-cover" alt="" />}
@@ -150,6 +158,7 @@ export function NpcManager() {
                   <Upload size={14} className="mr-1" /> PNG do NPC (aparece no combate)
                 </Button>
                 <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={uploadImage} />
+                {sel.kind === "aggressive" && (
                 <div className="pt-2 border-t border-border/40">
                   <div className="text-xs text-muted-foreground mb-1">Cenário de fundo (combate)</div>
                   {sel.battle_bg_url && (
@@ -165,8 +174,11 @@ export function NpcManager() {
                   </div>
                   <input ref={bgRef} type="file" accept="image/*" className="hidden" onChange={uploadBattleBg} />
                 </div>
+                )}
               </div>
             </div>
+            {sel.kind === "aggressive" && (
+            <>
             <div className="grid grid-cols-3 gap-3">
               <NumField label="HP máximo" value={sel.hp_max} onSave={(v) => save({ data: { ...sel, hp_max: v } } as any).then(load)} />
               <NumField label="XP (define stats)" value={sel.xp} onSave={(v) => save({ data: { ...sel, xp: v } } as any).then(load)} />
@@ -179,19 +191,13 @@ export function NpcManager() {
             <p className="text-xs text-muted-foreground">
               XP {sel.xp} → EF {Math.floor(sel.xp/2)}, EM {sel.xp - Math.floor(sel.xp/2)}, Chakra {sel.xp}.
             </p>
+            </>
+            )}
           </div>
 
           <div className="scroll-panel rounded-lg p-4 space-y-3">
-            <h4 className="font-display text-lg text-gold">Classe do NPC</h4>
-            <div className="flex gap-2 flex-wrap">
-              {(["aggressive","shop","reward"] as NpcKind[]).map((k) => (
-                <Button key={k} size="sm" variant={sel.kind === k ? "default" : "outline"}
-                  onClick={async () => { await save({ data: { ...sel, kind: k } } as any); load(); }}>
-                  {k === "aggressive" ? "Agressivo" : k === "shop" ? "Loja" : "Recompensa"}
-                </Button>
-              ))}
-            </div>
-            {sel.kind !== "aggressive" && (
+            <h4 className="font-display text-lg text-gold">Diálogos</h4>
+            {sel.kind !== "aggressive" ? (
               <div className="grid gap-2">
                 <Label>Diálogo de introdução</Label>
                 <Textarea rows={2} defaultValue={sel.dialog_intro ?? ""}
@@ -200,6 +206,8 @@ export function NpcManager() {
                 <Textarea rows={2} defaultValue={sel.dialog_outro ?? ""}
                   onBlur={async (e) => { await save({ data: { ...sel, dialog_outro: e.target.value } } as any); load(); }} />
               </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">Disponível para NPCs de Loja e Recompensa.</p>
             )}
           </div>
 
@@ -281,6 +289,7 @@ export function NpcManager() {
             </div>
           )}
 
+          {sel.kind === "aggressive" && (
           <div className="scroll-panel rounded-lg p-4 space-y-2">
             <h4 className="font-display text-lg text-gold">Tabela de drop</h4>
             <div className="space-y-2">
@@ -321,7 +330,9 @@ export function NpcManager() {
               await save({ data: { ...sel, drop_table: next } } as any); load();
             }}><Plus size={14} className="mr-1" /> Adicionar drop</Button>
           </div>
+          )}
 
+          {sel.kind === "aggressive" && (
           <div className="scroll-panel rounded-lg p-4 space-y-2">
             <h4 className="font-display text-lg text-gold">Habilidades ({selSkills.size})</h4>
             <div className="grid gap-1 max-h-[300px] overflow-y-auto pr-2">
@@ -341,6 +352,7 @@ export function NpcManager() {
               {skills.length === 0 && <p className="text-xs text-muted-foreground">Nenhuma habilidade cadastrada.</p>}
             </div>
           </div>
+          )}
         </div>
       ) : (
         <div className="text-muted-foreground text-sm p-6">Selecione um NPC à esquerda para editar HP, XP, imagem e habilidades.</div>

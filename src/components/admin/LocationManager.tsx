@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Trash2, Upload, Link2, Plus, Skull, Gamepad2 } from "lucide-react";
+import { Trash2, Upload, Link2, Plus, Skull, Gamepad2, Store, Gift } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { updateLocationDangerZone, setLocationNpcs } from "@/lib/npc.functions";
@@ -13,7 +13,7 @@ import { setLocationMinigames } from "@/lib/minigame.functions";
 type Loc = { id: string; name: string; description: string | null; image_url: string | null;
   is_danger_zone?: boolean; spawn_chance?: number; spawn_tick_seconds?: number };
 type Conn = { id: string; a_id: string; b_id: string };
-type Npc = { id: string; name: string };
+type Npc = { id: string; name: string; kind: "aggressive" | "shop" | "reward" };
 type Minigame = { id: string; name: string; active: boolean };
 
 export function LocationManager() {
@@ -36,7 +36,7 @@ export function LocationManager() {
     const [l, c, n, ln, mg, lmg] = await Promise.all([
       supabase.from("locations").select("id,name,description,image_url,is_danger_zone,spawn_chance,spawn_tick_seconds").order("name"),
       supabase.from("location_connections").select("id,a_id,b_id"),
-      supabase.from("npcs").select("id,name").order("name"),
+      supabase.from("npcs").select("id,name,kind").order("name"),
       supabase.from("location_npcs").select("location_id,npc_id"),
       supabase.from("minigames").select("id,name,active").eq("active", true).order("name"),
       supabase.from("location_minigames").select("location_id,minigame_id"),
@@ -104,6 +104,16 @@ export function LocationManager() {
   const availableToLink = locs.filter((l) => l.id !== selected && !neighborIds.has(l.id));
   const selNpcs = selected ? locNpcs[selected] ?? new Set<string>() : new Set<string>();
   const selMg = selected ? locMinigames[selected] ?? new Set<string>() : new Set<string>();
+  const aggressiveNpcs = npcs.filter((n) => (n.kind ?? "aggressive") === "aggressive");
+  const shopNpcs = npcs.filter((n) => n.kind === "shop");
+  const rewardNpcs = npcs.filter((n) => n.kind === "reward");
+  async function toggleNpc(npcId: string, on: boolean) {
+    if (!sel) return;
+    const next = new Set(selNpcs);
+    if (on) next.add(npcId); else next.delete(npcId);
+    await setLocNpcsFn({ data: { location_id: sel.id, npc_ids: Array.from(next) } });
+    load();
+  }
   const avgSpawnSec = sel?.is_danger_zone && (sel.spawn_chance ?? 0) > 0
     ? Math.round((sel.spawn_tick_seconds ?? 60) / ((sel.spawn_chance ?? 0) / 100))
     : null;
@@ -211,23 +221,44 @@ export function LocationManager() {
                 <div>
                   <Label>NPCs que podem aparecer aqui</Label>
                   <div className="grid gap-1 max-h-[220px] overflow-y-auto pr-2 mt-1">
-                    {npcs.map((n) => (
+                    {aggressiveNpcs.map((n) => (
                       <label key={n.id} className="flex items-center gap-2 text-sm p-1 hover:bg-secondary/40 rounded">
                         <input type="checkbox" checked={selNpcs.has(n.id)}
-                          onChange={async (e) => {
-                            const next = new Set(selNpcs);
-                            if (e.target.checked) next.add(n.id); else next.delete(n.id);
-                            await setLocNpcsFn({ data: { location_id: sel.id, npc_ids: Array.from(next) } });
-                            load();
-                          }} />
+                          onChange={(e) => toggleNpc(n.id, e.target.checked)} />
                         <span>{n.name}</span>
                       </label>
                     ))}
-                    {npcs.length === 0 && <p className="text-xs text-muted-foreground">Cadastre NPCs na aba NPCs primeiro.</p>}
+                    {aggressiveNpcs.length === 0 && <p className="text-xs text-muted-foreground">Cadastre NPCs agressivos primeiro.</p>}
                   </div>
                 </div>
               </>
             )}
+          </div>
+
+          <div className="scroll-panel rounded-lg p-4 space-y-3">
+            <h4 className="font-display text-lg text-gold flex items-center gap-2"><Store size={16} /> NPCs de Loja neste local</h4>
+            <div className="grid gap-1 max-h-[220px] overflow-y-auto pr-2">
+              {shopNpcs.map((n) => (
+                <label key={n.id} className="flex items-center gap-2 text-sm p-1 hover:bg-secondary/40 rounded">
+                  <input type="checkbox" checked={selNpcs.has(n.id)} onChange={(e) => toggleNpc(n.id, e.target.checked)} />
+                  <span>{n.name}</span>
+                </label>
+              ))}
+              {shopNpcs.length === 0 && <p className="text-xs text-muted-foreground">Nenhum NPC do tipo Loja cadastrado.</p>}
+            </div>
+          </div>
+
+          <div className="scroll-panel rounded-lg p-4 space-y-3">
+            <h4 className="font-display text-lg text-gold flex items-center gap-2"><Gift size={16} /> NPCs de Recompensa neste local</h4>
+            <div className="grid gap-1 max-h-[220px] overflow-y-auto pr-2">
+              {rewardNpcs.map((n) => (
+                <label key={n.id} className="flex items-center gap-2 text-sm p-1 hover:bg-secondary/40 rounded">
+                  <input type="checkbox" checked={selNpcs.has(n.id)} onChange={(e) => toggleNpc(n.id, e.target.checked)} />
+                  <span>{n.name}</span>
+                </label>
+              ))}
+              {rewardNpcs.length === 0 && <p className="text-xs text-muted-foreground">Nenhum NPC do tipo Recompensa cadastrado.</p>}
+            </div>
           </div>
 
           <div className="scroll-panel rounded-lg p-4 space-y-3">
