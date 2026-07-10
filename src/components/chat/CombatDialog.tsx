@@ -103,35 +103,61 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const currentCd = currentSkill ? (myCooldowns[currentSkill.id] ?? 0) : 0;
   const consumables = useMemo(() => bag.filter((e) => itemMap[e.item_id]?.type === "consumable"), [bag, itemMap]);
 
-  // Dispara animação + som na chegada de um novo log com mídia.
+  // Dispara animação + som SOMENTE após pré-carregar totalmente (evita "piscar" sem mídia).
   useEffect(() => {
     if (!log.length) return;
     const last = log[log.length - 1];
     if (!last || last.seq === lastLogSeq.current) return;
     lastLogSeq.current = last.seq;
-    if (last.animation_url) {
-      // Pré-carrega para evitar "piscar" sem imagem em GIFs pesados.
+    const animUrl: string | undefined = last.animation_url;
+    const soundUrl: string | undefined = last.sound_url;
+    if (!animUrl && !soundUrl) return;
+
+    let cancelled = false;
+    const MAX_WAIT = 5000;
+
+    const waitImg = animUrl ? new Promise<boolean>((res) => {
       const img = new Image();
-      img.src = last.animation_url;
-      const until = Date.now() + 2200;
-      setAnim({ url: last.animation_url, side: last.actor, until });
-      setTimeout(() => setAnim((cur) => (cur && cur.until <= Date.now() ? null : cur)), 2300);
-    }
-    if (last.sound_url) {
+      let done = false;
+      const finish = (ok: boolean) => { if (done) return; done = true; res(ok); };
+      img.onload = () => finish(true);
+      img.onerror = () => finish(false);
+      img.src = animUrl;
+      setTimeout(() => finish(false), MAX_WAIT);
+    }) : Promise.resolve(false);
+
+    let audio: HTMLAudioElement | null = null;
+    const waitAudio = soundUrl ? new Promise<boolean>((res) => {
       try {
+        audio = new Audio(soundUrl);
+        audio.crossOrigin = "anonymous";
+        audio.preload = "auto";
+        audio.volume = 0.7;
+        let done = false;
+        const finish = (ok: boolean) => { if (done) return; done = true; res(ok); };
+        audio.addEventListener("canplaythrough", () => finish(true), { once: true });
+        audio.addEventListener("loadeddata", () => finish(true), { once: true });
+        audio.addEventListener("error", () => finish(false), { once: true });
+        audio.load();
+        setTimeout(() => finish(false), MAX_WAIT);
+      } catch { res(false); }
+    }) : Promise.resolve(false);
+
+    Promise.all([waitImg, waitAudio]).then(([imgOk]) => {
+      if (cancelled) return;
+      if (audio) {
         if (audioRef.current) { try { audioRef.current.pause(); } catch { /* noop */ } }
-        const a = new Audio(last.sound_url);
-        a.crossOrigin = "anonymous";
-        a.preload = "auto";
-        a.volume = 0.7;
-        audioRef.current = a;
-        const tryPlay = () => a.play().catch(() => {});
-        if (a.readyState >= 2) tryPlay();
-        else a.addEventListener("canplaythrough", tryPlay, { once: true });
-        // fallback caso canplaythrough demore
-        setTimeout(tryPlay, 400);
-      } catch { /* noop */ }
-    }
+        audioRef.current = audio;
+        audio.play().catch(() => {});
+      }
+      if (animUrl && imgOk) {
+        const until = Date.now() + 2400;
+        setAnim({ url: animUrl, side: last.actor, until });
+        setTimeout(() => setAnim((cur) => (cur && cur.until <= Date.now() ? null : cur)), 2500);
+      }
+    });
+
+    return () => { cancelled = true; };
   }, [log.length, log[log.length - 1]?.seq]);
 
   if (!session) return null;
