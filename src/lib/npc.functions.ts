@@ -27,6 +27,7 @@ const npcPayload = z.object({
   kind: z.enum(["aggressive","shop","reward"]).optional(),
   dialog_intro: z.string().max(4000).nullish(),
   dialog_outro: z.string().max(4000).nullish(),
+  required_mission_id: z.string().uuid().nullish(),
   shop_items: z.array(z.object({
     item_id: z.string().uuid(),
     price: z.number().int().min(0).max(10_000_000),

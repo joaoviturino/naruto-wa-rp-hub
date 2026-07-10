@@ -1,0 +1,1 @@
+ALTER TABLE public.npcs ADD COLUMN IF NOT EXISTS required_mission_id uuid REFERENCES public.missions(id) ON DELETE SET NULL;

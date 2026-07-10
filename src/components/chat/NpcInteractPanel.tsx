@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Store, Gift, MessageSquare, Coins, Minus, Plus } from "lucide-react";
+import { Store, Gift, MessageSquare, Coins, Minus, Plus, Lock } from "lucide-react";
 import { listLocationInteractNpcs, buyFromShop, claimNpcReward } from "@/lib/npc-interact.functions";
 
 type Npc = {
@@ -15,6 +15,9 @@ type Npc = {
   reward_items?: { item_id: string; qty: number }[];
   reward_xp?: number; reward_ryo?: number;
   cooldown_remaining_ms?: number;
+  required_mission_id?: string | null;
+  mission_required_name?: string | null;
+  mission_unlocked?: boolean;
 };
 type Item = { id: string; name: string; image_url: string | null; description: string | null; type: string | null };
 
@@ -81,12 +84,14 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
         <div className="space-y-1">
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1"><Gift size={11} /> Recompensas</div>
           {rewardNpcs.map((n) => {
-            const disabled = (n.cooldown_remaining_ms ?? 0) > 0;
+            const locked = n.mission_unlocked === false;
+            const cooldown = (n.cooldown_remaining_ms ?? 0) > 0;
             return (
               <Button key={n.id} size="sm" variant="outline" className="w-full justify-start gap-2" onClick={() => setOpen(n)}>
-                <Gift size={12} className="text-gold" />
+                {locked ? <Lock size={12} className="text-muted-foreground" /> : <Gift size={12} className="text-gold" />}
                 <span className="flex-1 truncate text-left">{n.name}</span>
-                {disabled && <span className="text-[10px] text-muted-foreground">{remH(n.cooldown_remaining_ms)}h</span>}
+                {locked && <span className="text-[10px] text-muted-foreground">bloqueado</span>}
+                {!locked && cooldown && <span className="text-[10px] text-muted-foreground">{remH(n.cooldown_remaining_ms)}h</span>}
               </Button>
             );
           })}
@@ -190,7 +195,12 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
                       })}
                     </div>
                   )}
-                  <Button disabled={busy || (open.cooldown_remaining_ms ?? 0) > 0}
+                  {open.mission_unlocked === false && (
+                    <div className="text-xs text-destructive border border-destructive/40 rounded p-2 flex items-center gap-2">
+                      <Lock size={12} /> Requer a missão "{open.mission_required_name}" concluída.
+                    </div>
+                  )}
+                  <Button disabled={busy || (open.cooldown_remaining_ms ?? 0) > 0 || open.mission_unlocked === false}
                     onClick={async () => {
                       setBusy(true);
                       try {

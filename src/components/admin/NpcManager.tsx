@@ -20,14 +20,17 @@ type Npc = {
   reward_xp: number; reward_ryo: number; drop_table: DropRow[];
   kind: NpcKind; dialog_intro: string | null; dialog_outro: string | null;
   shop_items: ShopRow[]; reward_items: RewardRow[]; reward_cooldown_hours: number;
+  required_mission_id: string | null;
 };
 type Skill = { id: string; name: string; rank: string };
 type Item = { id: string; name: string; type: string };
+type Mission = { id: string; name: string; rank: string };
 
 export function NpcManager() {
   const [npcs, setNpcs] = useState<Npc[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [items, setItems] = useState<Item[]>([]);
+  const [missions, setMissions] = useState<Mission[]>([]);
   const [assigned, setAssigned] = useState<Record<string, Set<string>>>({});
   const [selected, setSelected] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -38,11 +41,12 @@ export function NpcManager() {
   const setSkillsFn = useServerFn(setNpcSkills);
 
   async function load() {
-    const [n, s, ns, it] = await Promise.all([
+    const [n, s, ns, it, mi] = await Promise.all([
       supabase.from("npcs").select("*").order("name"),
       supabase.from("skills").select("id,name,rank").order("name"),
       supabase.from("npc_skills").select("npc_id,skill_id"),
       supabase.from("items").select("id,name,type").order("name"),
+      supabase.from("missions").select("id,name,rank").order("name"),
     ]);
     setNpcs(((n.data as any[]) ?? []).map((r) => ({
       ...r,
@@ -52,9 +56,11 @@ export function NpcManager() {
       shop_items: Array.isArray(r.shop_items) ? r.shop_items : [],
       reward_items: Array.isArray(r.reward_items) ? r.reward_items : [],
       reward_cooldown_hours: Number(r.reward_cooldown_hours ?? 24),
+      required_mission_id: r.required_mission_id ?? null,
     })));
     setSkills((s.data as Skill[]) ?? []);
     setItems((it.data as Item[]) ?? []);
+    setMissions((mi.data as Mission[]) ?? []);
     const map: Record<string, Set<string>> = {};
     (ns.data ?? []).forEach((r: any) => {
       if (!map[r.npc_id]) map[r.npc_id] = new Set();
@@ -145,6 +151,9 @@ export function NpcManager() {
                   {k === "aggressive" ? "Agressivo" : k === "shop" ? "Loja" : "Recompensa"}
                 </Button>
               ))}
+              <Button size="sm" variant="outline" disabled title="Em breve">
+                Aprendizagem <span className="ml-1 text-[10px] text-muted-foreground">em breve</span>
+              </Button>
             </div>
             <div className="flex items-start gap-4">
               <div className="w-40 h-40 rounded bg-secondary overflow-hidden shrink-0">
@@ -286,6 +295,20 @@ export function NpcManager() {
                 const next = [...(sel.reward_items ?? []), { item_id: items[0].id, qty: 1 }];
                 await save({ data: { ...sel, reward_items: next } } as any); load();
               }}><Plus size={14} className="mr-1" /> Adicionar item</Button>
+              <div>
+                <label className="text-xs text-muted-foreground">Missão obrigatória (opcional)</label>
+                <select
+                  value={sel.required_mission_id ?? ""}
+                  onChange={async (e) => {
+                    const v = e.target.value || null;
+                    await save({ data: { ...sel, required_mission_id: v } } as any); load();
+                  }}
+                  className="w-full bg-input border border-border rounded px-2 py-1 text-sm mt-1">
+                  <option value="">— Sem requisito —</option>
+                  {missions.map((m) => <option key={m.id} value={m.id}>[{m.rank}] {m.name}</option>)}
+                </select>
+                <p className="text-[10px] text-muted-foreground mt-1">Só poderá receber a recompensa quem já concluiu esta missão.</p>
+              </div>
             </div>
           )}
 
