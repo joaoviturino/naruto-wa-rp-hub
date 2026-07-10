@@ -30,11 +30,21 @@ export const listLocationInteractNpcs = createServerFn({ method: "POST" })
     if (!me.current_location_id) return { npcs: [] as any[] };
     const { data } = await context.supabase
       .from("location_npcs")
-      .select("npc:npcs(id,name,image_url,kind,dialog_intro,dialog_outro,shop_items,reward_items,reward_xp,reward_ryo,reward_cooldown_hours)")
+      .select("npc:npcs(id,name,image_url,kind,dialog_intro,dialog_outro,shop_items,reward_items,reward_xp,reward_ryo,reward_cooldown_hours,required_mission_id)")
       .eq("location_id", me.current_location_id);
     const list = ((data as any[]) ?? []).map((r) => r.npc).filter((n: any) => n && n.kind !== "aggressive");
     // Enriquece reward com cooldown remaining
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Missões concluídas do personagem (para gate de recompensa)
+    const { data: doneRows } = await supabaseAdmin
+      .from("character_missions").select("mission_id").eq("character_id", me.id);
+    const done = new Set(((doneRows as any[]) ?? []).map((r) => r.mission_id));
+    const missionIds = list.map((n: any) => n.required_mission_id).filter(Boolean);
+    let missionNames: Record<string, string> = {};
+    if (missionIds.length) {
+      const { data: ms } = await supabaseAdmin.from("missions").select("id,name").in("id", missionIds);
+      for (const m of (ms as any[]) ?? []) missionNames[m.id] = m.name;
+    }
     for (const n of list) {
       if (n.kind === "reward") {
         const { data: last } = await supabaseAdmin
@@ -44,6 +54,12 @@ export const listLocationInteractNpcs = createServerFn({ method: "POST" })
         const hours = Number(n.reward_cooldown_hours ?? 24);
         const nextAt = last ? new Date(last.claimed_at).getTime() + hours * 3600_000 : 0;
         n.cooldown_remaining_ms = Math.max(0, nextAt - Date.now());
+        if (n.required_mission_id) {
+          n.mission_required_name = missionNames[n.required_mission_id] ?? "missão";
+          n.mission_unlocked = done.has(n.required_mission_id);
+        } else {
+          n.mission_unlocked = true;
+        }
       }
     }
     return { npcs: list };
@@ -98,8 +114,17 @@ export const claimNpcReward = createServerFn({ method: "POST" })
     const me = await assertNpcHere(context, data.npc_id);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: npc } = await supabaseAdmin.from("npcs")
-      .select("kind,reward_items,reward_xp,reward_ryo,reward_cooldown_hours,name").eq("id", data.npc_id).maybeSingle();
+      .select("kind,reward_items,reward_xp,reward_ryo,reward_cooldown_hours,name,required_mission_id").eq("id", data.npc_id).maybeSingle();
     if (!npc || npc.kind !== "reward") throw new Error("Este NPC não concede recompensas.");
+    if (npc.required_mission_id) {
+      const { data: done } = await supabaseAdmin
+        .from("character_missions").select("mission_id")
+        .eq("character_id", me.id).eq("mission_id", npc.required_mission_id).maybeSingle();
+      if (!done) {
+        const { data: mm } = await supabaseAdmin.from("missions").select("name").eq("id", npc.required_mission_id).maybeSingle();
+        throw new Error(`Você precisa concluir a missão "${(mm as any)?.name ?? "?"}" antes.`);
+      }
+    }
 
     const hours = Number(npc.reward_cooldown_hours ?? 24);
     if (hours > 0) {
