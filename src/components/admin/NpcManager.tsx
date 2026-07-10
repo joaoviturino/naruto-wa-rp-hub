@@ -15,6 +15,7 @@ type RewardRow = { item_id: string; qty: number };
 type NpcKind = "aggressive" | "shop" | "reward";
 type Npc = {
   id: string; name: string; image_url: string | null; description: string | null;
+  battle_bg_url: string | null;
   hp_max: number; xp: number; energy_max: number;
   reward_xp: number; reward_ryo: number; drop_table: DropRow[];
   kind: NpcKind; dialog_intro: string | null; dialog_outro: string | null;
@@ -45,6 +46,7 @@ export function NpcManager() {
     setNpcs(((n.data as any[]) ?? []).map((r) => ({
       ...r,
       kind: (r.kind ?? "aggressive") as NpcKind,
+      battle_bg_url: r.battle_bg_url ?? null,
       drop_table: Array.isArray(r.drop_table) ? r.drop_table : [],
       shop_items: Array.isArray(r.shop_items) ? r.shop_items : [],
       reward_items: Array.isArray(r.reward_items) ? r.reward_items : [],
