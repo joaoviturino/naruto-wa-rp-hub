@@ -11,6 +11,9 @@ import { DailyMissionsPanel } from "@/components/DailyMissionsPanel";
 import { updateCharacter } from "@/lib/character.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
+import { Link } from "@tanstack/react-router";
+import { Button } from "@/components/ui/button";
+import { BookOpen } from "lucide-react";
 
 type Character = {
   id: string; user_id: string; nickname: string; phone_e164: string;
@@ -114,7 +117,10 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
         <TabsContent value="ficha" className="mt-4">
           <div className="scroll-panel rounded-lg p-4 sm:p-6 space-y-4">
             <div className="flex justify-end">
-              <SceneImagesManager characterId={characterId} userId={char.user_id} />
+              <div className="flex gap-2">
+                <Link to="/library"><Button size="sm" variant="outline"><BookOpen size={14}/> Biblioteca</Button></Link>
+                <SceneImagesManager characterId={characterId} userId={char.user_id} />
+              </div>
             </div>
             {char.bio && <p className="italic text-gold">"{char.bio}"</p>}
             <FichaBlock title="Aparência" text={char.appearance} />

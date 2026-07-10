@@ -18,6 +18,7 @@ import { LocationManager } from "@/components/admin/LocationManager";
 import { NpcManager } from "@/components/admin/NpcManager";
 import { PartyManager } from "@/components/admin/PartyManager";
 import { MinigameManager } from "@/components/admin/MinigameManager";
+import { LibraryManager } from "@/components/admin/LibraryManager";
 import { NINJA_RANKS } from "@/components/admin/shared";
 import { Pencil, BatteryCharging } from "lucide-react";
 
@@ -38,6 +39,7 @@ export function AdminPanel() {
           <TabsTrigger value="locations">Locais</TabsTrigger>
           <TabsTrigger value="npcs">NPCs</TabsTrigger>
           <TabsTrigger value="minigames">Minigames</TabsTrigger>
+          <TabsTrigger value="library">Biblioteca</TabsTrigger>
           <TabsTrigger value="parties">Parties</TabsTrigger>
           <TabsTrigger value="admins">Admins</TabsTrigger>
           <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
@@ -51,6 +53,7 @@ export function AdminPanel() {
         <TabsContent value="locations" className="mt-4"><LocationManager /></TabsContent>
         <TabsContent value="npcs" className="mt-4"><NpcManager /></TabsContent>
         <TabsContent value="minigames" className="mt-4"><MinigameManager /></TabsContent>
+        <TabsContent value="library" className="mt-4"><LibraryManager /></TabsContent>
         <TabsContent value="parties" className="mt-4"><PartyManager /></TabsContent>
         <TabsContent value="admins" className="mt-4"><AdminUsers /></TabsContent>
         <TabsContent value="whatsapp" className="mt-4"><BotPanel /></TabsContent>
