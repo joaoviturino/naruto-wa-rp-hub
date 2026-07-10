@@ -340,6 +340,8 @@ const itemPayload = z.object({
   req_maestria: skillRank.nullable().optional(),
   req_mission_id: z.string().uuid().nullable().optional(),
   req_skill_id: z.string().uuid().nullable().optional(),
+  stackable: z.boolean().optional(),
+  stack_limit: z.number().int().min(1).nullable().optional(),
   meta: metaSchema,
 });
 
