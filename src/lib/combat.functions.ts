@@ -18,6 +18,7 @@ type Player = {
   user_id?: string | null;
   nickname: string;
   avatar_url: string | null;
+  sprite_url?: string | null;
   ef: number; em: number; chakra: number;
   ef_max: number; em_max: number; chakra_max: number;
   alive: boolean;
@@ -26,6 +27,7 @@ type Player = {
 };
 type NpcState = {
   id: string; name: string; image_url: string | null;
+  battle_bg_url?: string | null;
   hp: number; hp_max: number;
   energy: number; energy_max: number;
 };
@@ -47,6 +49,8 @@ type LogEntry = {
   speed: number;
   crit_mul: number;
   msg: string;
+  animation_url?: string | null;
+  sound_url?: string | null;
 };
 
 function computeStats(xp: number) {
@@ -72,7 +76,7 @@ function damageTargetPlayer(p: Player, dmg: number): { pool: Pool; taken: number
 
 async function loadMyChar(context: { supabase: any; userId: string }) {
   const { data, error } = await context.supabase
-    .from("characters").select("id,nickname,avatar_url,xp,current_location_id,ef_current,em_current,chakra_current").eq("user_id", context.userId).maybeSingle();
+    .from("characters").select("id,nickname,avatar_url,inventory_bg_url,xp,current_location_id,ef_current,em_current,chakra_current").eq("user_id", context.userId).maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Sem personagem.");
   return data;
