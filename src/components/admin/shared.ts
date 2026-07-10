@@ -44,6 +44,7 @@ export function labelize(s: string | null | undefined) {
 // Fontes: Narutopedia (naruto.fandom.com) — resumos adaptados.
 export const SKILL_CLASSES = [
   { value: "genjutsu", label: "Genjutsu", desc: "Ilusões que atacam o sistema nervoso e a percepção." },
+  { value: "selos_de_mao", label: "Selos de Mão", desc: "Domínio dos selos manuais que moldam e liberam o chakra." },
   { value: "ninjutsu", label: "Ninjutsu", desc: "Técnicas de chakra puras (elementais, invocações, etc.)." },
   { value: "taijutsu", label: "Taijutsu", desc: "Combate corpo a corpo baseado em força física." },
   { value: "shinjutsu", label: "Shinjutsu", desc: "Técnicas divinas ligadas ao chakra do Shinju/Ootsutsuki." },
