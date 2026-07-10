@@ -147,16 +147,17 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
       let audio: HTMLAudioElement | null = null;
       const waitAudio = soundUrl ? new Promise<boolean>((res) => {
         try {
-          audio = new Audio(soundUrl);
-          audio.crossOrigin = "anonymous";
-          audio.preload = "auto";
-          audio.volume = 0.7;
+          const a = new Audio(soundUrl);
+          a.crossOrigin = "anonymous";
+          a.preload = "auto";
+          a.volume = 0.7;
+          audio = a;
           let done = false;
           const finish = (ok: boolean) => { if (done) return; done = true; res(ok); };
-          audio.addEventListener("canplaythrough", () => finish(true), { once: true });
-          audio.addEventListener("loadeddata", () => finish(true), { once: true });
-          audio.addEventListener("error", () => finish(false), { once: true });
-          audio.load();
+          a.addEventListener("canplaythrough", () => finish(true), { once: true });
+          a.addEventListener("loadeddata", () => finish(true), { once: true });
+          a.addEventListener("error", () => finish(false), { once: true });
+          a.load();
           setTimeout(() => finish(false), MAX_WAIT);
         } catch { res(false); }
       }) : Promise.resolve(false);
@@ -165,11 +166,12 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
 
       // Tocar som
       let audioDuration = 0;
-      if (audio) {
+      const a2 = audio as HTMLAudioElement | null;
+      if (a2) {
         if (audioRef.current) { try { audioRef.current.pause(); } catch { /* noop */ } }
-        audioRef.current = audio;
-        try { await audio.play(); } catch { /* noop */ }
-        audioDuration = Number.isFinite(audio.duration) ? audio.duration * 1000 : 0;
+        audioRef.current = a2;
+        try { await a2.play(); } catch { /* noop */ }
+        audioDuration = Number.isFinite(a2.duration) ? a2.duration * 1000 : 0;
       }
 
       // Mostrar animação
