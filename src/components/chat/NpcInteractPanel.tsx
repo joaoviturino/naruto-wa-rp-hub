@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Store, Gift, MessageSquare } from "lucide-react";
+import { Store, Gift, MessageSquare, Coins, Minus, Plus } from "lucide-react";
 import { listLocationInteractNpcs, buyFromShop, claimNpcReward } from "@/lib/npc-interact.functions";
 
 type Npc = {
@@ -16,13 +16,15 @@ type Npc = {
   reward_xp?: number; reward_ryo?: number;
   cooldown_remaining_ms?: number;
 };
-type Item = { id: string; name: string; image_url: string | null };
+type Item = { id: string; name: string; image_url: string | null; description: string | null; type: string | null };
 
 export function NpcInteractPanel({ locationId, refreshTick }: { locationId: string; refreshTick?: number }) {
   const [npcs, setNpcs] = useState<Npc[]>([]);
   const [open, setOpen] = useState<Npc | null>(null);
   const [items, setItems] = useState<Record<string, Item>>({});
   const [busy, setBusy] = useState(false);
+  const [ryo, setRyo] = useState<number>(0);
+  const [qtys, setQtys] = useState<Record<string, number>>({});
   const list = useServerFn(listLocationInteractNpcs);
   const buy = useServerFn(buyFromShop);
   const claim = useServerFn(claimNpcReward);
@@ -37,10 +39,15 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
         for (const s of n.reward_items ?? []) ids.add(s.item_id);
       }
       if (ids.size) {
-        const { data } = await supabase.from("items").select("id,name,image_url").in("id", Array.from(ids));
+        const { data } = await supabase.from("items").select("id,name,image_url,description,type").in("id", Array.from(ids));
         const map: Record<string, Item> = {};
         for (const it of (data as Item[]) ?? []) map[it.id] = it;
         setItems(map);
+      }
+      const { data: me } = await supabase.auth.getUser();
+      if (me.user) {
+        const { data: ch } = await supabase.from("characters").select("ryo").eq("user_id", me.user.id).maybeSingle();
+        setRyo(Number((ch as any)?.ryo ?? 0));
       }
     } catch {/* ignore */}
   }
@@ -48,36 +55,62 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
 
   if (!npcs.length) return null;
   const remH = (ms?: number) => ms && ms > 0 ? Math.ceil(ms / 3600000) : 0;
+  const shopNpcs = npcs.filter((n) => n.kind === "shop");
+  const rewardNpcs = npcs.filter((n) => n.kind === "reward");
+  const getQty = (k: string) => Math.max(1, qtys[k] ?? 1);
+  const setQty = (k: string, v: number) => setQtys((s) => ({ ...s, [k]: Math.max(1, Math.min(50, v)) }));
 
   return (
     <div className="border border-border rounded p-2 space-y-2">
       <div className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1">
         <MessageSquare size={11} /> NPCs no local
       </div>
-      <div className="space-y-1">
-        {npcs.map((n) => {
-          const disabled = n.kind === "reward" && (n.cooldown_remaining_ms ?? 0) > 0;
-          return (
-            <Button key={n.id} size="sm" variant="outline" className="w-full justify-start" onClick={() => setOpen(n)}>
-              {n.kind === "shop" ? <Store size={12} className="mr-1" /> : <Gift size={12} className="mr-1" />}
+      {shopNpcs.length > 0 && (
+        <div className="space-y-1">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1"><Store size={11} /> Lojas</div>
+          {shopNpcs.map((n) => (
+            <Button key={n.id} size="sm" variant="outline" className="w-full justify-start gap-2" onClick={() => setOpen(n)}>
+              <Store size={12} className="text-gold" />
               <span className="flex-1 truncate text-left">{n.name}</span>
-              {disabled && <span className="text-[10px] text-muted-foreground">{remH(n.cooldown_remaining_ms)}h</span>}
+              <Badge variant="secondary" className="text-[10px]">Abrir loja</Badge>
             </Button>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
+      {rewardNpcs.length > 0 && (
+        <div className="space-y-1">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1"><Gift size={11} /> Recompensas</div>
+          {rewardNpcs.map((n) => {
+            const disabled = (n.cooldown_remaining_ms ?? 0) > 0;
+            return (
+              <Button key={n.id} size="sm" variant="outline" className="w-full justify-start gap-2" onClick={() => setOpen(n)}>
+                <Gift size={12} className="text-gold" />
+                <span className="flex-1 truncate text-left">{n.name}</span>
+                {disabled && <span className="text-[10px] text-muted-foreground">{remH(n.cooldown_remaining_ms)}h</span>}
+              </Button>
+            );
+          })}
+        </div>
+      )}
 
       <Dialog open={!!open} onOpenChange={(v) => { if (!v) { setOpen(null); load(); } }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           {open && (
             <>
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  <div className="w-10 h-10 rounded overflow-hidden bg-secondary shrink-0">
+                <DialogTitle className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded overflow-hidden bg-secondary shrink-0 border border-border">
                     {open.image_url && <img src={open.image_url} className="w-full h-full object-cover" alt="" />}
                   </div>
-                  <span>{open.name}</span>
-                  <Badge variant="outline">{open.kind === "shop" ? "Loja" : "Recompensa"}</Badge>
+                  <div className="flex-1 min-w-0">
+                    <div className="truncate">{open.name}</div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <Badge variant="outline" className="text-[10px]">{open.kind === "shop" ? "Loja" : "Recompensa"}</Badge>
+                      {open.kind === "shop" && (
+                        <span className="text-xs text-gold flex items-center gap-1"><Coins size={12} /> {ryo} Ryo</span>
+                      )}
+                    </div>
+                  </div>
                 </DialogTitle>
               </DialogHeader>
               {open.dialog_intro && (
@@ -86,31 +119,55 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
                 </div>
               )}
               {open.kind === "shop" ? (
-                <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+                <div className="grid gap-2 sm:grid-cols-2 max-h-[55vh] overflow-y-auto pr-1">
                   {(open.shop_items ?? []).length === 0 && <p className="text-sm text-muted-foreground">Sem itens à venda.</p>}
                   {(open.shop_items ?? []).map((s, i) => {
                     const it = items[s.item_id];
+                    const key = `${open.id}:${s.item_id}`;
+                    const qty = getQty(key);
+                    const stockLeft = Number(s.stock);
+                    const outOfStock = stockLeft !== -1 && stockLeft <= 0;
+                    const total = Number(s.price) * qty;
+                    const cannotAfford = ryo < total;
                     return (
-                      <div key={i} className="flex items-center gap-2 border border-border rounded p-2">
-                        <div className="w-10 h-10 rounded bg-secondary overflow-hidden shrink-0">
-                          {it?.image_url && <img src={it.image_url} className="w-full h-full object-cover" alt="" />}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-display truncate">{it?.name ?? "?"}</div>
-                          <div className="text-[11px] text-muted-foreground">
-                            {s.price} Ryo • {Number(s.stock) === -1 ? "estoque ilimitado" : `${s.stock} em estoque`}
+                      <div key={i} className="border border-border rounded-lg p-2 flex flex-col gap-2 bg-secondary/20">
+                        <div className="flex gap-2">
+                          <div className="w-14 h-14 rounded bg-secondary overflow-hidden shrink-0 border border-border">
+                            {it?.image_url && <img src={it.image_url} className="w-full h-full object-cover" alt="" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-display truncate">{it?.name ?? "?"}</div>
+                            {it?.type && <Badge variant="outline" className="text-[9px] mt-0.5">{it.type}</Badge>}
+                            <div className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
+                              <Coins size={10} className="text-gold" /> {s.price} Ryo
+                              <span>•</span>
+                              <span>{stockLeft === -1 ? "∞ estoque" : `${stockLeft} em estoque`}</span>
+                            </div>
                           </div>
                         </div>
-                        <Button size="sm" disabled={busy || (Number(s.stock) !== -1 && Number(s.stock) <= 0)}
-                          onClick={async () => {
-                            setBusy(true);
-                            try {
-                              const r = await buy({ data: { npc_id: open.id, item_id: s.item_id, qty: 1 } });
-                              toast.success(`Comprado por ${r.spent} Ryo.`);
-                              await load();
-                            } catch (e: any) { toast.error(e.message); }
-                            finally { setBusy(false); }
-                          }}>Comprar</Button>
+                        {it?.description && (
+                          <p className="text-[11px] text-muted-foreground line-clamp-2">{it.description}</p>
+                        )}
+                        <div className="flex items-center gap-1 mt-auto">
+                          <Button variant="outline" size="icon" className="h-7 w-7" disabled={outOfStock || qty <= 1}
+                            onClick={() => setQty(key, qty - 1)}><Minus size={12} /></Button>
+                          <div className="w-8 text-center text-sm font-mono">{qty}</div>
+                          <Button variant="outline" size="icon" className="h-7 w-7" disabled={outOfStock || (stockLeft !== -1 && qty >= stockLeft)}
+                            onClick={() => setQty(key, qty + 1)}><Plus size={12} /></Button>
+                          <Button size="sm" className="flex-1" disabled={busy || outOfStock || cannotAfford}
+                            onClick={async () => {
+                              setBusy(true);
+                              try {
+                                const r = await buy({ data: { npc_id: open.id, item_id: s.item_id, qty } });
+                                toast.success(`Comprado ${qty}× por ${r.spent} Ryo.`);
+                                setQty(key, 1);
+                                await load();
+                              } catch (e: any) { toast.error(e.message); }
+                              finally { setBusy(false); }
+                            }}>
+                            {outOfStock ? "Esgotado" : cannotAfford ? "Sem Ryo" : `Comprar ${total}`}
+                          </Button>
+                        </div>
                       </div>
                     );
                   })}
