@@ -289,6 +289,7 @@ export function NpcManager() {
             </div>
           )}
 
+          {sel.kind === "aggressive" && (
           <div className="scroll-panel rounded-lg p-4 space-y-2">
             <h4 className="font-display text-lg text-gold">Tabela de drop</h4>
             <div className="space-y-2">
@@ -329,7 +330,9 @@ export function NpcManager() {
               await save({ data: { ...sel, drop_table: next } } as any); load();
             }}><Plus size={14} className="mr-1" /> Adicionar drop</Button>
           </div>
+          )}
 
+          {sel.kind === "aggressive" && (
           <div className="scroll-panel rounded-lg p-4 space-y-2">
             <h4 className="font-display text-lg text-gold">Habilidades ({selSkills.size})</h4>
             <div className="grid gap-1 max-h-[300px] overflow-y-auto pr-2">
@@ -349,6 +352,7 @@ export function NpcManager() {
               {skills.length === 0 && <p className="text-xs text-muted-foreground">Nenhuma habilidade cadastrada.</p>}
             </div>
           </div>
+          )}
         </div>
       ) : (
         <div className="text-muted-foreground text-sm p-6">Selecione um NPC à esquerda para editar HP, XP, imagem e habilidades.</div>
