@@ -1016,6 +1016,7 @@ export type Database = {
           image_url: string | null
           kind: Database["public"]["Enums"]["npc_kind"]
           name: string
+          required_mission_id: string | null
           reward_cooldown_hours: number
           reward_items: Json
           reward_ryo: number
@@ -1037,6 +1038,7 @@ export type Database = {
           image_url?: string | null
           kind?: Database["public"]["Enums"]["npc_kind"]
           name: string
+          required_mission_id?: string | null
           reward_cooldown_hours?: number
           reward_items?: Json
           reward_ryo?: number
@@ -1058,6 +1060,7 @@ export type Database = {
           image_url?: string | null
           kind?: Database["public"]["Enums"]["npc_kind"]
           name?: string
+          required_mission_id?: string | null
           reward_cooldown_hours?: number
           reward_items?: Json
           reward_ryo?: number
@@ -1066,7 +1069,15 @@ export type Database = {
           updated_at?: string
           xp?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "npcs_required_mission_id_fkey"
+            columns: ["required_mission_id"]
+            isOneToOne: false
+            referencedRelation: "missions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       outbound_messages: {
         Row: {
