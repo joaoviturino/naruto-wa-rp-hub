@@ -31,6 +31,8 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const [sprites, setSprites] = useState<Record<string, string | null>>({});
   const [anim, setAnim] = useState<{ url: string; side: "npc" | "player"; until: number } | null>(null);
   const lastLogSeq = useRef<number>(0);
+  const animQueue = useRef<any[]>([]);
+  const animRunning = useRef<boolean>(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const attack = useServerFn(playerAttack);
   const flee = useServerFn(fleeCombat);
@@ -103,62 +105,84 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const currentCd = currentSkill ? (myCooldowns[currentSkill.id] ?? 0) : 0;
   const consumables = useMemo(() => bag.filter((e) => itemMap[e.item_id]?.type === "consumable"), [bag, itemMap]);
 
-  // Dispara animação + som SOMENTE após pré-carregar totalmente (evita "piscar" sem mídia).
+  // Enfileira TODAS as novas entradas do log (jogador + resposta do NPC vêm juntas do backend)
+  // e roda uma de cada vez: espera pré-carregar mídia, mostra animação, toca som e SÓ ENTÃO
+  // avança para a próxima. Isso evita que o ataque do NPC "sobrescreva" o do jogador.
   useEffect(() => {
     if (!log.length) return;
-    const last = log[log.length - 1];
-    if (!last || last.seq === lastLogSeq.current) return;
-    lastLogSeq.current = last.seq;
-    const animUrl: string | undefined = last.animation_url;
-    const soundUrl: string | undefined = last.sound_url;
-    if (!animUrl && !soundUrl) return;
+    const fresh = log.filter((l: any) => l.seq > lastLogSeq.current);
+    if (!fresh.length) return;
+    lastLogSeq.current = fresh[fresh.length - 1].seq;
+    for (const entry of fresh) {
+      if (entry.animation_url || entry.sound_url) animQueue.current.push(entry);
+    }
+    void runQueue();
 
-    let cancelled = false;
-    const MAX_WAIT = 5000;
+    async function runQueue() {
+      if (animRunning.current) return;
+      animRunning.current = true;
+      while (animQueue.current.length) {
+        const entry = animQueue.current.shift();
+        await playOne(entry);
+      }
+      animRunning.current = false;
+    }
 
-    const waitImg = animUrl ? new Promise<boolean>((res) => {
-      const img = new Image();
-      let done = false;
-      const finish = (ok: boolean) => { if (done) return; done = true; res(ok); };
-      img.onload = () => finish(true);
-      img.onerror = () => finish(false);
-      img.src = animUrl;
-      setTimeout(() => finish(false), MAX_WAIT);
-    }) : Promise.resolve(false);
+    async function playOne(entry: any) {
+      const animUrl: string | undefined = entry.animation_url;
+      const soundUrl: string | undefined = entry.sound_url;
+      const MAX_WAIT = 5000;
+      const ANIM_MS = 2400;
 
-    let audio: HTMLAudioElement | null = null;
-    const waitAudio = soundUrl ? new Promise<boolean>((res) => {
-      try {
-        audio = new Audio(soundUrl);
-        audio.crossOrigin = "anonymous";
-        audio.preload = "auto";
-        audio.volume = 0.7;
+      const waitImg = animUrl ? new Promise<boolean>((res) => {
+        const img = new Image();
         let done = false;
         const finish = (ok: boolean) => { if (done) return; done = true; res(ok); };
-        audio.addEventListener("canplaythrough", () => finish(true), { once: true });
-        audio.addEventListener("loadeddata", () => finish(true), { once: true });
-        audio.addEventListener("error", () => finish(false), { once: true });
-        audio.load();
+        img.onload = () => finish(true);
+        img.onerror = () => finish(false);
+        img.src = animUrl;
         setTimeout(() => finish(false), MAX_WAIT);
-      } catch { res(false); }
-    }) : Promise.resolve(false);
+      }) : Promise.resolve(false);
 
-    Promise.all([waitImg, waitAudio]).then(([imgOk]) => {
-      if (cancelled) return;
+      let audio: HTMLAudioElement | null = null;
+      const waitAudio = soundUrl ? new Promise<boolean>((res) => {
+        try {
+          audio = new Audio(soundUrl);
+          audio.crossOrigin = "anonymous";
+          audio.preload = "auto";
+          audio.volume = 0.7;
+          let done = false;
+          const finish = (ok: boolean) => { if (done) return; done = true; res(ok); };
+          audio.addEventListener("canplaythrough", () => finish(true), { once: true });
+          audio.addEventListener("loadeddata", () => finish(true), { once: true });
+          audio.addEventListener("error", () => finish(false), { once: true });
+          audio.load();
+          setTimeout(() => finish(false), MAX_WAIT);
+        } catch { res(false); }
+      }) : Promise.resolve(false);
+
+      const [imgOk] = await Promise.all([waitImg, waitAudio]);
+
+      // Tocar som
+      let audioDuration = 0;
       if (audio) {
         if (audioRef.current) { try { audioRef.current.pause(); } catch { /* noop */ } }
         audioRef.current = audio;
-        audio.play().catch(() => {});
+        try { await audio.play(); } catch { /* noop */ }
+        audioDuration = Number.isFinite(audio.duration) ? audio.duration * 1000 : 0;
       }
-      if (animUrl && imgOk) {
-        const until = Date.now() + 2400;
-        setAnim({ url: animUrl, side: last.actor, until });
-        setTimeout(() => setAnim((cur) => (cur && cur.until <= Date.now() ? null : cur)), 2500);
-      }
-    });
 
-    return () => { cancelled = true; };
-  }, [log.length, log[log.length - 1]?.seq]);
+      // Mostrar animação
+      if (animUrl && imgOk) {
+        setAnim({ url: animUrl, side: entry.actor, until: Date.now() + ANIM_MS });
+      }
+
+      // Aguarda o maior entre duração do áudio e a animação (mínimo 1.2s, máximo 6s)
+      const wait = Math.max(1200, Math.min(6000, Math.max(audioDuration || 0, animUrl && imgOk ? ANIM_MS : 0)));
+      await new Promise((r) => setTimeout(r, wait));
+      setAnim(null);
+    }
+  }, [log.length]);
 
   if (!session) return null;
 
