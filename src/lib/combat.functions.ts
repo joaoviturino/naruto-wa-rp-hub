@@ -354,7 +354,7 @@ async function applyRewards(supabaseAdmin: any, npcId: string, state: CombatStat
 
 async function runNpcTurn(supabaseAdmin: any, npcId: string, state: CombatState, log: LogEntry[], incomingSpeed: number) {
   const { data: skills } = await supabaseAdmin
-    .from("npc_skills").select("skill:skills(id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic)").eq("npc_id", npcId);
+    .from("npc_skills").select("skill:skills(id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic,animation_url,sound_url)").eq("npc_id", npcId);
   const pool = ((skills as any[]) ?? []).map((r: any) => r.skill).filter(Boolean);
   if (pool.length === 0) return { energyRemaining: state.npc.energy };
 
@@ -383,6 +383,8 @@ async function runNpcTurn(supabaseAdmin: any, npcId: string, state: CombatState,
     seq: log.length + 1, actor: "npc", actor_name: state.npc.name, target_name: target.nickname,
     skill_name: skill.name, energy_type: skill.energy_type as Pool, energy_used: energy,
     effective, damage: finalDamage, speed, crit_mul: Number(skill.bonus_critical),
+    animation_url: (skill as any).animation_url ?? null,
+    sound_url: (skill as any).sound_url ?? null,
     msg: `${state.npc.name} usa ${skill.name} → ${target.nickname} perde ${taken.taken} de ${taken.pool.toUpperCase()}${speedPenalty < 1 ? " (reação lenta)" : ""}.`,
   });
   return { energyRemaining: state.npc.energy - energy };
