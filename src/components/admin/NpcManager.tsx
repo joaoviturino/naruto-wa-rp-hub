@@ -295,6 +295,20 @@ export function NpcManager() {
                 const next = [...(sel.reward_items ?? []), { item_id: items[0].id, qty: 1 }];
                 await save({ data: { ...sel, reward_items: next } } as any); load();
               }}><Plus size={14} className="mr-1" /> Adicionar item</Button>
+              <div>
+                <label className="text-xs text-muted-foreground">Missão obrigatória (opcional)</label>
+                <select
+                  value={sel.required_mission_id ?? ""}
+                  onChange={async (e) => {
+                    const v = e.target.value || null;
+                    await save({ data: { ...sel, required_mission_id: v } } as any); load();
+                  }}
+                  className="w-full bg-input border border-border rounded px-2 py-1 text-sm mt-1">
+                  <option value="">— Sem requisito —</option>
+                  {missions.map((m) => <option key={m.id} value={m.id}>[{m.rank}] {m.name}</option>)}
+                </select>
+                <p className="text-[10px] text-muted-foreground mt-1">Só poderá receber a recompensa quem já concluiu esta missão.</p>
+              </div>
             </div>
           )}
 
