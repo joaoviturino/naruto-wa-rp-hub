@@ -998,6 +998,7 @@ export type Database = {
       }
       npcs: {
         Row: {
+          battle_bg_url: string | null
           created_at: string
           description: string | null
           dialog_intro: string | null
@@ -1018,6 +1019,7 @@ export type Database = {
           xp: number
         }
         Insert: {
+          battle_bg_url?: string | null
           created_at?: string
           description?: string | null
           dialog_intro?: string | null
@@ -1038,6 +1040,7 @@ export type Database = {
           xp?: number
         }
         Update: {
+          battle_bg_url?: string | null
           created_at?: string
           description?: string | null
           dialog_intro?: string | null
@@ -1252,6 +1255,7 @@ export type Database = {
       }
       skills: {
         Row: {
+          animation_url: string | null
           base_cost: number
           bonus_critical: number
           bonus_energetic: number
@@ -1277,9 +1281,11 @@ export type Database = {
           req_prereq_skill_id: string | null
           req_rank: Database["public"]["Enums"]["ninja_rank"] | null
           skill_class: string | null
+          sound_url: string | null
           type: string | null
         }
         Insert: {
+          animation_url?: string | null
           base_cost?: number
           bonus_critical?: number
           bonus_energetic?: number
@@ -1305,9 +1311,11 @@ export type Database = {
           req_prereq_skill_id?: string | null
           req_rank?: Database["public"]["Enums"]["ninja_rank"] | null
           skill_class?: string | null
+          sound_url?: string | null
           type?: string | null
         }
         Update: {
+          animation_url?: string | null
           base_cost?: number
           bonus_critical?: number
           bonus_energetic?: number
@@ -1333,6 +1341,7 @@ export type Database = {
           req_prereq_skill_id?: string | null
           req_rank?: Database["public"]["Enums"]["ninja_rank"] | null
           skill_class?: string | null
+          sound_url?: string | null
           type?: string | null
         }
         Relationships: [

@@ -18,6 +18,7 @@ type Player = {
   user_id?: string | null;
   nickname: string;
   avatar_url: string | null;
+  sprite_url?: string | null;
   ef: number; em: number; chakra: number;
   ef_max: number; em_max: number; chakra_max: number;
   alive: boolean;
@@ -26,6 +27,7 @@ type Player = {
 };
 type NpcState = {
   id: string; name: string; image_url: string | null;
+  battle_bg_url?: string | null;
   hp: number; hp_max: number;
   energy: number; energy_max: number;
 };
@@ -47,6 +49,8 @@ type LogEntry = {
   speed: number;
   crit_mul: number;
   msg: string;
+  animation_url?: string | null;
+  sound_url?: string | null;
 };
 
 function computeStats(xp: number) {
@@ -72,7 +76,7 @@ function damageTargetPlayer(p: Player, dmg: number): { pool: Pool; taken: number
 
 async function loadMyChar(context: { supabase: any; userId: string }) {
   const { data, error } = await context.supabase
-    .from("characters").select("id,nickname,avatar_url,xp,current_location_id,ef_current,em_current,chakra_current").eq("user_id", context.userId).maybeSingle();
+    .from("characters").select("id,nickname,avatar_url,inventory_bg_url,xp,current_location_id,ef_current,em_current,chakra_current").eq("user_id", context.userId).maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Sem personagem.");
   return data;
@@ -113,7 +117,7 @@ export const rollSpawn = createServerFn({ method: "POST" })
       const { data: party } = await supabaseAdmin.from("parties").select("leader_id").eq("id", partyIdEarly).maybeSingle();
       if (!party || party.leader_id !== me.id) return { session_id: null }; // só líder dispara
       const { data: mems } = await supabaseAdmin
-        .from("party_members").select("character:characters(id,nickname,avatar_url,xp,current_location_id,ef_current,em_current,chakra_current)").eq("party_id", partyIdEarly);
+        .from("party_members").select("character:characters(id,nickname,avatar_url,inventory_bg_url,xp,current_location_id,ef_current,em_current,chakra_current)").eq("party_id", partyIdEarly);
       partyMembersEarly = ((mems as any[]) ?? []).map((m: any) => m.character).filter(Boolean);
       // Todos os membros precisam estar no local
       const allHere = partyMembersEarly.every((c: any) => c.current_location_id === loc.id);
@@ -133,7 +137,7 @@ export const rollSpawn = createServerFn({ method: "POST" })
 
     // Escolhe um NPC do local
     const { data: pool } = await context.supabase
-      .from("location_npcs").select("npc_id,weight,npc:npcs(id,name,image_url,hp_max,energy_max,xp,kind)").eq("location_id", loc.id);
+      .from("location_npcs").select("npc_id,weight,npc:npcs(id,name,image_url,battle_bg_url,hp_max,energy_max,xp,kind)").eq("location_id", loc.id);
     const rows = ((pool as any[]) ?? []).filter((r) => (r.npc?.kind ?? "aggressive") === "aggressive");
     if (!rows.length) return { session_id: null };
     const total = rows.reduce((s, r) => s + (r.weight ?? 1), 0);
@@ -145,7 +149,7 @@ export const rollSpawn = createServerFn({ method: "POST" })
     // Participantes
     const partyId: string | null = partyIdEarly;
     let members: any[] = partyIdEarly ? partyMembersEarly : [{
-      id: me.id, nickname: me.nickname, avatar_url: me.avatar_url, xp: me.xp,
+      id: me.id, nickname: me.nickname, avatar_url: me.avatar_url, inventory_bg_url: (me as any).inventory_bg_url, xp: me.xp,
       ef_current: me.ef_current, em_current: me.em_current, chakra_current: me.chakra_current,
     }];
 
@@ -155,7 +159,7 @@ export const rollSpawn = createServerFn({ method: "POST" })
       const em = c.em_current == null ? s.em : Math.min(s.em, c.em_current);
       const ck = c.chakra_current == null ? s.chakra : Math.min(s.chakra, c.chakra_current);
       return {
-        character_id: c.id, nickname: c.nickname, avatar_url: c.avatar_url,
+        character_id: c.id, nickname: c.nickname, avatar_url: c.avatar_url, sprite_url: c.inventory_bg_url ?? null,
         ef, em, chakra: ck,
         ef_max: s.ef, em_max: s.em, chakra_max: s.chakra,
         alive: (ef + em + ck) > 0,
@@ -163,7 +167,7 @@ export const rollSpawn = createServerFn({ method: "POST" })
       };
     });
     const state: CombatState = {
-      npc: { id: npc.id, name: npc.name, image_url: npc.image_url, hp: npc.hp_max, hp_max: npc.hp_max, energy: npc.energy_max, energy_max: npc.energy_max },
+      npc: { id: npc.id, name: npc.name, image_url: npc.image_url, battle_bg_url: npc.battle_bg_url ?? null, hp: npc.hp_max, hp_max: npc.hp_max, energy: npc.energy_max, energy_max: npc.energy_max },
       players, active: 0,
     };
 
@@ -220,7 +224,7 @@ export const playerAttack = createServerFn({ method: "POST" })
       .from("character_skills").select("skill_id").eq("character_id", me.id).eq("skill_id", data.skill_id).maybeSingle();
     if (!owned) throw new Error("Você não conhece essa habilidade.");
     const { data: skill } = await context.supabase.from("skills")
-      .select("id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class").eq("id", data.skill_id).maybeSingle();
+      .select("id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class,animation_url,sound_url").eq("id", data.skill_id).maybeSingle();
     if (!skill) throw new Error("Habilidade inexistente.");
     if (data.energy_used < skill.base_cost) throw new Error(`Custo mínimo: ${skill.base_cost}.`);
 
@@ -251,6 +255,8 @@ export const playerAttack = createServerFn({ method: "POST" })
       seq: log.length + 1, actor: "player", actor_name: activePlayer.nickname, target_name: state.npc.name,
       skill_name: skill.name, energy_type: pool, energy_used: data.energy_used,
       effective, damage, speed, crit_mul: Number(skill.bonus_critical),
+      animation_url: (skill as any).animation_url ?? null,
+      sound_url: (skill as any).sound_url ?? null,
       msg: `${activePlayer.nickname} usa ${skill.name} (${pool.toUpperCase()} ${data.energy_used})${masteryMul > 1 ? ` [Maestria ×${masteryMul.toFixed(1)}]` : ""} → ${damage} de dano.`,
     });
     state.npc.hp = Math.max(0, state.npc.hp - damage);
@@ -348,7 +354,7 @@ async function applyRewards(supabaseAdmin: any, npcId: string, state: CombatStat
 
 async function runNpcTurn(supabaseAdmin: any, npcId: string, state: CombatState, log: LogEntry[], incomingSpeed: number) {
   const { data: skills } = await supabaseAdmin
-    .from("npc_skills").select("skill:skills(id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic)").eq("npc_id", npcId);
+    .from("npc_skills").select("skill:skills(id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic,animation_url,sound_url)").eq("npc_id", npcId);
   const pool = ((skills as any[]) ?? []).map((r: any) => r.skill).filter(Boolean);
   if (pool.length === 0) return { energyRemaining: state.npc.energy };
 
@@ -377,6 +383,8 @@ async function runNpcTurn(supabaseAdmin: any, npcId: string, state: CombatState,
     seq: log.length + 1, actor: "npc", actor_name: state.npc.name, target_name: target.nickname,
     skill_name: skill.name, energy_type: skill.energy_type as Pool, energy_used: energy,
     effective, damage: finalDamage, speed, crit_mul: Number(skill.bonus_critical),
+    animation_url: (skill as any).animation_url ?? null,
+    sound_url: (skill as any).sound_url ?? null,
     msg: `${state.npc.name} usa ${skill.name} → ${target.nickname} perde ${taken.taken} de ${taken.pool.toUpperCase()}${speedPenalty < 1 ? " (reação lenta)" : ""}.`,
   });
   return { energyRemaining: state.npc.energy - energy };

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,10 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const [bag, setBag] = useState<BagEntry[]>([]);
   const [itemMap, setItemMap] = useState<Record<string, Item>>({});
   const [avatars, setAvatars] = useState<Record<string, string | null>>({});
+  const [sprites, setSprites] = useState<Record<string, string | null>>({});
+  const [anim, setAnim] = useState<{ url: string; side: "npc" | "player"; until: number } | null>(null);
+  const lastLogSeq = useRef<number>(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const attack = useServerFn(playerAttack);
   const flee = useServerFn(fleeCombat);
   const consume = useServerFn(consumeInCombat);
@@ -76,10 +80,11 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
     if (!session) return;
     const ids = (session.state?.players ?? []).map((p: any) => p.character_id);
     if (!ids.length) return;
-    supabase.from("characters").select("id,avatar_url").in("id", ids).then(({ data }) => {
-      const map: Record<string, string | null> = {};
-      for (const c of (data as any[]) ?? []) map[c.id] = c.avatar_url;
-      setAvatars(map);
+    supabase.from("characters").select("id,avatar_url,inventory_bg_url").in("id", ids).then(({ data }) => {
+      const av: Record<string, string | null> = {};
+      const sp: Record<string, string | null> = {};
+      for (const c of (data as any[]) ?? []) { av[c.id] = c.avatar_url; sp[c.id] = c.inventory_bg_url; }
+      setAvatars(av); setSprites(sp);
     });
   }, [session?.id]);
 
@@ -97,6 +102,28 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const myCooldowns: Record<string, number> = (me?.cooldowns as any) ?? {};
   const currentCd = currentSkill ? (myCooldowns[currentSkill.id] ?? 0) : 0;
   const consumables = useMemo(() => bag.filter((e) => itemMap[e.item_id]?.type === "consumable"), [bag, itemMap]);
+
+  // Dispara animação + som na chegada de um novo log com mídia.
+  useEffect(() => {
+    if (!log.length) return;
+    const last = log[log.length - 1];
+    if (!last || last.seq === lastLogSeq.current) return;
+    lastLogSeq.current = last.seq;
+    if (last.animation_url) {
+      setAnim({ url: last.animation_url, side: last.actor, until: Date.now() + 1600 });
+      setTimeout(() => setAnim((cur) => (cur && cur.until <= Date.now() ? null : cur)), 1700);
+    }
+    if (last.sound_url) {
+      try {
+        if (audioRef.current) { audioRef.current.pause(); }
+        const a = new Audio(last.sound_url);
+        a.volume = 0.7;
+        audioRef.current = a;
+        a.play().catch(() => {});
+      } catch { /* noop */ }
+    }
+  }, [log.length]);
+
   if (!session) return null;
 
   async function doAttack() {
@@ -117,26 +144,30 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   }
 
   const poolColor: Record<string, string> = { ef: "oklch(0.55 0.22 25)", em: "oklch(0.6 0.15 220)", chakra: "oklch(0.78 0.15 80)" };
+  const lastEntry = log[log.length - 1];
+  const npcActive = session.status === "active" && lastEntry?.actor === "player" ? false : (lastEntry?.actor === "npc" && anim?.side === "npc");
+  const bgUrl = npc.battle_bg_url as string | null;
 
   return (
     <Dialog open onOpenChange={(v) => !v && session.status !== "active" && onClose()}>
-      <DialogContent className="max-w-4xl p-0 overflow-hidden border-blood/30">
+      <DialogContent className="max-w-4xl w-[calc(100vw-1rem)] p-0 overflow-hidden border-blood/30 max-h-[95vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 px-4 pt-4">
+          <DialogTitle className="flex items-center gap-2 px-3 pt-3 text-sm sm:text-base">
             <Sword size={16} /> Combate: {npc.name}
             {session.status !== "active" && <span className="ml-2 text-xs uppercase text-gold">{session.status}</span>}
           </DialogTitle>
         </DialogHeader>
 
         {/* Turn order strip */}
-        <div className="flex items-center gap-1 px-3 py-2 border-b border-border bg-input/40 overflow-x-auto">
+        <div className="flex items-center gap-1 px-2 py-1.5 border-b border-border bg-input/40 overflow-x-auto">
           <span className="text-[10px] uppercase text-muted-foreground mr-2 shrink-0">Turno</span>
           {[npc, ...players].map((entity: any, i: number) => {
             const isNpc = i === 0;
-            const active = !isNpc && players[state.active ?? 0]?.character_id === entity.character_id;
+            const activeP = !isNpc && players[state.active ?? 0]?.character_id === entity.character_id;
+            const activeN = isNpc && npcActive;
             const img = isNpc ? entity.image_url : avatars[entity.character_id];
             return (
-              <div key={i} className={`w-10 h-10 rounded-md overflow-hidden shrink-0 border-2 ${active ? "border-gold ring-2 ring-gold/40" : isNpc ? "border-blood/60" : "border-border"} bg-secondary`}>
+              <div key={i} className={`w-9 h-9 sm:w-10 sm:h-10 rounded-md overflow-hidden shrink-0 border-2 ${activeP ? "border-emerald-400 ring-2 ring-emerald-400/40" : activeN ? "border-red-500 ring-2 ring-red-500/40" : isNpc ? "border-blood/60" : "border-border"} bg-secondary`}>
                 {img && <img src={img} className="w-full h-full object-cover" alt="" />}
               </div>
             );
@@ -144,25 +175,58 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
         </div>
 
         {/* Battle stage */}
-        <div className="relative bg-gradient-to-b from-background to-secondary/40 px-4 py-6">
-          <div className="flex justify-center">
-            <div className="text-center">
-              <div className="w-full aspect-square max-w-[240px] mx-auto rounded-lg bg-secondary overflow-hidden border-2 border-blood/40 shadow-lg shadow-blood/20">
-                {npc.image_url && <img src={npc.image_url} className="w-full h-full object-cover" alt="" />}
+        <div className="relative overflow-hidden border-y border-border" style={{
+          backgroundImage: bgUrl ? `url(${bgUrl})` : undefined,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}>
+          {!bgUrl && <div className="absolute inset-0 bg-gradient-to-b from-background to-secondary/60" />}
+          <div className="absolute inset-0 bg-black/25" />
+          <div className="relative h-[240px] sm:h-[320px] flex items-end justify-between px-3 sm:px-6 pb-3">
+            {/* NPC (left) */}
+            <div className="flex flex-col items-center gap-1 max-w-[45%]">
+              <div className={`relative transition-all ${npcActive ? "drop-shadow-[0_0_18px_rgba(239,68,68,0.9)] scale-105" : ""}`}>
+                {npc.image_url ? (
+                  <img src={npc.image_url} alt={npc.name} className="h-[150px] sm:h-[210px] w-auto object-contain" style={{ filter: npcActive ? "drop-shadow(0 0 10px rgb(239 68 68))" : undefined }} />
+                ) : <div className="h-[150px] w-[150px] bg-secondary rounded" />}
+                {anim && anim.side === "npc" && (
+                  <img src={anim.url} alt="" className="pointer-events-none absolute inset-0 m-auto w-[180px] h-[180px] object-contain animate-scale-in" />
+                )}
               </div>
-              <div className="mt-2 font-display text-xl">{npc.name}</div>
-              <div className="mx-auto max-w-[240px]">
-                <div className="flex justify-between text-[10px] mt-1"><span className="text-blood">HP</span><span>{npc.hp}/{npc.hp_max}</span></div>
-                <Progress value={npc.hp_max ? (npc.hp / npc.hp_max) * 100 : 0} />
-                <div className="flex justify-between text-[10px] mt-1"><span className="text-gold">Energia</span><span>{npc.energy}/{npc.energy_max}</span></div>
-                <Progress value={npc.energy_max ? (npc.energy / npc.energy_max) * 100 : 0} />
+              <div className="bg-black/70 rounded px-2 py-1 min-w-[140px] sm:min-w-[180px]">
+                <div className="font-display text-xs sm:text-sm text-white truncate">{npc.name}</div>
+                <div className="flex justify-between text-[10px] text-white/80"><span>HP</span><span>{npc.hp}/{npc.hp_max}</span></div>
+                <Progress value={npc.hp_max ? (npc.hp / npc.hp_max) * 100 : 0} className="h-1.5" />
               </div>
+            </div>
+
+            {/* Allies (right) */}
+            <div className="flex items-end gap-1 sm:gap-3 max-w-[55%] justify-end flex-wrap">
+              {players.map((p: any) => {
+                const isActive = session.status === "active" && !npcActive && p.character_id === activePlayer?.character_id && p.alive;
+                const sprite = p.sprite_url || sprites[p.character_id];
+                const size = players.length > 2 ? "h-[110px] sm:h-[150px]" : "h-[140px] sm:h-[190px]";
+                return (
+                  <div key={p.character_id} className="flex flex-col items-center gap-1">
+                    <div className={`relative transition-all ${isActive ? "drop-shadow-[0_0_18px_rgba(52,211,153,0.9)] scale-105" : ""} ${!p.alive ? "opacity-30 grayscale" : ""}`}>
+                      {sprite ? (
+                        <img src={sprite} alt={p.nickname} className={`${size} w-auto object-contain`} style={{ transform: "scaleX(-1)", filter: isActive ? "drop-shadow(0 0 10px rgb(52 211 153))" : undefined }} />
+                      ) : (
+                        <div className={`${size} w-24 bg-secondary rounded`} />
+                      )}
+                      {anim && anim.side === "player" && isActive && (
+                        <img src={anim.url} alt="" className="pointer-events-none absolute inset-0 m-auto w-[160px] h-[160px] object-contain animate-scale-in" />
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
 
         {/* Party bar */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 px-3 py-2 border-y border-border bg-background/60">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 px-2 py-2 border-b border-border bg-background/60">
           {players.map((p: any) => {
             const isMe = p.character_id === myCharId;
             const active = players[state.active ?? 0]?.character_id === p.character_id;
@@ -192,7 +256,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
         </div>
 
         {/* Log */}
-        <div className="mx-3 mt-2 border border-border rounded p-2 max-h-28 overflow-y-auto text-xs space-y-1 bg-input/40">
+        <div className="mx-2 mt-2 border border-border rounded p-2 max-h-24 sm:max-h-28 overflow-y-auto text-xs space-y-1 bg-input/40">
           {log.slice(-8).map((l: any) => (
             <div key={l.seq} className={l.actor === "player" ? "text-emerald-300" : "text-red-300"}>
               #{l.seq} {l.msg}
@@ -201,7 +265,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
           {log.length === 0 && <div className="text-muted-foreground">O combate começou. Escolha uma habilidade.</div>}
         </div>
 
-        <div className="p-3">
+        <div className="p-2 sm:p-3">
         {session.status === "active" ? (
           myTurn ? (
             <Tabs defaultValue="skills">

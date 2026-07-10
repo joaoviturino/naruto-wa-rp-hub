@@ -378,6 +378,8 @@ const skillPayload = z.object({
   description: z.string().max(2000).nullable().optional(),
   image_url: z.string().url().nullable().optional(),
   clan_id: z.string().uuid().nullable().optional(),
+  animation_url: z.string().url().nullable().optional(),
+  sound_url: z.string().url().nullable().optional(),
   req_rank: ninjaRank.nullable().optional(),
   req_class: skillClassEnum.nullable().optional(),
   req_nivel: skillRank.nullable().optional(),

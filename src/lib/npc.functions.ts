@@ -12,6 +12,7 @@ const npcPayload = z.object({
   id: z.string().uuid().optional(),
   name: z.string().min(2).max(80),
   image_url: z.string().nullish(),
+  battle_bg_url: z.string().nullish(),
   description: z.string().max(2000).nullish(),
   hp_max: z.number().int().min(1).max(100000),
   xp: z.number().int().min(0).max(100000),

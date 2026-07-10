@@ -15,6 +15,7 @@ type RewardRow = { item_id: string; qty: number };
 type NpcKind = "aggressive" | "shop" | "reward";
 type Npc = {
   id: string; name: string; image_url: string | null; description: string | null;
+  battle_bg_url: string | null;
   hp_max: number; xp: number; energy_max: number;
   reward_xp: number; reward_ryo: number; drop_table: DropRow[];
   kind: NpcKind; dialog_intro: string | null; dialog_outro: string | null;
@@ -31,6 +32,7 @@ export function NpcManager() {
   const [selected, setSelected] = useState<string | null>(null);
   const [name, setName] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const bgRef = useRef<HTMLInputElement>(null);
   const save = useServerFn(upsertNpc);
   const del = useServerFn(deleteNpc);
   const setSkillsFn = useServerFn(setNpcSkills);
@@ -45,6 +47,7 @@ export function NpcManager() {
     setNpcs(((n.data as any[]) ?? []).map((r) => ({
       ...r,
       kind: (r.kind ?? "aggressive") as NpcKind,
+      battle_bg_url: r.battle_bg_url ?? null,
       drop_table: Array.isArray(r.drop_table) ? r.drop_table : [],
       shop_items: Array.isArray(r.shop_items) ? r.shop_items : [],
       reward_items: Array.isArray(r.reward_items) ? r.reward_items : [],
@@ -90,6 +93,22 @@ export function NpcManager() {
     load();
   }
 
+  async function uploadBattleBg(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f || !selected) return;
+    if (f.size > 8 * 1024 * 1024) return toast.error("Máx 8MB.");
+    const ext = f.name.split(".").pop() ?? "png";
+    const path = `${selected}/bg/${Date.now()}.${ext}`;
+    const up = await supabase.storage.from("npcs").upload(path, f, { upsert: true, contentType: f.type });
+    if (up.error) return toast.error(up.error.message);
+    const signed = await supabase.storage.from("npcs").createSignedUrl(path, 60 * 60 * 24 * 365);
+    if (!signed.data?.signedUrl) return;
+    const npc = npcs.find((x) => x.id === selected)!;
+    await save({ data: { ...npc, battle_bg_url: signed.data.signedUrl } } as any);
+    if (bgRef.current) bgRef.current.value = "";
+    load();
+  }
+
   const sel = npcs.find((n) => n.id === selected);
   const selSkills = selected ? assigned[selected] ?? new Set<string>() : new Set<string>();
 
@@ -131,6 +150,21 @@ export function NpcManager() {
                   <Upload size={14} className="mr-1" /> PNG do NPC (aparece no combate)
                 </Button>
                 <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={uploadImage} />
+                <div className="pt-2 border-t border-border/40">
+                  <div className="text-xs text-muted-foreground mb-1">Cenário de fundo (combate)</div>
+                  {sel.battle_bg_url && (
+                    <img src={sel.battle_bg_url} alt="" className="w-full max-w-[240px] rounded border border-border mb-2 object-cover" />
+                  )}
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => bgRef.current?.click()}>
+                      <Upload size={14} className="mr-1" /> Enviar fundo
+                    </Button>
+                    {sel.battle_bg_url && (
+                      <Button variant="ghost" size="sm" onClick={async () => { await save({ data: { ...sel, battle_bg_url: null } } as any); load(); }}>Remover</Button>
+                    )}
+                  </div>
+                  <input ref={bgRef} type="file" accept="image/*" className="hidden" onChange={uploadBattleBg} />
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-3 gap-3">
