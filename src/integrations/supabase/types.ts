@@ -573,6 +573,8 @@ export type Database = {
           req_rank: Database["public"]["Enums"]["ninja_rank"] | null
           req_skill_id: string | null
           slot_size: number
+          stack_limit: number | null
+          stackable: boolean
           type: Database["public"]["Enums"]["item_type"]
         }
         Insert: {
@@ -590,6 +592,8 @@ export type Database = {
           req_rank?: Database["public"]["Enums"]["ninja_rank"] | null
           req_skill_id?: string | null
           slot_size?: number
+          stack_limit?: number | null
+          stackable?: boolean
           type: Database["public"]["Enums"]["item_type"]
         }
         Update: {
@@ -607,6 +611,8 @@ export type Database = {
           req_rank?: Database["public"]["Enums"]["ninja_rank"] | null
           req_skill_id?: string | null
           slot_size?: number
+          stack_limit?: number | null
+          stackable?: boolean
           type?: Database["public"]["Enums"]["item_type"]
         }
         Relationships: [
