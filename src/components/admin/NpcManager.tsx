@@ -151,6 +151,9 @@ export function NpcManager() {
                   {k === "aggressive" ? "Agressivo" : k === "shop" ? "Loja" : "Recompensa"}
                 </Button>
               ))}
+              <Button size="sm" variant="outline" disabled title="Em breve">
+                Aprendizagem <span className="ml-1 text-[10px] text-muted-foreground">em breve</span>
+              </Button>
             </div>
             <div className="flex items-start gap-4">
               <div className="w-40 h-40 rounded bg-secondary overflow-hidden shrink-0">
