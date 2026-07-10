@@ -110,19 +110,29 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
     if (!last || last.seq === lastLogSeq.current) return;
     lastLogSeq.current = last.seq;
     if (last.animation_url) {
-      setAnim({ url: last.animation_url, side: last.actor, until: Date.now() + 1600 });
-      setTimeout(() => setAnim((cur) => (cur && cur.until <= Date.now() ? null : cur)), 1700);
+      // Pré-carrega para evitar "piscar" sem imagem em GIFs pesados.
+      const img = new Image();
+      img.src = last.animation_url;
+      const until = Date.now() + 2200;
+      setAnim({ url: last.animation_url, side: last.actor, until });
+      setTimeout(() => setAnim((cur) => (cur && cur.until <= Date.now() ? null : cur)), 2300);
     }
     if (last.sound_url) {
       try {
-        if (audioRef.current) { audioRef.current.pause(); }
+        if (audioRef.current) { try { audioRef.current.pause(); } catch { /* noop */ } }
         const a = new Audio(last.sound_url);
+        a.crossOrigin = "anonymous";
+        a.preload = "auto";
         a.volume = 0.7;
         audioRef.current = a;
-        a.play().catch(() => {});
+        const tryPlay = () => a.play().catch(() => {});
+        if (a.readyState >= 2) tryPlay();
+        else a.addEventListener("canplaythrough", tryPlay, { once: true });
+        // fallback caso canplaythrough demore
+        setTimeout(tryPlay, 400);
       } catch { /* noop */ }
     }
-  }, [log.length]);
+  }, [log.length, log[log.length - 1]?.seq]);
 
   if (!session) return null;
 
@@ -189,9 +199,6 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                 {npc.image_url ? (
                   <img src={npc.image_url} alt={npc.name} className="h-[150px] sm:h-[210px] w-auto object-contain" style={{ filter: npcActive ? "drop-shadow(0 0 10px rgb(239 68 68))" : undefined }} />
                 ) : <div className="h-[150px] w-[150px] bg-secondary rounded" />}
-                {anim && anim.side === "npc" && (
-                  <img src={anim.url} alt="" className="pointer-events-none absolute inset-0 m-auto w-[180px] h-[180px] object-contain animate-scale-in" />
-                )}
               </div>
               <div className="bg-black/70 rounded px-2 py-1 min-w-[140px] sm:min-w-[180px]">
                 <div className="font-display text-xs sm:text-sm text-white truncate">{npc.name}</div>
@@ -214,14 +221,22 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                       ) : (
                         <div className={`${size} w-24 bg-secondary rounded`} />
                       )}
-                      {anim && anim.side === "player" && isActive && (
-                        <img src={anim.url} alt="" className="pointer-events-none absolute inset-0 m-auto w-[160px] h-[160px] object-contain animate-scale-in" />
-                      )}
                     </div>
                   </div>
                 );
               })}
             </div>
+
+            {/* Skill animation overlay — center of stage, visible to everyone */}
+            {anim && (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-20">
+                <img
+                  src={anim.url}
+                  alt=""
+                  className="w-[70%] max-w-[420px] h-[70%] max-h-[280px] object-contain animate-scale-in drop-shadow-[0_0_30px_rgba(0,0,0,0.8)]"
+                />
+              </div>
+            )}
           </div>
         </div>
 
