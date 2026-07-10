@@ -63,8 +63,9 @@ export function InventoryView({ characterId, userId, bgUrl, onBgChange }: {
 
   if (!inv) return <div className="p-6 text-muted-foreground">Sem inventário ainda.</div>;
 
-  const bagUsed = inv.ninja_bag.reduce((s, e) => s + (items[e.item_id]?.slot_size ?? 1) * e.qty, 0);
-  const secondaryUsed = inv.secondary_slots.reduce((s, e) => s + (items[e.item_id]?.slot_size ?? 1) * e.qty, 0);
+  // Cada entrada da bolsa é UMA pilha e ocupa slot_size células, independente da quantidade.
+  const bagUsed = inv.ninja_bag.reduce((s, e) => s + (items[e.item_id]?.slot_size ?? 1), 0);
+  const secondaryUsed = inv.secondary_slots.reduce((s, e) => s + (items[e.item_id]?.slot_size ?? 1), 0);
 
   function renderCells(source: BagSource, capacity: number, entries: BagEntry[]) {
     type Cell = { item: Item | null; entry: BagEntry | null };
@@ -72,7 +73,7 @@ export function InventoryView({ characterId, userId, bgUrl, onBgChange }: {
     for (const entry of entries) {
       const it = items[entry.item_id] ?? null;
       const size = it?.slot_size ?? 1;
-      for (let q = 0; q < entry.qty; q++) for (let s = 0; s < size; s++) cells.push({ item: it, entry });
+      for (let s = 0; s < size; s++) cells.push({ item: it, entry });
     }
     while (cells.length < capacity) cells.push({ item: null, entry: null });
     return cells.slice(0, capacity).map((c, i) => (
