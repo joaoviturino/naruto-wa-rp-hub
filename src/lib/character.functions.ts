@@ -7,6 +7,11 @@ const villageEnum = z.enum([
 ]);
 const elementEnum = z.enum(["katon","suiton","fuuton","doton","raiton"]);
 
+const NINJA_BAG_CAP = 20;
+const SECONDARY_CAP = 10;
+const capOf = (source: "ninja_bag" | "secondary_slots") =>
+  source === "ninja_bag" ? NINJA_BAG_CAP : SECONDARY_CAP;
+
 const SLOT_BY_TYPE: Record<string, string> = {
   armor_helmet: "helmet_id",
   armor_vest: "vest_id",
@@ -154,11 +159,70 @@ function removeOneFromBag(bag: { item_id: string; qty: number }[], itemId: strin
   return next;
 }
 
-function addOneToBag(bag: { item_id: string; qty: number }[], itemId: string) {
+/** Adiciona qty unidades respeitando stackable/stack_limit; retorna nova bolsa. */
+export function addToBag(
+  bag: { item_id: string; qty: number }[],
+  itemId: string,
+  addQty: number,
+  stackable: boolean,
+  stackLimit: number | null,
+) {
   const next = bag.map((e) => ({ ...e }));
-  const idx = next.findIndex((e) => e.item_id === itemId);
-  if (idx === -1) next.push({ item_id: itemId, qty: 1 });
-  else next[idx].qty += 1;
+  let remaining = addQty;
+  if (stackable) {
+    for (const e of next) {
+      if (remaining <= 0) break;
+      if (e.item_id !== itemId) continue;
+      const room = stackLimit ? Math.max(0, stackLimit - e.qty) : remaining;
+      const add = Math.min(room, remaining);
+      e.qty += add; remaining -= add;
+    }
+    while (remaining > 0) {
+      const take = stackLimit ? Math.min(stackLimit, remaining) : remaining;
+      next.push({ item_id: itemId, qty: take });
+      remaining -= take;
+    }
+  } else {
+    for (let i = 0; i < addQty; i++) next.push({ item_id: itemId, qty: 1 });
+  }
+  return next;
+}
+
+/** Carrega slot_size/stackable/stack_limit de uma lista de itens (mapa por id). */
+async function loadItemMeta(supabase: any, ids: string[]) {
+  const uniq = Array.from(new Set(ids)).filter(Boolean);
+  if (!uniq.length) return {} as Record<string, { slot_size: number; stackable: boolean; stack_limit: number | null; type: string }>;
+  const { data } = await supabase.from("items").select("id,slot_size,stackable,stack_limit,type").in("id", uniq);
+  const map: any = {};
+  for (const r of (data ?? []) as any[]) {
+    map[r.id] = {
+      slot_size: Number(r.slot_size ?? 1),
+      stackable: r.stackable !== false,
+      stack_limit: r.stack_limit == null ? null : Number(r.stack_limit),
+      type: r.type,
+    };
+  }
+  return map;
+}
+
+function usedSlots(bag: { item_id: string; qty: number }[], meta: Record<string, { slot_size: number }>) {
+  return bag.reduce((s, e) => s + (meta[e.item_id]?.slot_size ?? 1), 0);
+}
+
+/** Adiciona qty com verificação de capacidade. Retorna nova bolsa ou lança "Bolsa cheia". */
+export async function addWithCapacity(
+  supabase: any,
+  bag: { item_id: string; qty: number }[],
+  itemId: string,
+  addQty: number,
+  capacity: number,
+) {
+  const meta = await loadItemMeta(supabase, [...bag.map((e) => e.item_id), itemId]);
+  const info = meta[itemId] ?? { slot_size: 1, stackable: true, stack_limit: null, type: "misc" };
+  const next = addToBag(bag, itemId, addQty, info.stackable, info.stack_limit);
+  if (usedSlots(next, meta) > capacity) {
+    throw new Error("Bolsa cheia — sem espaço para este item.");
+  }
   return next;
 }
 
@@ -183,7 +247,7 @@ export const equipItem = createServerFn({ method: "POST" })
     // Se já havia algo equipado, volta pra bolsa
     const previous: string | null = inv[slotCol] ?? null;
     let bag = data.source === "ninja_bag" ? src : normalizeBag(inv.ninja_bag);
-    if (previous) bag = addOneToBag(bag, previous);
+    if (previous) bag = await addWithCapacity(context.supabase, bag, previous, 1, NINJA_BAG_CAP);
 
     const patch: any = { ninja_bag: bag };
     if (data.source === "secondary_slots") patch.secondary_slots = src;
@@ -203,7 +267,7 @@ export const unequipItem = createServerFn({ method: "POST" })
     const { char, inv } = await loadOwnInventory(context);
     const currentId: string | null = inv[data.slot] ?? null;
     if (!currentId) throw new Error("Slot vazio.");
-    const bag = addOneToBag(normalizeBag(inv.ninja_bag), currentId);
+    const bag = await addWithCapacity(context.supabase, normalizeBag(inv.ninja_bag), currentId, 1, NINJA_BAG_CAP);
     const patch: any = { ninja_bag: bag };
     patch[data.slot] = null;
     const { error } = await context.supabase.from("inventory").update(patch).eq("character_id", char.id);
@@ -287,7 +351,7 @@ export const moveItemBetweenBags = createServerFn({ method: "POST" })
     if (data.from === data.to) throw new Error("Origem e destino iguais.");
     const { char, inv } = await loadOwnInventory(context);
     const src = removeOneFromBag(normalizeBag(inv[data.from]), data.item_id);
-    const dst = addOneToBag(normalizeBag(inv[data.to]), data.item_id);
+    const dst = await addWithCapacity(context.supabase, normalizeBag(inv[data.to]), data.item_id, 1, capOf(data.to));
     const patch: any = { [data.from]: src, [data.to]: dst };
     const { error } = await context.supabase.from("inventory").update(patch).eq("character_id", char.id);
     if (error) throw new Error(error.message);

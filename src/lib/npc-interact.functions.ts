@@ -1,6 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { addWithCapacity } from "./character.functions";
+
+const NINJA_BAG_CAP = 20;
 
 async function loadMyChar(context: { supabase: any; userId: string }) {
   const { data, error } = await context.supabase
@@ -77,9 +80,13 @@ export const buyFromShop = createServerFn({ method: "POST" })
     // Adiciona à bolsa
     const { data: inv } = await supabaseAdmin.from("inventory").select("ninja_bag").eq("character_id", me.id).maybeSingle();
     const bag = (Array.isArray(inv?.ninja_bag) ? inv!.ninja_bag : []).map((e: any) => ({ item_id: e.item_id, qty: Number(e.qty ?? 1) }));
-    const bidx = bag.findIndex((e: any) => e.item_id === data.item_id);
-    if (bidx >= 0) bag[bidx].qty += data.qty; else bag.push({ item_id: data.item_id, qty: data.qty });
-    await supabaseAdmin.from("inventory").update({ ninja_bag: bag }).eq("character_id", me.id);
+    let nextBag;
+    try {
+      nextBag = await addWithCapacity(supabaseAdmin, bag, data.item_id, data.qty, NINJA_BAG_CAP);
+    } catch (e: any) {
+      throw new Error(e?.message ?? "Bolsa cheia.");
+    }
+    await supabaseAdmin.from("inventory").update({ ninja_bag: nextBag }).eq("character_id", me.id);
     return { ok: true, spent: totalCost };
   });
 
@@ -112,10 +119,9 @@ export const claimNpcReward = createServerFn({ method: "POST" })
     const rItems = (Array.isArray(npc.reward_items) ? npc.reward_items : []) as any[];
     if (rItems.length) {
       const { data: inv } = await supabaseAdmin.from("inventory").select("ninja_bag").eq("character_id", me.id).maybeSingle();
-      const bag = (Array.isArray(inv?.ninja_bag) ? inv!.ninja_bag : []).map((e: any) => ({ item_id: e.item_id, qty: Number(e.qty ?? 1) }));
+      let bag = (Array.isArray(inv?.ninja_bag) ? inv!.ninja_bag : []).map((e: any) => ({ item_id: e.item_id, qty: Number(e.qty ?? 1) }));
       for (const r of rItems) {
-        const i = bag.findIndex((e: any) => e.item_id === r.item_id);
-        if (i >= 0) bag[i].qty += Number(r.qty ?? 1); else bag.push({ item_id: r.item_id, qty: Number(r.qty ?? 1) });
+        bag = await addWithCapacity(supabaseAdmin, bag, r.item_id, Number(r.qty ?? 1), NINJA_BAG_CAP);
       }
       await supabaseAdmin.from("inventory").update({ ninja_bag: bag }).eq("character_id", me.id);
     }
