@@ -224,7 +224,7 @@ export const playerAttack = createServerFn({ method: "POST" })
       .from("character_skills").select("skill_id").eq("character_id", me.id).eq("skill_id", data.skill_id).maybeSingle();
     if (!owned) throw new Error("Você não conhece essa habilidade.");
     const { data: skill } = await context.supabase.from("skills")
-      .select("id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class").eq("id", data.skill_id).maybeSingle();
+      .select("id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class,animation_url,sound_url").eq("id", data.skill_id).maybeSingle();
     if (!skill) throw new Error("Habilidade inexistente.");
     if (data.energy_used < skill.base_cost) throw new Error(`Custo mínimo: ${skill.base_cost}.`);
 
@@ -255,6 +255,8 @@ export const playerAttack = createServerFn({ method: "POST" })
       seq: log.length + 1, actor: "player", actor_name: activePlayer.nickname, target_name: state.npc.name,
       skill_name: skill.name, energy_type: pool, energy_used: data.energy_used,
       effective, damage, speed, crit_mul: Number(skill.bonus_critical),
+      animation_url: (skill as any).animation_url ?? null,
+      sound_url: (skill as any).sound_url ?? null,
       msg: `${activePlayer.nickname} usa ${skill.name} (${pool.toUpperCase()} ${data.energy_used})${masteryMul > 1 ? ` [Maestria ×${masteryMul.toFixed(1)}]` : ""} → ${damage} de dano.`,
     });
     state.npc.hp = Math.max(0, state.npc.hp - damage);
