@@ -83,21 +83,21 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
     });
   }, [session?.id]);
 
-  if (!session) return null;
-  const state = (session.state ?? {}) as any;
+  const state = (session?.state ?? {}) as any;
   const players: any[] = Array.isArray(state.players) ? state.players : [];
   const npc = state.npc ?? { name: "?", image_url: null, hp: 0, hp_max: 1, energy: 0, energy_max: 1 };
-  const log: any[] = Array.isArray(session.log) ? session.log : [];
+  const log: any[] = Array.isArray(session?.log) ? session.log : [];
   const me = players.find((p: any) => p.character_id === myCharId);
   const activePlayer = players[state.active ?? 0];
   const aliveMe = !!me?.alive;
   const solo = players.length <= 1;
   const onlyAlivePlayer = players.filter((p: any) => p.alive).length === 1 && aliveMe;
-  const myTurn = session.status === "active" && aliveMe && (solo || onlyAlivePlayer || activePlayer?.character_id === myCharId);
+  const myTurn = session?.status === "active" && aliveMe && (solo || onlyAlivePlayer || activePlayer?.character_id === myCharId);
   const currentSkill = skills.find((s) => s.id === selectedSkill);
   const myCooldowns: Record<string, number> = (me?.cooldowns as any) ?? {};
   const currentCd = currentSkill ? (myCooldowns[currentSkill.id] ?? 0) : 0;
   const consumables = useMemo(() => bag.filter((e) => itemMap[e.item_id]?.type === "consumable"), [bag, itemMap]);
+  if (!session) return null;
 
   async function doAttack() {
     if (!currentSkill) return;
