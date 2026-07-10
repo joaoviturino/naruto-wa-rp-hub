@@ -110,19 +110,29 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
     if (!last || last.seq === lastLogSeq.current) return;
     lastLogSeq.current = last.seq;
     if (last.animation_url) {
-      setAnim({ url: last.animation_url, side: last.actor, until: Date.now() + 1600 });
-      setTimeout(() => setAnim((cur) => (cur && cur.until <= Date.now() ? null : cur)), 1700);
+      // Pré-carrega para evitar "piscar" sem imagem em GIFs pesados.
+      const img = new Image();
+      img.src = last.animation_url;
+      const until = Date.now() + 2200;
+      setAnim({ url: last.animation_url, side: last.actor, until });
+      setTimeout(() => setAnim((cur) => (cur && cur.until <= Date.now() ? null : cur)), 2300);
     }
     if (last.sound_url) {
       try {
-        if (audioRef.current) { audioRef.current.pause(); }
+        if (audioRef.current) { try { audioRef.current.pause(); } catch { /* noop */ } }
         const a = new Audio(last.sound_url);
+        a.crossOrigin = "anonymous";
+        a.preload = "auto";
         a.volume = 0.7;
         audioRef.current = a;
-        a.play().catch(() => {});
+        const tryPlay = () => a.play().catch(() => {});
+        if (a.readyState >= 2) tryPlay();
+        else a.addEventListener("canplaythrough", tryPlay, { once: true });
+        // fallback caso canplaythrough demore
+        setTimeout(tryPlay, 400);
       } catch { /* noop */ }
     }
-  }, [log.length]);
+  }, [log.length, log[log.length - 1]?.seq]);
 
   if (!session) return null;
 
