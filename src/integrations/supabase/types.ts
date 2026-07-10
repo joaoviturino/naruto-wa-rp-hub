@@ -65,6 +65,45 @@ export type Database = {
         }
         Relationships: []
       }
+      character_book_reads: {
+        Row: {
+          book_id: string
+          character_id: string
+          completed_at: string
+          id: string
+          rewards_applied: Json
+        }
+        Insert: {
+          book_id: string
+          character_id: string
+          completed_at?: string
+          id?: string
+          rewards_applied?: Json
+        }
+        Update: {
+          book_id?: string
+          character_id?: string
+          completed_at?: string
+          id?: string
+          rewards_applied?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "character_book_reads_book_id_fkey"
+            columns: ["book_id"]
+            isOneToOne: false
+            referencedRelation: "library_books"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "character_book_reads_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       character_knowledges: {
         Row: {
           character_id: string
@@ -647,6 +686,98 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+        }
+        Relationships: []
+      }
+      library_books: {
+        Row: {
+          active: boolean
+          author: string | null
+          content: string
+          cover_url: string | null
+          created_at: string
+          id: string
+          min_read_seconds: number
+          proficiency_grants: Json
+          rewards: Json
+          section_id: string | null
+          sort_order: number
+          summary: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          author?: string | null
+          content?: string
+          cover_url?: string | null
+          created_at?: string
+          id?: string
+          min_read_seconds?: number
+          proficiency_grants?: Json
+          rewards?: Json
+          section_id?: string | null
+          sort_order?: number
+          summary?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          author?: string | null
+          content?: string
+          cover_url?: string | null
+          created_at?: string
+          id?: string
+          min_read_seconds?: number
+          proficiency_grants?: Json
+          rewards?: Json
+          section_id?: string | null
+          sort_order?: number
+          summary?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "library_books_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "library_sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      library_sections: {
+        Row: {
+          active: boolean
+          cover_url: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          cover_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          cover_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
         }
         Relationships: []
       }
