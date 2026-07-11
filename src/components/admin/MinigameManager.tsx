@@ -58,7 +58,7 @@ export function MinigameManager() {
       supabase.from("items").select("id,name").order("name"),
       supabase.from("skills").select("id,name,rank").order("name"),
     ]);
-    setList((mg as Minigame[]) ?? []);
+    setList(((mg as any[]) ?? []) as Minigame[]);
     setItems((it as Item[]) ?? []);
     setSkills((sk as SkillLite[]) ?? []);
   }
