@@ -32,10 +32,20 @@ const sequenceConfigSchema = z.object({
     image_url: z.string().min(1),
     correct: z.boolean().default(false),
     order: z.number().int().min(0).max(15).nullish(),
+    description: z.string().max(300).nullish(),
   })).default([]),
 }).default({ duration_seconds: 60, max_mistakes: 2, tiles: [] });
 
 const configSchema = z.any();
+
+const ninjaRank = z.enum(["estudante","genin","chunin","tokubetsu_jonin","jonin","anbu","sannin","kage"]);
+const skillRankZ = z.enum(["E","D","C","B","A","S"]);
+const requiredProfsSchema = z.array(z.object({
+  skill_class: z.string().min(2).max(60),
+  nivel: skillRankZ.nullish(),
+  maestria: skillRankZ.nullish(),
+})).default([]);
+const rewardSkillsSchema = z.array(z.object({ skill_id: z.string().uuid() })).default([]);
 
 const upsertSchema = z.object({
   id: z.string().uuid().optional(),
@@ -53,6 +63,10 @@ const upsertSchema = z.object({
   rewards: rewardsSchema,
   cooldown_hours: z.number().int().min(0).max(168).default(24),
   active: z.boolean().default(true),
+  one_time: z.boolean().default(false),
+  required_rank: ninjaRank.nullish(),
+  required_profs: requiredProfsSchema,
+  reward_skills: rewardSkillsSchema,
 }).superRefine((data, ctx) => {
   const parser = data.kind === "sequence" ? sequenceConfigSchema : cleanupConfigSchema;
   const r = parser.safeParse(data.config);
@@ -123,16 +137,49 @@ export const listMinigamesForMyLocation = createServerFn({ method: "POST" })
       .order("completed_at", { ascending: false });
     const lastByGame = new Map<string, string>();
     (lastRuns ?? []).forEach((r: any) => { if (!lastByGame.has(r.minigame_id)) lastByGame.set(r.minigame_id, r.completed_at); });
+    const successByGame = new Set<string>();
+    {
+      const { data: successRuns } = await context.supabase
+        .from("minigame_runs").select("minigame_id").eq("character_id", char.id).in("minigame_id", ids).eq("success", true);
+      (successRuns ?? []).forEach((r: any) => successByGame.add(r.minigame_id));
+    }
     const now = Date.now();
-    const minigames = (games ?? []).map((g: any) => {
+    const minigames = (games ?? []).flatMap((g: any) => {
+      if (g.one_time && successByGame.has(g.id)) return [];
       const last = lastByGame.get(g.id);
       const cdMs = (g.cooldown_hours ?? 0) * 3600 * 1000;
       const next = last ? new Date(last).getTime() + cdMs : 0;
       const remaining = last ? Math.max(0, next - now) : 0;
-      return { ...g, cooldown_remaining_ms: remaining, next_available_at: last ? new Date(next).toISOString() : null };
+      return [{ ...g, cooldown_remaining_ms: remaining, next_available_at: last ? new Date(next).toISOString() : null }];
     });
     return { minigames, character_id: char.id, location_id: char.current_location_id };
   });
+
+const RANK_ORDER = ["estudante","genin","chunin","tokubetsu_jonin","jonin","anbu","sannin","kage"] as const;
+const SKILL_RANK_ORDER = ["E","D","C","B","A","S"] as const;
+function rankGte(cur: string | null | undefined, req: string | null | undefined) {
+  if (!req) return true;
+  const a = RANK_ORDER.indexOf((cur as any) ?? "estudante");
+  const b = RANK_ORDER.indexOf(req as any);
+  return a >= b;
+}
+function skillRankGte(cur: string | null | undefined, req: string | null | undefined) {
+  if (!req) return true;
+  const a = SKILL_RANK_ORDER.indexOf((cur as any) ?? "E");
+  const b = SKILL_RANK_ORDER.indexOf(req as any);
+  return a >= 0 && a >= b;
+}
+function checkRequirements(character: any, req_rank: string | null, req_profs: any[]): string[] {
+  const missing: string[] = [];
+  if (req_rank && !rankGte(character.rank, req_rank)) missing.push(`Patente ${req_rank}`);
+  const profs = (character.proficiencies ?? {}) as Record<string, { nivel?: string; maestria?: string }>;
+  for (const p of req_profs ?? []) {
+    const cur = profs[p.skill_class] ?? {};
+    if (p.nivel && !skillRankGte(cur.nivel, p.nivel)) missing.push(`${p.skill_class} Nível ${p.nivel}`);
+    if (p.maestria && !skillRankGte(cur.maestria, p.maestria)) missing.push(`${p.skill_class} Maestria ${p.maestria}`);
+  }
+  return missing;
+}
 
 /** Cria um run pendente (para telemetria). Verifica cooldown. */
 export const startMinigameRun = createServerFn({ method: "POST" })
@@ -140,10 +187,17 @@ export const startMinigameRun = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ minigame_id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
     const { data: char } = await context.supabase
-      .from("characters").select("id,current_location_id").eq("user_id", context.userId).maybeSingle();
+      .from("characters").select("id,current_location_id,rank,proficiencies").eq("user_id", context.userId).maybeSingle();
     if (!char) throw new Error("Sem personagem.");
     const { data: game } = await context.supabase.from("minigames").select("*").eq("id", data.minigame_id).maybeSingle();
     if (!game) throw new Error("Minigame não encontrado.");
+    if (game.one_time) {
+      const { data: prev } = await context.supabase
+        .from("minigame_runs").select("id").eq("character_id", char.id).eq("minigame_id", data.minigame_id).eq("success", true).limit(1).maybeSingle();
+      if (prev) throw new Error("Este treino só pode ser feito uma única vez.");
+    }
+    const missing = checkRequirements(char, game.required_rank ?? null, (game.required_profs as any[]) ?? []);
+    if (missing.length) throw new Error("Requisitos não atendidos: " + missing.join(", "));
     // Verifica cooldown
     const { data: last } = await context.supabase
       .from("minigame_runs").select("completed_at").eq("character_id", char.id).eq("minigame_id", data.minigame_id)
@@ -201,6 +255,16 @@ export const completeMinigameRun = createServerFn({ method: "POST" })
         await supabaseAdmin.from("inventory").update({ ninja_bag: bag }).eq("character_id", run.character_id);
         applied.items = rewards.items;
       }
+
+      const skillRewards = (run.minigames.reward_skills as any[]) ?? [];
+      if (skillRewards.length) {
+        const skillIds = skillRewards.map((s: any) => s.skill_id).filter(Boolean);
+        if (skillIds.length) {
+          const rows = skillIds.map((sid: string) => ({ character_id: run.character_id, skill_id: sid }));
+          await supabaseAdmin.from("character_skills").upsert(rows, { onConflict: "character_id,skill_id" });
+          applied.skills = skillIds;
+        }
+      }
     }
 
     await supabaseAdmin.from("minigame_runs").update({
@@ -208,4 +272,68 @@ export const completeMinigameRun = createServerFn({ method: "POST" })
     }).eq("id", data.run_id);
 
     return { ok: true, rewards: applied };
+  });
+
+/** Lista os passos de aprendizagem de um NPC com status por personagem. */
+export const listNpcLearningSteps = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ npc_id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { data: char } = await context.supabase
+      .from("characters").select("id,rank,proficiencies").eq("user_id", context.userId).maybeSingle();
+    if (!char) throw new Error("Sem personagem.");
+    const { data: steps } = await context.supabase
+      .from("npc_learning_steps")
+      .select("id,minigame_id,position,required_rank,required_profs,minigame:minigames(id,name,kind,description,one_time,required_rank,required_profs,reward_skills)")
+      .eq("npc_id", data.npc_id).order("position", { ascending: true });
+    const arr = ((steps as any[]) ?? []).map((r) => ({ ...r, minigame: r.minigame }));
+    const mgIds = arr.map((s) => s.minigame_id);
+    let completedIds = new Set<string>();
+    if (mgIds.length) {
+      const { data: done } = await context.supabase
+        .from("minigame_runs").select("minigame_id").eq("character_id", char.id).eq("success", true).in("minigame_id", mgIds);
+      completedIds = new Set(((done as any[]) ?? []).map((r) => r.minigame_id));
+    }
+    let allowNextAvailable = true;
+    const out = arr.map((s) => {
+      const completed = completedIds.has(s.minigame_id);
+      const stepReqs = checkRequirements(char, s.required_rank ?? s.minigame?.required_rank ?? null, (s.required_profs as any[]) ?? (s.minigame?.required_profs as any[]) ?? []);
+      const status: "completed" | "available" | "locked" = completed
+        ? "completed"
+        : (allowNextAvailable && stepReqs.length === 0 ? "available" : "locked");
+      if (!completed) allowNextAvailable = false; // apenas o primeiro pendente pode ficar disponível
+      return {
+        id: s.id, position: s.position, minigame_id: s.minigame_id,
+        name: s.minigame?.name ?? "?", kind: s.minigame?.kind,
+        one_time: !!s.minigame?.one_time,
+        required_rank: s.required_rank ?? s.minigame?.required_rank ?? null,
+        required_profs: s.required_profs ?? s.minigame?.required_profs ?? [],
+        reward_skills: s.minigame?.reward_skills ?? [],
+        status, blockers: status === "locked" && !completed ? stepReqs : [],
+      };
+    });
+    return { steps: out };
+  });
+
+export const setNpcLearningSteps = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    npc_id: z.string().uuid(),
+    steps: z.array(z.object({
+      minigame_id: z.string().uuid(),
+      position: z.number().int().min(0).max(999),
+      required_rank: ninjaRank.nullish(),
+      required_profs: requiredProfsSchema,
+    })),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.from("npc_learning_steps").delete().eq("npc_id", data.npc_id);
+    if (data.steps.length) {
+      const rows = data.steps.map((s) => ({ npc_id: data.npc_id, ...s }));
+      const { error } = await supabaseAdmin.from("npc_learning_steps").insert(rows);
+      if (error) throw new Error(error.message);
+    }
+    return { ok: true };
   });

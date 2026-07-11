@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 
-type Tile = { slot: number; image_url: string; correct: boolean; order: number | null };
+type Tile = { slot: number; image_url: string; correct: boolean; order: number | null; description?: string | null };
 
 export function SequenceGame({
   background, config, onFinish,
@@ -24,6 +24,7 @@ export function SequenceGame({
   const [okFlash, setOkFlash] = useState<Set<number>>(new Set());
   const [remaining, setRemaining] = useState(duration);
   const [done, setDone] = useState(false);
+  const [hovered, setHovered] = useState<number | null>(null);
 
   useEffect(() => {
     if (done) return;
@@ -73,6 +74,8 @@ export function SequenceGame({
             const wrong = wrongFlash === slot;
             return (
               <button key={slot} onClick={() => onClick(slot)}
+                onMouseEnter={() => setHovered(slot)} onMouseLeave={() => setHovered((s) => s === slot ? null : s)}
+                title={t?.description ?? ""}
                 disabled={!t?.image_url || done}
                 className={`rounded overflow-hidden flex items-center justify-center transition
                   ${t?.image_url ? "bg-black/30 hover:ring-2 hover:ring-gold" : "bg-transparent"}
@@ -82,6 +85,11 @@ export function SequenceGame({
             );
           })}
         </div>
+        {hovered != null && tiles.find((x) => x.slot === hovered)?.description && (
+          <div className="absolute left-2 right-2 bottom-2 rounded bg-black/70 text-white text-xs px-2 py-1 pointer-events-none">
+            {tiles.find((x) => x.slot === hovered)?.description}
+          </div>
+        )}
       </div>
       {correctSeq.length === 0 && (
         <div className="text-xs text-red-400">Este minigame ainda não tem tiles corretos configurados.</div>

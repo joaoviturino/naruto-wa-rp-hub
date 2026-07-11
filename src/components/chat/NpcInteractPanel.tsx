@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Store, Gift, MessageSquare, Coins, Minus, Plus, Lock, GraduationCap } from "lucide-react";
 import { listLocationInteractNpcs, buyFromShop, claimNpcReward } from "@/lib/npc-interact.functions";
+import { listNpcLearningSteps } from "@/lib/minigame.functions";
 import { MinigameDialog } from "@/components/minigame/MinigameDialog";
 
 type LearnBlock = { id: string; kind: "text" | "image"; text?: string | null; image_url?: string | null };
@@ -253,22 +254,25 @@ function LearningNpcView({ npc, onClose }: { npc: Npc; onClose: () => void }) {
   const [minigame, setMinigame] = useState<any | null>(null);
   const [openMg, setOpenMg] = useState(false);
   const [ready, setReady] = useState(false);
+  const [steps, setSteps] = useState<any[] | null>(null);
+  const loadSteps = useServerFn(listNpcLearningSteps);
 
   useEffect(() => {
     const id = setInterval(() => setElapsed((e) => e + 1), 1000);
     return () => clearInterval(id);
   }, []);
   useEffect(() => { if (elapsed >= minSec) setReady(true); }, [elapsed, minSec]);
+  useEffect(() => { loadSteps({ data: { npc_id: npc.id } }).then((r) => setSteps(r.steps)).catch(() => setSteps([])); /* eslint-disable-next-line */ }, [npc.id]);
 
-  async function loadMinigame() {
-    if (!npc.linked_minigame_id) return toast.error("Nenhum minigame vinculado a este NPC.");
-    const { data } = await supabase.from("minigames").select("*").eq("id", npc.linked_minigame_id).maybeSingle();
+  async function startMinigame(minigameId: string) {
+    const { data } = await supabase.from("minigames").select("*").eq("id", minigameId).maybeSingle();
     if (!data) return toast.error("Minigame não encontrado.");
     setMinigame(data);
     setOpenMg(true);
   }
 
   const remaining = Math.max(0, minSec - elapsed);
+  const nextAvailable = (steps ?? []).find((s) => s.status === "available");
 
   return (
     <div className="space-y-3">
@@ -277,6 +281,27 @@ function LearningNpcView({ npc, onClose }: { npc: Npc; onClose: () => void }) {
         {blocks.map((b) => b.kind === "text"
           ? <div key={b.id} className="whitespace-pre-wrap text-sm leading-relaxed">{b.text ?? ""}</div>
           : (b.image_url ? <img key={b.id} src={b.image_url} className="w-full rounded" alt="" /> : null)
+        )}
+        {steps && steps.length > 0 && (
+          <div className="border-t border-border pt-2 space-y-1">
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Progresso de aprendizado</div>
+            {steps.map((s: any, i: number) => (
+              <div key={s.id ?? i} className={`flex items-center gap-2 text-xs p-2 rounded border ${
+                s.status === "completed" ? "border-emerald-700/40 bg-emerald-950/30" :
+                s.status === "available" ? "border-gold/40 bg-secondary/40" :
+                "border-border bg-secondary/20 opacity-70"}`}>
+                <span className="font-mono">{i + 1}.</span>
+                <span className="flex-1 truncate">{s.name}</span>
+                {s.status === "completed" && <Badge variant="secondary" className="text-[10px]">Concluído</Badge>}
+                {s.status === "available" && <Badge className="text-[10px]">Disponível</Badge>}
+                {s.status === "locked" && (
+                  <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                    <Lock size={10}/> {s.blockers?.length ? s.blockers.join(" · ") : "aguarde o anterior"}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
         )}
       </div>
       <div className="border-t border-border pt-2 flex items-center justify-between gap-2">
@@ -287,8 +312,8 @@ function LearningNpcView({ npc, onClose }: { npc: Npc; onClose: () => void }) {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={onClose}>Fechar</Button>
-          <Button disabled={!ready || !npc.linked_minigame_id} onClick={loadMinigame}>
-            <GraduationCap size={14} className="mr-1"/> Iniciar treino
+          <Button disabled={!ready || !nextAvailable} onClick={() => nextAvailable && startMinigame(nextAvailable.minigame_id)}>
+            <GraduationCap size={14} className="mr-1"/> {nextAvailable ? `Iniciar: ${nextAvailable.name}` : "Sem passo disponível"}
           </Button>
         </div>
       </div>

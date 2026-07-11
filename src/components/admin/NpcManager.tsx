@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Trash2, Upload, Plus } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { upsertNpc, deleteNpc, setNpcSkills } from "@/lib/npc.functions";
+import { setNpcLearningSteps } from "@/lib/minigame.functions";
 import { toast } from "sonner";
 
 type DropRow = { item_id: string; qty: number; chance: number };
@@ -31,6 +32,19 @@ type Item = { id: string; name: string; type: string };
 type Mission = { id: string; name: string; rank: string };
 type MinigameLite = { id: string; name: string; kind: string };
 
+type LearningStep = { id?: string; minigame_id: string; position: number; required_rank: string | null; required_profs: Array<{ skill_class: string; nivel?: string | null; maestria?: string | null }> };
+
+const NINJA_RANKS_ = ["estudante","genin","chunin","tokubetsu_jonin","jonin","anbu","sannin","kage"];
+const SKILL_RANKS_ = ["E","D","C","B","A","S"];
+const SKILL_CLASSES_ = [
+  "genjutsu","ninjutsu","taijutsu","shinjutsu","armadilha","boujutsu","bukijutsu","bunshinjutsu",
+  "doujutsu","fluxo_de_chakra","formacao","estilo_de_luta","fuuinjutsu","gijutsu","hiden","juinjutsu",
+  "jujutsu","jutsu_basico","kaijutsu","kekkaijutsu","kekkei_genkai","kekkei_moura","kekkei_touta",
+  "kenjutsu","kinjutsu","kinkojutsu","konbijutsu","kugutsujutsu","kyuuinjutsu","ninjutsu_espaco_tempo",
+  "ninjutsu_medico","nintaijutsu","saiseijutsu","senjutsu","shurikenjutsu","tansakujutsu",
+  "tenseijutsu","tonjutsu","yuugoujutsu",
+];
+
 export function NpcManager() {
   const [npcs, setNpcs] = useState<Npc[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
@@ -38,6 +52,7 @@ export function NpcManager() {
   const [missions, setMissions] = useState<Mission[]>([]);
   const [minigames, setMinigames] = useState<MinigameLite[]>([]);
   const [assigned, setAssigned] = useState<Record<string, Set<string>>>({});
+  const [learningSteps, setLearningSteps] = useState<Record<string, LearningStep[]>>({});
   const [selected, setSelected] = useState<string | null>(null);
   const [name, setName] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -45,6 +60,7 @@ export function NpcManager() {
   const save = useServerFn(upsertNpc);
   const del = useServerFn(deleteNpc);
   const setSkillsFn = useServerFn(setNpcSkills);
+  const saveSteps = useServerFn(setNpcLearningSteps);
 
   async function load() {
     const [n, s, ns, it, mi, mg] = await Promise.all([
@@ -78,6 +94,14 @@ export function NpcManager() {
       map[r.npc_id].add(r.skill_id);
     });
     setAssigned(map);
+    // Learning steps
+    const { data: ls } = await supabase.from("npc_learning_steps").select("id,npc_id,minigame_id,position,required_rank,required_profs").order("position");
+    const bynpc: Record<string, LearningStep[]> = {};
+    for (const r of (ls as any[]) ?? []) {
+      const step: LearningStep = { id: r.id, minigame_id: r.minigame_id, position: r.position, required_rank: r.required_rank ?? null, required_profs: Array.isArray(r.required_profs) ? r.required_profs : [] };
+      (bynpc[r.npc_id] ??= []).push(step);
+    }
+    setLearningSteps(bynpc);
   }
   useEffect(() => { load(); }, []);
 
@@ -330,21 +354,22 @@ export function NpcManager() {
                     defaultValue={Math.max(1, Math.round((sel.learning_min_read_seconds ?? 30) / 60))}
                     onBlur={async (e) => { await save({ data: { ...sel, learning_min_read_seconds: Math.max(5, Number(e.target.value) * 60) } } as any); load(); }} />
                 </div>
-                <div>
-                  <Label>Minigame vinculado</Label>
-                  <select
-                    value={sel.linked_minigame_id ?? ""}
-                    onChange={async (e) => { await save({ data: { ...sel, linked_minigame_id: e.target.value || null } } as any); load(); }}
-                    className="w-full bg-input border border-border rounded px-2 py-2 text-sm">
-                    <option value="">— Nenhum —</option>
-                    {minigames.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.kind})</option>)}
-                  </select>
-                </div>
               </div>
               <LearnBlocksEditor
                 blocks={sel.tutorial_blocks ?? []}
                 onChange={async (bs) => { await save({ data: { ...sel, tutorial_blocks: bs } } as any); load(); }}
                 npcId={sel.id}
+              />
+              <LearningStepsEditor
+                steps={learningSteps[sel.id] ?? []}
+                minigames={minigames}
+                onSave={async (steps) => {
+                  try {
+                    await saveSteps({ data: { npc_id: sel.id, steps: steps.map((s, i) => ({ minigame_id: s.minigame_id, position: i, required_rank: s.required_rank ?? null, required_profs: s.required_profs ?? [] })) } });
+                    toast.success("Passos salvos.");
+                    load();
+                  } catch (e: any) { toast.error(e.message); }
+                }}
               />
             </div>
           )}
@@ -479,6 +504,75 @@ function LearnBlocksEditor({ blocks, onChange, npcId }: { blocks: LearnBlock[]; 
               </label>
             </div>
           )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function LearningStepsEditor({ steps, minigames, onSave }: { steps: LearningStep[]; minigames: MinigameLite[]; onSave: (steps: LearningStep[]) => void }) {
+  const [draft, setDraft] = useState<LearningStep[]>(steps);
+  useEffect(() => { setDraft(steps); }, [steps]);
+  function move(i: number, dir: -1 | 1) {
+    const j = i + dir; if (j < 0 || j >= draft.length) return;
+    const arr = [...draft]; const [it] = arr.splice(i, 1); arr.splice(j, 0, it); setDraft(arr);
+  }
+  return (
+    <div className="rounded border border-border p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="text-xs uppercase tracking-widest text-muted-foreground">Passos de aprendizagem (ordem)</div>
+        <div className="flex gap-1">
+          <Button size="sm" variant="outline" onClick={() => {
+            if (!minigames.length) return toast.error("Cadastre um minigame primeiro.");
+            setDraft([...draft, { minigame_id: minigames[0].id, position: draft.length, required_rank: null, required_profs: [] }]);
+          }}><Plus size={12} className="mr-1" /> Passo</Button>
+          <Button size="sm" onClick={() => onSave(draft)}>Salvar passos</Button>
+        </div>
+      </div>
+      {draft.length === 0 && <div className="text-xs text-muted-foreground">Nenhum passo. Adicione os minigames que este NPC ensina, em ordem.</div>}
+      {draft.map((s, i) => (
+        <div key={i} className="rounded bg-secondary/40 p-2 space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">#{i + 1}</div>
+            <select className="flex-1 bg-input border border-border rounded px-2 py-1 text-sm"
+              value={s.minigame_id}
+              onChange={(e) => { const arr = [...draft]; arr[i] = { ...s, minigame_id: e.target.value }; setDraft(arr); }}>
+              {minigames.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.kind})</option>)}
+            </select>
+            <select className="bg-input border border-border rounded px-2 py-1 text-sm" value={s.required_rank ?? ""}
+              onChange={(e) => { const arr = [...draft]; arr[i] = { ...s, required_rank: e.target.value || null }; setDraft(arr); }}>
+              <option value="">— patente —</option>
+              {NINJA_RANKS_.map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
+            <Button size="sm" variant="outline" onClick={() => move(i, -1)} disabled={i === 0}>↑</Button>
+            <Button size="sm" variant="outline" onClick={() => move(i, 1)} disabled={i === draft.length - 1}>↓</Button>
+            <Button size="sm" variant="destructive" onClick={() => setDraft(draft.filter((_, idx) => idx !== i))}><Trash2 size={12}/></Button>
+          </div>
+          <div className="space-y-1">
+            <div className="text-[10px] text-muted-foreground">Proficiências extras exigidas neste passo</div>
+            {(s.required_profs ?? []).map((p, pi) => (
+              <div key={pi} className="flex flex-wrap gap-1 items-center">
+                <select className="flex-1 min-w-[140px] bg-input border border-border rounded px-2 py-1 text-xs"
+                  value={p.skill_class}
+                  onChange={(e) => { const arr = [...draft]; const rp = [...s.required_profs]; rp[pi] = { ...p, skill_class: e.target.value }; arr[i] = { ...s, required_profs: rp }; setDraft(arr); }}>
+                  <option value="">— classe —</option>
+                  {SKILL_CLASSES_.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <select className="bg-input border border-border rounded px-1 py-1 text-xs" value={p.nivel ?? ""}
+                  onChange={(e) => { const arr = [...draft]; const rp = [...s.required_profs]; rp[pi] = { ...p, nivel: (e.target.value || null) as any }; arr[i] = { ...s, required_profs: rp }; setDraft(arr); }}>
+                  <option value="">Nível —</option>{SKILL_RANKS_.map((r) => <option key={r} value={r}>N {r}</option>)}
+                </select>
+                <select className="bg-input border border-border rounded px-1 py-1 text-xs" value={p.maestria ?? ""}
+                  onChange={(e) => { const arr = [...draft]; const rp = [...s.required_profs]; rp[pi] = { ...p, maestria: (e.target.value || null) as any }; arr[i] = { ...s, required_profs: rp }; setDraft(arr); }}>
+                  <option value="">Maestria —</option>{SKILL_RANKS_.map((r) => <option key={r} value={r}>M {r}</option>)}
+                </select>
+                <Button size="icon" variant="ghost" onClick={() => { const arr = [...draft]; arr[i] = { ...s, required_profs: s.required_profs.filter((_, x) => x !== pi) }; setDraft(arr); }}><Trash2 size={12}/></Button>
+              </div>
+            ))}
+            <Button size="sm" variant="outline" onClick={() => { const arr = [...draft]; arr[i] = { ...s, required_profs: [...(s.required_profs ?? []), { skill_class: "", nivel: null, maestria: null }] }; setDraft(arr); }}>
+              <Plus size={12} className="mr-1" /> Proficiência
+            </Button>
+          </div>
         </div>
       ))}
     </div>

@@ -10,12 +10,17 @@ import { upsertMinigame, deleteMinigame } from "@/lib/minigame.functions";
 import { toast } from "sonner";
 
 type Item = { id: string; name: string };
+type SkillLite = { id: string; name: string; rank: string };
 type RewardItem = { item_id: string; qty: number };
 type Minigame = {
   id: string; slug: string; kind: string; name: string; description: string | null;
   background_url: string | null; tileset_url: string | null; npc_portrait_url: string | null; npc_name: string | null;
   dialog_intro: string | null; dialog_outro: string | null;
   config: any; rewards: any; cooldown_hours: number; active: boolean;
+  one_time?: boolean;
+  required_rank?: string | null;
+  required_profs?: Array<{ skill_class: string; nivel?: string | null; maestria?: string | null }>;
+  reward_skills?: Array<{ skill_id: string }>;
 };
 
 const EMPTY: Minigame = {
@@ -25,22 +30,37 @@ const EMPTY: Minigame = {
   config: { duration_seconds: 60, spots: 12, target_score: 8 },
   rewards: { xp: 0, ryo: 0, ef: 0, em: 0, chakra: 0, items: [] },
   cooldown_hours: 24, active: true,
+  one_time: false, required_rank: null, required_profs: [], reward_skills: [],
 };
+
+const NINJA_RANKS = ["estudante","genin","chunin","tokubetsu_jonin","jonin","anbu","sannin","kage"];
+const SKILL_RANKS = ["E","D","C","B","A","S"];
+const SKILL_CLASSES = [
+  "genjutsu","ninjutsu","taijutsu","shinjutsu","armadilha","boujutsu","bukijutsu","bunshinjutsu",
+  "doujutsu","fluxo_de_chakra","formacao","estilo_de_luta","fuuinjutsu","gijutsu","hiden","juinjutsu",
+  "jujutsu","jutsu_basico","kaijutsu","kekkaijutsu","kekkei_genkai","kekkei_moura","kekkei_touta",
+  "kenjutsu","kinjutsu","kinkojutsu","konbijutsu","kugutsujutsu","kyuuinjutsu","ninjutsu_espaco_tempo",
+  "ninjutsu_medico","nintaijutsu","saiseijutsu","senjutsu","shurikenjutsu","tansakujutsu",
+  "tenseijutsu","tonjutsu","yuugoujutsu",
+];
 
 export function MinigameManager() {
   const [list, setList] = useState<Minigame[]>([]);
   const [items, setItems] = useState<Item[]>([]);
+  const [skills, setSkills] = useState<SkillLite[]>([]);
   const [selected, setSelected] = useState<Minigame | null>(null);
   const upsert = useServerFn(upsertMinigame);
   const remove = useServerFn(deleteMinigame);
 
   async function load() {
-    const [{ data: mg }, { data: it }] = await Promise.all([
+    const [{ data: mg }, { data: it }, { data: sk }] = await Promise.all([
       supabase.from("minigames").select("*").order("name"),
       supabase.from("items").select("id,name").order("name"),
+      supabase.from("skills").select("id,name,rank").order("name"),
     ]);
-    setList((mg as Minigame[]) ?? []);
+    setList(((mg as any[]) ?? []) as Minigame[]);
     setItems((it as Item[]) ?? []);
+    setSkills((sk as SkillLite[]) ?? []);
   }
   useEffect(() => { load(); }, []);
 
@@ -59,6 +79,10 @@ export function MinigameManager() {
         dialog_intro: selected.dialog_intro || null, dialog_outro: selected.dialog_outro || null,
         config: selected.config, rewards: selected.rewards,
         cooldown_hours: Number(selected.cooldown_hours) || 0, active: selected.active,
+        one_time: !!selected.one_time,
+        required_rank: selected.required_rank || null,
+        required_profs: (selected.required_profs ?? []).filter((p) => p.skill_class),
+        reward_skills: (selected.reward_skills ?? []).filter((s) => s.skill_id),
       };
       const r = await upsert({ data: payload });
       toast.success("Minigame salvo.");
@@ -122,6 +146,58 @@ export function MinigameManager() {
               <label className="flex items-center gap-2 mt-6 text-sm">
                 <input type="checkbox" checked={selected.active} onChange={(e) => setSelected({ ...selected, active: e.target.checked })} /> Ativo
               </label>
+              <label className="flex items-center gap-2 mt-6 text-sm">
+                <input type="checkbox" checked={!!selected.one_time} onChange={(e) => setSelected({ ...selected, one_time: e.target.checked })} /> Feito uma única vez
+              </label>
+            </div>
+          </div>
+
+          <div className="scroll-panel rounded-lg p-4 space-y-3">
+            <h4 className="font-display text-lg text-gold">Requisitos</h4>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div>
+                <Label>Patente mínima</Label>
+                <select className="w-full bg-input border border-border rounded px-2 py-2 text-sm"
+                  value={selected.required_rank ?? ""}
+                  onChange={(e) => setSelected({ ...selected, required_rank: e.target.value || null })}>
+                  <option value="">— Nenhuma —</option>
+                  {NINJA_RANKS.map((r) => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <Label>Proficiências requeridas</Label>
+              <div className="space-y-1">
+                {(selected.required_profs ?? []).map((p, idx) => (
+                  <div key={idx} className="flex flex-wrap gap-2 items-center">
+                    <select className="flex-1 min-w-[160px] bg-input border border-border rounded px-2 py-1 text-sm"
+                      value={p.skill_class} onChange={(e) => {
+                        const next = [...(selected.required_profs ?? [])]; next[idx] = { ...p, skill_class: e.target.value };
+                        setSelected({ ...selected, required_profs: next });
+                      }}>
+                      <option value="">— classe —</option>
+                      {SKILL_CLASSES.map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <select className="bg-input border border-border rounded px-2 py-1 text-sm" value={p.nivel ?? ""}
+                      onChange={(e) => { const next = [...(selected.required_profs ?? [])]; next[idx] = { ...p, nivel: (e.target.value || null) as any }; setSelected({ ...selected, required_profs: next }); }}>
+                      <option value="">Nível —</option>
+                      {SKILL_RANKS.map((r) => <option key={r} value={r}>Nível {r}</option>)}
+                    </select>
+                    <select className="bg-input border border-border rounded px-2 py-1 text-sm" value={p.maestria ?? ""}
+                      onChange={(e) => { const next = [...(selected.required_profs ?? [])]; next[idx] = { ...p, maestria: (e.target.value || null) as any }; setSelected({ ...selected, required_profs: next }); }}>
+                      <option value="">Maestria —</option>
+                      {SKILL_RANKS.map((r) => <option key={r} value={r}>Maestria {r}</option>)}
+                    </select>
+                    <Button variant="ghost" size="icon" onClick={() => {
+                      const next = [...(selected.required_profs ?? [])]; next.splice(idx, 1);
+                      setSelected({ ...selected, required_profs: next });
+                    }}><Trash2 size={14} /></Button>
+                  </div>
+                ))}
+                <Button variant="outline" size="sm" onClick={() => setSelected({ ...selected, required_profs: [...(selected.required_profs ?? []), { skill_class: "", nivel: null, maestria: null }] })}>
+                  <Plus size={14} className="mr-1" /> Adicionar proficiência
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -197,6 +273,32 @@ export function MinigameManager() {
                 }}><Plus size={14} className="mr-1" /> Adicionar item</Button>
               </div>
             </div>
+
+            <div>
+              <Label>Habilidades concedidas</Label>
+              <div className="space-y-1">
+                {(selected.reward_skills ?? []).map((rs, idx) => (
+                  <div key={idx} className="flex gap-2 items-center">
+                    <select className="flex-1 bg-input border border-border rounded px-2 py-1 text-sm"
+                      value={rs.skill_id}
+                      onChange={(e) => {
+                        const next = [...(selected.reward_skills ?? [])]; next[idx] = { skill_id: e.target.value };
+                        setSelected({ ...selected, reward_skills: next });
+                      }}>
+                      <option value="">— habilidade —</option>
+                      {skills.map((s) => <option key={s.id} value={s.id}>[{s.rank}] {s.name}</option>)}
+                    </select>
+                    <Button variant="ghost" size="icon" onClick={() => {
+                      const next = [...(selected.reward_skills ?? [])]; next.splice(idx, 1);
+                      setSelected({ ...selected, reward_skills: next });
+                    }}><Trash2 size={14} /></Button>
+                  </div>
+                ))}
+                <Button variant="outline" size="sm" onClick={() => setSelected({ ...selected, reward_skills: [...(selected.reward_skills ?? []), { skill_id: "" }] })}>
+                  <Plus size={14} className="mr-1" /> Adicionar habilidade
+                </Button>
+              </div>
+            </div>
           </div>
 
           <div className="flex gap-2">
@@ -248,7 +350,7 @@ function ImgSlot({ label, url, onChange, folder }: { label: string; url: string 
   );
 }
 
-type Tile = { slot: number; image_url: string; correct: boolean; order: number | null };
+type Tile = { slot: number; image_url: string; correct: boolean; order: number | null; description?: string | null };
 
 function SequenceConfigEditor({ selected, setSelected }: { selected: any; setSelected: (s: any) => void }) {
   const cfg = selected.config ?? { duration_seconds: 60, max_mistakes: 2, tiles: [] as Tile[] };
@@ -323,6 +425,10 @@ function SequenceConfigEditor({ selected, setSelected }: { selected: any; setSel
                   const v = Number(e.target.value);
                   setTile(slot, { order: v > 0 ? v - 1 : 0 });
                 }} />
+              <Input className="h-7 text-xs" placeholder="descrição"
+                defaultValue={t?.description ?? ""}
+                disabled={!t?.image_url}
+                onBlur={(e) => setTile(slot, { description: e.target.value || null })} />
             </div>
           );
         })}

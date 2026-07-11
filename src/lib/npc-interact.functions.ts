@@ -62,6 +62,32 @@ export const listLocationInteractNpcs = createServerFn({ method: "POST" })
         }
       }
     }
+    // Aprendizagem: computa quantos passos ainda estão pendentes (não concluídos com sucesso).
+    const learningNpcs = list.filter((n: any) => n.kind === "learning");
+    if (learningNpcs.length) {
+      const npcIds = learningNpcs.map((n: any) => n.id);
+      const { data: steps } = await supabaseAdmin
+        .from("npc_learning_steps").select("npc_id,minigame_id").in("npc_id", npcIds);
+      const byNpc = new Map<string, string[]>();
+      for (const s of (steps as any[]) ?? []) {
+        const arr = byNpc.get(s.npc_id) ?? []; arr.push(s.minigame_id); byNpc.set(s.npc_id, arr);
+      }
+      const allMinigames = Array.from(new Set(((steps as any[]) ?? []).map((s) => s.minigame_id)));
+      let completed = new Set<string>();
+      if (allMinigames.length) {
+        const { data: done } = await supabaseAdmin
+          .from("minigame_runs").select("minigame_id").eq("character_id", me.id).eq("success", true).in("minigame_id", allMinigames);
+        completed = new Set(((done as any[]) ?? []).map((r) => r.minigame_id));
+      }
+      for (const n of learningNpcs) {
+        const mgs = byNpc.get(n.id) ?? [];
+        const pending = mgs.filter((id: string) => !completed.has(id)).length;
+        n.learning_total = mgs.length;
+        n.learning_pending = pending;
+      }
+      // Se o NPC de aprendizagem não tem nenhum passo pendente, some da lista (botão some).
+      return { npcs: list.filter((n: any) => n.kind !== "learning" || (n.learning_pending ?? 0) > 0) };
+    }
     return { npcs: list };
   });
 
