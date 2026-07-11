@@ -12,7 +12,8 @@ import { toast } from "sonner";
 type DropRow = { item_id: string; qty: number; chance: number };
 type ShopRow = { item_id: string; price: number; stock: number };
 type RewardRow = { item_id: string; qty: number };
-type NpcKind = "aggressive" | "shop" | "reward";
+type NpcKind = "aggressive" | "shop" | "reward" | "learning";
+type LearnBlock = { id: string; kind: "text" | "image"; text?: string | null; image_url?: string | null };
 type Npc = {
   id: string; name: string; image_url: string | null; description: string | null;
   battle_bg_url: string | null;
@@ -21,16 +22,21 @@ type Npc = {
   kind: NpcKind; dialog_intro: string | null; dialog_outro: string | null;
   shop_items: ShopRow[]; reward_items: RewardRow[]; reward_cooldown_hours: number;
   required_mission_id: string | null;
+  tutorial_blocks?: LearnBlock[];
+  learning_min_read_seconds?: number;
+  linked_minigame_id?: string | null;
 };
 type Skill = { id: string; name: string; rank: string };
 type Item = { id: string; name: string; type: string };
 type Mission = { id: string; name: string; rank: string };
+type MinigameLite = { id: string; name: string; kind: string };
 
 export function NpcManager() {
   const [npcs, setNpcs] = useState<Npc[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [missions, setMissions] = useState<Mission[]>([]);
+  const [minigames, setMinigames] = useState<MinigameLite[]>([]);
   const [assigned, setAssigned] = useState<Record<string, Set<string>>>({});
   const [selected, setSelected] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -41,12 +47,13 @@ export function NpcManager() {
   const setSkillsFn = useServerFn(setNpcSkills);
 
   async function load() {
-    const [n, s, ns, it, mi] = await Promise.all([
+    const [n, s, ns, it, mi, mg] = await Promise.all([
       supabase.from("npcs").select("*").order("name"),
       supabase.from("skills").select("id,name,rank").order("name"),
       supabase.from("npc_skills").select("npc_id,skill_id"),
       supabase.from("items").select("id,name,type").order("name"),
       supabase.from("missions").select("id,name,rank").order("name"),
+      supabase.from("minigames").select("id,name,kind").order("name"),
     ]);
     setNpcs(((n.data as any[]) ?? []).map((r) => ({
       ...r,
@@ -57,10 +64,14 @@ export function NpcManager() {
       reward_items: Array.isArray(r.reward_items) ? r.reward_items : [],
       reward_cooldown_hours: Number(r.reward_cooldown_hours ?? 24),
       required_mission_id: r.required_mission_id ?? null,
+      tutorial_blocks: Array.isArray(r.tutorial_blocks) ? r.tutorial_blocks : [],
+      learning_min_read_seconds: Number(r.learning_min_read_seconds ?? 30),
+      linked_minigame_id: r.linked_minigame_id ?? null,
     })));
     setSkills((s.data as Skill[]) ?? []);
     setItems((it.data as Item[]) ?? []);
     setMissions((mi.data as Mission[]) ?? []);
+    setMinigames((mg.data as MinigameLite[]) ?? []);
     const map: Record<string, Set<string>> = {};
     (ns.data ?? []).forEach((r: any) => {
       if (!map[r.npc_id]) map[r.npc_id] = new Set();
@@ -145,15 +156,12 @@ export function NpcManager() {
         <div className="space-y-4">
           <div className="scroll-panel rounded-lg p-4 space-y-3">
             <div className="flex flex-wrap gap-2">
-              {(["aggressive","shop","reward"] as NpcKind[]).map((k) => (
+              {(["aggressive","shop","reward","learning"] as NpcKind[]).map((k) => (
                 <Button key={k} size="sm" variant={sel.kind === k ? "default" : "outline"}
                   onClick={async () => { await save({ data: { ...sel, kind: k } } as any); load(); }}>
-                  {k === "aggressive" ? "Agressivo" : k === "shop" ? "Loja" : "Recompensa"}
+                  {k === "aggressive" ? "Agressivo" : k === "shop" ? "Loja" : k === "reward" ? "Recompensa" : "Aprendizagem"}
                 </Button>
               ))}
-              <Button size="sm" variant="outline" disabled title="Em breve">
-                Aprendizagem <span className="ml-1 text-[10px] text-muted-foreground">em breve</span>
-              </Button>
             </div>
             <div className="flex items-start gap-4">
               <div className="w-40 h-40 rounded bg-secondary overflow-hidden shrink-0">
