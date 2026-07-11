@@ -246,3 +246,55 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
     </div>
   );
 }
+function LearningNpcView({ npc, onClose }: { npc: Npc; onClose: () => void }) {
+  const blocks: LearnBlock[] = Array.isArray(npc.tutorial_blocks) ? npc.tutorial_blocks : [];
+  const minSec = Math.max(5, Number(npc.learning_min_read_seconds ?? 30));
+  const [elapsed, setElapsed] = useState(0);
+  const [minigame, setMinigame] = useState<any | null>(null);
+  const [openMg, setOpenMg] = useState(false);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const id = setInterval(() => setElapsed((e) => e + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+  useEffect(() => { if (elapsed >= minSec) setReady(true); }, [elapsed, minSec]);
+
+  async function loadMinigame() {
+    if (!npc.linked_minigame_id) return toast.error("Nenhum minigame vinculado a este NPC.");
+    const { data } = await supabase.from("minigames").select("*").eq("id", npc.linked_minigame_id).maybeSingle();
+    if (!data) return toast.error("Minigame não encontrado.");
+    setMinigame(data);
+    setOpenMg(true);
+  }
+
+  const remaining = Math.max(0, minSec - elapsed);
+
+  return (
+    <div className="space-y-3">
+      <div className="max-h-[55vh] overflow-y-auto pr-1 space-y-3">
+        {blocks.length === 0 && <div className="text-sm text-muted-foreground">Este NPC ainda não tem tutorial configurado.</div>}
+        {blocks.map((b) => b.kind === "text"
+          ? <div key={b.id} className="whitespace-pre-wrap text-sm leading-relaxed">{b.text ?? ""}</div>
+          : (b.image_url ? <img key={b.id} src={b.image_url} className="w-full rounded" alt="" /> : null)
+        )}
+      </div>
+      <div className="border-t border-border pt-2 flex items-center justify-between gap-2">
+        <div className="text-xs text-muted-foreground">
+          {ready
+            ? "Você já pode iniciar o treino."
+            : <span className="flex items-center gap-1"><Lock size={12}/> Leia por mais {remaining >= 60 ? `${Math.floor(remaining/60)}min ${remaining%60}s` : `${remaining}s`}…</span>}
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={onClose}>Fechar</Button>
+          <Button disabled={!ready || !npc.linked_minigame_id} onClick={loadMinigame}>
+            <GraduationCap size={14} className="mr-1"/> Iniciar treino
+          </Button>
+        </div>
+      </div>
+      {minigame && (
+        <MinigameDialog minigame={minigame} open={openMg} onOpenChange={(v) => { setOpenMg(v); if (!v) onClose(); }} />
+      )}
+    </div>
+  );
+}
