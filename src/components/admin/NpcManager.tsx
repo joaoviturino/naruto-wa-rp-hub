@@ -430,3 +430,57 @@ function NumField({ label, value, onSave }: { label: string; value: number; onSa
     </div>
   );
 }
+function LearnBlocksEditor({ blocks, onChange, npcId }: { blocks: LearnBlock[]; onChange: (bs: LearnBlock[]) => void; npcId: string }) {
+  const uid = () => (globalThis.crypto?.randomUUID?.() ?? String(Math.random()));
+  function move(i: number, dir: -1 | 1) {
+    const j = i + dir; if (j < 0 || j >= blocks.length) return;
+    const arr = [...blocks]; const [it] = arr.splice(i, 1); arr.splice(j, 0, it); onChange(arr);
+  }
+  async function upload(i: number, file: File) {
+    if (file.size > 10 * 1024 * 1024) return toast.error("Máx 10MB.");
+    const ext = file.name.split(".").pop() ?? "png";
+    const path = `${npcId}/tutorial/${Date.now()}.${ext}`;
+    const up = await supabase.storage.from("npcs").upload(path, file, { upsert: true, contentType: file.type });
+    if (up.error) return toast.error(up.error.message);
+    const signed = await supabase.storage.from("npcs").createSignedUrl(path, 60 * 60 * 24 * 365);
+    if (!signed.data?.signedUrl) return;
+    const arr = [...blocks]; arr[i] = { ...arr[i], image_url: signed.data.signedUrl }; onChange(arr);
+  }
+  return (
+    <div className="rounded border border-border p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="text-xs uppercase tracking-widest text-muted-foreground">Tutorial (blocos de texto/imagem)</div>
+        <div className="flex gap-1">
+          <Button size="sm" variant="outline" onClick={() => onChange([...blocks, { id: uid(), kind: "text", text: "" }])}>+ Texto</Button>
+          <Button size="sm" variant="outline" onClick={() => onChange([...blocks, { id: uid(), kind: "image", image_url: "" }])}>+ Imagem</Button>
+        </div>
+      </div>
+      {blocks.length === 0 && <div className="text-xs text-muted-foreground">Explique o passo a passo do minigame usando blocos.</div>}
+      {blocks.map((b, i) => (
+        <div key={b.id} className="rounded bg-secondary/40 p-2 space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Bloco {i + 1} · {b.kind}</div>
+            <div className="ml-auto flex gap-1">
+              <Button size="sm" variant="outline" onClick={() => move(i, -1)} disabled={i === 0}>↑</Button>
+              <Button size="sm" variant="outline" onClick={() => move(i, 1)} disabled={i === blocks.length - 1}>↓</Button>
+              <Button size="sm" variant="destructive" onClick={() => onChange(blocks.filter((_, idx) => idx !== i))}><Trash2 size={12}/></Button>
+            </div>
+          </div>
+          {b.kind === "text" ? (
+            <Textarea rows={4} defaultValue={b.text ?? ""}
+              onBlur={(e) => { const arr = [...blocks]; arr[i] = { ...arr[i], text: e.target.value }; onChange(arr); }} />
+          ) : (
+            <div className="flex items-center gap-2">
+              {b.image_url && <img src={b.image_url} className="w-24 h-24 rounded object-cover" alt="" />}
+              <label className="inline-flex items-center gap-1 text-xs cursor-pointer bg-secondary px-2 py-1 rounded">
+                <Upload size={12} /> Enviar imagem
+                <input type="file" accept="image/*" className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(i, f); if (e.target) e.target.value = ""; }} />
+              </label>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
