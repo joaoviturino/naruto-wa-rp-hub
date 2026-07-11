@@ -350,7 +350,7 @@ function ImgSlot({ label, url, onChange, folder }: { label: string; url: string 
   );
 }
 
-type Tile = { slot: number; image_url: string; correct: boolean; order: number | null };
+type Tile = { slot: number; image_url: string; correct: boolean; order: number | null; description?: string | null };
 
 function SequenceConfigEditor({ selected, setSelected }: { selected: any; setSelected: (s: any) => void }) {
   const cfg = selected.config ?? { duration_seconds: 60, max_mistakes: 2, tiles: [] as Tile[] };
@@ -425,6 +425,10 @@ function SequenceConfigEditor({ selected, setSelected }: { selected: any; setSel
                   const v = Number(e.target.value);
                   setTile(slot, { order: v > 0 ? v - 1 : 0 });
                 }} />
+              <Input className="h-7 text-xs" placeholder="descrição"
+                defaultValue={t?.description ?? ""}
+                disabled={!t?.image_url}
+                onBlur={(e) => setTile(slot, { description: e.target.value || null })} />
             </div>
           );
         })}
