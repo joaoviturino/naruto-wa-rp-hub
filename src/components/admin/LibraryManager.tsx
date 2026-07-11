@@ -10,6 +10,7 @@ import { ImageUpload } from "@/components/ImageUpload";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Trash2, Plus, BookOpen, FolderTree } from "lucide-react";
+import { ArrowUp, ArrowDown, Image as ImageIcon, Type } from "lucide-react";
 import { SKILL_CLASSES, SKILL_RANKS } from "@/components/admin/shared";
 import {
   upsertLibrarySection, deleteLibrarySection,
@@ -21,7 +22,9 @@ type Book = {
   id: string; section_id: string | null; title: string; author: string | null; cover_url: string | null;
   summary: string | null; content: string; min_read_seconds: number; rewards: any;
   proficiency_grants: any; sort_order: number; active: boolean;
+  blocks?: Block[];
 };
+type Block = { id: string; kind: "text" | "image"; text?: string | null; image_url?: string | null };
 type Item = { id: string; name: string };
 
 export function LibraryManager() {
@@ -51,8 +54,14 @@ export function LibraryManager() {
 
   function newSection() { setSec({ name: "", sort_order: 0, active: true }); setEditing("section"); }
   function editSection(x: Section) { setSec(x); setEditing("section"); }
-  function newBook() { setBook({ title: "", content: "", min_read_seconds: 30, rewards: {}, proficiency_grants: [], sort_order: 0, active: true }); setEditing("book"); }
-  function editBook(x: Book) { setBook({ ...x, rewards: x.rewards ?? {}, proficiency_grants: x.proficiency_grants ?? [] }); setEditing("book"); }
+  function newBook() { setBook({ title: "", content: "", min_read_seconds: 60, rewards: {}, proficiency_grants: [], sort_order: 0, active: true, blocks: [] }); setEditing("book"); }
+  function editBook(x: Book) {
+    const blocks: Block[] = Array.isArray(x.blocks) && x.blocks.length
+      ? x.blocks
+      : (x.content ? [{ id: crypto.randomUUID(), kind: "text", text: x.content }] : []);
+    setBook({ ...x, rewards: x.rewards ?? {}, proficiency_grants: x.proficiency_grants ?? [], blocks });
+    setEditing("book");
+  }
 
   async function submitSection() {
     try {
@@ -65,10 +74,13 @@ export function LibraryManager() {
   }
   async function submitBook() {
     try {
+      const blocks: Block[] = Array.isArray(book.blocks) ? book.blocks : [];
+      const plainContent = blocks.filter((b) => b.kind === "text").map((b) => b.text ?? "").join("\n\n");
       await saveBook({ data: {
         id: book.id, section_id: book.section_id ?? null, title: book.title!,
         author: book.author ?? null, cover_url: book.cover_url ?? null,
-        summary: book.summary ?? null, content: book.content ?? "",
+        summary: book.summary ?? null, content: plainContent || (book.content ?? ""),
+        blocks,
         min_read_seconds: Number(book.min_read_seconds ?? 30),
         rewards: book.rewards ?? {}, proficiency_grants: book.proficiency_grants ?? [],
         sort_order: Number(book.sort_order ?? 0), active: book.active ?? true,
