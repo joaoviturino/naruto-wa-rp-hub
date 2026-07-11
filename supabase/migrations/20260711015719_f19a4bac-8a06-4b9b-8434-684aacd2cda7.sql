@@ -1,0 +1,1 @@
+ALTER TYPE public.skill_class ADD VALUE IF NOT EXISTS 'selos_de_mao';
