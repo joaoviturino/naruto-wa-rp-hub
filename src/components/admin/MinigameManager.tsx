@@ -245,3 +245,91 @@ function ImgSlot({ label, url, onChange, folder }: { label: string; url: string 
     </div>
   );
 }
+
+type Tile = { slot: number; image_url: string; correct: boolean; order: number | null };
+
+function SequenceConfigEditor({ selected, setSelected }: { selected: any; setSelected: (s: any) => void }) {
+  const cfg = selected.config ?? { duration_seconds: 60, max_mistakes: 2, tiles: [] as Tile[] };
+  const tiles: Tile[] = Array.isArray(cfg.tiles) ? cfg.tiles : [];
+  const byslot = new Map<number, Tile>();
+  tiles.forEach((t) => byslot.set(t.slot, t));
+  const fileRefs = useRef<Array<HTMLInputElement | null>>([]);
+
+  function updateCfg(patch: any) { setSelected({ ...selected, config: { ...cfg, ...patch } }); }
+  function setTile(slot: number, patch: Partial<Tile> | null) {
+    let next = tiles.filter((t) => t.slot !== slot);
+    if (patch !== null) {
+      const cur = byslot.get(slot) ?? { slot, image_url: "", correct: false, order: null };
+      next.push({ ...cur, ...patch, slot });
+    }
+    next.sort((a, b) => a.slot - b.slot);
+    updateCfg({ tiles: next });
+  }
+
+  async function uploadTo(slot: number, file: File) {
+    if (file.size > 10 * 1024 * 1024) return toast.error("Máx 10MB.");
+    const ext = file.name.split(".").pop() ?? "png";
+    const path = `${selected.slug || "seq"}/tile-${slot}-${Date.now()}.${ext}`;
+    const up = await supabase.storage.from("minigames").upload(path, file, { upsert: true, contentType: file.type });
+    if (up.error) return toast.error(up.error.message);
+    const signed = await supabase.storage.from("minigames").createSignedUrl(path, 60 * 60 * 24 * 365);
+    if (signed.data?.signedUrl) setTile(slot, { image_url: signed.data.signedUrl });
+  }
+
+  return (
+    <div className="scroll-panel rounded-lg p-4 space-y-3">
+      <h4 className="font-display text-lg text-gold">Configuração da sequência</h4>
+      <div className="grid gap-3 md:grid-cols-3">
+        <div><Label>Duração (s)</Label><Input type="number" min={10} max={600}
+          value={cfg.duration_seconds ?? 60}
+          onChange={(e) => updateCfg({ duration_seconds: Number(e.target.value) })} /></div>
+        <div><Label>Erros permitidos</Label><Input type="number" min={0} max={10}
+          value={cfg.max_mistakes ?? 2}
+          onChange={(e) => updateCfg({ max_mistakes: Number(e.target.value) })} /></div>
+      </div>
+      <div className="text-xs text-muted-foreground">
+        Configure o grid 4×4. Marque quais tiles são corretos e a ordem em que devem ser clicados (1, 2, 3…).
+      </div>
+      <div className="grid grid-cols-4 gap-2 max-w-[520px]">
+        {Array.from({ length: 16 }, (_, slot) => {
+          const t = byslot.get(slot);
+          return (
+            <div key={slot} className="rounded border border-border bg-secondary/40 p-1 space-y-1">
+              <div className="text-[10px] text-muted-foreground text-center">#{slot + 1}</div>
+              <div className="aspect-square rounded overflow-hidden bg-black/30 flex items-center justify-center">
+                {t?.image_url
+                  ? <img src={t.image_url} className="w-full h-full object-cover" alt="" />
+                  : <span className="text-[10px] text-muted-foreground">vazio</span>}
+              </div>
+              <input ref={(el) => { fileRefs.current[slot] = el; }} type="file" accept="image/*" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadTo(slot, f); if (e.target) e.target.value = ""; }} />
+              <div className="flex gap-1">
+                <Button size="sm" variant="outline" className="flex-1 text-[10px] h-7"
+                  onClick={() => fileRefs.current[slot]?.click()}>Img</Button>
+                {t && <Button size="sm" variant="ghost" className="h-7" onClick={() => setTile(slot, null)}><Trash2 size={12} /></Button>}
+              </div>
+              <label className="flex items-center gap-1 text-[10px]">
+                <input type="checkbox" checked={!!t?.correct} disabled={!t?.image_url}
+                  onChange={(e) => setTile(slot, { correct: e.target.checked, order: e.target.checked ? (t?.order ?? nextOrder(tiles)) : null })} />
+                correto
+              </label>
+              <Input type="number" min={1} className="h-7 text-xs"
+                placeholder="ordem"
+                value={t?.correct && t?.order != null ? t.order + 1 : ""}
+                disabled={!t?.correct}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  setTile(slot, { order: v > 0 ? v - 1 : 0 });
+                }} />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function nextOrder(tiles: Tile[]) {
+  const orders = tiles.filter((t) => t.correct && t.order != null).map((t) => t.order as number);
+  return orders.length ? Math.max(...orders) + 1 : 0;
+}
