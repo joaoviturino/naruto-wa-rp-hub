@@ -32,10 +32,20 @@ const sequenceConfigSchema = z.object({
     image_url: z.string().min(1),
     correct: z.boolean().default(false),
     order: z.number().int().min(0).max(15).nullish(),
+    description: z.string().max(300).nullish(),
   })).default([]),
 }).default({ duration_seconds: 60, max_mistakes: 2, tiles: [] });
 
 const configSchema = z.any();
+
+const ninjaRank = z.enum(["estudante","genin","chunin","tokubetsu_jonin","jonin","anbu","sannin","kage"]);
+const skillRankZ = z.enum(["E","D","C","B","A","S"]);
+const requiredProfsSchema = z.array(z.object({
+  skill_class: z.string().min(2).max(60),
+  nivel: skillRankZ.nullish(),
+  maestria: skillRankZ.nullish(),
+})).default([]);
+const rewardSkillsSchema = z.array(z.object({ skill_id: z.string().uuid() })).default([]);
 
 const upsertSchema = z.object({
   id: z.string().uuid().optional(),
@@ -53,6 +63,10 @@ const upsertSchema = z.object({
   rewards: rewardsSchema,
   cooldown_hours: z.number().int().min(0).max(168).default(24),
   active: z.boolean().default(true),
+  one_time: z.boolean().default(false),
+  required_rank: ninjaRank.nullish(),
+  required_profs: requiredProfsSchema,
+  reward_skills: rewardSkillsSchema,
 }).superRefine((data, ctx) => {
   const parser = data.kind === "sequence" ? sequenceConfigSchema : cleanupConfigSchema;
   const r = parser.safeParse(data.config);
