@@ -279,8 +279,20 @@ function LearningNpcView({ npc, onClose }: { npc: Npc; onClose: () => void }) {
   const allCompleted = (steps?.length ?? 0) > 0 && (steps ?? []).every((s) => s.status === "completed");
   const lockedBlockers: string[] = nextLocked?.blockers?.length ? nextLocked.blockers : [];
   const startBtn = (
-    <Button disabled={!ready || !nextAvailable} onClick={() => nextAvailable && startMinigame(nextAvailable.minigame_id)}>
-      <GraduationCap size={14} className="mr-1"/> {nextAvailable ? `Iniciar: ${nextAvailable.name}` : allCompleted ? "Tudo concluído" : "Sem passo disponível"}
+    <Button
+      disabled={!ready || !nextAvailable}
+      onClick={() => nextAvailable && startMinigame(nextAvailable.minigame_id)}
+      className={!nextAvailable && nextLocked ? "h-auto flex-col items-start py-2 gap-0.5" : undefined}
+    >
+      <span className="flex items-center gap-1">
+        <GraduationCap size={14} />
+        {nextAvailable ? `Iniciar: ${nextAvailable.name}` : allCompleted ? "Tudo concluído" : "Sem passo disponível"}
+      </span>
+      {!nextAvailable && nextLocked && (
+        <span className="text-[10px] text-muted-foreground leading-tight text-left whitespace-normal">
+          {lockedBlockers.length ? lockedBlockers.join(" · ") : "Conclua o passo anterior"}
+        </span>
+      )}
     </Button>
   );
 
