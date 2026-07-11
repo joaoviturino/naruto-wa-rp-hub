@@ -17,7 +17,7 @@ const itemType = z.enum(["consumable","tool","armor_helmet","armor_vest","armor_
 const villageEnum = z.enum(["konoha","suna","kiri","kumo","iwa","ame","kusa","taki","oto","yuki","hoshi","nomad"]);
 const elementEnum = z.enum(["katon","suiton","fuuton","doton","raiton"]);
 const skillClassEnum = z.enum([
-  "genjutsu","ninjutsu","taijutsu","shinjutsu","armadilha","boujutsu","bukijutsu","bunshinjutsu",
+  "genjutsu","ninjutsu","taijutsu","shinjutsu","selos_de_mao","armadilha","boujutsu","bukijutsu","bunshinjutsu",
   "doujutsu","fluxo_de_chakra","formacao","estilo_de_luta","fuuinjutsu","gijutsu","hiden","juinjutsu",
   "jujutsu","jutsu_basico","kaijutsu","kekkaijutsu","kekkei_genkai","kekkei_moura","kekkei_touta",
   "kenjutsu","kinjutsu","kinkojutsu","konbijutsu","kugutsujutsu","kyuuinjutsu","ninjutsu_espaco_tempo",
