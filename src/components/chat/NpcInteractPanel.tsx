@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Store, Gift, MessageSquare, Coins, Minus, Plus, Lock } from "lucide-react";
+import { Store, Gift, MessageSquare, Coins, Minus, Plus, Lock, GraduationCap } from "lucide-react";
 import { listLocationInteractNpcs, buyFromShop, claimNpcReward } from "@/lib/npc-interact.functions";
 import { MinigameDialog } from "@/components/minigame/MinigameDialog";
 
@@ -65,6 +65,7 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
   const remH = (ms?: number) => ms && ms > 0 ? Math.ceil(ms / 3600000) : 0;
   const shopNpcs = npcs.filter((n) => n.kind === "shop");
   const rewardNpcs = npcs.filter((n) => n.kind === "reward");
+  const learningNpcs = npcs.filter((n) => n.kind === "learning");
   const getQty = (k: string) => Math.max(1, qtys[k] ?? 1);
   const setQty = (k: string, v: number) => setQtys((s) => ({ ...s, [k]: Math.max(1, Math.min(50, v)) }));
 
@@ -100,6 +101,18 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
               </Button>
             );
           })}
+        </div>
+      )}
+      {learningNpcs.length > 0 && (
+        <div className="space-y-1">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1"><GraduationCap size={11} /> Aprendizagem</div>
+          {learningNpcs.map((n) => (
+            <Button key={n.id} size="sm" variant="outline" className="w-full justify-start gap-2" onClick={() => setOpen(n)}>
+              <GraduationCap size={12} className="text-gold" />
+              <span className="flex-1 truncate text-left">{n.name}</span>
+              <Badge variant="secondary" className="text-[10px]">Aprender</Badge>
+            </Button>
+          ))}
         </div>
       )}
 
