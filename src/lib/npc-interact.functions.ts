@@ -85,8 +85,8 @@ export const listLocationInteractNpcs = createServerFn({ method: "POST" })
         n.learning_total = mgs.length;
         n.learning_pending = pending;
       }
-      // Se o NPC de aprendizagem não tem nenhum passo pendente, some da lista (botão some).
-      return { npcs: list.filter((n: any) => n.kind !== "learning" || (n.learning_pending ?? 0) > 0) };
+      // Mantém o NPC visível mesmo sem passos pendentes/disponíveis — os requisitos
+      // e o estado ("tudo concluído" / "bloqueado") são mostrados dentro do diálogo.
     }
     return { npcs: list };
   });
