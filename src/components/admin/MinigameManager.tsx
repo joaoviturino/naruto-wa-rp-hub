@@ -52,7 +52,7 @@ export function MinigameManager() {
     try {
       const payload: any = {
         ...(selected.id ? { id: selected.id } : {}),
-        slug: selected.slug, kind: "cleanup", name: selected.name,
+        slug: selected.slug, kind: selected.kind || "cleanup", name: selected.name,
         description: selected.description || null,
         background_url: selected.background_url, tileset_url: selected.tileset_url,
         npc_portrait_url: selected.npc_portrait_url, npc_name: selected.npc_name || null,
@@ -97,7 +97,22 @@ export function MinigameManager() {
       {selected ? (
         <div className="space-y-4">
           <div className="scroll-panel rounded-lg p-4 space-y-3">
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid gap-3 md:grid-cols-3">
+              <div>
+                <Label>Tipo</Label>
+                <select className="w-full bg-input border border-border rounded px-2 py-2 text-sm"
+                  value={selected.kind || "cleanup"}
+                  onChange={(e) => {
+                    const kind = e.target.value;
+                    const config = kind === "sequence"
+                      ? { duration_seconds: 60, max_mistakes: 2, tiles: [] }
+                      : { duration_seconds: 60, spots: 12, target_score: 8 };
+                    setSelected({ ...selected, kind, config });
+                  }}>
+                  <option value="cleanup">Limpeza (clique)</option>
+                  <option value="sequence">Sequência (acerto)</option>
+                </select>
+              </div>
               <div><Label>Nome</Label><Input value={selected.name} onChange={(e) => setSelected({ ...selected, name: e.target.value })} /></div>
               <div><Label>Slug (único, a-z, 0-9, _, -)</Label><Input value={selected.slug} onChange={(e) => setSelected({ ...selected, slug: e.target.value })} /></div>
             </div>
@@ -127,14 +142,18 @@ export function MinigameManager() {
             </div>
           </div>
 
-          <div className="scroll-panel rounded-lg p-4 space-y-3">
-            <h4 className="font-display text-lg text-gold">Configuração da limpeza</h4>
-            <div className="grid gap-3 md:grid-cols-3">
-              <div><Label>Duração (s)</Label><Input type="number" min={15} max={600} value={selected.config?.duration_seconds ?? 60} onChange={(e) => setSelected({ ...selected, config: { ...selected.config, duration_seconds: Number(e.target.value) } })} /></div>
-              <div><Label>Sujeiras na cena</Label><Input type="number" min={3} max={40} value={selected.config?.spots ?? 12} onChange={(e) => setSelected({ ...selected, config: { ...selected.config, spots: Number(e.target.value) } })} /></div>
-              <div><Label>Alvo p/ sucesso</Label><Input type="number" min={1} max={40} value={selected.config?.target_score ?? 8} onChange={(e) => setSelected({ ...selected, config: { ...selected.config, target_score: Number(e.target.value) } })} /></div>
+          {selected.kind === "sequence" ? (
+            <SequenceConfigEditor selected={selected} setSelected={setSelected} />
+          ) : (
+            <div className="scroll-panel rounded-lg p-4 space-y-3">
+              <h4 className="font-display text-lg text-gold">Configuração da limpeza</h4>
+              <div className="grid gap-3 md:grid-cols-3">
+                <div><Label>Duração (s)</Label><Input type="number" min={15} max={600} value={selected.config?.duration_seconds ?? 60} onChange={(e) => setSelected({ ...selected, config: { ...selected.config, duration_seconds: Number(e.target.value) } })} /></div>
+                <div><Label>Sujeiras na cena</Label><Input type="number" min={3} max={40} value={selected.config?.spots ?? 12} onChange={(e) => setSelected({ ...selected, config: { ...selected.config, spots: Number(e.target.value) } })} /></div>
+                <div><Label>Alvo p/ sucesso</Label><Input type="number" min={1} max={40} value={selected.config?.target_score ?? 8} onChange={(e) => setSelected({ ...selected, config: { ...selected.config, target_score: Number(e.target.value) } })} /></div>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="scroll-panel rounded-lg p-4 space-y-3">
             <h4 className="font-display text-lg text-gold">Recompensas (ao concluir com sucesso)</h4>
