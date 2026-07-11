@@ -323,6 +323,7 @@ export function NpcManager() {
           {sel.kind === "aggressive" && (
           <div className="scroll-panel rounded-lg p-4 space-y-2">
             <h4 className="font-display text-lg text-gold">Tabela de drop</h4>
+            {/* drop table below */}
             <div className="space-y-2">
               {(sel.drop_table ?? []).map((d, i) => (
                 <div key={i} className="flex items-center gap-2">
