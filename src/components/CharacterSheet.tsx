@@ -11,9 +11,6 @@ import { DailyMissionsPanel } from "@/components/DailyMissionsPanel";
 import { updateCharacter } from "@/lib/character.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Link } from "@tanstack/react-router";
-import { Button } from "@/components/ui/button";
-import { BookOpen } from "lucide-react";
 
 type Character = {
   id: string; user_id: string; nickname: string; phone_e164: string;
