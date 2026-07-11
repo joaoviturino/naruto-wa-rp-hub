@@ -10,12 +10,17 @@ import { upsertMinigame, deleteMinigame } from "@/lib/minigame.functions";
 import { toast } from "sonner";
 
 type Item = { id: string; name: string };
+type SkillLite = { id: string; name: string; rank: string };
 type RewardItem = { item_id: string; qty: number };
 type Minigame = {
   id: string; slug: string; kind: string; name: string; description: string | null;
   background_url: string | null; tileset_url: string | null; npc_portrait_url: string | null; npc_name: string | null;
   dialog_intro: string | null; dialog_outro: string | null;
   config: any; rewards: any; cooldown_hours: number; active: boolean;
+  one_time?: boolean;
+  required_rank?: string | null;
+  required_profs?: Array<{ skill_class: string; nivel?: string | null; maestria?: string | null }>;
+  reward_skills?: Array<{ skill_id: string }>;
 };
 
 const EMPTY: Minigame = {
@@ -25,22 +30,37 @@ const EMPTY: Minigame = {
   config: { duration_seconds: 60, spots: 12, target_score: 8 },
   rewards: { xp: 0, ryo: 0, ef: 0, em: 0, chakra: 0, items: [] },
   cooldown_hours: 24, active: true,
+  one_time: false, required_rank: null, required_profs: [], reward_skills: [],
 };
+
+const NINJA_RANKS = ["estudante","genin","chunin","tokubetsu_jonin","jonin","anbu","sannin","kage"];
+const SKILL_RANKS = ["E","D","C","B","A","S"];
+const SKILL_CLASSES = [
+  "genjutsu","ninjutsu","taijutsu","shinjutsu","armadilha","boujutsu","bukijutsu","bunshinjutsu",
+  "doujutsu","fluxo_de_chakra","formacao","estilo_de_luta","fuuinjutsu","gijutsu","hiden","juinjutsu",
+  "jujutsu","jutsu_basico","kaijutsu","kekkaijutsu","kekkei_genkai","kekkei_moura","kekkei_touta",
+  "kenjutsu","kinjutsu","kinkojutsu","konbijutsu","kugutsujutsu","kyuuinjutsu","ninjutsu_espaco_tempo",
+  "ninjutsu_medico","nintaijutsu","saiseijutsu","senjutsu","shurikenjutsu","tansakujutsu",
+  "tenseijutsu","tonjutsu","yuugoujutsu",
+];
 
 export function MinigameManager() {
   const [list, setList] = useState<Minigame[]>([]);
   const [items, setItems] = useState<Item[]>([]);
+  const [skills, setSkills] = useState<SkillLite[]>([]);
   const [selected, setSelected] = useState<Minigame | null>(null);
   const upsert = useServerFn(upsertMinigame);
   const remove = useServerFn(deleteMinigame);
 
   async function load() {
-    const [{ data: mg }, { data: it }] = await Promise.all([
+    const [{ data: mg }, { data: it }, { data: sk }] = await Promise.all([
       supabase.from("minigames").select("*").order("name"),
       supabase.from("items").select("id,name").order("name"),
+      supabase.from("skills").select("id,name,rank").order("name"),
     ]);
     setList((mg as Minigame[]) ?? []);
     setItems((it as Item[]) ?? []);
+    setSkills((sk as SkillLite[]) ?? []);
   }
   useEffect(() => { load(); }, []);
 
@@ -59,6 +79,10 @@ export function MinigameManager() {
         dialog_intro: selected.dialog_intro || null, dialog_outro: selected.dialog_outro || null,
         config: selected.config, rewards: selected.rewards,
         cooldown_hours: Number(selected.cooldown_hours) || 0, active: selected.active,
+        one_time: !!selected.one_time,
+        required_rank: selected.required_rank || null,
+        required_profs: (selected.required_profs ?? []).filter((p) => p.skill_class),
+        reward_skills: (selected.reward_skills ?? []).filter((s) => s.skill_id),
       };
       const r = await upsert({ data: payload });
       toast.success("Minigame salvo.");
