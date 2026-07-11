@@ -11,6 +11,7 @@ import { SKILL_CLASSES } from "@/components/admin/shared";
 export const Route = createFileRoute("/_authenticated/library")({
   component: LibraryPage,
   head: () => ({ meta: [{ title: "Biblioteca — Naruto RPG" }] }),
+  validateSearch: (s: Record<string, unknown>) => ({ location: typeof s.location === "string" ? s.location : undefined }),
   errorComponent: ({ error }) => <div className="p-6 text-red-400">{String(error?.message ?? error)}</div>,
   notFoundComponent: () => <div className="p-6">Nada por aqui.</div>,
 });
@@ -21,6 +22,7 @@ type Book = { id: string; section_id: string | null; title: string; author: stri
 
 function LibraryPage() {
   const load = useServerFn(listLibrary);
+  const { location } = Route.useSearch();
   const [sections, setSections] = useState<Section[]>([]);
   const [books, setBooks] = useState<Book[]>([]);
   const [readIds, setReadIds] = useState<string[]>([]);
@@ -29,11 +31,11 @@ function LibraryPage() {
 
   async function refresh() {
     try {
-      const r: any = await load({});
+      const r: any = await load({ data: { location_id: location ?? null } });
       setSections(r.sections ?? []); setBooks(r.books ?? []); setReadIds(r.read_ids ?? []);
     } catch (e: any) { toast.error(e.message); }
   }
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { refresh(); /* eslint-disable-next-line */ }, [location]);
 
   const shown = useMemo(
     () => selectedSection ? books.filter((b) => b.section_id === selectedSection) : books,

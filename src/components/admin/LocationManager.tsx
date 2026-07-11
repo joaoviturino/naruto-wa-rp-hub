@@ -4,17 +4,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Trash2, Upload, Link2, Plus, Skull, Gamepad2, Store, Gift } from "lucide-react";
+import { Trash2, Upload, Link2, Plus, Skull, Gamepad2, Store, Gift, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { updateLocationDangerZone, setLocationNpcs } from "@/lib/npc.functions";
 import { setLocationMinigames } from "@/lib/minigame.functions";
+import { setLocationLibraries } from "@/lib/library.functions";
 
 type Loc = { id: string; name: string; description: string | null; image_url: string | null;
   is_danger_zone?: boolean; spawn_chance?: number; spawn_tick_seconds?: number };
 type Conn = { id: string; a_id: string; b_id: string };
 type Npc = { id: string; name: string; kind: "aggressive" | "shop" | "reward" };
 type Minigame = { id: string; name: string; active: boolean };
+type LibSection = { id: string; name: string; active: boolean };
 
 export function LocationManager() {
   const [locs, setLocs] = useState<Loc[]>([]);
@@ -23,6 +25,8 @@ export function LocationManager() {
   const [locNpcs, setLocNpcs] = useState<Record<string, Set<string>>>({});
   const [minigames, setMinigames] = useState<Minigame[]>([]);
   const [locMinigames, setLocMinigames] = useState<Record<string, Set<string>>>({});
+  const [libSections, setLibSections] = useState<LibSection[]>([]);
+  const [locLibs, setLocLibs] = useState<Record<string, Set<string>>>({});
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
@@ -31,20 +35,24 @@ export function LocationManager() {
   const updateDz = useServerFn(updateLocationDangerZone);
   const setLocNpcsFn = useServerFn(setLocationNpcs);
   const setLocMgFn = useServerFn(setLocationMinigames);
+  const setLocLibFn = useServerFn(setLocationLibraries);
 
   async function load() {
-    const [l, c, n, ln, mg, lmg] = await Promise.all([
+    const [l, c, n, ln, mg, lmg, ls, llb] = await Promise.all([
       supabase.from("locations").select("id,name,description,image_url,is_danger_zone,spawn_chance,spawn_tick_seconds").order("name"),
       supabase.from("location_connections").select("id,a_id,b_id"),
       supabase.from("npcs").select("id,name,kind").order("name"),
       supabase.from("location_npcs").select("location_id,npc_id"),
       supabase.from("minigames").select("id,name,active").eq("active", true).order("name"),
       supabase.from("location_minigames").select("location_id,minigame_id"),
+      supabase.from("library_sections").select("id,name,active").eq("active", true).order("name"),
+      supabase.from("location_libraries").select("location_id,section_id"),
     ]);
     setLocs((l.data as Loc[]) ?? []);
     setConns((c.data as Conn[]) ?? []);
     setNpcs((n.data as Npc[]) ?? []);
     setMinigames((mg.data as Minigame[]) ?? []);
+    setLibSections((ls.data as LibSection[]) ?? []);
     const map: Record<string, Set<string>> = {};
     (ln.data ?? []).forEach((r: any) => {
       if (!map[r.location_id]) map[r.location_id] = new Set();
@@ -57,6 +65,12 @@ export function LocationManager() {
       map2[r.location_id].add(r.minigame_id);
     });
     setLocMinigames(map2);
+    const map3: Record<string, Set<string>> = {};
+    (llb.data ?? []).forEach((r: any) => {
+      if (!map3[r.location_id]) map3[r.location_id] = new Set();
+      map3[r.location_id].add(r.section_id);
+    });
+    setLocLibs(map3);
   }
   useEffect(() => { load(); }, []);
 
@@ -104,6 +118,7 @@ export function LocationManager() {
   const availableToLink = locs.filter((l) => l.id !== selected && !neighborIds.has(l.id));
   const selNpcs = selected ? locNpcs[selected] ?? new Set<string>() : new Set<string>();
   const selMg = selected ? locMinigames[selected] ?? new Set<string>() : new Set<string>();
+  const selLibs = selected ? locLibs[selected] ?? new Set<string>() : new Set<string>();
   const aggressiveNpcs = npcs.filter((n) => (n.kind ?? "aggressive") === "aggressive");
   const shopNpcs = npcs.filter((n) => n.kind === "shop");
   const rewardNpcs = npcs.filter((n) => n.kind === "reward");
@@ -277,6 +292,26 @@ export function LocationManager() {
                 </label>
               ))}
               {minigames.length === 0 && <p className="text-xs text-muted-foreground">Crie minigames ativos na aba Minigames primeiro.</p>}
+            </div>
+          </div>
+
+          <div className="scroll-panel rounded-lg p-4 space-y-3">
+            <h4 className="font-display text-lg text-gold flex items-center gap-2"><BookOpen size={16} /> Bibliotecas neste local</h4>
+            <p className="text-xs text-muted-foreground">Marque quais seções da biblioteca podem ser lidas quando o jogador estiver aqui.</p>
+            <div className="grid gap-1 max-h-[220px] overflow-y-auto pr-2">
+              {libSections.map((s) => (
+                <label key={s.id} className="flex items-center gap-2 text-sm p-1 hover:bg-secondary/40 rounded">
+                  <input type="checkbox" checked={selLibs.has(s.id)}
+                    onChange={async (e) => {
+                      const next = new Set(selLibs);
+                      if (e.target.checked) next.add(s.id); else next.delete(s.id);
+                      await setLocLibFn({ data: { location_id: sel.id, section_ids: Array.from(next) } });
+                      load();
+                    }} />
+                  <span>{s.name}</span>
+                </label>
+              ))}
+              {libSections.length === 0 && <p className="text-xs text-muted-foreground">Crie seções ativas na aba Biblioteca primeiro.</p>}
             </div>
           </div>
         </div>

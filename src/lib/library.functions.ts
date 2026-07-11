@@ -106,17 +106,44 @@ export const deleteLibraryBook = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// ============ Location <-> Sections ============
+export const setLocationLibraries = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    location_id: z.string().uuid(),
+    section_ids: z.array(z.string().uuid()),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.from("location_libraries").delete().eq("location_id", data.location_id);
+    if (data.section_ids.length) {
+      const rows = data.section_ids.map((section_id) => ({ location_id: data.location_id, section_id }));
+      const { error } = await supabaseAdmin.from("location_libraries").insert(rows);
+      if (error) throw new Error(error.message);
+    }
+    return { ok: true };
+  });
+
 // ============ Player-side ============
 
 /** Lista as seções, os livros ativos e quais eu já li. */
 export const listLibrary = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .inputValidator((i: unknown) => z.object({ location_id: z.string().uuid().nullish() }).default({}).parse(i ?? {}))
+  .handler(async ({ data, context }) => {
     const { data: char } = await context.supabase.from("characters").select("id").eq("user_id", context.userId).maybeSingle();
-    const [{ data: sections }, { data: books }] = await Promise.all([
-      context.supabase.from("library_sections").select("*").eq("active", true).order("sort_order", { ascending: true }).order("name", { ascending: true }),
-      context.supabase.from("library_books").select("*").eq("active", true).order("sort_order", { ascending: true }).order("title", { ascending: true }),
-    ]);
+    let sectionFilterIds: string[] | null = null;
+    if (data.location_id) {
+      const { data: links } = await context.supabase.from("location_libraries").select("section_id").eq("location_id", data.location_id);
+      sectionFilterIds = (links ?? []).map((l: any) => l.section_id);
+      if (!sectionFilterIds.length) return { sections: [], books: [], read_ids: [], character_id: char?.id ?? null };
+    }
+    let sectionsQuery = context.supabase.from("library_sections").select("*").eq("active", true).order("sort_order", { ascending: true }).order("name", { ascending: true });
+    if (sectionFilterIds) sectionsQuery = sectionsQuery.in("id", sectionFilterIds);
+    let booksQuery = context.supabase.from("library_books").select("*").eq("active", true).order("sort_order", { ascending: true }).order("title", { ascending: true });
+    if (sectionFilterIds) booksQuery = booksQuery.in("section_id", sectionFilterIds);
+    const [{ data: sections }, { data: books }] = await Promise.all([sectionsQuery, booksQuery]);
     let readIds: string[] = [];
     if (char) {
       const { data: reads } = await context.supabase.from("character_book_reads").select("book_id").eq("character_id", char.id);

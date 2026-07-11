@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useServerFn } from "@tanstack/react-start";
 import { moveCharacter, sendLocationMessage } from "@/lib/chat.functions";
 import { rollSpawn, getMyActiveCombat } from "@/lib/combat.functions";
-import { MapPin, Send, ImagePlus, X, Compass, Skull, Users, Menu, Gamepad2 } from "lucide-react";
+import { MapPin, Send, ImagePlus, X, Compass, Skull, Users, Menu, Gamepad2, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 import { CombatDialog } from "@/components/chat/CombatDialog";
 import { PlayerActionMenu } from "@/components/chat/PlayerActionMenu";
@@ -58,6 +58,7 @@ function ChatPage() {
   const [availableMinigames, setAvailableMinigames] = useState<any[]>([]);
   const [activeMinigame, setActiveMinigame] = useState<any | null>(null);
   const listMg = useServerFn(listMinigamesForMyLocation);
+  const [hasLibraryHere, setHasLibraryHere] = useState(false);
 
   async function loadCore() {
     const [{ data: c }, { data: l }, { data: cn }] = await Promise.all([
@@ -80,6 +81,14 @@ function ChatPage() {
     catch { setAvailableMinigames([]); }
   }
   useEffect(() => { refreshMinigames(); }, [character?.current_location_id]);
+
+  useEffect(() => {
+    (async () => {
+      if (!character?.current_location_id) { setHasLibraryHere(false); return; }
+      const { data } = await supabase.from("location_libraries").select("section_id").eq("location_id", character.current_location_id).limit(1);
+      setHasLibraryHere((data ?? []).length > 0);
+    })();
+  }, [character?.current_location_id]);
 
   // Convites de party e checagem inicial de combate
   async function loadInvites() {
@@ -284,6 +293,14 @@ function ChatPage() {
       )}
 
       {currentLoc && <NpcInteractPanel locationId={currentLoc.id} />}
+
+      {currentLoc && hasLibraryHere && (
+        <Link to="/library" search={{ location: currentLoc.id }}>
+          <Button size="sm" variant="outline" className="w-full justify-start">
+            <BookOpen size={12} className="mr-1 text-gold" /> Biblioteca deste local
+          </Button>
+        </Link>
+      )}
 
       <div>
         <div className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1 mb-2"><Compass size={12} /> {character.current_location_id ? "Locais próximos" : "Escolha onde iniciar"}</div>
