@@ -117,10 +117,7 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
         <TabsContent value="ficha" className="mt-4">
           <div className="scroll-panel rounded-lg p-4 sm:p-6 space-y-4">
             <div className="flex justify-end">
-              <div className="flex gap-2">
-                <Link to="/library"><Button size="sm" variant="outline"><BookOpen size={14}/> Biblioteca</Button></Link>
-                <SceneImagesManager characterId={characterId} userId={char.user_id} />
-              </div>
+              <SceneImagesManager characterId={characterId} userId={char.user_id} />
             </div>
             {char.bio && <p className="italic text-gold">"{char.bio}"</p>}
             <FichaBlock title="Aparência" text={char.appearance} />
