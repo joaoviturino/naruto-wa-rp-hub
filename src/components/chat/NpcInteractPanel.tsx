@@ -4,6 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
 import { Store, Gift, MessageSquare, Coins, Minus, Plus, Lock, GraduationCap } from "lucide-react";
 import { listLocationInteractNpcs, buyFromShop, claimNpcReward } from "@/lib/npc-interact.functions";
@@ -273,6 +275,14 @@ function LearningNpcView({ npc, onClose }: { npc: Npc; onClose: () => void }) {
 
   const remaining = Math.max(0, minSec - elapsed);
   const nextAvailable = (steps ?? []).find((s) => s.status === "available");
+  const nextLocked = !nextAvailable ? (steps ?? []).find((s) => s.status === "locked") : null;
+  const allCompleted = (steps?.length ?? 0) > 0 && (steps ?? []).every((s) => s.status === "completed");
+  const lockedBlockers: string[] = nextLocked?.blockers?.length ? nextLocked.blockers : [];
+  const startBtn = (
+    <Button disabled={!ready || !nextAvailable} onClick={() => nextAvailable && startMinigame(nextAvailable.minigame_id)}>
+      <GraduationCap size={14} className="mr-1"/> {nextAvailable ? `Iniciar: ${nextAvailable.name}` : allCompleted ? "Tudo concluído" : "Sem passo disponível"}
+    </Button>
+  );
 
   return (
     <div className="space-y-3">
@@ -312,9 +322,35 @@ function LearningNpcView({ npc, onClose }: { npc: Npc; onClose: () => void }) {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={onClose}>Fechar</Button>
-          <Button disabled={!ready || !nextAvailable} onClick={() => nextAvailable && startMinigame(nextAvailable.minigame_id)}>
-            <GraduationCap size={14} className="mr-1"/> {nextAvailable ? `Iniciar: ${nextAvailable.name}` : "Sem passo disponível"}
-          </Button>
+          {!nextAvailable && nextLocked ? (
+            <Popover>
+              <TooltipProvider>
+                <Tooltip>
+                  <PopoverTrigger asChild>
+                    <TooltipTrigger asChild>
+                      <span tabIndex={0}>{startBtn}</span>
+                    </TooltipTrigger>
+                  </PopoverTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    <div className="text-[11px] font-semibold mb-1">Requisitos para "{nextLocked.name}":</div>
+                    <ul className="text-[11px] list-disc pl-4 space-y-0.5">
+                      {lockedBlockers.length
+                        ? lockedBlockers.map((b, i) => <li key={i}>{b}</li>)
+                        : <li>Conclua o passo anterior.</li>}
+                    </ul>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <PopoverContent side="top" className="max-w-xs text-xs">
+                <div className="font-semibold mb-1">Requisitos para "{nextLocked.name}":</div>
+                <ul className="list-disc pl-4 space-y-0.5">
+                  {lockedBlockers.length
+                    ? lockedBlockers.map((b, i) => <li key={i}>{b}</li>)
+                    : <li>Conclua o passo anterior.</li>}
+                </ul>
+              </PopoverContent>
+            </Popover>
+          ) : startBtn}
         </div>
       </div>
       {minigame && (
