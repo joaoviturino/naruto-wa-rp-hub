@@ -213,6 +213,7 @@ export function MinigameManager() {
 function ImgSlot({ label, url, onChange, folder }: { label: string; url: string | null; onChange: (u: string | null) => void; folder: string }) {
   const ref = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  // component below
   async function pick(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return;
     if (f.size > 10 * 1024 * 1024) return toast.error("Máx 10MB.");
