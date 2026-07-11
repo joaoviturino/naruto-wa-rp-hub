@@ -1067,6 +1067,10 @@ export type Database = {
           name: string
           npc_name: string | null
           npc_portrait_url: string | null
+          one_time: boolean
+          required_profs: Json
+          required_rank: string | null
+          reward_skills: Json
           rewards: Json
           slug: string
           tileset_url: string | null
@@ -1086,6 +1090,10 @@ export type Database = {
           name: string
           npc_name?: string | null
           npc_portrait_url?: string | null
+          one_time?: boolean
+          required_profs?: Json
+          required_rank?: string | null
+          reward_skills?: Json
           rewards?: Json
           slug: string
           tileset_url?: string | null
@@ -1105,6 +1113,10 @@ export type Database = {
           name?: string
           npc_name?: string | null
           npc_portrait_url?: string | null
+          one_time?: boolean
+          required_profs?: Json
+          required_rank?: string | null
+          reward_skills?: Json
           rewards?: Json
           slug?: string
           tileset_url?: string | null
@@ -1138,6 +1150,51 @@ export type Database = {
           reward_xp?: number
         }
         Relationships: []
+      }
+      npc_learning_steps: {
+        Row: {
+          created_at: string
+          id: string
+          minigame_id: string
+          npc_id: string
+          position: number
+          required_profs: Json
+          required_rank: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          minigame_id: string
+          npc_id: string
+          position?: number
+          required_profs?: Json
+          required_rank?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          minigame_id?: string
+          npc_id?: string
+          position?: number
+          required_profs?: Json
+          required_rank?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "npc_learning_steps_minigame_id_fkey"
+            columns: ["minigame_id"]
+            isOneToOne: false
+            referencedRelation: "minigames"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "npc_learning_steps_npc_id_fkey"
+            columns: ["npc_id"]
+            isOneToOne: false
+            referencedRelation: "npcs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       npc_skills: {
         Row: {
