@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Trash2, Upload, Plus } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { upsertNpc, deleteNpc, setNpcSkills } from "@/lib/npc.functions";
+import { setNpcLearningSteps } from "@/lib/minigame.functions";
 import { toast } from "sonner";
 
 type DropRow = { item_id: string; qty: number; chance: number };
@@ -31,6 +32,19 @@ type Item = { id: string; name: string; type: string };
 type Mission = { id: string; name: string; rank: string };
 type MinigameLite = { id: string; name: string; kind: string };
 
+type LearningStep = { id?: string; minigame_id: string; position: number; required_rank: string | null; required_profs: Array<{ skill_class: string; nivel?: string | null; maestria?: string | null }> };
+
+const NINJA_RANKS_ = ["estudante","genin","chunin","tokubetsu_jonin","jonin","anbu","sannin","kage"];
+const SKILL_RANKS_ = ["E","D","C","B","A","S"];
+const SKILL_CLASSES_ = [
+  "genjutsu","ninjutsu","taijutsu","shinjutsu","armadilha","boujutsu","bukijutsu","bunshinjutsu",
+  "doujutsu","fluxo_de_chakra","formacao","estilo_de_luta","fuuinjutsu","gijutsu","hiden","juinjutsu",
+  "jujutsu","jutsu_basico","kaijutsu","kekkaijutsu","kekkei_genkai","kekkei_moura","kekkei_touta",
+  "kenjutsu","kinjutsu","kinkojutsu","konbijutsu","kugutsujutsu","kyuuinjutsu","ninjutsu_espaco_tempo",
+  "ninjutsu_medico","nintaijutsu","saiseijutsu","senjutsu","shurikenjutsu","tansakujutsu",
+  "tenseijutsu","tonjutsu","yuugoujutsu",
+];
+
 export function NpcManager() {
   const [npcs, setNpcs] = useState<Npc[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
@@ -38,6 +52,7 @@ export function NpcManager() {
   const [missions, setMissions] = useState<Mission[]>([]);
   const [minigames, setMinigames] = useState<MinigameLite[]>([]);
   const [assigned, setAssigned] = useState<Record<string, Set<string>>>({});
+  const [learningSteps, setLearningSteps] = useState<Record<string, LearningStep[]>>({});
   const [selected, setSelected] = useState<string | null>(null);
   const [name, setName] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -45,6 +60,7 @@ export function NpcManager() {
   const save = useServerFn(upsertNpc);
   const del = useServerFn(deleteNpc);
   const setSkillsFn = useServerFn(setNpcSkills);
+  const saveSteps = useServerFn(setNpcLearningSteps);
 
   async function load() {
     const [n, s, ns, it, mi, mg] = await Promise.all([
@@ -78,6 +94,14 @@ export function NpcManager() {
       map[r.npc_id].add(r.skill_id);
     });
     setAssigned(map);
+    // Learning steps
+    const { data: ls } = await supabase.from("npc_learning_steps").select("id,npc_id,minigame_id,position,required_rank,required_profs").order("position");
+    const bynpc: Record<string, LearningStep[]> = {};
+    for (const r of (ls as any[]) ?? []) {
+      const step: LearningStep = { id: r.id, minigame_id: r.minigame_id, position: r.position, required_rank: r.required_rank ?? null, required_profs: Array.isArray(r.required_profs) ? r.required_profs : [] };
+      (bynpc[r.npc_id] ??= []).push(step);
+    }
+    setLearningSteps(bynpc);
   }
   useEffect(() => { load(); }, []);
 
