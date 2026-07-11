@@ -294,6 +294,14 @@ function ChatPage() {
 
       {currentLoc && <NpcInteractPanel locationId={currentLoc.id} />}
 
+      {currentLoc && hasLibraryHere && (
+        <Link to="/library" search={{ location: currentLoc.id }}>
+          <Button size="sm" variant="outline" className="w-full justify-start">
+            <BookOpen size={12} className="mr-1 text-gold" /> Biblioteca deste local
+          </Button>
+        </Link>
+      )}
+
       <div>
         <div className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1 mb-2"><Compass size={12} /> {character.current_location_id ? "Locais próximos" : "Escolha onde iniciar"}</div>
         <div className="space-y-1">
