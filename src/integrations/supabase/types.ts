@@ -820,6 +820,39 @@ export type Database = {
           },
         ]
       }
+      location_libraries: {
+        Row: {
+          created_at: string
+          location_id: string
+          section_id: string
+        }
+        Insert: {
+          created_at?: string
+          location_id: string
+          section_id: string
+        }
+        Update: {
+          created_at?: string
+          location_id?: string
+          section_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_libraries_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_libraries_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "library_sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       location_messages: {
         Row: {
           character_id: string
