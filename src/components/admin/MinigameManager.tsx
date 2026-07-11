@@ -146,6 +146,58 @@ export function MinigameManager() {
               <label className="flex items-center gap-2 mt-6 text-sm">
                 <input type="checkbox" checked={selected.active} onChange={(e) => setSelected({ ...selected, active: e.target.checked })} /> Ativo
               </label>
+              <label className="flex items-center gap-2 mt-6 text-sm">
+                <input type="checkbox" checked={!!selected.one_time} onChange={(e) => setSelected({ ...selected, one_time: e.target.checked })} /> Feito uma única vez
+              </label>
+            </div>
+          </div>
+
+          <div className="scroll-panel rounded-lg p-4 space-y-3">
+            <h4 className="font-display text-lg text-gold">Requisitos</h4>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div>
+                <Label>Patente mínima</Label>
+                <select className="w-full bg-input border border-border rounded px-2 py-2 text-sm"
+                  value={selected.required_rank ?? ""}
+                  onChange={(e) => setSelected({ ...selected, required_rank: e.target.value || null })}>
+                  <option value="">— Nenhuma —</option>
+                  {NINJA_RANKS.map((r) => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <Label>Proficiências requeridas</Label>
+              <div className="space-y-1">
+                {(selected.required_profs ?? []).map((p, idx) => (
+                  <div key={idx} className="flex flex-wrap gap-2 items-center">
+                    <select className="flex-1 min-w-[160px] bg-input border border-border rounded px-2 py-1 text-sm"
+                      value={p.skill_class} onChange={(e) => {
+                        const next = [...(selected.required_profs ?? [])]; next[idx] = { ...p, skill_class: e.target.value };
+                        setSelected({ ...selected, required_profs: next });
+                      }}>
+                      <option value="">— classe —</option>
+                      {SKILL_CLASSES.map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <select className="bg-input border border-border rounded px-2 py-1 text-sm" value={p.nivel ?? ""}
+                      onChange={(e) => { const next = [...(selected.required_profs ?? [])]; next[idx] = { ...p, nivel: (e.target.value || null) as any }; setSelected({ ...selected, required_profs: next }); }}>
+                      <option value="">Nível —</option>
+                      {SKILL_RANKS.map((r) => <option key={r} value={r}>Nível {r}</option>)}
+                    </select>
+                    <select className="bg-input border border-border rounded px-2 py-1 text-sm" value={p.maestria ?? ""}
+                      onChange={(e) => { const next = [...(selected.required_profs ?? [])]; next[idx] = { ...p, maestria: (e.target.value || null) as any }; setSelected({ ...selected, required_profs: next }); }}>
+                      <option value="">Maestria —</option>
+                      {SKILL_RANKS.map((r) => <option key={r} value={r}>Maestria {r}</option>)}
+                    </select>
+                    <Button variant="ghost" size="icon" onClick={() => {
+                      const next = [...(selected.required_profs ?? [])]; next.splice(idx, 1);
+                      setSelected({ ...selected, required_profs: next });
+                    }}><Trash2 size={14} /></Button>
+                  </div>
+                ))}
+                <Button variant="outline" size="sm" onClick={() => setSelected({ ...selected, required_profs: [...(selected.required_profs ?? []), { skill_class: "", nivel: null, maestria: null }] })}>
+                  <Plus size={14} className="mr-1" /> Adicionar proficiência
+                </Button>
+              </div>
             </div>
           </div>
 
