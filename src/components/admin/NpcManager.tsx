@@ -320,6 +320,35 @@ export function NpcManager() {
             </div>
           )}
 
+          {sel.kind === "learning" && (
+            <div className="scroll-panel rounded-lg p-4 space-y-3">
+              <h4 className="font-display text-lg text-gold">Aprendizagem</h4>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <Label>Leitura mínima do tutorial (min)</Label>
+                  <Input type="number" min={1}
+                    defaultValue={Math.max(1, Math.round((sel.learning_min_read_seconds ?? 30) / 60))}
+                    onBlur={async (e) => { await save({ data: { ...sel, learning_min_read_seconds: Math.max(5, Number(e.target.value) * 60) } } as any); load(); }} />
+                </div>
+                <div>
+                  <Label>Minigame vinculado</Label>
+                  <select
+                    value={sel.linked_minigame_id ?? ""}
+                    onChange={async (e) => { await save({ data: { ...sel, linked_minigame_id: e.target.value || null } } as any); load(); }}
+                    className="w-full bg-input border border-border rounded px-2 py-2 text-sm">
+                    <option value="">— Nenhum —</option>
+                    {minigames.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.kind})</option>)}
+                  </select>
+                </div>
+              </div>
+              <LearnBlocksEditor
+                blocks={sel.tutorial_blocks ?? []}
+                onChange={async (bs) => { await save({ data: { ...sel, tutorial_blocks: bs } } as any); load(); }}
+                npcId={sel.id}
+              />
+            </div>
+          )}
+
           {sel.kind === "aggressive" && (
           <div className="scroll-panel rounded-lg p-4 space-y-2">
             <h4 className="font-display text-lg text-gold">Tabela de drop</h4>
