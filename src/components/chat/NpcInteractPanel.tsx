@@ -123,7 +123,9 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
                   {open.dialog_intro}
                 </div>
               )}
-              {open.kind === "shop" ? (
+              {open.kind === "learning" ? (
+                <LearningNpcView npc={open} onClose={() => { setOpen(null); load(); }} />
+              ) : open.kind === "shop" ? (
                 <div className="grid gap-2 sm:grid-cols-2 max-h-[55vh] overflow-y-auto pr-1">
                   {(open.shop_items ?? []).length === 0 && <p className="text-sm text-muted-foreground">Sem itens à venda.</p>}
                   {(open.shop_items ?? []).map((s, i) => {
