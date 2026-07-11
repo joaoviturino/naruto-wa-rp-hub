@@ -130,8 +130,10 @@ export function MinigameManager() {
             <div className="grid gap-3 md:grid-cols-3">
               <ImgSlot label="Fundo (cena)" url={selected.background_url}
                 onChange={(u) => setSelected({ ...selected, background_url: u })} folder={selected.slug || "new"} />
-              <ImgSlot label="Tileset (itens de limpeza)" url={selected.tileset_url}
-                onChange={(u) => setSelected({ ...selected, tileset_url: u })} folder={selected.slug || "new"} />
+              {selected.kind !== "sequence" && (
+                <ImgSlot label="Tileset (itens de limpeza)" url={selected.tileset_url}
+                  onChange={(u) => setSelected({ ...selected, tileset_url: u })} folder={selected.slug || "new"} />
+              )}
               <ImgSlot label="Retrato NPC" url={selected.npc_portrait_url}
                 onChange={(u) => setSelected({ ...selected, npc_portrait_url: u })} folder={selected.slug || "new"} />
             </div>
