@@ -294,6 +294,26 @@ export function LocationManager() {
               {minigames.length === 0 && <p className="text-xs text-muted-foreground">Crie minigames ativos na aba Minigames primeiro.</p>}
             </div>
           </div>
+
+          <div className="scroll-panel rounded-lg p-4 space-y-3">
+            <h4 className="font-display text-lg text-gold flex items-center gap-2"><BookOpen size={16} /> Bibliotecas neste local</h4>
+            <p className="text-xs text-muted-foreground">Marque quais seções da biblioteca podem ser lidas quando o jogador estiver aqui.</p>
+            <div className="grid gap-1 max-h-[220px] overflow-y-auto pr-2">
+              {libSections.map((s) => (
+                <label key={s.id} className="flex items-center gap-2 text-sm p-1 hover:bg-secondary/40 rounded">
+                  <input type="checkbox" checked={selLibs.has(s.id)}
+                    onChange={async (e) => {
+                      const next = new Set(selLibs);
+                      if (e.target.checked) next.add(s.id); else next.delete(s.id);
+                      await setLocLibFn({ data: { location_id: sel.id, section_ids: Array.from(next) } });
+                      load();
+                    }} />
+                  <span>{s.name}</span>
+                </label>
+              ))}
+              {libSections.length === 0 && <p className="text-xs text-muted-foreground">Crie seções ativas na aba Biblioteca primeiro.</p>}
+            </div>
+          </div>
         </div>
       ) : (
         <div className="text-muted-foreground text-sm p-6">Selecione um local à esquerda para editar suas conexões.</div>
