@@ -509,3 +509,72 @@ function LearnBlocksEditor({ blocks, onChange, npcId }: { blocks: LearnBlock[]; 
     </div>
   );
 }
+
+function LearningStepsEditor({ steps, minigames, onSave }: { steps: LearningStep[]; minigames: MinigameLite[]; onSave: (steps: LearningStep[]) => void }) {
+  const [draft, setDraft] = useState<LearningStep[]>(steps);
+  useEffect(() => { setDraft(steps); }, [steps]);
+  function move(i: number, dir: -1 | 1) {
+    const j = i + dir; if (j < 0 || j >= draft.length) return;
+    const arr = [...draft]; const [it] = arr.splice(i, 1); arr.splice(j, 0, it); setDraft(arr);
+  }
+  return (
+    <div className="rounded border border-border p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="text-xs uppercase tracking-widest text-muted-foreground">Passos de aprendizagem (ordem)</div>
+        <div className="flex gap-1">
+          <Button size="sm" variant="outline" onClick={() => {
+            if (!minigames.length) return toast.error("Cadastre um minigame primeiro.");
+            setDraft([...draft, { minigame_id: minigames[0].id, position: draft.length, required_rank: null, required_profs: [] }]);
+          }}><Plus size={12} className="mr-1" /> Passo</Button>
+          <Button size="sm" onClick={() => onSave(draft)}>Salvar passos</Button>
+        </div>
+      </div>
+      {draft.length === 0 && <div className="text-xs text-muted-foreground">Nenhum passo. Adicione os minigames que este NPC ensina, em ordem.</div>}
+      {draft.map((s, i) => (
+        <div key={i} className="rounded bg-secondary/40 p-2 space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">#{i + 1}</div>
+            <select className="flex-1 bg-input border border-border rounded px-2 py-1 text-sm"
+              value={s.minigame_id}
+              onChange={(e) => { const arr = [...draft]; arr[i] = { ...s, minigame_id: e.target.value }; setDraft(arr); }}>
+              {minigames.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.kind})</option>)}
+            </select>
+            <select className="bg-input border border-border rounded px-2 py-1 text-sm" value={s.required_rank ?? ""}
+              onChange={(e) => { const arr = [...draft]; arr[i] = { ...s, required_rank: e.target.value || null }; setDraft(arr); }}>
+              <option value="">— patente —</option>
+              {NINJA_RANKS_.map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
+            <Button size="sm" variant="outline" onClick={() => move(i, -1)} disabled={i === 0}>↑</Button>
+            <Button size="sm" variant="outline" onClick={() => move(i, 1)} disabled={i === draft.length - 1}>↓</Button>
+            <Button size="sm" variant="destructive" onClick={() => setDraft(draft.filter((_, idx) => idx !== i))}><Trash2 size={12}/></Button>
+          </div>
+          <div className="space-y-1">
+            <div className="text-[10px] text-muted-foreground">Proficiências extras exigidas neste passo</div>
+            {(s.required_profs ?? []).map((p, pi) => (
+              <div key={pi} className="flex flex-wrap gap-1 items-center">
+                <select className="flex-1 min-w-[140px] bg-input border border-border rounded px-2 py-1 text-xs"
+                  value={p.skill_class}
+                  onChange={(e) => { const arr = [...draft]; const rp = [...s.required_profs]; rp[pi] = { ...p, skill_class: e.target.value }; arr[i] = { ...s, required_profs: rp }; setDraft(arr); }}>
+                  <option value="">— classe —</option>
+                  {SKILL_CLASSES_.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <select className="bg-input border border-border rounded px-1 py-1 text-xs" value={p.nivel ?? ""}
+                  onChange={(e) => { const arr = [...draft]; const rp = [...s.required_profs]; rp[pi] = { ...p, nivel: (e.target.value || null) as any }; arr[i] = { ...s, required_profs: rp }; setDraft(arr); }}>
+                  <option value="">Nível —</option>{SKILL_RANKS_.map((r) => <option key={r} value={r}>N {r}</option>)}
+                </select>
+                <select className="bg-input border border-border rounded px-1 py-1 text-xs" value={p.maestria ?? ""}
+                  onChange={(e) => { const arr = [...draft]; const rp = [...s.required_profs]; rp[pi] = { ...p, maestria: (e.target.value || null) as any }; arr[i] = { ...s, required_profs: rp }; setDraft(arr); }}>
+                  <option value="">Maestria —</option>{SKILL_RANKS_.map((r) => <option key={r} value={r}>M {r}</option>)}
+                </select>
+                <Button size="icon" variant="ghost" onClick={() => { const arr = [...draft]; arr[i] = { ...s, required_profs: s.required_profs.filter((_, x) => x !== pi) }; setDraft(arr); }}><Trash2 size={12}/></Button>
+              </div>
+            ))}
+            <Button size="sm" variant="outline" onClick={() => { const arr = [...draft]; arr[i] = { ...s, required_profs: [...(s.required_profs ?? []), { skill_class: "", nivel: null, maestria: null }] }; setDraft(arr); }}>
+              <Plus size={12} className="mr-1" /> Proficiência
+            </Button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
