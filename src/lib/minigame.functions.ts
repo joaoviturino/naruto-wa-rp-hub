@@ -17,16 +17,30 @@ const rewardsSchema = z.object({
   items: z.array(z.object({ item_id: z.string().uuid(), qty: z.number().int().min(1).max(99).default(1) })).optional(),
 }).default({});
 
-const configSchema = z.object({
+const cleanupConfigSchema = z.object({
   duration_seconds: z.number().int().min(15).max(600).default(60),
   spots: z.number().int().min(3).max(40).default(12),
   target_score: z.number().int().min(1).max(40).default(8),
 }).default({ duration_seconds: 60, spots: 12, target_score: 8 });
 
+const sequenceConfigSchema = z.object({
+  duration_seconds: z.number().int().min(10).max(600).default(60),
+  max_mistakes: z.number().int().min(0).max(10).default(2),
+  background_url: z.string().nullish(),
+  tiles: z.array(z.object({
+    slot: z.number().int().min(0).max(15),
+    image_url: z.string().min(1),
+    correct: z.boolean().default(false),
+    order: z.number().int().min(0).max(15).nullish(),
+  })).default([]),
+}).default({ duration_seconds: 60, max_mistakes: 2, tiles: [] });
+
+const configSchema = z.any();
+
 const upsertSchema = z.object({
   id: z.string().uuid().optional(),
   slug: z.string().trim().min(2).max(40).regex(/^[a-z0-9_-]+$/, "slug inválido"),
-  kind: z.enum(["cleanup"]).default("cleanup"),
+  kind: z.enum(["cleanup", "sequence"]).default("cleanup"),
   name: z.string().min(2).max(80),
   description: z.string().max(2000).nullish(),
   background_url: z.string().nullish(),
@@ -39,6 +53,14 @@ const upsertSchema = z.object({
   rewards: rewardsSchema,
   cooldown_hours: z.number().int().min(0).max(168).default(24),
   active: z.boolean().default(true),
+}).superRefine((data, ctx) => {
+  const parser = data.kind === "sequence" ? sequenceConfigSchema : cleanupConfigSchema;
+  const r = parser.safeParse(data.config);
+  if (!r.success) {
+    r.error.issues.forEach((i) => ctx.addIssue({ ...i, path: ["config", ...(i.path ?? [])] }));
+  } else {
+    data.config = r.data as any;
+  }
 });
 
 export const upsertMinigame = createServerFn({ method: "POST" })

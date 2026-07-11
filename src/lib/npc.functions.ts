@@ -24,7 +24,7 @@ const npcPayload = z.object({
     qty: z.number().int().min(1).max(99).default(1),
     chance: z.number().min(0).max(100), // percentual
   })).optional(),
-  kind: z.enum(["aggressive","shop","reward"]).optional(),
+  kind: z.enum(["aggressive","shop","reward","learning"]).optional(),
   dialog_intro: z.string().max(4000).nullish(),
   dialog_outro: z.string().max(4000).nullish(),
   required_mission_id: z.string().uuid().nullish(),
@@ -38,6 +38,14 @@ const npcPayload = z.object({
     qty: z.number().int().min(1).max(99).default(1),
   })).optional(),
   reward_cooldown_hours: z.number().int().min(0).max(24 * 30).optional(),
+  tutorial_blocks: z.array(z.object({
+    id: z.string().min(1).max(64),
+    kind: z.enum(["text","image"]),
+    text: z.string().max(20_000).nullish(),
+    image_url: z.string().nullish(),
+  })).optional(),
+  learning_min_read_seconds: z.number().int().min(5).max(3600).optional(),
+  linked_minigame_id: z.string().uuid().nullish(),
 });
 
 export const upsertNpc = createServerFn({ method: "POST" })

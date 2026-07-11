@@ -5,11 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Store, Gift, MessageSquare, Coins, Minus, Plus, Lock } from "lucide-react";
+import { Store, Gift, MessageSquare, Coins, Minus, Plus, Lock, GraduationCap } from "lucide-react";
 import { listLocationInteractNpcs, buyFromShop, claimNpcReward } from "@/lib/npc-interact.functions";
+import { MinigameDialog } from "@/components/minigame/MinigameDialog";
 
+type LearnBlock = { id: string; kind: "text" | "image"; text?: string | null; image_url?: string | null };
 type Npc = {
-  id: string; name: string; image_url: string | null; kind: "shop" | "reward";
+  id: string; name: string; image_url: string | null; kind: "shop" | "reward" | "learning";
   dialog_intro: string | null; dialog_outro: string | null;
   shop_items?: { item_id: string; price: number; stock: number }[];
   reward_items?: { item_id: string; qty: number }[];
@@ -18,6 +20,9 @@ type Npc = {
   required_mission_id?: string | null;
   mission_required_name?: string | null;
   mission_unlocked?: boolean;
+  tutorial_blocks?: LearnBlock[];
+  learning_min_read_seconds?: number;
+  linked_minigame_id?: string | null;
 };
 type Item = { id: string; name: string; image_url: string | null; description: string | null; type: string | null };
 
@@ -60,6 +65,7 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
   const remH = (ms?: number) => ms && ms > 0 ? Math.ceil(ms / 3600000) : 0;
   const shopNpcs = npcs.filter((n) => n.kind === "shop");
   const rewardNpcs = npcs.filter((n) => n.kind === "reward");
+  const learningNpcs = npcs.filter((n) => n.kind === "learning");
   const getQty = (k: string) => Math.max(1, qtys[k] ?? 1);
   const setQty = (k: string, v: number) => setQtys((s) => ({ ...s, [k]: Math.max(1, Math.min(50, v)) }));
 
@@ -97,6 +103,18 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
           })}
         </div>
       )}
+      {learningNpcs.length > 0 && (
+        <div className="space-y-1">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1"><GraduationCap size={11} /> Aprendizagem</div>
+          {learningNpcs.map((n) => (
+            <Button key={n.id} size="sm" variant="outline" className="w-full justify-start gap-2" onClick={() => setOpen(n)}>
+              <GraduationCap size={12} className="text-gold" />
+              <span className="flex-1 truncate text-left">{n.name}</span>
+              <Badge variant="secondary" className="text-[10px]">Aprender</Badge>
+            </Button>
+          ))}
+        </div>
+      )}
 
       <Dialog open={!!open} onOpenChange={(v) => { if (!v) { setOpen(null); load(); } }}>
         <DialogContent className="max-w-2xl">
@@ -123,7 +141,9 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
                   {open.dialog_intro}
                 </div>
               )}
-              {open.kind === "shop" ? (
+              {open.kind === "learning" ? (
+                <LearningNpcView npc={open} onClose={() => { setOpen(null); load(); }} />
+              ) : open.kind === "shop" ? (
                 <div className="grid gap-2 sm:grid-cols-2 max-h-[55vh] overflow-y-auto pr-1">
                   {(open.shop_items ?? []).length === 0 && <p className="text-sm text-muted-foreground">Sem itens à venda.</p>}
                   {(open.shop_items ?? []).map((s, i) => {
@@ -223,6 +243,58 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
           )}
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+function LearningNpcView({ npc, onClose }: { npc: Npc; onClose: () => void }) {
+  const blocks: LearnBlock[] = Array.isArray(npc.tutorial_blocks) ? npc.tutorial_blocks : [];
+  const minSec = Math.max(5, Number(npc.learning_min_read_seconds ?? 30));
+  const [elapsed, setElapsed] = useState(0);
+  const [minigame, setMinigame] = useState<any | null>(null);
+  const [openMg, setOpenMg] = useState(false);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const id = setInterval(() => setElapsed((e) => e + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+  useEffect(() => { if (elapsed >= minSec) setReady(true); }, [elapsed, minSec]);
+
+  async function loadMinigame() {
+    if (!npc.linked_minigame_id) return toast.error("Nenhum minigame vinculado a este NPC.");
+    const { data } = await supabase.from("minigames").select("*").eq("id", npc.linked_minigame_id).maybeSingle();
+    if (!data) return toast.error("Minigame não encontrado.");
+    setMinigame(data);
+    setOpenMg(true);
+  }
+
+  const remaining = Math.max(0, minSec - elapsed);
+
+  return (
+    <div className="space-y-3">
+      <div className="max-h-[55vh] overflow-y-auto pr-1 space-y-3">
+        {blocks.length === 0 && <div className="text-sm text-muted-foreground">Este NPC ainda não tem tutorial configurado.</div>}
+        {blocks.map((b) => b.kind === "text"
+          ? <div key={b.id} className="whitespace-pre-wrap text-sm leading-relaxed">{b.text ?? ""}</div>
+          : (b.image_url ? <img key={b.id} src={b.image_url} className="w-full rounded" alt="" /> : null)
+        )}
+      </div>
+      <div className="border-t border-border pt-2 flex items-center justify-between gap-2">
+        <div className="text-xs text-muted-foreground">
+          {ready
+            ? "Você já pode iniciar o treino."
+            : <span className="flex items-center gap-1"><Lock size={12}/> Leia por mais {remaining >= 60 ? `${Math.floor(remaining/60)}min ${remaining%60}s` : `${remaining}s`}…</span>}
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={onClose}>Fechar</Button>
+          <Button disabled={!ready || !npc.linked_minigame_id} onClick={loadMinigame}>
+            <GraduationCap size={14} className="mr-1"/> Iniciar treino
+          </Button>
+        </div>
+      </div>
+      {minigame && (
+        <MinigameDialog minigame={minigame} open={openMg} onOpenChange={(v) => { setOpenMg(v); if (!v) onClose(); }} />
+      )}
     </div>
   );
 }

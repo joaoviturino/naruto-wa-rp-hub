@@ -76,6 +76,12 @@ const bookSchema = z.object({
   proficiency_grants: grantSchema,
   sort_order: z.number().int().min(0).max(9999).default(0),
   active: z.boolean().default(true),
+  blocks: z.array(z.object({
+    id: z.string().min(1).max(64),
+    kind: z.enum(["text", "image"]),
+    text: z.string().max(20_000).nullish(),
+    image_url: z.string().nullish(),
+  })).default([]),
 });
 
 export const upsertLibraryBook = createServerFn({ method: "POST" })

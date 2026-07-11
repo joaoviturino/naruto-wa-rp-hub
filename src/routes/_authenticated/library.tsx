@@ -16,7 +16,8 @@ export const Route = createFileRoute("/_authenticated/library")({
 });
 
 type Section = { id: string; name: string; description: string | null; cover_url: string | null };
-type Book = { id: string; section_id: string | null; title: string; author: string | null; cover_url: string | null; summary: string | null; content: string; min_read_seconds: number; rewards: any; proficiency_grants: any };
+type Block = { id: string; kind: "text" | "image"; text?: string | null; image_url?: string | null };
+type Book = { id: string; section_id: string | null; title: string; author: string | null; cover_url: string | null; summary: string | null; content: string; min_read_seconds: number; rewards: any; proficiency_grants: any; blocks?: Block[] };
 
 function LibraryPage() {
   const load = useServerFn(listLibrary);
@@ -139,7 +140,7 @@ function BookReader({ book, alreadyRead, onClose, onCompleted }: {
         <div className="flex-1 overflow-y-auto pr-2 space-y-3">
           {book.cover_url && <img src={book.cover_url} className="w-full max-h-64 object-cover rounded" alt="" />}
           {book.summary && <p className="italic text-gold text-sm">{book.summary}</p>}
-          <div className="whitespace-pre-wrap text-sm leading-relaxed">{book.content || "—"}</div>
+          <BookBody book={book} />
 
           {(rewards.xp || rewards.ryo || rewardItems.length > 0 || grants.length > 0) && (
             <div className="rounded border border-border p-3 bg-secondary/30">
@@ -180,19 +181,42 @@ function BookReader({ book, alreadyRead, onClose, onCompleted }: {
             {alreadyRead
               ? "Recompensa já resgatada."
               : canClaim
-                ? "Leitura completa. Você pode resgatar."
-                : <span className="flex items-center gap-1"><Lock size={12}/> Continue lendo por mais {remaining}s…</span>}
+                ? "Leitura completa. Confirme abaixo para receber a recompensa."
+                : <span className="flex items-center gap-1"><Lock size={12}/> Continue lendo por mais {formatRemaining(remaining)}…</span>}
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={onClose}>Fechar</Button>
             {!alreadyRead && (
               <Button onClick={claim} disabled={!canClaim || claiming || claimed}>
-                {claiming ? "…" : claimed ? "Resgatado" : "Concluir leitura"}
+                {claiming ? "…" : claimed ? "Resgatado" : "Confirmar leitura"}
               </Button>
             )}
           </div>
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function formatRemaining(sec: number) {
+  if (sec >= 60) {
+    const m = Math.floor(sec / 60); const s = sec % 60;
+    return `${m}min${s ? ` ${s}s` : ""}`;
+  }
+  return `${sec}s`;
+}
+
+function BookBody({ book }: { book: Book }) {
+  const blocks: Block[] = Array.isArray(book.blocks) && book.blocks.length
+    ? book.blocks
+    : (book.content ? [{ id: "legacy", kind: "text", text: book.content }] : []);
+  if (blocks.length === 0) return <div className="text-sm text-muted-foreground">—</div>;
+  return (
+    <div className="space-y-3">
+      {blocks.map((b) => b.kind === "text"
+        ? <div key={b.id} className="whitespace-pre-wrap text-sm leading-relaxed">{b.text ?? ""}</div>
+        : (b.image_url ? <img key={b.id} src={b.image_url} className="w-full rounded" alt="" /> : null)
+      )}
+    </div>
   );
 }

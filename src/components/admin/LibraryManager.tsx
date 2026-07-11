@@ -10,6 +10,7 @@ import { ImageUpload } from "@/components/ImageUpload";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Trash2, Plus, BookOpen, FolderTree } from "lucide-react";
+import { ArrowUp, ArrowDown, Image as ImageIcon, Type } from "lucide-react";
 import { SKILL_CLASSES, SKILL_RANKS } from "@/components/admin/shared";
 import {
   upsertLibrarySection, deleteLibrarySection,
@@ -21,7 +22,9 @@ type Book = {
   id: string; section_id: string | null; title: string; author: string | null; cover_url: string | null;
   summary: string | null; content: string; min_read_seconds: number; rewards: any;
   proficiency_grants: any; sort_order: number; active: boolean;
+  blocks?: Block[];
 };
+type Block = { id: string; kind: "text" | "image"; text?: string | null; image_url?: string | null };
 type Item = { id: string; name: string };
 
 export function LibraryManager() {
@@ -51,8 +54,14 @@ export function LibraryManager() {
 
   function newSection() { setSec({ name: "", sort_order: 0, active: true }); setEditing("section"); }
   function editSection(x: Section) { setSec(x); setEditing("section"); }
-  function newBook() { setBook({ title: "", content: "", min_read_seconds: 30, rewards: {}, proficiency_grants: [], sort_order: 0, active: true }); setEditing("book"); }
-  function editBook(x: Book) { setBook({ ...x, rewards: x.rewards ?? {}, proficiency_grants: x.proficiency_grants ?? [] }); setEditing("book"); }
+  function newBook() { setBook({ title: "", content: "", min_read_seconds: 60, rewards: {}, proficiency_grants: [], sort_order: 0, active: true, blocks: [] }); setEditing("book"); }
+  function editBook(x: Book) {
+    const blocks: Block[] = Array.isArray(x.blocks) && x.blocks.length
+      ? x.blocks
+      : (x.content ? [{ id: crypto.randomUUID(), kind: "text", text: x.content }] : []);
+    setBook({ ...x, rewards: x.rewards ?? {}, proficiency_grants: x.proficiency_grants ?? [], blocks });
+    setEditing("book");
+  }
 
   async function submitSection() {
     try {
@@ -65,10 +74,13 @@ export function LibraryManager() {
   }
   async function submitBook() {
     try {
+      const blocks: Block[] = Array.isArray(book.blocks) ? book.blocks : [];
+      const plainContent = blocks.filter((b) => b.kind === "text").map((b) => b.text ?? "").join("\n\n");
       await saveBook({ data: {
         id: book.id, section_id: book.section_id ?? null, title: book.title!,
         author: book.author ?? null, cover_url: book.cover_url ?? null,
-        summary: book.summary ?? null, content: book.content ?? "",
+        summary: book.summary ?? null, content: plainContent || (book.content ?? ""),
+        blocks,
         min_read_seconds: Number(book.min_read_seconds ?? 30),
         rewards: book.rewards ?? {}, proficiency_grants: book.proficiency_grants ?? [],
         sort_order: Number(book.sort_order ?? 0), active: book.active ?? true,
@@ -119,7 +131,7 @@ export function LibraryManager() {
                   {b.cover_url && <img src={b.cover_url} className="w-8 h-10 rounded object-cover" alt="" />}
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold truncate">{b.title}</div>
-                    <div className="text-[10px] text-muted-foreground truncate">{secName ?? "Sem seção"} · {b.min_read_seconds}s de leitura</div>
+                    <div className="text-[10px] text-muted-foreground truncate">{secName ?? "Sem seção"} · {Math.max(1, Math.round((b.min_read_seconds ?? 0) / 60))} min de leitura</div>
                   </div>
                   <Button size="sm" variant="outline" onClick={() => editBook(b)}>Editar</Button>
                   <Button size="sm" variant="destructive" onClick={async () => {
@@ -165,6 +177,53 @@ export function LibraryManager() {
   );
 }
 
+function BlocksEditor({ blocks, setBlocks, adminUserId }: { blocks: Block[]; setBlocks: (b: Block[]) => void; adminUserId: string }) {
+  const uid = () => (globalThis.crypto?.randomUUID?.() ?? String(Math.random()));
+  function move(i: number, dir: -1 | 1) {
+    const j = i + dir; if (j < 0 || j >= blocks.length) return;
+    const arr = [...blocks]; const [it] = arr.splice(i, 1); arr.splice(j, 0, it); setBlocks(arr);
+  }
+  function remove(i: number) { setBlocks(blocks.filter((_, idx) => idx !== i)); }
+  function update(i: number, patch: Partial<Block>) {
+    const arr = [...blocks]; arr[i] = { ...arr[i], ...patch }; setBlocks(arr);
+  }
+  return (
+    <div className="rounded border border-border p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="text-xs uppercase tracking-widest text-muted-foreground">Conteúdo do livro (blocos)</div>
+        <div className="flex gap-1">
+          <Button size="sm" variant="outline" onClick={() => setBlocks([...blocks, { id: uid(), kind: "text", text: "" }])}><Type size={14}/> Texto</Button>
+          <Button size="sm" variant="outline" onClick={() => setBlocks([...blocks, { id: uid(), kind: "image", image_url: "" }])}><ImageIcon size={14}/> Imagem</Button>
+        </div>
+      </div>
+      {blocks.length === 0 && <div className="text-xs text-muted-foreground">Adicione blocos de texto e imagem na ordem que quiser.</div>}
+      {blocks.map((b, i) => (
+        <div key={b.id} className="rounded bg-secondary/40 p-2 space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Bloco {i + 1} · {b.kind === "text" ? "Texto" : "Imagem"}</div>
+            <div className="ml-auto flex gap-1">
+              <Button size="icon" variant="outline" onClick={() => move(i, -1)} disabled={i === 0}><ArrowUp size={14}/></Button>
+              <Button size="icon" variant="outline" onClick={() => move(i, 1)} disabled={i === blocks.length - 1}><ArrowDown size={14}/></Button>
+              <Button size="icon" variant="destructive" onClick={() => remove(i)}><Trash2 size={14}/></Button>
+            </div>
+          </div>
+          {b.kind === "text" ? (
+            <Textarea rows={5} value={b.text ?? ""} onChange={(e) => update(i, { text: e.target.value })} />
+          ) : (
+            <div className="flex items-center gap-2">
+              {b.image_url && <img src={b.image_url} className="w-24 h-24 rounded object-cover" alt="" />}
+              <div className="flex-1 space-y-1">
+                <Input placeholder="URL da imagem" value={b.image_url ?? ""} onChange={(e) => update(i, { image_url: e.target.value })} />
+                {adminUserId && <ImageUpload label="Enviar imagem" bucket="library" userId={adminUserId} onUploaded={(url) => update(i, { image_url: url })} />}
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function BookEditor({ book, setBook, sections, items, adminUserId, onSave, onCancel }: {
   book: Partial<Book>; setBook: (b: Partial<Book>) => void;
   sections: Section[]; items: Item[]; adminUserId: string; onSave: () => void; onCancel: () => void;
@@ -190,9 +249,9 @@ function BookEditor({ book, setBook, sections, items, adminUserId, onSave, onCan
         </div>
       </div>
       <div><Label>Resumo</Label><Textarea rows={2} value={book.summary ?? ""} onChange={(e) => setBook({ ...book, summary: e.target.value })} /></div>
-      <div><Label>Conteúdo (o livro em si)</Label><Textarea rows={10} value={book.content ?? ""} onChange={(e) => setBook({ ...book, content: e.target.value })} /></div>
+      <BlocksEditor blocks={(book.blocks as Block[]) ?? []} setBlocks={(bs) => setBook({ ...book, blocks: bs })} adminUserId={adminUserId} />
       <div className="grid grid-cols-3 gap-2">
-        <div><Label>Leitura mínima (s)</Label><Input type="number" value={book.min_read_seconds ?? 30} onChange={(e) => setBook({ ...book, min_read_seconds: Number(e.target.value) })} /></div>
+        <div><Label>Leitura mínima (min)</Label><Input type="number" min={1} value={Math.max(1, Math.round((book.min_read_seconds ?? 60) / 60))} onChange={(e) => setBook({ ...book, min_read_seconds: Math.max(5, Number(e.target.value) * 60) })} /></div>
         <div><Label>Ordem</Label><Input type="number" value={book.sort_order ?? 0} onChange={(e) => setBook({ ...book, sort_order: Number(e.target.value) })} /></div>
         <div className="flex items-end gap-2"><Switch checked={book.active ?? true} onCheckedChange={(v) => setBook({ ...book, active: v })} /><Label>Ativo</Label></div>
       </div>

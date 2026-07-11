@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useServerFn } from "@tanstack/react-start";
 import { startMinigameRun, completeMinigameRun } from "@/lib/minigame.functions";
 import { CleanupGame } from "./CleanupGame";
+import { SequenceGame } from "./SequenceGame";
 import { toast } from "sonner";
 
 type Minigame = {
@@ -76,8 +77,10 @@ export function MinigameDialog({
         )}
 
         {stage === "play" && (
-          <CleanupGame background={minigame.background_url} tileset={minigame.tileset_url}
-            config={minigame.config ?? {}} onFinish={onFinish} />
+          (minigame.kind === "sequence"
+            ? <SequenceGame background={minigame.background_url} config={minigame.config ?? {}} onFinish={onFinish} />
+            : <CleanupGame background={minigame.background_url} tileset={minigame.tileset_url} config={minigame.config ?? {}} onFinish={onFinish} />
+          )
         )}
 
         {stage === "outro" && result && (

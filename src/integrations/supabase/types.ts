@@ -693,6 +693,7 @@ export type Database = {
         Row: {
           active: boolean
           author: string | null
+          blocks: Json
           content: string
           cover_url: string | null
           created_at: string
@@ -709,6 +710,7 @@ export type Database = {
         Insert: {
           active?: boolean
           author?: string | null
+          blocks?: Json
           content?: string
           cover_url?: string | null
           created_at?: string
@@ -725,6 +727,7 @@ export type Database = {
         Update: {
           active?: boolean
           author?: string | null
+          blocks?: Json
           content?: string
           cover_url?: string | null
           created_at?: string
@@ -1146,6 +1149,8 @@ export type Database = {
           id: string
           image_url: string | null
           kind: Database["public"]["Enums"]["npc_kind"]
+          learning_min_read_seconds: number
+          linked_minigame_id: string | null
           name: string
           required_mission_id: string | null
           reward_cooldown_hours: number
@@ -1153,6 +1158,7 @@ export type Database = {
           reward_ryo: number
           reward_xp: number
           shop_items: Json
+          tutorial_blocks: Json
           updated_at: string
           xp: number
         }
@@ -1168,6 +1174,8 @@ export type Database = {
           id?: string
           image_url?: string | null
           kind?: Database["public"]["Enums"]["npc_kind"]
+          learning_min_read_seconds?: number
+          linked_minigame_id?: string | null
           name: string
           required_mission_id?: string | null
           reward_cooldown_hours?: number
@@ -1175,6 +1183,7 @@ export type Database = {
           reward_ryo?: number
           reward_xp?: number
           shop_items?: Json
+          tutorial_blocks?: Json
           updated_at?: string
           xp?: number
         }
@@ -1190,6 +1199,8 @@ export type Database = {
           id?: string
           image_url?: string | null
           kind?: Database["public"]["Enums"]["npc_kind"]
+          learning_min_read_seconds?: number
+          linked_minigame_id?: string | null
           name?: string
           required_mission_id?: string | null
           reward_cooldown_hours?: number
@@ -1197,10 +1208,18 @@ export type Database = {
           reward_ryo?: number
           reward_xp?: number
           shop_items?: Json
+          tutorial_blocks?: Json
           updated_at?: string
           xp?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "npcs_linked_minigame_id_fkey"
+            columns: ["linked_minigame_id"]
+            isOneToOne: false
+            referencedRelation: "minigames"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "npcs_required_mission_id_fkey"
             columns: ["required_mission_id"]
@@ -1566,7 +1585,7 @@ export type Database = {
         | "armor_boots"
         | "weapon_primary"
         | "weapon_secondary"
-      minigame_kind: "cleanup"
+      minigame_kind: "cleanup" | "sequence"
       msg_status: "pending" | "sent" | "failed"
       ninja_rank:
         | "estudante"
@@ -1577,7 +1596,7 @@ export type Database = {
         | "anbu"
         | "sannin"
         | "kage"
-      npc_kind: "aggressive" | "shop" | "reward"
+      npc_kind: "aggressive" | "shop" | "reward" | "learning"
       proficiency_kind:
         | "kenjutsu"
         | "shurikenjutsu"
@@ -1783,7 +1802,7 @@ export const Constants = {
         "weapon_primary",
         "weapon_secondary",
       ],
-      minigame_kind: ["cleanup"],
+      minigame_kind: ["cleanup", "sequence"],
       msg_status: ["pending", "sent", "failed"],
       ninja_rank: [
         "estudante",
@@ -1795,7 +1814,7 @@ export const Constants = {
         "sannin",
         "kage",
       ],
-      npc_kind: ["aggressive", "shop", "reward"],
+      npc_kind: ["aggressive", "shop", "reward", "learning"],
       proficiency_kind: [
         "kenjutsu",
         "shurikenjutsu",

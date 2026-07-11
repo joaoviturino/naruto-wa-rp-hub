@@ -12,7 +12,8 @@ import { toast } from "sonner";
 type DropRow = { item_id: string; qty: number; chance: number };
 type ShopRow = { item_id: string; price: number; stock: number };
 type RewardRow = { item_id: string; qty: number };
-type NpcKind = "aggressive" | "shop" | "reward";
+type NpcKind = "aggressive" | "shop" | "reward" | "learning";
+type LearnBlock = { id: string; kind: "text" | "image"; text?: string | null; image_url?: string | null };
 type Npc = {
   id: string; name: string; image_url: string | null; description: string | null;
   battle_bg_url: string | null;
@@ -21,16 +22,21 @@ type Npc = {
   kind: NpcKind; dialog_intro: string | null; dialog_outro: string | null;
   shop_items: ShopRow[]; reward_items: RewardRow[]; reward_cooldown_hours: number;
   required_mission_id: string | null;
+  tutorial_blocks?: LearnBlock[];
+  learning_min_read_seconds?: number;
+  linked_minigame_id?: string | null;
 };
 type Skill = { id: string; name: string; rank: string };
 type Item = { id: string; name: string; type: string };
 type Mission = { id: string; name: string; rank: string };
+type MinigameLite = { id: string; name: string; kind: string };
 
 export function NpcManager() {
   const [npcs, setNpcs] = useState<Npc[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [missions, setMissions] = useState<Mission[]>([]);
+  const [minigames, setMinigames] = useState<MinigameLite[]>([]);
   const [assigned, setAssigned] = useState<Record<string, Set<string>>>({});
   const [selected, setSelected] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -41,12 +47,13 @@ export function NpcManager() {
   const setSkillsFn = useServerFn(setNpcSkills);
 
   async function load() {
-    const [n, s, ns, it, mi] = await Promise.all([
+    const [n, s, ns, it, mi, mg] = await Promise.all([
       supabase.from("npcs").select("*").order("name"),
       supabase.from("skills").select("id,name,rank").order("name"),
       supabase.from("npc_skills").select("npc_id,skill_id"),
       supabase.from("items").select("id,name,type").order("name"),
       supabase.from("missions").select("id,name,rank").order("name"),
+      supabase.from("minigames").select("id,name,kind").order("name"),
     ]);
     setNpcs(((n.data as any[]) ?? []).map((r) => ({
       ...r,
@@ -57,10 +64,14 @@ export function NpcManager() {
       reward_items: Array.isArray(r.reward_items) ? r.reward_items : [],
       reward_cooldown_hours: Number(r.reward_cooldown_hours ?? 24),
       required_mission_id: r.required_mission_id ?? null,
+      tutorial_blocks: Array.isArray(r.tutorial_blocks) ? r.tutorial_blocks : [],
+      learning_min_read_seconds: Number(r.learning_min_read_seconds ?? 30),
+      linked_minigame_id: r.linked_minigame_id ?? null,
     })));
     setSkills((s.data as Skill[]) ?? []);
     setItems((it.data as Item[]) ?? []);
     setMissions((mi.data as Mission[]) ?? []);
+    setMinigames((mg.data as MinigameLite[]) ?? []);
     const map: Record<string, Set<string>> = {};
     (ns.data ?? []).forEach((r: any) => {
       if (!map[r.npc_id]) map[r.npc_id] = new Set();
@@ -145,15 +156,12 @@ export function NpcManager() {
         <div className="space-y-4">
           <div className="scroll-panel rounded-lg p-4 space-y-3">
             <div className="flex flex-wrap gap-2">
-              {(["aggressive","shop","reward"] as NpcKind[]).map((k) => (
+              {(["aggressive","shop","reward","learning"] as NpcKind[]).map((k) => (
                 <Button key={k} size="sm" variant={sel.kind === k ? "default" : "outline"}
                   onClick={async () => { await save({ data: { ...sel, kind: k } } as any); load(); }}>
-                  {k === "aggressive" ? "Agressivo" : k === "shop" ? "Loja" : "Recompensa"}
+                  {k === "aggressive" ? "Agressivo" : k === "shop" ? "Loja" : k === "reward" ? "Recompensa" : "Aprendizagem"}
                 </Button>
               ))}
-              <Button size="sm" variant="outline" disabled title="Em breve">
-                Aprendizagem <span className="ml-1 text-[10px] text-muted-foreground">em breve</span>
-              </Button>
             </div>
             <div className="flex items-start gap-4">
               <div className="w-40 h-40 rounded bg-secondary overflow-hidden shrink-0">
@@ -312,9 +320,39 @@ export function NpcManager() {
             </div>
           )}
 
+          {sel.kind === "learning" && (
+            <div className="scroll-panel rounded-lg p-4 space-y-3">
+              <h4 className="font-display text-lg text-gold">Aprendizagem</h4>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <Label>Leitura mínima do tutorial (min)</Label>
+                  <Input type="number" min={1}
+                    defaultValue={Math.max(1, Math.round((sel.learning_min_read_seconds ?? 30) / 60))}
+                    onBlur={async (e) => { await save({ data: { ...sel, learning_min_read_seconds: Math.max(5, Number(e.target.value) * 60) } } as any); load(); }} />
+                </div>
+                <div>
+                  <Label>Minigame vinculado</Label>
+                  <select
+                    value={sel.linked_minigame_id ?? ""}
+                    onChange={async (e) => { await save({ data: { ...sel, linked_minigame_id: e.target.value || null } } as any); load(); }}
+                    className="w-full bg-input border border-border rounded px-2 py-2 text-sm">
+                    <option value="">— Nenhum —</option>
+                    {minigames.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.kind})</option>)}
+                  </select>
+                </div>
+              </div>
+              <LearnBlocksEditor
+                blocks={sel.tutorial_blocks ?? []}
+                onChange={async (bs) => { await save({ data: { ...sel, tutorial_blocks: bs } } as any); load(); }}
+                npcId={sel.id}
+              />
+            </div>
+          )}
+
           {sel.kind === "aggressive" && (
           <div className="scroll-panel rounded-lg p-4 space-y-2">
             <h4 className="font-display text-lg text-gold">Tabela de drop</h4>
+            {/* drop table below */}
             <div className="space-y-2">
               {(sel.drop_table ?? []).map((d, i) => (
                 <div key={i} className="flex items-center gap-2">
@@ -389,6 +427,60 @@ function NumField({ label, value, onSave }: { label: string; value: number; onSa
     <div>
       <Label>{label}</Label>
       <Input type="number" defaultValue={value} onBlur={(e) => { const v = Number(e.target.value); if (v !== value) onSave(v); }} />
+    </div>
+  );
+}
+function LearnBlocksEditor({ blocks, onChange, npcId }: { blocks: LearnBlock[]; onChange: (bs: LearnBlock[]) => void; npcId: string }) {
+  const uid = () => (globalThis.crypto?.randomUUID?.() ?? String(Math.random()));
+  function move(i: number, dir: -1 | 1) {
+    const j = i + dir; if (j < 0 || j >= blocks.length) return;
+    const arr = [...blocks]; const [it] = arr.splice(i, 1); arr.splice(j, 0, it); onChange(arr);
+  }
+  async function upload(i: number, file: File) {
+    if (file.size > 10 * 1024 * 1024) return toast.error("Máx 10MB.");
+    const ext = file.name.split(".").pop() ?? "png";
+    const path = `${npcId}/tutorial/${Date.now()}.${ext}`;
+    const up = await supabase.storage.from("npcs").upload(path, file, { upsert: true, contentType: file.type });
+    if (up.error) return toast.error(up.error.message);
+    const signed = await supabase.storage.from("npcs").createSignedUrl(path, 60 * 60 * 24 * 365);
+    if (!signed.data?.signedUrl) return;
+    const arr = [...blocks]; arr[i] = { ...arr[i], image_url: signed.data.signedUrl }; onChange(arr);
+  }
+  return (
+    <div className="rounded border border-border p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="text-xs uppercase tracking-widest text-muted-foreground">Tutorial (blocos de texto/imagem)</div>
+        <div className="flex gap-1">
+          <Button size="sm" variant="outline" onClick={() => onChange([...blocks, { id: uid(), kind: "text", text: "" }])}>+ Texto</Button>
+          <Button size="sm" variant="outline" onClick={() => onChange([...blocks, { id: uid(), kind: "image", image_url: "" }])}>+ Imagem</Button>
+        </div>
+      </div>
+      {blocks.length === 0 && <div className="text-xs text-muted-foreground">Explique o passo a passo do minigame usando blocos.</div>}
+      {blocks.map((b, i) => (
+        <div key={b.id} className="rounded bg-secondary/40 p-2 space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Bloco {i + 1} · {b.kind}</div>
+            <div className="ml-auto flex gap-1">
+              <Button size="sm" variant="outline" onClick={() => move(i, -1)} disabled={i === 0}>↑</Button>
+              <Button size="sm" variant="outline" onClick={() => move(i, 1)} disabled={i === blocks.length - 1}>↓</Button>
+              <Button size="sm" variant="destructive" onClick={() => onChange(blocks.filter((_, idx) => idx !== i))}><Trash2 size={12}/></Button>
+            </div>
+          </div>
+          {b.kind === "text" ? (
+            <Textarea rows={4} defaultValue={b.text ?? ""}
+              onBlur={(e) => { const arr = [...blocks]; arr[i] = { ...arr[i], text: e.target.value }; onChange(arr); }} />
+          ) : (
+            <div className="flex items-center gap-2">
+              {b.image_url && <img src={b.image_url} className="w-24 h-24 rounded object-cover" alt="" />}
+              <label className="inline-flex items-center gap-1 text-xs cursor-pointer bg-secondary px-2 py-1 rounded">
+                <Upload size={12} /> Enviar imagem
+                <input type="file" accept="image/*" className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(i, f); if (e.target) e.target.value = ""; }} />
+              </label>
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
