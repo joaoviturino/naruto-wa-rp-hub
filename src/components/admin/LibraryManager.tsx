@@ -131,7 +131,7 @@ export function LibraryManager() {
                   {b.cover_url && <img src={b.cover_url} className="w-8 h-10 rounded object-cover" alt="" />}
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold truncate">{b.title}</div>
-                    <div className="text-[10px] text-muted-foreground truncate">{secName ?? "Sem seção"} · {b.min_read_seconds}s de leitura</div>
+                    <div className="text-[10px] text-muted-foreground truncate">{secName ?? "Sem seção"} · {Math.max(1, Math.round((b.min_read_seconds ?? 0) / 60))} min de leitura</div>
                   </div>
                   <Button size="sm" variant="outline" onClick={() => editBook(b)}>Editar</Button>
                   <Button size="sm" variant="destructive" onClick={async () => {
@@ -202,9 +202,9 @@ function BookEditor({ book, setBook, sections, items, adminUserId, onSave, onCan
         </div>
       </div>
       <div><Label>Resumo</Label><Textarea rows={2} value={book.summary ?? ""} onChange={(e) => setBook({ ...book, summary: e.target.value })} /></div>
-      <div><Label>Conteúdo (o livro em si)</Label><Textarea rows={10} value={book.content ?? ""} onChange={(e) => setBook({ ...book, content: e.target.value })} /></div>
+      <BlocksEditor blocks={(book.blocks as Block[]) ?? []} setBlocks={(bs) => setBook({ ...book, blocks: bs })} adminUserId={adminUserId} />
       <div className="grid grid-cols-3 gap-2">
-        <div><Label>Leitura mínima (s)</Label><Input type="number" value={book.min_read_seconds ?? 30} onChange={(e) => setBook({ ...book, min_read_seconds: Number(e.target.value) })} /></div>
+        <div><Label>Leitura mínima (min)</Label><Input type="number" min={1} value={Math.max(1, Math.round((book.min_read_seconds ?? 60) / 60))} onChange={(e) => setBook({ ...book, min_read_seconds: Math.max(5, Number(e.target.value) * 60) })} /></div>
         <div><Label>Ordem</Label><Input type="number" value={book.sort_order ?? 0} onChange={(e) => setBook({ ...book, sort_order: Number(e.target.value) })} /></div>
         <div className="flex items-end gap-2"><Switch checked={book.active ?? true} onCheckedChange={(v) => setBook({ ...book, active: v })} /><Label>Ativo</Label></div>
       </div>
