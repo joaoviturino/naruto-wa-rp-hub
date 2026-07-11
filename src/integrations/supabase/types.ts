@@ -1000,7 +1000,7 @@ export type Database = {
       minigame_runs: {
         Row: {
           character_id: string
-          completed_at: string
+          completed_at: string | null
           id: string
           location_id: string | null
           minigame_id: string
@@ -1010,7 +1010,7 @@ export type Database = {
         }
         Insert: {
           character_id: string
-          completed_at?: string
+          completed_at?: string | null
           id?: string
           location_id?: string | null
           minigame_id: string
@@ -1020,7 +1020,7 @@ export type Database = {
         }
         Update: {
           character_id?: string
-          completed_at?: string
+          completed_at?: string | null
           id?: string
           location_id?: string | null
           minigame_id?: string
