@@ -177,6 +177,53 @@ export function LibraryManager() {
   );
 }
 
+function BlocksEditor({ blocks, setBlocks, adminUserId }: { blocks: Block[]; setBlocks: (b: Block[]) => void; adminUserId: string }) {
+  const uid = () => (globalThis.crypto?.randomUUID?.() ?? String(Math.random()));
+  function move(i: number, dir: -1 | 1) {
+    const j = i + dir; if (j < 0 || j >= blocks.length) return;
+    const arr = [...blocks]; const [it] = arr.splice(i, 1); arr.splice(j, 0, it); setBlocks(arr);
+  }
+  function remove(i: number) { setBlocks(blocks.filter((_, idx) => idx !== i)); }
+  function update(i: number, patch: Partial<Block>) {
+    const arr = [...blocks]; arr[i] = { ...arr[i], ...patch }; setBlocks(arr);
+  }
+  return (
+    <div className="rounded border border-border p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="text-xs uppercase tracking-widest text-muted-foreground">Conteúdo do livro (blocos)</div>
+        <div className="flex gap-1">
+          <Button size="sm" variant="outline" onClick={() => setBlocks([...blocks, { id: uid(), kind: "text", text: "" }])}><Type size={14}/> Texto</Button>
+          <Button size="sm" variant="outline" onClick={() => setBlocks([...blocks, { id: uid(), kind: "image", image_url: "" }])}><ImageIcon size={14}/> Imagem</Button>
+        </div>
+      </div>
+      {blocks.length === 0 && <div className="text-xs text-muted-foreground">Adicione blocos de texto e imagem na ordem que quiser.</div>}
+      {blocks.map((b, i) => (
+        <div key={b.id} className="rounded bg-secondary/40 p-2 space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Bloco {i + 1} · {b.kind === "text" ? "Texto" : "Imagem"}</div>
+            <div className="ml-auto flex gap-1">
+              <Button size="icon" variant="outline" onClick={() => move(i, -1)} disabled={i === 0}><ArrowUp size={14}/></Button>
+              <Button size="icon" variant="outline" onClick={() => move(i, 1)} disabled={i === blocks.length - 1}><ArrowDown size={14}/></Button>
+              <Button size="icon" variant="destructive" onClick={() => remove(i)}><Trash2 size={14}/></Button>
+            </div>
+          </div>
+          {b.kind === "text" ? (
+            <Textarea rows={5} value={b.text ?? ""} onChange={(e) => update(i, { text: e.target.value })} />
+          ) : (
+            <div className="flex items-center gap-2">
+              {b.image_url && <img src={b.image_url} className="w-24 h-24 rounded object-cover" alt="" />}
+              <div className="flex-1 space-y-1">
+                <Input placeholder="URL da imagem" value={b.image_url ?? ""} onChange={(e) => update(i, { image_url: e.target.value })} />
+                {adminUserId && <ImageUpload label="Enviar imagem" bucket="library" userId={adminUserId} onUploaded={(url) => update(i, { image_url: url })} />}
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function BookEditor({ book, setBook, sections, items, adminUserId, onSave, onCancel }: {
   book: Partial<Book>; setBook: (b: Partial<Book>) => void;
   sections: Section[]; items: Item[]; adminUserId: string; onSave: () => void; onCancel: () => void;
