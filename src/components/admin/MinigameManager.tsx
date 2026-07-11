@@ -273,6 +273,32 @@ export function MinigameManager() {
                 }}><Plus size={14} className="mr-1" /> Adicionar item</Button>
               </div>
             </div>
+
+            <div>
+              <Label>Habilidades concedidas</Label>
+              <div className="space-y-1">
+                {(selected.reward_skills ?? []).map((rs, idx) => (
+                  <div key={idx} className="flex gap-2 items-center">
+                    <select className="flex-1 bg-input border border-border rounded px-2 py-1 text-sm"
+                      value={rs.skill_id}
+                      onChange={(e) => {
+                        const next = [...(selected.reward_skills ?? [])]; next[idx] = { skill_id: e.target.value };
+                        setSelected({ ...selected, reward_skills: next });
+                      }}>
+                      <option value="">— habilidade —</option>
+                      {skills.map((s) => <option key={s.id} value={s.id}>[{s.rank}] {s.name}</option>)}
+                    </select>
+                    <Button variant="ghost" size="icon" onClick={() => {
+                      const next = [...(selected.reward_skills ?? [])]; next.splice(idx, 1);
+                      setSelected({ ...selected, reward_skills: next });
+                    }}><Trash2 size={14} /></Button>
+                  </div>
+                ))}
+                <Button variant="outline" size="sm" onClick={() => setSelected({ ...selected, reward_skills: [...(selected.reward_skills ?? []), { skill_id: "" }] })}>
+                  <Plus size={14} className="mr-1" /> Adicionar habilidade
+                </Button>
+              </div>
+            </div>
           </div>
 
           <div className="flex gap-2">
