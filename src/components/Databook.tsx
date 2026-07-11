@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { SKILL_CLASSES } from "@/components/admin/shared";
 
 type Skill = { id: string; name: string; rank: string; element: string | null; type: string | null; description: string | null };
 type Knowledge = { id: string; name: string; description: string | null };
+type Prof = { key: string; label: string; nivel: string | null; maestria: string | null };
 
 const RANKS = ["S", "A", "B", "C", "D", "E"] as const;
 const RANK_COLORS: Record<string, string> = {
@@ -17,15 +19,28 @@ const RANK_COLORS: Record<string, string> = {
 export function Databook({ characterId }: { characterId: string }) {
   const [skills, setSkills] = useState<Skill[]>([]);
   const [knowledges, setKnowledges] = useState<Knowledge[]>([]);
+  const [profs, setProfs] = useState<Prof[]>([]);
 
   useEffect(() => {
     (async () => {
-      const [{ data: cs }, { data: ck }] = await Promise.all([
+      const [{ data: cs }, { data: ck }, { data: ch }] = await Promise.all([
         supabase.from("character_skills").select("skills(*)").eq("character_id", characterId),
         supabase.from("character_knowledges").select("knowledges(*)").eq("character_id", characterId),
+        supabase.from("characters").select("proficiencies").eq("id", characterId).maybeSingle(),
       ]);
       setSkills((cs ?? []).flatMap((r: any) => (r.skills ? [r.skills] : [])));
       setKnowledges((ck ?? []).flatMap((r: any) => (r.knowledges ? [r.knowledges] : [])));
+      const raw = (ch?.proficiencies as any) ?? {};
+      const list: Prof[] = SKILL_CLASSES
+        .map((c) => {
+          const e = raw[c.value] ?? {};
+          const nivel = e.nivel ?? null;
+          const maestria = e.maestria ?? null;
+          if (!nivel && !maestria) return null;
+          return { key: c.value, label: c.label, nivel, maestria };
+        })
+        .filter(Boolean) as Prof[];
+      setProfs(list);
     })();
   }, [characterId]);
 
@@ -58,7 +73,20 @@ export function Databook({ characterId }: { characterId: string }) {
         </div>
       </div>
       <div className="scroll-panel rounded-lg p-4 sm:p-6">
-        <h3 className="font-display text-lg text-gold mb-4">Conhecimentos</h3>
+        <h3 className="font-display text-lg text-gold mb-2">Proficiências</h3>
+        {profs.length === 0 && <p className="text-sm text-muted-foreground mb-4">Nenhuma proficiência registrada.</p>}
+        <ul className="space-y-2 mb-6">
+          {profs.map((p) => (
+            <li key={p.key} className="rounded border border-border p-2 flex items-center justify-between gap-2">
+              <span className="text-sm font-semibold">{p.label}</span>
+              <span className="flex gap-1 text-[10px]">
+                <span className="px-1.5 py-0.5 rounded border border-border">Nv {p.nivel ?? "—"}</span>
+                <span className="px-1.5 py-0.5 rounded border border-gold/50 text-gold">M {p.maestria ?? "—"}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+        <h3 className="font-display text-lg text-gold mb-2">Conhecimentos</h3>
         {knowledges.length === 0 && <p className="text-sm text-muted-foreground">Nenhum conhecimento registrado.</p>}
         <ul className="space-y-2">
           {knowledges.map((k) => (
