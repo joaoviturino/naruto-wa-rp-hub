@@ -354,21 +354,22 @@ export function NpcManager() {
                     defaultValue={Math.max(1, Math.round((sel.learning_min_read_seconds ?? 30) / 60))}
                     onBlur={async (e) => { await save({ data: { ...sel, learning_min_read_seconds: Math.max(5, Number(e.target.value) * 60) } } as any); load(); }} />
                 </div>
-                <div>
-                  <Label>Minigame vinculado</Label>
-                  <select
-                    value={sel.linked_minigame_id ?? ""}
-                    onChange={async (e) => { await save({ data: { ...sel, linked_minigame_id: e.target.value || null } } as any); load(); }}
-                    className="w-full bg-input border border-border rounded px-2 py-2 text-sm">
-                    <option value="">— Nenhum —</option>
-                    {minigames.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.kind})</option>)}
-                  </select>
-                </div>
               </div>
               <LearnBlocksEditor
                 blocks={sel.tutorial_blocks ?? []}
                 onChange={async (bs) => { await save({ data: { ...sel, tutorial_blocks: bs } } as any); load(); }}
                 npcId={sel.id}
+              />
+              <LearningStepsEditor
+                steps={learningSteps[sel.id] ?? []}
+                minigames={minigames}
+                onSave={async (steps) => {
+                  try {
+                    await saveSteps({ data: { npc_id: sel.id, steps: steps.map((s, i) => ({ minigame_id: s.minigame_id, position: i, required_rank: s.required_rank ?? null, required_profs: s.required_profs ?? [] })) } });
+                    toast.success("Passos salvos.");
+                    load();
+                  } catch (e: any) { toast.error(e.message); }
+                }}
               />
             </div>
           )}
