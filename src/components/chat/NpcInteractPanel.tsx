@@ -7,9 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Store, Gift, MessageSquare, Coins, Minus, Plus, Lock } from "lucide-react";
 import { listLocationInteractNpcs, buyFromShop, claimNpcReward } from "@/lib/npc-interact.functions";
+import { MinigameDialog } from "@/components/minigame/MinigameDialog";
 
+type LearnBlock = { id: string; kind: "text" | "image"; text?: string | null; image_url?: string | null };
 type Npc = {
-  id: string; name: string; image_url: string | null; kind: "shop" | "reward";
+  id: string; name: string; image_url: string | null; kind: "shop" | "reward" | "learning";
   dialog_intro: string | null; dialog_outro: string | null;
   shop_items?: { item_id: string; price: number; stock: number }[];
   reward_items?: { item_id: string; qty: number }[];
@@ -18,6 +20,9 @@ type Npc = {
   required_mission_id?: string | null;
   mission_required_name?: string | null;
   mission_unlocked?: boolean;
+  tutorial_blocks?: LearnBlock[];
+  learning_min_read_seconds?: number;
+  linked_minigame_id?: string | null;
 };
 type Item = { id: string; name: string; image_url: string | null; description: string | null; type: string | null };
 
