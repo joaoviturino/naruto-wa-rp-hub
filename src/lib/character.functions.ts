@@ -133,7 +133,7 @@ const bagSource = z.enum(["ninja_bag","secondary_slots"]).default("ninja_bag");
 
 async function loadOwnInventory(context: { supabase: any; userId: string }) {
   const { data: char, error: cErr } = await context.supabase
-    .from("characters").select("id").eq("user_id", context.userId).maybeSingle();
+    .from("characters").select("id,proficiencies").eq("user_id", context.userId).maybeSingle();
   if (cErr) throw new Error(cErr.message);
   if (!char) throw new Error("Personagem não encontrado.");
   const { data: inv, error: iErr } = await context.supabase
@@ -141,6 +141,15 @@ async function loadOwnInventory(context: { supabase: any; userId: string }) {
   if (iErr) throw new Error(iErr.message);
   if (!inv) throw new Error("Inventário não encontrado.");
   return { char, inv };
+}
+
+const SKILL_RANK_ORDER = ["E","D","C","B","A","S"] as const;
+function rankGteE(r: string | null | undefined) {
+  return typeof r === "string" && SKILL_RANK_ORDER.indexOf(r as any) >= 0;
+}
+export function weaponUnlocks(profs: any): { primary: boolean; secondary: boolean } {
+  const k = (profs ?? {})?.kenjutsu ?? {};
+  return { primary: rankGteE(k.nivel), secondary: rankGteE(k.maestria) };
 }
 
 function normalizeBag(raw: any): { item_id: string; qty: number }[] {
