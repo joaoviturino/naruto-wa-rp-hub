@@ -1,0 +1,3 @@
+CREATE POLICY "msg author or admin update" ON public.location_messages FOR UPDATE
+USING (public.has_role(auth.uid(), 'admin') OR EXISTS (SELECT 1 FROM public.characters c WHERE c.id = location_messages.character_id AND c.user_id = auth.uid()))
+WITH CHECK (public.has_role(auth.uid(), 'admin') OR EXISTS (SELECT 1 FROM public.characters c WHERE c.id = location_messages.character_id AND c.user_id = auth.uid()));
