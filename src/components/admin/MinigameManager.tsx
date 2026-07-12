@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Trash2, Upload, Plus, Save } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { upsertMinigame, deleteMinigame } from "@/lib/minigame.functions";
+import { useProficiencies } from "@/hooks/useProficiencies";
 import { toast } from "sonner";
 
 type Item = { id: string; name: string };
@@ -37,6 +38,8 @@ const NINJA_RANKS = ["estudante","genin","chunin","tokubetsu_jonin","jonin","anb
 const SKILL_RANKS = ["E","D","C","B","A","S"];
 
 export function MinigameManager() {
+  const SKILL_CLASSES_ROWS = useProficiencies();
+  const SKILL_CLASSES = SKILL_CLASSES_ROWS.map((c) => c.value);
   const [list, setList] = useState<Minigame[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [skills, setSkills] = useState<SkillLite[]>([]);
