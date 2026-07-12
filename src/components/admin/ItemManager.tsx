@@ -10,7 +10,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { upsertItem, deleteItem } from "@/lib/admin.functions";
 import { toast } from "sonner";
 import { ImageUpload } from "@/components/ImageUpload";
-import { NINJA_RANKS, SKILL_RANKS, ITEM_TYPES, SKILL_CLASSES, labelize } from "./shared";
+import { NINJA_RANKS, SKILL_RANKS, ITEM_TYPES, labelize } from "./shared";
+import { useProficiencies } from "@/hooks/useProficiencies";
 import { Trash2, Pencil, Plus } from "lucide-react";
 import { RestoreEffectFields } from "./RestoreEffectFields";
 
@@ -83,6 +84,7 @@ export function ItemManager({ adminUserId }: { adminUserId: string }) {
 }
 
 function ItemDialog({ open, onOpenChange, initial, missions, skills, adminUserId, onSaved }: any) {
+  const SKILL_CLASSES = useProficiencies();
   const save = useServerFn(upsertItem);
   const [f, setF] = useState<any>(initial ?? {});
   useEffect(() => { setF(initial ?? {}); }, [initial]);
