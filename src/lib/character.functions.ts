@@ -247,8 +247,9 @@ export const equipItem = createServerFn({ method: "POST" })
     if (!item) throw new Error("Item inexistente.");
     const slotCol = SLOT_BY_TYPE[item.type];
     if (!slotCol) throw new Error("Este item não pode ser equipado.");
-    if (item.type === "weapon_primary" && !inv.primary_unlocked) throw new Error("Slot primário bloqueado.");
-    if (item.type === "weapon_secondary" && !inv.secondary_unlocked) throw new Error("Slot secundário bloqueado.");
+    const unlocks = weaponUnlocks((char as any).proficiencies);
+    if (item.type === "weapon_primary" && !unlocks.primary) throw new Error("Slot primário bloqueado. Requer Kenjutsu Nível E.");
+    if (item.type === "weapon_secondary" && !unlocks.secondary) throw new Error("Slot secundário bloqueado. Requer Kenjutsu Maestria E.");
 
     let src = normalizeBag(inv[data.source]);
     src = removeOneFromBag(src, data.item_id);
