@@ -19,12 +19,12 @@ export function AdminUsers() {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
         <h3 className="font-display text-xl text-gold">Usuários ({rows.length})</h3>
-        <Input placeholder="Buscar email..." className="max-w-xs" value={q} onChange={(e) => setQ(e.target.value)} />
+        <Input placeholder="Buscar email..." className="w-full sm:max-w-xs" value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
-      <div className="scroll-panel rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="scroll-panel rounded-lg overflow-x-auto">
+        <table className="w-full text-sm min-w-[560px]">
           <thead className="bg-secondary/50 text-xs uppercase tracking-wider">
             <tr><th className="text-left p-2">Email</th><th className="text-left p-2">Roles</th><th className="text-left p-2">Criado</th><th></th></tr>
           </thead>

@@ -80,10 +80,10 @@ function PartyPage() {
   const inParty = members.length > 0;
 
   return (
-    <div className="mx-auto max-w-3xl p-4 space-y-6">
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" asChild><Link to="/chat"><ArrowLeft size={14} className="mr-1" /> Voltar ao chat</Link></Button>
-        <h1 className="font-display text-2xl text-gold flex items-center gap-2"><Users size={20} /> Meu Time</h1>
+    <div className="mx-auto max-w-3xl p-3 sm:p-4 space-y-4 sm:space-y-6">
+      <div className="flex items-center gap-2 flex-wrap">
+        <Button variant="ghost" size="sm" asChild><Link to="/chat"><ArrowLeft size={14} className="mr-1" /> Voltar</Link></Button>
+        <h1 className="font-display text-xl sm:text-2xl text-gold flex items-center gap-2 min-w-0"><Users size={18} className="shrink-0" /> <span className="truncate">Meu Time</span></h1>
         <div className="flex-1" />
         <Button variant="outline" size="sm" onClick={() => { router.invalidate(); load(); }}><RefreshCw size={14} /></Button>
       </div>
@@ -92,11 +92,11 @@ function PartyPage() {
         <div className="scroll-panel rounded-lg p-4 space-y-2">
           <h2 className="font-display text-lg">Convites pendentes</h2>
           {invites.map((iv) => (
-            <div key={iv.id} className="flex items-center gap-2 border-b border-border last:border-0 py-2">
-              <div className="w-10 h-10 rounded-full bg-secondary overflow-hidden">
+            <div key={iv.id} className="flex items-center gap-2 border-b border-border last:border-0 py-2 flex-wrap">
+              <div className="w-10 h-10 rounded-full bg-secondary overflow-hidden shrink-0">
                 {iv.from_character?.avatar_url && <img src={iv.from_character.avatar_url} className="w-full h-full object-cover" alt="" />}
               </div>
-              <div className="flex-1 text-sm"><b>{iv.from_character?.nickname ?? "?"}</b> te convidou.</div>
+              <div className="flex-1 text-sm min-w-0 truncate"><b>{iv.from_character?.nickname ?? "?"}</b> te convidou.</div>
               <Button size="sm" onClick={async () => { try { await respond({ data: { invite_id: iv.id, accept: true } }); toast.success("Você entrou no time."); load(); } catch (e: any) { toast.error(e.message); } }}>Aceitar</Button>
               <Button size="sm" variant="ghost" onClick={async () => { await respond({ data: { invite_id: iv.id, accept: false } }); load(); }}>Recusar</Button>
             </div>
@@ -126,7 +126,7 @@ function PartyPage() {
                 </div>
               ))}
             </div>
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex flex-wrap justify-end gap-2 pt-2">
               {isLeader ? (
                 <Button variant="destructive" size="sm" onClick={async () => {
                   if (!confirm("Dissolver o time? Todos os membros serão removidos.")) return;

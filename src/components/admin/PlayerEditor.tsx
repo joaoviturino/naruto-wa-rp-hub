@@ -74,10 +74,10 @@ export function PlayerEditor({ characterId, open, onOpenChange, onSaved }: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl w-[calc(100vw-1.5rem)] max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader><DialogTitle>Editar: {char.nickname}</DialogTitle></DialogHeader>
         <Tabs defaultValue="stats">
-          <TabsList>
+          <TabsList className="flex flex-wrap h-auto w-full justify-start gap-1">
             <TabsTrigger value="stats">Ficha</TabsTrigger>
             <TabsTrigger value="prof">Proficiências</TabsTrigger>
             <TabsTrigger value="skills">Habilidades</TabsTrigger>

@@ -28,10 +28,10 @@ export function AdminPanel() {
   const [adminUserId, setAdminUserId] = useState<string>("");
   useEffect(() => { supabase.auth.getUser().then(({ data }) => setAdminUserId(data.user?.id ?? "")); }, []);
   return (
-    <div className="mx-auto max-w-6xl p-6">
-      <h1 className="font-display text-3xl font-black mb-6">Painel do Kage <span className="text-gold">影</span></h1>
+    <div className="mx-auto max-w-6xl p-3 sm:p-6">
+      <h1 className="font-display text-2xl sm:text-3xl font-black mb-4 sm:mb-6">Painel do Kage <span className="text-gold">影</span></h1>
       <Tabs defaultValue="dashboard">
-        <TabsList className="flex flex-wrap h-auto">
+        <TabsList className="flex flex-wrap h-auto gap-1 w-full justify-start text-xs sm:text-sm">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="players">Jogadores</TabsTrigger>
           <TabsTrigger value="items">Itens</TabsTrigger>
@@ -112,13 +112,13 @@ function Players() {
   useEffect(() => { load(); }, []);
   return (
     <>
-    <div className="scroll-panel rounded-lg overflow-hidden">
-      <table className="w-full text-sm">
+    <div className="scroll-panel rounded-lg overflow-x-auto">
+      <table className="w-full text-sm min-w-[720px]">
         <thead className="bg-secondary/50">
           <tr>
-            <th className="text-left p-3">Nickname</th><th className="text-left p-3">Vila</th>
-            <th className="text-left p-3">Clã</th><th className="text-left p-3">Patente</th>
-            <th className="text-left p-3">WhatsApp</th><th className="text-left p-3">XP</th>
+            <th className="text-left p-2 sm:p-3">Nickname</th><th className="text-left p-2 sm:p-3">Vila</th>
+            <th className="text-left p-2 sm:p-3">Clã</th><th className="text-left p-2 sm:p-3">Patente</th>
+            <th className="text-left p-2 sm:p-3">WhatsApp</th><th className="text-left p-2 sm:p-3">XP</th>
             <th></th>
           </tr>
         </thead>
@@ -224,8 +224,8 @@ function BotPanel() {
   const statusColor: Record<string,string> = { connected: "text-emerald-400", qr: "text-gold", connecting: "text-sky-400", disconnected: "text-red-400" };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <div className="scroll-panel rounded-lg p-6">
+    <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
+      <div className="scroll-panel rounded-lg p-4 sm:p-6">
         <h3 className="font-display text-xl text-gold">Sessão do Bot</h3>
         <div className="mt-2 text-sm">Status: <span className={statusColor[session?.status ?? "disconnected"]}>{session?.status ?? "—"}</span></div>
         {session?.phone && <div className="text-xs text-muted-foreground">Conectado como: {session.phone}</div>}
@@ -260,7 +260,7 @@ function BotPanel() {
         <p className="mt-4 text-xs text-muted-foreground">O painel renderiza o QR direto aqui, sem depender de serviço externo de imagem.</p>
       </div>
 
-      <div className="scroll-panel rounded-lg p-6">
+      <div className="scroll-panel rounded-lg p-4 sm:p-6">
         <h3 className="font-display text-xl text-gold">Enviar mensagem de teste</h3>
         <div className="mt-3 space-y-3">
           <div>
@@ -278,9 +278,9 @@ function BotPanel() {
         </div>
       </div>
 
-      <div className="scroll-panel rounded-lg p-6 lg:col-span-2">
+      <div className="scroll-panel rounded-lg p-4 sm:p-6 lg:col-span-2 overflow-x-auto">
         <h3 className="font-display text-xl text-gold">Últimas mensagens</h3>
-        <table className="w-full text-sm mt-3">
+        <table className="w-full text-sm mt-3 min-w-[560px]">
           <thead className="text-xs text-muted-foreground">
             <tr><th className="text-left p-2">Quando</th><th className="text-left p-2">Para</th><th className="text-left p-2">Status</th><th className="text-left p-2">Conteúdo</th></tr>
           </thead>

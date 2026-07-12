@@ -33,8 +33,8 @@ export function MissionManager() {
             <h3 className="font-display text-xl text-gold">Missões diárias ({rows.length})</h3>
             <Button size="sm" onClick={() => { setEditing({}); setOpen(true); }}><Plus size={14} /> Nova missão</Button>
           </div>
-          <div className="scroll-panel rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="scroll-panel rounded-lg overflow-x-auto">
+            <table className="w-full text-sm min-w-[640px]">
               <thead className="bg-secondary/50 text-xs uppercase tracking-wider">
                 <tr><th className="text-left p-2">Nome</th><th className="text-left p-2">Patente</th><th className="text-left p-2">XP</th><th className="text-left p-2">Descrição</th><th></th></tr>
               </thead>
