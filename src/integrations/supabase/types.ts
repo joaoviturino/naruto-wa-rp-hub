@@ -1547,6 +1547,190 @@ export type Database = {
         }
         Relationships: []
       }
+      pvp_duels: {
+        Row: {
+          challenger_id: string
+          created_at: string
+          current_turn_character_id: string | null
+          ended_at: string | null
+          forfeit_by: string | null
+          id: string
+          location_id: string | null
+          opponent_id: string
+          started_at: string | null
+          state: Json
+          status: Database["public"]["Enums"]["pvp_status"]
+          turn_number: number
+          updated_at: string
+          winner_id: string | null
+        }
+        Insert: {
+          challenger_id: string
+          created_at?: string
+          current_turn_character_id?: string | null
+          ended_at?: string | null
+          forfeit_by?: string | null
+          id?: string
+          location_id?: string | null
+          opponent_id: string
+          started_at?: string | null
+          state?: Json
+          status?: Database["public"]["Enums"]["pvp_status"]
+          turn_number?: number
+          updated_at?: string
+          winner_id?: string | null
+        }
+        Update: {
+          challenger_id?: string
+          created_at?: string
+          current_turn_character_id?: string | null
+          ended_at?: string | null
+          forfeit_by?: string | null
+          id?: string
+          location_id?: string | null
+          opponent_id?: string
+          started_at?: string | null
+          state?: Json
+          status?: Database["public"]["Enums"]["pvp_status"]
+          turn_number?: number
+          updated_at?: string
+          winner_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pvp_duels_challenger_id_fkey"
+            columns: ["challenger_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pvp_duels_current_turn_character_id_fkey"
+            columns: ["current_turn_character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pvp_duels_forfeit_by_fkey"
+            columns: ["forfeit_by"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pvp_duels_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pvp_duels_opponent_id_fkey"
+            columns: ["opponent_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pvp_duels_winner_id_fkey"
+            columns: ["winner_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pvp_turns: {
+        Row: {
+          action: Database["public"]["Enums"]["pvp_action"]
+          actor_character_id: string
+          category: Database["public"]["Enums"]["pvp_category"] | null
+          created_at: string
+          crit: boolean
+          damage: number
+          duel_id: string
+          effects: Json
+          energy_invested_pct: number | null
+          id: string
+          item_id: string | null
+          narrative: string
+          skill_id: string | null
+          target_character_id: string | null
+          turn_number: number
+        }
+        Insert: {
+          action: Database["public"]["Enums"]["pvp_action"]
+          actor_character_id: string
+          category?: Database["public"]["Enums"]["pvp_category"] | null
+          created_at?: string
+          crit?: boolean
+          damage?: number
+          duel_id: string
+          effects?: Json
+          energy_invested_pct?: number | null
+          id?: string
+          item_id?: string | null
+          narrative: string
+          skill_id?: string | null
+          target_character_id?: string | null
+          turn_number: number
+        }
+        Update: {
+          action?: Database["public"]["Enums"]["pvp_action"]
+          actor_character_id?: string
+          category?: Database["public"]["Enums"]["pvp_category"] | null
+          created_at?: string
+          crit?: boolean
+          damage?: number
+          duel_id?: string
+          effects?: Json
+          energy_invested_pct?: number | null
+          id?: string
+          item_id?: string | null
+          narrative?: string
+          skill_id?: string | null
+          target_character_id?: string | null
+          turn_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pvp_turns_actor_character_id_fkey"
+            columns: ["actor_character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pvp_turns_duel_id_fkey"
+            columns: ["duel_id"]
+            isOneToOne: false
+            referencedRelation: "pvp_duels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pvp_turns_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pvp_turns_skill_id_fkey"
+            columns: ["skill_id"]
+            isOneToOne: false
+            referencedRelation: "skills"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pvp_turns_target_character_id_fkey"
+            columns: ["target_character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scene_images: {
         Row: {
           character_id: string
@@ -1731,6 +1915,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_duel_participant: {
+        Args: { _duel: string; _user: string }
+        Returns: boolean
+      }
       user_at_location: { Args: { _loc: string }; Returns: boolean }
       user_in_party: {
         Args: { _party: string; _user: string }
@@ -1771,6 +1959,9 @@ export type Database = {
         | "genjutsu"
         | "fuinjutsu"
         | "iryo"
+      pvp_action: "attack" | "defend" | "item" | "pass" | "forfeit"
+      pvp_category: "fisico" | "mental" | "ninjutsu"
+      pvp_status: "pending" | "active" | "finished" | "cancelled"
       skill_class:
         | "genjutsu"
         | "ninjutsu"
@@ -1996,6 +2187,9 @@ export const Constants = {
         "fuinjutsu",
         "iryo",
       ],
+      pvp_action: ["attack", "defend", "item", "pass", "forfeit"],
+      pvp_category: ["fisico", "mental", "ninjutsu"],
+      pvp_status: ["pending", "active", "finished", "cancelled"],
       skill_class: [
         "genjutsu",
         "ninjutsu",
