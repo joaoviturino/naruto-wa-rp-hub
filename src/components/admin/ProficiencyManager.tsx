@@ -15,7 +15,7 @@ export function ProficiencyManager() {
   const [form, setForm] = useState<{ value: string; label: string; description: string; sort_order: number }>({ value: "", label: "", description: "", sort_order: 999 });
 
   function startCreate() { setCreating(true); setEditing(null); setForm({ value: "", label: "", description: "", sort_order: (rows.length + 1) * 10 }); }
-  function startEdit(r: Proficiency) { setEditing(r); setCreating(false); setForm({ value: r.value, label: r.label, description: r.description ?? "", sort_order: r.sort_order }); }
+  function startEdit(r: Proficiency) { setEditing(r); setCreating(false); setForm({ value: r.value, label: r.label, description: (r.description ?? "") as string, sort_order: r.sort_order }); }
   function cancel() { setEditing(null); setCreating(false); }
 
   async function saveCreate() {
