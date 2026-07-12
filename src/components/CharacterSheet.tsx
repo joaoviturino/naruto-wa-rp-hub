@@ -11,6 +11,8 @@ import { DailyMissionsPanel } from "@/components/DailyMissionsPanel";
 import { updateCharacter } from "@/lib/character.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
+import { getLevelConfig } from "@/lib/level.functions";
+import { levelProgress, DEFAULT_LEVEL_CONFIG, type LevelConfig } from "@/lib/level";
 
 type Character = {
   id: string; user_id: string; nickname: string; phone_e164: string;
@@ -26,7 +28,9 @@ const ELEMENTS_MAP = Object.fromEntries(ELEMENTS.map((e) => [e.id, e]));
 
 export function CharacterSheet({ characterId }: { characterId: string }) {
   const [char, setChar] = useState<Character | null>(null);
+  const [levelCfg, setLevelCfg] = useState<LevelConfig>(DEFAULT_LEVEL_CONFIG);
   const update = useServerFn(updateCharacter);
+  const fetchLevelCfg = useServerFn(getLevelConfig);
 
   async function load() {
     const { data } = await supabase
@@ -36,13 +40,14 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
     setChar(data as any);
   }
   useEffect(() => { load(); }, [characterId]);
+  useEffect(() => { fetchLevelCfg({}).then(setLevelCfg).catch(() => {}); }, []);
 
   if (!char) return <div className="p-10 text-center text-muted-foreground">Carregando ficha…</div>;
 
   const village = (VILLAGES_MAP as any)[char.village];
   const element = (ELEMENTS_MAP as any)[char.element_primary];
   const s = stats(char.xp);
-  const nextLevel = Math.max(100, Math.pow(Math.floor(char.xp / 100) + 1, 2) * 100);
+  const lp = levelProgress(char.xp, levelCfg);
   const rarity = ((char.clan?.rarity as Rarity) ?? "common");
   const efCur = char.ef_current == null ? s.ef : Math.min(s.ef, char.ef_current);
   const emCur = char.em_current == null ? s.em : Math.min(s.em, char.em_current);
@@ -100,8 +105,15 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
         <StatBlock label="Chakra total" value={`${ckCur} / ${s.chakra}`} accent="oklch(0.78 0.15 80)" />
       </div>
       <div className="px-4 sm:px-6">
-        <div className="text-xs text-muted-foreground mb-1">XP: {char.xp} / {nextLevel}</div>
-        <Progress value={(char.xp / nextLevel) * 100} />
+        <div className="flex items-center justify-between text-xs mb-1">
+          <span className="text-gold font-semibold">Nível {lp.level}{lp.maxed && " (máx)"}</span>
+          <span className="text-muted-foreground">
+            {lp.maxed
+              ? `XP: ${char.xp.toLocaleString("pt-BR")}`
+              : `XP: ${char.xp.toLocaleString("pt-BR")} / ${lp.nextFloor.toLocaleString("pt-BR")}`}
+          </span>
+        </div>
+        <Progress value={lp.pct} />
         <div className="text-xs text-gold mt-2">Ryo: {char.ryo ?? 0} 💰</div>
       </div>
 
