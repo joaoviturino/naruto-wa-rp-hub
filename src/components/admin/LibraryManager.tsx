@@ -11,7 +11,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Trash2, Plus, BookOpen, FolderTree } from "lucide-react";
 import { ArrowUp, ArrowDown, Image as ImageIcon, Type } from "lucide-react";
-import { SKILL_CLASSES, SKILL_RANKS, NINJA_RANKS } from "@/components/admin/shared";
+import { SKILL_RANKS, NINJA_RANKS } from "@/components/admin/shared";
+import { useProficiencies } from "@/hooks/useProficiencies";
 import {
   upsertLibrarySection, deleteLibrarySection,
   upsertLibraryBook, deleteLibraryBook,
