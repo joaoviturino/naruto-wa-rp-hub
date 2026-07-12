@@ -224,8 +224,8 @@ function BotPanel() {
   const statusColor: Record<string,string> = { connected: "text-emerald-400", qr: "text-gold", connecting: "text-sky-400", disconnected: "text-red-400" };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <div className="scroll-panel rounded-lg p-6">
+    <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
+      <div className="scroll-panel rounded-lg p-4 sm:p-6">
         <h3 className="font-display text-xl text-gold">Sessão do Bot</h3>
         <div className="mt-2 text-sm">Status: <span className={statusColor[session?.status ?? "disconnected"]}>{session?.status ?? "—"}</span></div>
         {session?.phone && <div className="text-xs text-muted-foreground">Conectado como: {session.phone}</div>}
@@ -260,7 +260,7 @@ function BotPanel() {
         <p className="mt-4 text-xs text-muted-foreground">O painel renderiza o QR direto aqui, sem depender de serviço externo de imagem.</p>
       </div>
 
-      <div className="scroll-panel rounded-lg p-6">
+      <div className="scroll-panel rounded-lg p-4 sm:p-6">
         <h3 className="font-display text-xl text-gold">Enviar mensagem de teste</h3>
         <div className="mt-3 space-y-3">
           <div>
@@ -278,9 +278,9 @@ function BotPanel() {
         </div>
       </div>
 
-      <div className="scroll-panel rounded-lg p-6 lg:col-span-2">
+      <div className="scroll-panel rounded-lg p-4 sm:p-6 lg:col-span-2 overflow-x-auto">
         <h3 className="font-display text-xl text-gold">Últimas mensagens</h3>
-        <table className="w-full text-sm mt-3">
+        <table className="w-full text-sm mt-3 min-w-[560px]">
           <thead className="text-xs text-muted-foreground">
             <tr><th className="text-left p-2">Quando</th><th className="text-left p-2">Para</th><th className="text-left p-2">Status</th><th className="text-left p-2">Conteúdo</th></tr>
           </thead>
