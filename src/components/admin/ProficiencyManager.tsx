@@ -21,8 +21,8 @@ export function ProficiencyManager() {
   async function saveCreate() {
     if (!form.value.trim() || !form.label.trim()) { toast.error("Preencha valor e rótulo."); return; }
     const { error } = await supabase.rpc("add_proficiency", {
-      _value: form.value, _label: form.label, _desc: form.description || null, _sort: form.sort_order,
-    });
+      _value: form.value, _label: form.label, _desc: form.description || undefined, _sort: form.sort_order,
+    } as any);
     if (error) { toast.error(error.message); return; }
     toast.success("Proficiência criada.");
     cancel(); refreshProficiencies();
