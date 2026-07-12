@@ -35,10 +35,12 @@ export function InventoryView({ characterId, userId, bgUrl, onBgChange }: {
 }) {
   const [inv, setInv] = useState<Inv | null>(null);
   const [items, setItems] = useState<Record<string, Item>>({});
+  const [profs, setProfs] = useState<any>({});
 
   const load = useCallback(async () => {
     const { data: iv } = await supabase.from("inventory").select("*").eq("character_id", characterId).maybeSingle();
     const { data: it } = await supabase.from("items").select("*");
+    const { data: ch } = await supabase.from("characters").select("proficiencies").eq("id", characterId).maybeSingle();
     const raw = (iv as any) ?? {};
     setInv({
       ...raw,
@@ -46,6 +48,7 @@ export function InventoryView({ characterId, userId, bgUrl, onBgChange }: {
       secondary_slots: normalizeBag(raw.secondary_slots),
     });
     setItems(Object.fromEntries((it ?? []).map((i) => [i.id, i as Item])));
+    setProfs((ch as any)?.proficiencies ?? {});
   }, [characterId]);
 
   useEffect(() => { load(); }, [load]);
@@ -62,6 +65,11 @@ export function InventoryView({ characterId, userId, bgUrl, onBgChange }: {
   }
 
   if (!inv) return <div className="p-6 text-muted-foreground">Sem inventário ainda.</div>;
+
+  const kenj = (profs?.kenjutsu ?? {}) as { nivel?: string; maestria?: string };
+  const RANKS = ["E","D","C","B","A","S"];
+  const primaryUnlocked = RANKS.includes(kenj.nivel ?? "");
+  const secondaryUnlocked = RANKS.includes(kenj.maestria ?? "");
 
   // Cada entrada da bolsa é UMA pilha e ocupa slot_size células, independente da quantidade.
   const bagUsed = inv.ninja_bag.reduce((s, e) => s + (items[e.item_id]?.slot_size ?? 1), 0);
@@ -99,7 +107,7 @@ export function InventoryView({ characterId, userId, bgUrl, onBgChange }: {
             onUnequip={() => run(() => unequip({ data: { slot: "helmet_id" } } as any), "Desequipado.")} />
           <EquipSlot icon={<Shirt />} label="Colete" slot="vest_id" itemId={inv.vest_id} items={items}
             onUnequip={() => run(() => unequip({ data: { slot: "vest_id" } } as any), "Desequipado.")} />
-          <EquipSlot icon={<Sword />} label="Arma Primária" slot="primary_weapon_id" itemId={inv.primary_weapon_id} items={items} locked={!inv.primary_unlocked}
+          <EquipSlot icon={<Sword />} label="Arma Primária" slot="primary_weapon_id" itemId={inv.primary_weapon_id} items={items} locked={!primaryUnlocked} lockedHint="Requer Kenjutsu Nível E"
             onUnequip={() => run(() => unequip({ data: { slot: "primary_weapon_id" } } as any), "Desequipado.")} />
         </div>
 
@@ -122,7 +130,7 @@ export function InventoryView({ characterId, userId, bgUrl, onBgChange }: {
             onUnequip={() => run(() => unequip({ data: { slot: "pants_id" } } as any), "Desequipado.")} />
           <EquipSlot icon={<Footprints />} label="Botas" slot="boots_id" itemId={inv.boots_id} items={items}
             onUnequip={() => run(() => unequip({ data: { slot: "boots_id" } } as any), "Desequipado.")} />
-          <EquipSlot icon={<Swords />} label="Arma Secundária" slot="secondary_weapon_id" itemId={inv.secondary_weapon_id} items={items} locked={!inv.secondary_unlocked}
+          <EquipSlot icon={<Swords />} label="Arma Secundária" slot="secondary_weapon_id" itemId={inv.secondary_weapon_id} items={items} locked={!secondaryUnlocked} lockedHint="Requer Kenjutsu Maestria E"
             onUnequip={() => run(() => unequip({ data: { slot: "secondary_weapon_id" } } as any), "Desequipado.")} />
         </div>
       </div>
@@ -152,18 +160,26 @@ export function InventoryView({ characterId, userId, bgUrl, onBgChange }: {
   );
 }
 
-function EquipSlot({ icon, label, slot, itemId, items, locked, onUnequip }: {
+function EquipSlot({ icon, label, slot, itemId, items, locked, lockedHint, onUnequip }: {
   icon: React.ReactNode; label: string; slot: SlotKey; itemId: string | null;
-  items: Record<string, Item>; locked?: boolean; onUnequip: () => void;
+  items: Record<string, Item>; locked?: boolean; lockedHint?: string; onUnequip: () => void;
 }) {
   const item = itemId ? items[itemId] : null;
   const disabled = locked || !item;
   const inner = (
-    <div className={`w-full text-left rounded-lg border p-3 flex items-center gap-3 transition ${locked ? "opacity-40 border-dashed" : "border-border"} ${item && !locked ? "hover:border-gold cursor-pointer" : ""}`}>
-      <div className="text-gold">{locked ? <Lock size={18} /> : icon}</div>
+    <div className={`w-full text-left rounded-lg border p-3 flex items-center gap-3 transition ${locked ? "opacity-60 border-dashed" : "border-border"} ${item && !locked ? "hover:border-gold cursor-pointer" : ""}`} title={locked ? lockedHint : undefined}>
+      <div className="w-10 h-10 rounded flex items-center justify-center overflow-hidden bg-input/60 border border-border/50 shrink-0 text-gold">
+        {locked ? (
+          <Lock size={18} />
+        ) : item?.image_url ? (
+          <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+        ) : (
+          icon
+        )}
+      </div>
       <div className="flex-1 min-w-0">
         <div className="text-[10px] uppercase tracking-widest text-muted-foreground">{label}</div>
-        <div className="text-sm truncate">{locked ? "Bloqueado" : item?.name ?? "Vazio"}</div>
+        <div className="text-sm truncate">{locked ? (lockedHint ?? "Bloqueado") : item?.name ?? "Vazio"}</div>
       </div>
     </div>
   );
