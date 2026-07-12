@@ -158,9 +158,9 @@ export const applyNpcTemplate = createServerFn({ method: "POST" })
     } else if (data.only_aggressive) {
       q = q.eq("kind", "aggressive");
     }
-    const { error, count } = await q.select("id", { count: "exact", head: true });
+    const { data: rows, error } = await q.select("id");
     if (error) throw new Error(error.message);
-    return { ok: true, updated: count ?? 0 };
+    return { ok: true, updated: rows?.length ?? 0 };
   });
 
 export const listNpcsBasic = createServerFn({ method: "POST" })
