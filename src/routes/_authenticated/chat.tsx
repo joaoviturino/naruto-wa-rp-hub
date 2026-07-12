@@ -5,9 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useServerFn } from "@tanstack/react-start";
-import { moveCharacter, sendLocationMessage } from "@/lib/chat.functions";
+import { moveCharacter, sendLocationMessage, togglePinMessage } from "@/lib/chat.functions";
 import { rollSpawn, getMyActiveCombat } from "@/lib/combat.functions";
-import { MapPin, Send, ImagePlus, X, Compass, Skull, Users, Menu, Gamepad2, BookOpen } from "lucide-react";
+import { MapPin, Send, ImagePlus, X, Compass, Skull, Users, Menu, Gamepad2, BookOpen, Pin, PinOff } from "lucide-react";
 import { toast } from "sonner";
 import { CombatDialog } from "@/components/chat/CombatDialog";
 import { PlayerActionMenu } from "@/components/chat/PlayerActionMenu";
@@ -28,7 +28,7 @@ type Character = { id: string; nickname: string; avatar_url: string | null; curr
 type Scene = { id: string; image_url: string; label: string | null };
 type Msg = {
   id: string; content: string; image_url: string | null; created_at: string;
-  character_id: string;
+  character_id: string; is_pinned?: boolean;
   character?: { nickname: string; avatar_url: string | null } | null;
 };
 
@@ -49,6 +49,7 @@ function ChatPage() {
   const sendMsg = useServerFn(sendLocationMessage);
   const roll = useServerFn(rollSpawn);
   const getCombat = useServerFn(getMyActiveCombat);
+  const togglePin = useServerFn(togglePinMessage);
   const [combatId, setCombatId] = useState<string | null>(null);
   const [target, setTarget] = useState<{ id: string; nickname: string; avatar_url: string | null } | null>(null);
   const [targetOpen, setTargetOpen] = useState(false);
@@ -165,7 +166,7 @@ function ChatPage() {
   async function loadMessages(locId: string) {
     const { data } = await supabase
       .from("location_messages")
-      .select("id,content,image_url,created_at,character_id,character:characters(nickname,avatar_url)")
+      .select("id,content,image_url,created_at,character_id,is_pinned,character:characters(nickname,avatar_url)")
       .eq("location_id", locId)
       .order("created_at", { ascending: false })
       .limit(HISTORY_LIMIT);
@@ -184,6 +185,12 @@ function ChatPage() {
           const { data: c } = await supabase.from("characters").select("nickname,avatar_url").eq("id", raw.character_id).maybeSingle();
           setMessages((prev) => (prev.some((m) => m.id === raw.id) ? prev : [...prev, { ...raw, character: c } as Msg]));
           setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+        })
+      .on("postgres_changes",
+        { event: "UPDATE", schema: "public", table: "location_messages", filter: `location_id=eq.${currentLoc.id}` },
+        (payload) => {
+          const raw = payload.new as any;
+          setMessages((prev) => prev.map((m) => m.id === raw.id ? { ...m, is_pinned: raw.is_pinned, content: raw.content, image_url: raw.image_url } : m));
         })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
@@ -230,6 +237,16 @@ function ChatPage() {
     } catch (e: any) { toast.error(e.message); }
     finally { setSending(false); }
   }
+
+  async function doTogglePin(id: string) {
+    try {
+      const r = await togglePin({ data: { messageId: id } });
+      setMessages((prev) => prev.map((m) => m.id === id ? { ...m, is_pinned: r.pinned } : m));
+      toast.success(r.pinned ? "Mensagem marcada." : "Marcação removida.");
+    } catch (e: any) { toast.error(e.message); }
+  }
+
+  const pinned = messages.filter((m) => m.is_pinned);
 
   if (!character) return <div className="p-10 text-center text-muted-foreground">Você precisa criar um personagem primeiro.</div>;
 
@@ -364,6 +381,17 @@ function ChatPage() {
           </div>
         ) : (
           <>
+            {pinned.length > 0 && (
+              <div className="border-b border-border bg-card/50 p-2 max-h-32 overflow-y-auto space-y-1">
+                <div className="text-[10px] uppercase tracking-widest text-gold flex items-center gap-1"><Pin size={11} /> Marcadas ({pinned.length})</div>
+                {pinned.map((m) => (
+                  <div key={m.id} className="text-xs flex items-start gap-2 rounded p-1 hover:bg-secondary/50">
+                    <span className="text-gold font-display shrink-0">{m.character?.nickname ?? "?"}:</span>
+                    <span className="truncate flex-1">{m.content || (m.image_url ? "[imagem]" : "")}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3">
               {messages.length === 0 && <div className="text-center text-xs text-muted-foreground py-10">Silêncio. Seja o primeiro a agir.</div>}
               {messages.map((m) => {
@@ -377,12 +405,20 @@ function ChatPage() {
                       onClick={() => { if (mine) return; setTarget({ id: m.character_id, nickname: m.character?.nickname ?? "?", avatar_url: m.character?.avatar_url ?? null }); setTargetOpen(true); }}>
                       {m.character?.avatar_url && <img src={m.character.avatar_url} className="w-full h-full object-cover" alt="" />}
                     </button>
-                    <div className={`max-w-[75%] rounded-lg p-2 ${mine ? "bg-primary text-primary-foreground" : "bg-secondary"}`}>
+                    <div className={`group max-w-[75%] rounded-lg p-2 ${mine ? "bg-primary text-primary-foreground" : "bg-secondary"} ${m.is_pinned ? "ring-2 ring-gold" : ""}`}>
                       <div className={`text-[10px] font-display ${mine ? "text-primary-foreground/70" : "text-gold"}`}>{m.character?.nickname ?? "?"}</div>
                       {m.image_url && <img src={m.image_url} className="mt-1 rounded max-h-64 object-cover" alt="" />}
                       {m.content && <div className="whitespace-pre-wrap text-sm mt-1">{m.content}</div>}
-                      <div className={`text-[10px] mt-1 ${mine ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
-                        {new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                      <div className={`text-[10px] mt-1 flex items-center gap-2 ${mine ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
+                        <span>{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
+                        {mine && (
+                          <button onClick={() => doTogglePin(m.id)}
+                            title={m.is_pinned ? "Desmarcar" : "Marcar mensagem"}
+                            className="opacity-60 hover:opacity-100 transition">
+                            {m.is_pinned ? <PinOff size={11} /> : <Pin size={11} />}
+                          </button>
+                        )}
+                        {m.is_pinned && !mine && <Pin size={11} className="text-gold" />}
                       </div>
                     </div>
                   </div>
