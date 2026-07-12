@@ -20,6 +20,7 @@ type Npc = {
   battle_bg_url: string | null;
   hp_max: number; xp: number; energy_max: number;
   reward_xp: number; reward_ryo: number; drop_table: DropRow[];
+  avg_damage?: number; crit_chance?: number; crit_multiplier?: number;
   kind: NpcKind; dialog_intro: string | null; dialog_outro: string | null;
   shop_items: ShopRow[]; reward_items: RewardRow[]; reward_cooldown_hours: number;
   required_mission_id: string | null;
@@ -229,6 +230,14 @@ export function NpcManager() {
               <NumField label="Recompensa XP" value={sel.reward_xp ?? 0} onSave={(v) => save({ data: { ...sel, reward_xp: v } } as any).then(load)} />
               <NumField label="Recompensa Ryo" value={sel.reward_ryo ?? 0} onSave={(v) => save({ data: { ...sel, reward_ryo: v } } as any).then(load)} />
             </div>
+            <div className="grid grid-cols-3 gap-3">
+              <NumField label="Dano médio" value={sel.avg_damage ?? 0} onSave={(v) => save({ data: { ...sel, avg_damage: v } } as any).then(load)} />
+              <NumField label="Crítico (%)" value={sel.crit_chance ?? 10} onSave={(v) => save({ data: { ...sel, crit_chance: Math.max(0, Math.min(100, v)) } } as any).then(load)} />
+              <NumField label="Mult. crítico (×)" value={Number(sel.crit_multiplier ?? 1.5)} onSave={(v) => save({ data: { ...sel, crit_multiplier: Math.max(1, v) } } as any).then(load)} />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Se o dano médio for &gt; 0, o NPC usa esse valor como base (variação ±20%). Ao acertar um crítico ({sel.crit_chance ?? 10}%), o dano é multiplicado por {Number(sel.crit_multiplier ?? 1.5).toFixed(2)}×.
+            </p>
             <p className="text-xs text-muted-foreground">
               XP {sel.xp} → EF {Math.floor(sel.xp/2)}, EM {sel.xp - Math.floor(sel.xp/2)}, Chakra {sel.xp}.
             </p>

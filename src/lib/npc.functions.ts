@@ -19,6 +19,9 @@ const npcPayload = z.object({
   energy_max: z.number().int().min(1).max(100000),
   reward_xp: z.number().int().min(0).max(1000000).optional(),
   reward_ryo: z.number().int().min(0).max(10000000).optional(),
+  avg_damage: z.number().int().min(0).max(100000).optional(),
+  crit_chance: z.number().int().min(0).max(100).optional(),
+  crit_multiplier: z.number().min(1).max(10).optional(),
   drop_table: z.array(z.object({
     item_id: z.string().uuid(),
     qty: z.number().int().min(1).max(99).default(1),

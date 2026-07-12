@@ -1267,8 +1267,11 @@ export type Database = {
       }
       npcs: {
         Row: {
+          avg_damage: number
           battle_bg_url: string | null
           created_at: string
+          crit_chance: number
+          crit_multiplier: number
           description: string | null
           dialog_intro: string | null
           dialog_outro: string | null
@@ -1292,8 +1295,11 @@ export type Database = {
           xp: number
         }
         Insert: {
+          avg_damage?: number
           battle_bg_url?: string | null
           created_at?: string
+          crit_chance?: number
+          crit_multiplier?: number
           description?: string | null
           dialog_intro?: string | null
           dialog_outro?: string | null
@@ -1317,8 +1323,11 @@ export type Database = {
           xp?: number
         }
         Update: {
+          avg_damage?: number
           battle_bg_url?: string | null
           created_at?: string
+          crit_chance?: number
+          crit_multiplier?: number
           description?: string | null
           dialog_intro?: string | null
           dialog_outro?: string | null
