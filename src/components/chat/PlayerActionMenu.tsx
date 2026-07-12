@@ -45,10 +45,9 @@ export function PlayerActionMenu({
           </Button>
           <Button variant="outline" className="w-full justify-start" onClick={async () => {
             try {
-              const res: any = await challenge({ data: { opponent_character_id: target.id } } as any);
-              toast.success("Convite enviado. Aguardando resposta...");
+              await challenge({ data: { opponent_character_id: target.id } } as any);
+              toast.success("Desafio enviado. Você tem 2 minutos para receber a resposta.");
               onOpenChange(false);
-              navigate({ to: "/duel/$id", params: { id: res.duel_id } });
             } catch (e: any) { toast.error(e.message); }
           }}>
             <Sword size={14} className="mr-2" /> Desafiar para duelo
