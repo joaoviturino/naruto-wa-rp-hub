@@ -11,7 +11,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Trash2, Plus, BookOpen, FolderTree } from "lucide-react";
 import { ArrowUp, ArrowDown, Image as ImageIcon, Type } from "lucide-react";
-import { SKILL_CLASSES, SKILL_RANKS } from "@/components/admin/shared";
+import { SKILL_CLASSES, SKILL_RANKS, NINJA_RANKS } from "@/components/admin/shared";
 import {
   upsertLibrarySection, deleteLibrarySection,
   upsertLibraryBook, deleteLibraryBook,
@@ -23,6 +23,9 @@ type Book = {
   summary: string | null; content: string; min_read_seconds: number; rewards: any;
   proficiency_grants: any; sort_order: number; active: boolean;
   blocks?: Block[];
+  required_level?: number | null;
+  required_rank?: string | null;
+  required_profs?: any;
 };
 type Block = { id: string; kind: "text" | "image"; text?: string | null; image_url?: string | null };
 type Item = { id: string; name: string };
@@ -54,12 +57,12 @@ export function LibraryManager() {
 
   function newSection() { setSec({ name: "", sort_order: 0, active: true }); setEditing("section"); }
   function editSection(x: Section) { setSec(x); setEditing("section"); }
-  function newBook() { setBook({ title: "", content: "", min_read_seconds: 60, rewards: {}, proficiency_grants: [], sort_order: 0, active: true, blocks: [] }); setEditing("book"); }
+  function newBook() { setBook({ title: "", content: "", min_read_seconds: 60, rewards: {}, proficiency_grants: [], sort_order: 0, active: true, blocks: [], required_level: 1, required_rank: null, required_profs: [] }); setEditing("book"); }
   function editBook(x: Book) {
     const blocks: Block[] = Array.isArray(x.blocks) && x.blocks.length
       ? x.blocks
       : (x.content ? [{ id: crypto.randomUUID(), kind: "text", text: x.content }] : []);
-    setBook({ ...x, rewards: x.rewards ?? {}, proficiency_grants: x.proficiency_grants ?? [], blocks });
+    setBook({ ...x, rewards: x.rewards ?? {}, proficiency_grants: x.proficiency_grants ?? [], required_profs: Array.isArray(x.required_profs) ? x.required_profs : [], blocks });
     setEditing("book");
   }
 
@@ -84,6 +87,9 @@ export function LibraryManager() {
         min_read_seconds: Number(book.min_read_seconds ?? 30),
         rewards: book.rewards ?? {}, proficiency_grants: book.proficiency_grants ?? [],
         sort_order: Number(book.sort_order ?? 0), active: book.active ?? true,
+        required_level: Math.max(1, Number(book.required_level ?? 1)),
+        required_rank: book.required_rank ?? null,
+        required_profs: Array.isArray(book.required_profs) ? book.required_profs : [],
       } as any });
       toast.success("Livro salvo."); setEditing(null); load();
     } catch (e: any) { toast.error(e.message); }
