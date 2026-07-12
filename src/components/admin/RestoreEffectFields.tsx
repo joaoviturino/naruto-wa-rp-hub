@@ -5,7 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { BatteryCharging } from "lucide-react";
 
 export type RestoreEffect = {
-  pool: "ef" | "em" | "chakra" | "all";
+  pool: "hp" | "ef" | "em" | "chakra" | "all";
   mode: "flat" | "percent";
   amount: number;
 };
@@ -40,6 +40,7 @@ export function RestoreEffectFields({
             <Select value={v.pool} onValueChange={(p: any) => onChange({ ...v, pool: p })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
+                <SelectItem value="hp">HP (Vida)</SelectItem>
                 <SelectItem value="ef">EF (Física)</SelectItem>
                 <SelectItem value="em">EM (Mental)</SelectItem>
                 <SelectItem value="chakra">Chakra</SelectItem>
