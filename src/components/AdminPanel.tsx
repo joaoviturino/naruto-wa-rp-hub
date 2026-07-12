@@ -28,10 +28,10 @@ export function AdminPanel() {
   const [adminUserId, setAdminUserId] = useState<string>("");
   useEffect(() => { supabase.auth.getUser().then(({ data }) => setAdminUserId(data.user?.id ?? "")); }, []);
   return (
-    <div className="mx-auto max-w-6xl p-6">
-      <h1 className="font-display text-3xl font-black mb-6">Painel do Kage <span className="text-gold">影</span></h1>
+    <div className="mx-auto max-w-6xl p-3 sm:p-6">
+      <h1 className="font-display text-2xl sm:text-3xl font-black mb-4 sm:mb-6">Painel do Kage <span className="text-gold">影</span></h1>
       <Tabs defaultValue="dashboard">
-        <TabsList className="flex flex-wrap h-auto">
+        <TabsList className="flex flex-wrap h-auto gap-1 w-full justify-start text-xs sm:text-sm">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="players">Jogadores</TabsTrigger>
           <TabsTrigger value="items">Itens</TabsTrigger>
