@@ -80,10 +80,10 @@ function PartyPage() {
   const inParty = members.length > 0;
 
   return (
-    <div className="mx-auto max-w-3xl p-4 space-y-6">
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" asChild><Link to="/chat"><ArrowLeft size={14} className="mr-1" /> Voltar ao chat</Link></Button>
-        <h1 className="font-display text-2xl text-gold flex items-center gap-2"><Users size={20} /> Meu Time</h1>
+    <div className="mx-auto max-w-3xl p-3 sm:p-4 space-y-4 sm:space-y-6">
+      <div className="flex items-center gap-2 flex-wrap">
+        <Button variant="ghost" size="sm" asChild><Link to="/chat"><ArrowLeft size={14} className="mr-1" /> Voltar</Link></Button>
+        <h1 className="font-display text-xl sm:text-2xl text-gold flex items-center gap-2 min-w-0"><Users size={18} className="shrink-0" /> <span className="truncate">Meu Time</span></h1>
         <div className="flex-1" />
         <Button variant="outline" size="sm" onClick={() => { router.invalidate(); load(); }}><RefreshCw size={14} /></Button>
       </div>
@@ -126,7 +126,7 @@ function PartyPage() {
                 </div>
               ))}
             </div>
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex flex-wrap justify-end gap-2 pt-2">
               {isLeader ? (
                 <Button variant="destructive" size="sm" onClick={async () => {
                   if (!confirm("Dissolver o time? Todos os membros serão removidos.")) return;
