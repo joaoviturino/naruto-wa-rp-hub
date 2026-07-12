@@ -1496,6 +1496,36 @@ export type Database = {
           },
         ]
       }
+      proficiencies: {
+        Row: {
+          active: boolean
+          created_at: string
+          description: string | null
+          label: string
+          sort_order: number
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          label: string
+          sort_order?: number
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          label?: string
+          sort_order?: number
+          updated_at?: string
+          value?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -1690,6 +1720,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_proficiency: {
+        Args: { _desc?: string; _label: string; _sort?: number; _value: string }
+        Returns: undefined
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
