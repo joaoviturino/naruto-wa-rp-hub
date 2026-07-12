@@ -121,6 +121,7 @@ function LibraryPage() {
 function BookReader({ book, alreadyRead, onClose, onCompleted }: {
   book: Book; alreadyRead: boolean; onClose: () => void; onCompleted: () => void;
 }) {
+  const SKILL_CLASSES = useProficiencies();
   const complete = useServerFn(completeBookRead);
   const [elapsed, setElapsed] = useState(0);
   const [claiming, setClaiming] = useState(false);
