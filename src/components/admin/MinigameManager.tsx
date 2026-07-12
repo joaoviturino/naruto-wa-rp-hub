@@ -35,14 +35,6 @@ const EMPTY: Minigame = {
 
 const NINJA_RANKS = ["estudante","genin","chunin","tokubetsu_jonin","jonin","anbu","sannin","kage"];
 const SKILL_RANKS = ["E","D","C","B","A","S"];
-const SKILL_CLASSES = [
-  "genjutsu","ninjutsu","taijutsu","shinjutsu","armadilha","boujutsu","bukijutsu","bunshinjutsu",
-  "doujutsu","fluxo_de_chakra","formacao","estilo_de_luta","fuuinjutsu","gijutsu","hiden","juinjutsu",
-  "jujutsu","jutsu_basico","kaijutsu","kekkaijutsu","kekkei_genkai","kekkei_moura","kekkei_touta",
-  "kenjutsu","kinjutsu","kinkojutsu","konbijutsu","kugutsujutsu","kyuuinjutsu","ninjutsu_espaco_tempo",
-  "ninjutsu_medico","nintaijutsu","saiseijutsu","senjutsu","shurikenjutsu","tansakujutsu",
-  "tenseijutsu","tonjutsu","yuugoujutsu",
-];
 
 export function MinigameManager() {
   const [list, setList] = useState<Minigame[]>([]);
