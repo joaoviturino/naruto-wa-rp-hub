@@ -1769,6 +1769,11 @@ export type Database = {
         | "tonjutsu"
         | "yuugoujutsu"
         | "selos_de_mao"
+        | "katon"
+        | "suiton"
+        | "fuuton"
+        | "doton"
+        | "raiton"
       skill_classification: "ofensivo" | "defensivo" | "suplementar"
       skill_range: "curto" | "medio" | "longo"
       skill_rank: "E" | "D" | "C" | "B" | "A" | "S"
@@ -1989,6 +1994,11 @@ export const Constants = {
         "tonjutsu",
         "yuugoujutsu",
         "selos_de_mao",
+        "katon",
+        "suiton",
+        "fuuton",
+        "doton",
+        "raiton",
       ],
       skill_classification: ["ofensivo", "defensivo", "suplementar"],
       skill_range: ["curto", "medio", "longo"],
