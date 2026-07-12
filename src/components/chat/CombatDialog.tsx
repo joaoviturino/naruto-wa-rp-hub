@@ -318,6 +318,13 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="text-xs font-display truncate">{p.nickname} {isMe && "(você)"}</div>
+                    <div className="flex items-center gap-1 mb-0.5" title={`HP ${p.hp}/${p.hp_max}`}>
+                      <span className="text-[9px] text-muted-foreground w-5">HP</span>
+                      <div className="h-1.5 flex-1 rounded overflow-hidden bg-input">
+                        <div className="h-full bg-emerald-500" style={{ width: `${p.hp_max > 0 ? (p.hp / p.hp_max) * 100 : 0}%` }} />
+                      </div>
+                      <span className="text-[9px] text-muted-foreground tabular-nums">{p.hp}/{p.hp_max}</span>
+                    </div>
                     <div className="grid grid-cols-3 gap-0.5">
                       {(["ef","em","chakra"] as const).map((k) => {
                         const v = p[k]; const m = p[`${k}_max` as const];
