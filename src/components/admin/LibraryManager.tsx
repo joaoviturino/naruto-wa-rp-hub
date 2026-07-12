@@ -11,7 +11,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Trash2, Plus, BookOpen, FolderTree } from "lucide-react";
 import { ArrowUp, ArrowDown, Image as ImageIcon, Type } from "lucide-react";
-import { SKILL_CLASSES, SKILL_RANKS } from "@/components/admin/shared";
+import { SKILL_CLASSES, SKILL_RANKS, NINJA_RANKS } from "@/components/admin/shared";
 import {
   upsertLibrarySection, deleteLibrarySection,
   upsertLibraryBook, deleteLibraryBook,
@@ -23,6 +23,9 @@ type Book = {
   summary: string | null; content: string; min_read_seconds: number; rewards: any;
   proficiency_grants: any; sort_order: number; active: boolean;
   blocks?: Block[];
+  required_level?: number | null;
+  required_rank?: string | null;
+  required_profs?: any;
 };
 type Block = { id: string; kind: "text" | "image"; text?: string | null; image_url?: string | null };
 type Item = { id: string; name: string };
@@ -54,12 +57,12 @@ export function LibraryManager() {
 
   function newSection() { setSec({ name: "", sort_order: 0, active: true }); setEditing("section"); }
   function editSection(x: Section) { setSec(x); setEditing("section"); }
-  function newBook() { setBook({ title: "", content: "", min_read_seconds: 60, rewards: {}, proficiency_grants: [], sort_order: 0, active: true, blocks: [] }); setEditing("book"); }
+  function newBook() { setBook({ title: "", content: "", min_read_seconds: 60, rewards: {}, proficiency_grants: [], sort_order: 0, active: true, blocks: [], required_level: 1, required_rank: null, required_profs: [] }); setEditing("book"); }
   function editBook(x: Book) {
     const blocks: Block[] = Array.isArray(x.blocks) && x.blocks.length
       ? x.blocks
       : (x.content ? [{ id: crypto.randomUUID(), kind: "text", text: x.content }] : []);
-    setBook({ ...x, rewards: x.rewards ?? {}, proficiency_grants: x.proficiency_grants ?? [], blocks });
+    setBook({ ...x, rewards: x.rewards ?? {}, proficiency_grants: x.proficiency_grants ?? [], required_profs: Array.isArray(x.required_profs) ? x.required_profs : [], blocks });
     setEditing("book");
   }
 
@@ -84,6 +87,9 @@ export function LibraryManager() {
         min_read_seconds: Number(book.min_read_seconds ?? 30),
         rewards: book.rewards ?? {}, proficiency_grants: book.proficiency_grants ?? [],
         sort_order: Number(book.sort_order ?? 0), active: book.active ?? true,
+        required_level: Math.max(1, Number(book.required_level ?? 1)),
+        required_rank: book.required_rank ?? null,
+        required_profs: Array.isArray(book.required_profs) ? book.required_profs : [],
       } as any });
       toast.success("Livro salvo."); setEditing(null); load();
     } catch (e: any) { toast.error(e.message); }
@@ -260,6 +266,8 @@ function BookEditor({ book, setBook, sections, items, adminUserId, onSave, onCan
         {adminUserId && <ImageUpload label="Capa" bucket="library" userId={adminUserId} onUploaded={(url) => setBook({ ...book, cover_url: url })} />}
       </div>
 
+      <RequirementsEditor book={book} setBook={setBook} />
+
       <div className="rounded border border-border p-3 space-y-2">
         <div className="text-xs uppercase tracking-widest text-muted-foreground">Recompensas ao concluir a leitura</div>
         <div className="grid grid-cols-2 gap-2">
@@ -336,6 +344,73 @@ function BookEditor({ book, setBook, sections, items, adminUserId, onSave, onCan
       </div>
 
       <div className="flex gap-2"><Button onClick={onSave}>Salvar</Button><Button variant="outline" onClick={onCancel}>Cancelar</Button></div>
+    </div>
+  );
+}
+
+function RequirementsEditor({ book, setBook }: { book: Partial<Book>; setBook: (b: Partial<Book>) => void }) {
+  const reqProfs: any[] = Array.isArray(book.required_profs) ? book.required_profs : [];
+  return (
+    <div className="rounded border border-border p-3 space-y-2">
+      <div className="text-xs uppercase tracking-widest text-muted-foreground">Requisitos para ler</div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <Label>Nível mínimo</Label>
+          <Input type="number" min={1} value={book.required_level ?? 1}
+            onChange={(e) => setBook({ ...book, required_level: Math.max(1, Number(e.target.value) || 1) })} />
+        </div>
+        <div>
+          <Label>Patente mínima</Label>
+          <Select value={book.required_rank ?? "none"} onValueChange={(v) => setBook({ ...book, required_rank: v === "none" ? null : v })}>
+            <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">— Qualquer —</SelectItem>
+              {NINJA_RANKS.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div className="space-y-1">
+        <Label>Proficiências mínimas</Label>
+        {reqProfs.map((p: any, i: number) => (
+          <div key={i} className="grid grid-cols-[1fr_90px_90px_auto] gap-2 items-center">
+            <Select value={p.skill_class ?? ""} onValueChange={(v) => {
+              const arr = [...reqProfs]; arr[i] = { ...arr[i], skill_class: v };
+              setBook({ ...book, required_profs: arr });
+            }}>
+              <SelectTrigger><SelectValue placeholder="Classe..." /></SelectTrigger>
+              <SelectContent className="max-h-72">{SKILL_CLASSES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+            </Select>
+            <Select value={p.nivel ?? "none"} onValueChange={(v) => {
+              const arr = [...reqProfs]; arr[i] = { ...arr[i], nivel: v === "none" ? null : v };
+              setBook({ ...book, required_profs: arr });
+            }}>
+              <SelectTrigger><SelectValue placeholder="Nível" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">—</SelectItem>
+                {SKILL_RANKS.map((r) => <SelectItem key={r} value={r}>Nv {r}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={p.maestria ?? "none"} onValueChange={(v) => {
+              const arr = [...reqProfs]; arr[i] = { ...arr[i], maestria: v === "none" ? null : v };
+              setBook({ ...book, required_profs: arr });
+            }}>
+              <SelectTrigger><SelectValue placeholder="Maestria" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">—</SelectItem>
+                {SKILL_RANKS.map((r) => <SelectItem key={r} value={r}>Ms {r}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Button size="icon" variant="destructive" onClick={() => {
+              const arr = reqProfs.filter((_, idx) => idx !== i);
+              setBook({ ...book, required_profs: arr });
+            }}><Trash2 size={14}/></Button>
+          </div>
+        ))}
+        <Button size="sm" variant="outline" onClick={() => setBook({ ...book, required_profs: [...reqProfs, { skill_class: "", nivel: null, maestria: null }] })}>
+          <Plus size={14}/> Adicionar proficiência
+        </Button>
+      </div>
     </div>
   );
 }

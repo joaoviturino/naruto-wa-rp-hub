@@ -2,10 +2,44 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { addWithCapacity } from "@/lib/character.functions";
+import { DEFAULT_LEVEL_CONFIG, levelFromXp, type LevelConfig } from "@/lib/level";
 
 const NINJA_BAG_CAP = 20;
 const RANKS = ["E", "D", "C", "B", "A", "S"] as const;
 const skillRank = z.enum(RANKS);
+const NINJA_RANKS = ["estudante","genin","chunin","tokubetsu_jonin","jonin","anbu","sannin","kage"] as const;
+const ninjaRank = z.enum(NINJA_RANKS);
+const requiredProfsSchema = z.array(z.object({
+  skill_class: z.string().min(2).max(60),
+  nivel: skillRank.nullish(),
+  maestria: skillRank.nullish(),
+})).default([]);
+
+function rankGte(cur: string | null | undefined, req: string | null | undefined) {
+  if (!req) return true;
+  const a = NINJA_RANKS.indexOf((cur as any) ?? "estudante");
+  const b = NINJA_RANKS.indexOf(req as any);
+  return a >= b;
+}
+function skillRankGte(cur: string | null | undefined, req: string | null | undefined) {
+  if (!req) return true;
+  const a = RANKS.indexOf((cur as any) ?? "E");
+  const b = RANKS.indexOf(req as any);
+  return a >= 0 && a >= b;
+}
+function bookMissingReqs(char: any, book: any, cfg: LevelConfig): string[] {
+  const missing: string[] = [];
+  const lvl = levelFromXp(char.xp ?? 0, cfg);
+  if ((book.required_level ?? 1) > lvl) missing.push(`Nível ${book.required_level}`);
+  if (book.required_rank && !rankGte(char.rank, book.required_rank)) missing.push(`Patente ${book.required_rank}`);
+  const profs = (char.proficiencies ?? {}) as Record<string, { nivel?: string; maestria?: string }>;
+  for (const p of ((book.required_profs as any[]) ?? [])) {
+    const cur = profs[p.skill_class] ?? {};
+    if (p.nivel && !skillRankGte(cur.nivel, p.nivel)) missing.push(`${p.skill_class} Nível ${p.nivel}`);
+    if (p.maestria && !skillRankGte(cur.maestria, p.maestria)) missing.push(`${p.skill_class} Maestria ${p.maestria}`);
+  }
+  return missing;
+}
 
 async function assertAdmin(context: { supabase: any; userId: string }) {
   const { data, error } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
@@ -76,6 +110,9 @@ const bookSchema = z.object({
   proficiency_grants: grantSchema,
   sort_order: z.number().int().min(0).max(9999).default(0),
   active: z.boolean().default(true),
+  required_level: z.number().int().min(1).max(1000).default(1),
+  required_rank: ninjaRank.nullish(),
+  required_profs: requiredProfsSchema,
   blocks: z.array(z.object({
     id: z.string().min(1).max(64),
     kind: z.enum(["text", "image"]),
@@ -132,12 +169,18 @@ export const listLibrary = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ location_id: z.string().uuid().nullish() }).default({}).parse(i ?? {}))
   .handler(async ({ data, context }) => {
-    const { data: char } = await context.supabase.from("characters").select("id").eq("user_id", context.userId).maybeSingle();
+    const { data: char } = await context.supabase.from("characters")
+      .select("id,xp,rank,proficiencies").eq("user_id", context.userId).maybeSingle();
+    const { data: lvlCfg } = await context.supabase.from("level_config").select("*").limit(1).maybeSingle();
+    const cfg: LevelConfig = lvlCfg
+      ? { base_xp: lvlCfg.base_xp ?? DEFAULT_LEVEL_CONFIG.base_xp, growth_factor: lvlCfg.growth_factor ?? DEFAULT_LEVEL_CONFIG.growth_factor, max_level: lvlCfg.max_level ?? DEFAULT_LEVEL_CONFIG.max_level }
+      : DEFAULT_LEVEL_CONFIG;
+    const charLevel = char ? levelFromXp(char.xp ?? 0, cfg) : 1;
     let sectionFilterIds: string[] | null = null;
     if (data.location_id) {
       const { data: links } = await context.supabase.from("location_libraries").select("section_id").eq("location_id", data.location_id);
       sectionFilterIds = (links ?? []).map((l: any) => l.section_id);
-      if (!sectionFilterIds.length) return { sections: [], books: [], read_ids: [], character_id: char?.id ?? null };
+      if (!sectionFilterIds.length) return { sections: [], books: [], read_ids: [], character_id: char?.id ?? null, character: char ? { id: char.id, xp: char.xp, rank: char.rank, level: charLevel, proficiencies: char.proficiencies ?? {} } : null };
     }
     let sectionsQuery = context.supabase.from("library_sections").select("*").eq("active", true).order("sort_order", { ascending: true }).order("name", { ascending: true });
     if (sectionFilterIds) sectionsQuery = sectionsQuery.in("id", sectionFilterIds);
@@ -149,7 +192,17 @@ export const listLibrary = createServerFn({ method: "POST" })
       const { data: reads } = await context.supabase.from("character_book_reads").select("book_id").eq("character_id", char.id);
       readIds = (reads ?? []).map((r: any) => r.book_id);
     }
-    return { sections: sections ?? [], books: books ?? [], read_ids: readIds, character_id: char?.id ?? null };
+    const booksWithReqs = (books ?? []).map((b: any) => ({
+      ...b,
+      missing_requirements: char ? bookMissingReqs(char, b, cfg) : [],
+    }));
+    return {
+      sections: sections ?? [],
+      books: booksWithReqs,
+      read_ids: readIds,
+      character_id: char?.id ?? null,
+      character: char ? { id: char.id, xp: char.xp, rank: char.rank, level: charLevel, proficiencies: char.proficiencies ?? {} } : null,
+    };
   });
 
 /** Marca o livro como lido e aplica as recompensas (apenas 1x). */
@@ -157,10 +210,17 @@ export const completeBookRead = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ book_id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
-    const { data: char } = await context.supabase.from("characters").select("id,xp,ryo,proficiencies").eq("user_id", context.userId).maybeSingle();
+    const { data: char } = await context.supabase.from("characters").select("id,xp,ryo,rank,proficiencies").eq("user_id", context.userId).maybeSingle();
     if (!char) throw new Error("Sem personagem.");
     const { data: book } = await context.supabase.from("library_books").select("*").eq("id", data.book_id).maybeSingle();
     if (!book || !book.active) throw new Error("Livro indisponível.");
+
+    const { data: lvlCfg } = await context.supabase.from("level_config").select("*").limit(1).maybeSingle();
+    const cfg: LevelConfig = lvlCfg
+      ? { base_xp: lvlCfg.base_xp ?? DEFAULT_LEVEL_CONFIG.base_xp, growth_factor: lvlCfg.growth_factor ?? DEFAULT_LEVEL_CONFIG.growth_factor, max_level: lvlCfg.max_level ?? DEFAULT_LEVEL_CONFIG.max_level }
+      : DEFAULT_LEVEL_CONFIG;
+    const missing = bookMissingReqs(char, book, cfg);
+    if (missing.length) throw new Error("Requisitos não atendidos: " + missing.join(", "));
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // Já leu? devolve idempotente sem re-aplicar.

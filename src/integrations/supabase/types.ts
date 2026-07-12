@@ -730,6 +730,9 @@ export type Database = {
           id: string
           min_read_seconds: number
           proficiency_grants: Json
+          required_level: number
+          required_profs: Json
+          required_rank: string | null
           rewards: Json
           section_id: string | null
           sort_order: number
@@ -747,6 +750,9 @@ export type Database = {
           id?: string
           min_read_seconds?: number
           proficiency_grants?: Json
+          required_level?: number
+          required_profs?: Json
+          required_rank?: string | null
           rewards?: Json
           section_id?: string | null
           sort_order?: number
@@ -764,6 +770,9 @@ export type Database = {
           id?: string
           min_read_seconds?: number
           proficiency_grants?: Json
+          required_level?: number
+          required_profs?: Json
+          required_rank?: string | null
           rewards?: Json
           section_id?: string | null
           sort_order?: number
