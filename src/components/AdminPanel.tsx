@@ -112,13 +112,13 @@ function Players() {
   useEffect(() => { load(); }, []);
   return (
     <>
-    <div className="scroll-panel rounded-lg overflow-hidden">
-      <table className="w-full text-sm">
+    <div className="scroll-panel rounded-lg overflow-x-auto">
+      <table className="w-full text-sm min-w-[720px]">
         <thead className="bg-secondary/50">
           <tr>
-            <th className="text-left p-3">Nickname</th><th className="text-left p-3">Vila</th>
-            <th className="text-left p-3">Clã</th><th className="text-left p-3">Patente</th>
-            <th className="text-left p-3">WhatsApp</th><th className="text-left p-3">XP</th>
+            <th className="text-left p-2 sm:p-3">Nickname</th><th className="text-left p-2 sm:p-3">Vila</th>
+            <th className="text-left p-2 sm:p-3">Clã</th><th className="text-left p-2 sm:p-3">Patente</th>
+            <th className="text-left p-2 sm:p-3">WhatsApp</th><th className="text-left p-2 sm:p-3">XP</th>
             <th></th>
           </tr>
         </thead>
