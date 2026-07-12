@@ -356,13 +356,34 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
               </TabsList>
               <TabsContent value="skills" className="mt-2">
                 {skills.length === 0 && <p className="text-sm text-muted-foreground p-4 text-center">Você não conhece nenhuma habilidade.</p>}
+                <div className="mb-2">
+                  <div className="grid grid-cols-3 gap-1 rounded-md bg-input/40 p-1 text-[10px] sm:text-xs">
+                    {([
+                      { k: "ef", label: "Física" },
+                      { k: "em", label: "Mental" },
+                      { k: "chakra", label: "Ninjutsu" },
+                    ] as const).map((t) => {
+                      const count = skills.filter((s) => s.energy_type === t.k).length;
+                      const active = skillTab === t.k;
+                      return (
+                        <button key={t.k} onClick={() => setSkillTab(t.k)}
+                          className={`rounded px-2 py-1.5 transition ${active ? "bg-gold/20 text-gold border border-gold/60" : "border border-transparent hover:bg-secondary/50"}`}>
+                          {t.label} <span className="opacity-60">({count})</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
                 <div className="grid gap-2 sm:grid-cols-2 max-h-56 overflow-y-auto pr-1">
-                  {skills.map((s) => {
+                  {skillsByTab.length === 0 && <p className="text-xs text-muted-foreground p-3 text-center col-span-full">Nenhuma habilidade nesta categoria.</p>}
+                  {skillsByTab.map((s) => {
                     const cd = myCooldowns[s.id] ?? 0;
                     const chosen = s.id === selectedSkill;
+                    const poolMaxS = me ? (me[`${s.energy_type}_max` as const] as number) : 0;
+                    const maxES = Math.max(1, Math.floor((poolMaxS * Math.max(1, Math.min(100, Number(s.cost_percent ?? 20)))) / 100));
                     return (
                       <button key={s.id} disabled={cd > 0}
-                        onClick={() => { setSelectedSkill(s.id); setEnergy(s.base_cost); }}
+                        onClick={() => { setSelectedSkill(s.id); setEnergy(maxES); }}
                         className={`text-left rounded-md border p-2 transition ${chosen ? "border-gold bg-gold/10" : "border-border hover:border-gold/60"} ${cd > 0 ? "opacity-40 cursor-not-allowed" : ""}`}>
                         <div className="flex items-center justify-between">
                           <span className="font-display text-sm">{s.name}</span>
@@ -371,6 +392,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                         <div className="text-[10px] text-muted-foreground mt-1">
                           ×{s.bonus_energetic} energ • ×{s.bonus_critical} crit • ×{s.bonus_speed} spd
                           {cd > 0 ? ` • ⏳ ${cd}` : (s.cooldown_turns ? ` • CD ${s.cooldown_turns}` : "")}
+                          <span className="ml-1">• máx {maxES} ({s.cost_percent ?? 20}%)</span>
                         </div>
                       </button>
                     );
@@ -378,9 +400,11 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                 </div>
                 <div className="flex items-end gap-2 mt-3">
                   <div className="flex-1">
-                    <div className="text-xs text-muted-foreground mb-1">Energia ({currentSkill?.energy_type.toUpperCase() ?? "—"})</div>
-                    <Input type="number" min={currentSkill?.base_cost ?? 1} value={energy}
-                      onChange={(e) => setEnergy(Math.max(1, Number(e.target.value)))} />
+                    <div className="text-xs text-muted-foreground mb-1">
+                      Energia ({currentSkill?.energy_type.toUpperCase() ?? "—"}) — máx {currentMaxEnergy} ({currentPct}%)
+                    </div>
+                    <Input type="number" min={1} max={currentMaxEnergy} value={energy}
+                      onChange={(e) => setEnergy(Math.max(1, Math.min(currentMaxEnergy, Number(e.target.value))))} />
                   </div>
                   <Button onClick={doAttack} disabled={!currentSkill || busy || currentCd > 0} className="shrink-0">
                     <Sword size={14} className="mr-1" /> {busy ? "..." : "Atacar"}
