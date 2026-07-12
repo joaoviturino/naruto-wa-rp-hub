@@ -92,11 +92,11 @@ function PartyPage() {
         <div className="scroll-panel rounded-lg p-4 space-y-2">
           <h2 className="font-display text-lg">Convites pendentes</h2>
           {invites.map((iv) => (
-            <div key={iv.id} className="flex items-center gap-2 border-b border-border last:border-0 py-2">
-              <div className="w-10 h-10 rounded-full bg-secondary overflow-hidden">
+            <div key={iv.id} className="flex items-center gap-2 border-b border-border last:border-0 py-2 flex-wrap">
+              <div className="w-10 h-10 rounded-full bg-secondary overflow-hidden shrink-0">
                 {iv.from_character?.avatar_url && <img src={iv.from_character.avatar_url} className="w-full h-full object-cover" alt="" />}
               </div>
-              <div className="flex-1 text-sm"><b>{iv.from_character?.nickname ?? "?"}</b> te convidou.</div>
+              <div className="flex-1 text-sm min-w-0 truncate"><b>{iv.from_character?.nickname ?? "?"}</b> te convidou.</div>
               <Button size="sm" onClick={async () => { try { await respond({ data: { invite_id: iv.id, accept: true } }); toast.success("Você entrou no time."); load(); } catch (e: any) { toast.error(e.message); } }}>Aceitar</Button>
               <Button size="sm" variant="ghost" onClick={async () => { await respond({ data: { invite_id: iv.id, accept: false } }); load(); }}>Recusar</Button>
             </div>
