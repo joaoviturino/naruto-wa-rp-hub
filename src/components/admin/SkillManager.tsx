@@ -16,7 +16,6 @@ import { Trash2, Pencil, Plus, Swords } from "lucide-react";
 import { RestoreEffectFields } from "./RestoreEffectFields";
 
 export function SkillManager({ adminUserId }: { adminUserId: string }) {
-  const SKILL_CLASSES = useProficiencies();
   const [skills, setSkills] = useState<any[]>([]);
   const [missions, setMissions] = useState<any[]>([]);
   const [clans, setClans] = useState<any[]>([]);
@@ -84,6 +83,7 @@ export function SkillManager({ adminUserId }: { adminUserId: string }) {
 }
 
 function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, adminUserId, onSaved }: any) {
+  const SKILL_CLASSES = useProficiencies();
   const save = useServerFn(upsertSkill);
   const [f, setF] = useState<any>(initial ?? {});
   useEffect(() => { setF(initial ?? {}); }, [initial]);
