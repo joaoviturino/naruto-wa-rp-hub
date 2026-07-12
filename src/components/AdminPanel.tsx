@@ -20,6 +20,7 @@ import { PartyManager } from "@/components/admin/PartyManager";
 import { MinigameManager } from "@/components/admin/MinigameManager";
 import { LibraryManager } from "@/components/admin/LibraryManager";
 import { LevelManager } from "@/components/admin/LevelManager";
+import { ProficiencyManager } from "@/components/admin/ProficiencyManager";
 import { NINJA_RANKS } from "@/components/admin/shared";
 import { Pencil, BatteryCharging } from "lucide-react";
 
@@ -35,6 +36,7 @@ export function AdminPanel() {
           <TabsTrigger value="players">Jogadores</TabsTrigger>
           <TabsTrigger value="items">Itens</TabsTrigger>
           <TabsTrigger value="skills">Habilidades</TabsTrigger>
+          <TabsTrigger value="profs">Proficiências</TabsTrigger>
           <TabsTrigger value="missions">Missões</TabsTrigger>
           <TabsTrigger value="clans">Árvore de Clã</TabsTrigger>
           <TabsTrigger value="locations">Locais</TabsTrigger>
@@ -50,6 +52,7 @@ export function AdminPanel() {
         <TabsContent value="players" className="mt-4"><Players /></TabsContent>
         <TabsContent value="items" className="mt-4">{adminUserId && <ItemManager adminUserId={adminUserId} />}</TabsContent>
         <TabsContent value="skills" className="mt-4">{adminUserId && <SkillManager adminUserId={adminUserId} />}</TabsContent>
+        <TabsContent value="profs" className="mt-4"><ProficiencyManager /></TabsContent>
         <TabsContent value="missions" className="mt-4"><MissionManager /></TabsContent>
         <TabsContent value="clans" className="mt-4"><ClanTreeManager /></TabsContent>
         <TabsContent value="locations" className="mt-4"><LocationManager /></TabsContent>

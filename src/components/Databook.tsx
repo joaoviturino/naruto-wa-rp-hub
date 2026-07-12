@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { SKILL_CLASSES } from "@/components/admin/shared";
+import { useProficiencies } from "@/hooks/useProficiencies";
 
 type Skill = { id: string; name: string; rank: string; element: string | null; type: string | null; description: string | null };
 type Knowledge = { id: string; name: string; description: string | null };
@@ -17,6 +17,7 @@ const RANK_COLORS: Record<string, string> = {
 };
 
 export function Databook({ characterId }: { characterId: string }) {
+  const SKILL_CLASSES = useProficiencies();
   const [skills, setSkills] = useState<Skill[]>([]);
   const [knowledges, setKnowledges] = useState<Knowledge[]>([]);
   const [profs, setProfs] = useState<Prof[]>([]);
@@ -42,7 +43,7 @@ export function Databook({ characterId }: { characterId: string }) {
         .filter(Boolean) as Prof[];
       setProfs(list);
     })();
-  }, [characterId]);
+  }, [characterId, SKILL_CLASSES]);
 
   return (
     <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">

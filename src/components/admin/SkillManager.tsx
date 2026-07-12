@@ -10,7 +10,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { upsertSkill, deleteSkill } from "@/lib/admin.functions";
 import { toast } from "sonner";
 import { ImageUpload } from "@/components/ImageUpload";
-import { NINJA_RANKS, SKILL_RANKS, ELEMENTS, CLASSIFICATIONS, RANGES, SKILL_CLASSES, labelize } from "./shared";
+import { NINJA_RANKS, SKILL_RANKS, ELEMENTS, CLASSIFICATIONS, RANGES, labelize } from "./shared";
+import { useProficiencies } from "@/hooks/useProficiencies";
 import { Trash2, Pencil, Plus, Swords } from "lucide-react";
 import { RestoreEffectFields } from "./RestoreEffectFields";
 
@@ -82,6 +83,7 @@ export function SkillManager({ adminUserId }: { adminUserId: string }) {
 }
 
 function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, adminUserId, onSaved }: any) {
+  const SKILL_CLASSES = useProficiencies();
   const save = useServerFn(upsertSkill);
   const [f, setF] = useState<any>(initial ?? {});
   useEffect(() => { setF(initial ?? {}); }, [initial]);
@@ -110,7 +112,7 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
             />
             {f.skill_class && (
               <p className="text-[11px] text-muted-foreground mt-1">
-                {SKILL_CLASSES.find((c) => c.value === f.skill_class)?.desc}
+                {SKILL_CLASSES.find((c) => c.value === f.skill_class)?.description}
               </p>
             )}
           </Field>

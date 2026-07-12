@@ -11,7 +11,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Trash2, Plus, BookOpen, FolderTree } from "lucide-react";
 import { ArrowUp, ArrowDown, Image as ImageIcon, Type } from "lucide-react";
-import { SKILL_CLASSES, SKILL_RANKS, NINJA_RANKS } from "@/components/admin/shared";
+import { SKILL_RANKS, NINJA_RANKS } from "@/components/admin/shared";
+import { useProficiencies } from "@/hooks/useProficiencies";
 import {
   upsertLibrarySection, deleteLibrarySection,
   upsertLibraryBook, deleteLibraryBook,
@@ -234,6 +235,7 @@ function BookEditor({ book, setBook, sections, items, adminUserId, onSave, onCan
   book: Partial<Book>; setBook: (b: Partial<Book>) => void;
   sections: Section[]; items: Item[]; adminUserId: string; onSave: () => void; onCancel: () => void;
 }) {
+  const SKILL_CLASSES = useProficiencies();
   const grants: any[] = Array.isArray(book.proficiency_grants) ? book.proficiency_grants : [];
   const rewards: any = book.rewards ?? {};
   const rewardItems: any[] = Array.isArray(rewards.items) ? rewards.items : [];
@@ -349,6 +351,7 @@ function BookEditor({ book, setBook, sections, items, adminUserId, onSave, onCan
 }
 
 function RequirementsEditor({ book, setBook }: { book: Partial<Book>; setBook: (b: Partial<Book>) => void }) {
+  const SKILL_CLASSES = useProficiencies();
   const reqProfs: any[] = Array.isArray(book.required_profs) ? book.required_profs : [];
   return (
     <div className="rounded border border-border p-3 space-y-2">

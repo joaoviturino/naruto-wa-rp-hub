@@ -9,12 +9,14 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useServerFn } from "@tanstack/react-start";
 import { updatePlayer, grantSkill, revokeSkill, grantItem, revokeItem, completeMission, uncompleteMission, giftRyo } from "@/lib/admin.functions";
 import { toast } from "sonner";
-import { NINJA_RANKS, SKILL_RANKS, SKILL_CLASSES, VILLAGES, ELEMENTS, labelize } from "./shared";
+import { NINJA_RANKS, SKILL_RANKS, VILLAGES, ELEMENTS, labelize } from "./shared";
+import { useProficiencies } from "@/hooks/useProficiencies";
 import { X, Plus } from "lucide-react";
 
 export function PlayerEditor({ characterId, open, onOpenChange, onSaved }: {
   characterId: string | null; open: boolean; onOpenChange: (v: boolean) => void; onSaved: () => void;
 }) {
+  const SKILL_CLASSES = useProficiencies();
   const [char, setChar] = useState<any>(null);
   const [clans, setClans] = useState<any[]>([]);
   const [items, setItems] = useState<any[]>([]);

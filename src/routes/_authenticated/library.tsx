@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { BookOpen, ArrowLeft, CheckCircle2, Lock } from "lucide-react";
-import { SKILL_CLASSES, NINJA_RANKS } from "@/components/admin/shared";
+import { NINJA_RANKS } from "@/components/admin/shared";
+import { useProficiencies } from "@/hooks/useProficiencies";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export const Route = createFileRoute("/_authenticated/library")({
@@ -120,6 +121,7 @@ function LibraryPage() {
 function BookReader({ book, alreadyRead, onClose, onCompleted }: {
   book: Book; alreadyRead: boolean; onClose: () => void; onCompleted: () => void;
 }) {
+  const SKILL_CLASSES = useProficiencies();
   const complete = useServerFn(completeBookRead);
   const [elapsed, setElapsed] = useState(0);
   const [claiming, setClaiming] = useState(false);
