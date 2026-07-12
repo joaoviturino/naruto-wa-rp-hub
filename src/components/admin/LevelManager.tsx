@@ -6,13 +6,52 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { applyNpcTemplate, listNpcsBasic } from "@/lib/npc.functions";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+type RankKey =
+  | "estudante" | "genin" | "chunin" | "tokubetsu_jonin"
+  | "jonin" | "anbu" | "sannin" | "kage";
+
+type Difficulty = "Fácil" | "Médio" | "Difícil";
+
+const RANK_TABLE: { key: RankKey; label: string; difficulty: Difficulty; ratio: number; dmgPct: number; xpPct: number; ryoBase: number; crit: number; critMul: number }[] = [
+  { key: "estudante",       label: "Estudante",       difficulty: "Fácil",   ratio: 0.05, dmgPct: 0.05, xpPct: 0.07, ryoBase: 15,  crit: 3,  critMul: 1.5 },
+  { key: "genin",           label: "Genin",           difficulty: "Fácil",   ratio: 0.15, dmgPct: 0.06, xpPct: 0.08, ryoBase: 25,  crit: 5,  critMul: 1.5 },
+  { key: "chunin",          label: "Chunin",          difficulty: "Fácil",   ratio: 0.30, dmgPct: 0.08, xpPct: 0.10, ryoBase: 45,  crit: 7,  critMul: 1.6 },
+  { key: "tokubetsu_jonin", label: "Tokubetsu Jōnin", difficulty: "Médio",   ratio: 0.45, dmgPct: 0.10, xpPct: 0.12, ryoBase: 80,  crit: 10, critMul: 1.7 },
+  { key: "jonin",           label: "Jōnin",           difficulty: "Médio",   ratio: 0.60, dmgPct: 0.12, xpPct: 0.14, ryoBase: 120, crit: 12, critMul: 1.8 },
+  { key: "anbu",            label: "ANBU",            difficulty: "Difícil", ratio: 0.75, dmgPct: 0.14, xpPct: 0.17, ryoBase: 180, crit: 15, critMul: 1.9 },
+  { key: "sannin",          label: "Sannin",          difficulty: "Difícil", ratio: 0.90, dmgPct: 0.16, xpPct: 0.20, ryoBase: 260, crit: 18, critMul: 2.0 },
+  { key: "kage",            label: "Kage",            difficulty: "Difícil", ratio: 1.00, dmgPct: 0.18, xpPct: 0.24, ryoBase: 400, crit: 20, critMul: 2.2 },
+];
+
+const DIFF_STYLE: Record<Difficulty, string> = {
+  "Fácil":   "border-emerald-600/50 bg-emerald-950/20",
+  "Médio":   "border-amber-600/50 bg-amber-950/20",
+  "Difícil": "border-rose-600/50 bg-rose-950/20",
+};
+
+type NpcStats = {
+  hp_max: number; energy_max: number; xp: number;
+  avg_damage: number; crit_chance: number; crit_multiplier: number;
+  reward_xp: number; reward_ryo: number;
+};
 
 export function LevelManager() {
   const get = useServerFn(getLevelConfig);
   const save = useServerFn(updateLevelConfig);
+  const applyTpl = useServerFn(applyNpcTemplate);
+  const listNpcs = useServerFn(listNpcsBasic);
   const [cfg, setCfg] = useState<LevelConfig>(DEFAULT_LEVEL_CONFIG);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [applying, setApplying] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickedNpc, setPickedNpc] = useState<string>("");
+  const [pendingStats, setPendingStats] = useState<{ stats: NpcStats; label: string } | null>(null);
+  const [npcs, setNpcs] = useState<{ id: string; name: string; kind: string | null }[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -34,26 +73,56 @@ export function LevelManager() {
     return rows;
   }, [cfg]);
 
-  const npcTiers = useMemo(() => {
+  const rankCards = useMemo(() => {
     const max = cfg.max_level;
-    const easyLv = Math.max(1, Math.round(max * 0.1));
-    const mediumLv = Math.max(easyLv + 1, Math.round(max * 0.4));
-    const hardLv = Math.max(mediumLv + 1, Math.round(max * 0.75));
-
-    const build = (label: string, lv: number, dmgPct: number, xpPct: number, ryoBase: number, drops: string) => {
-      const hp = totalXpForLevel(lv, cfg); // HP = XP acumulado (regra do jogo)
-      const damage = Math.max(5, Math.round(hp * dmgPct));
-      const xpReward = Math.max(10, Math.round(hp * xpPct));
-      const ryo = Math.round(ryoBase * lv);
-      return { label, lv, hp, damage, xpReward, ryo, drops };
-    };
-
-    return [
-      build("Fácil", easyLv, 0.06, 0.08, 25, "Consumíveis comuns (5–15%) · Ryo baixo"),
-      build("Médio", mediumLv, 0.09, 0.12, 60, "Itens incomuns (3–10%) · Pergaminhos raros (1–3%)"),
-      build("Difícil", hardLv, 0.14, 0.18, 150, "Itens raros (2–6%) · Habilidades exclusivas (0.5–2%)"),
-    ];
+    return RANK_TABLE.map((r) => {
+      const lv = Math.max(1, Math.round(max * r.ratio));
+      const hp = Math.max(10, totalXpForLevel(lv, cfg));
+      const stats: NpcStats = {
+        hp_max: hp,
+        energy_max: Math.max(50, Math.round(hp * 0.5)),
+        xp: hp,
+        avg_damage: Math.max(5, Math.round(hp * r.dmgPct)),
+        crit_chance: r.crit,
+        crit_multiplier: r.critMul,
+        reward_xp: Math.max(10, Math.round(hp * r.xpPct)),
+        reward_ryo: Math.max(5, Math.round(r.ryoBase * lv)),
+      };
+      return { ...r, lv, stats };
+    });
   }, [cfg]);
+
+  async function refreshNpcs() {
+    try { setNpcs(await listNpcs({}) as any); } catch (e: any) { toast.error(e.message); }
+  }
+
+  async function handleApplyAll(label: string, stats: NpcStats) {
+    if (!confirm(`Aplicar template "${label}" a TODOS os NPCs agressivos? Isso sobrescreve HP, energia, dano, crítico e recompensas.`)) return;
+    setApplying(label + "-all");
+    try {
+      const r: any = await applyTpl({ data: { target: "all", only_aggressive: true, stats } });
+      toast.success(`Template "${label}" aplicado a ${r.updated} NPC(s).`);
+    } catch (e: any) { toast.error(e.message); }
+    finally { setApplying(null); }
+  }
+
+  function openPicker(label: string, stats: NpcStats) {
+    setPendingStats({ label, stats });
+    setPickedNpc("");
+    setPickerOpen(true);
+    if (npcs.length === 0) refreshNpcs();
+  }
+
+  async function confirmPicker() {
+    if (!pendingStats || !pickedNpc) { toast.error("Selecione um NPC."); return; }
+    setApplying(pendingStats.label + "-one");
+    try {
+      await applyTpl({ data: { target: "one", npc_id: pickedNpc, only_aggressive: false, stats: pendingStats.stats } });
+      toast.success(`Template "${pendingStats.label}" aplicado ao NPC.`);
+      setPickerOpen(false);
+    } catch (e: any) { toast.error(e.message); }
+    finally { setApplying(null); }
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -128,42 +197,79 @@ export function LevelManager() {
       <div className="scroll-panel rounded-lg p-6 lg:col-span-2">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
-            <h3 className="font-display text-xl text-gold">Recomendações de NPCs por dificuldade</h3>
+            <h3 className="font-display text-xl text-gold">Templates de NPC por patente</h3>
             <p className="text-xs text-muted-foreground mt-1">
-              Sugestões calculadas a partir da curva atual. Use como base ao configurar NPCs em <em>Danger Zones</em> — ajuste conforme necessário.
+              Cada patente tem uma dificuldade e estatísticas derivadas da curva atual. Use os botões para aplicar em massa (todos os NPCs agressivos) ou em um NPC específico.
             </p>
           </div>
-          <div className="text-[10px] text-muted-foreground">
-            HP = XP acumulado do nível · Dano por turno é uma média sugerida.
+          <div className="text-[10px] text-muted-foreground max-w-xs text-right">
+            "Aplicar a todos" atualiza somente NPCs agressivos.<br />
+            "Escolher NPC" permite aplicar em qualquer um.
           </div>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-3 mt-4">
-          {npcTiers.map((t) => (
-            <div key={t.label} className="rounded-md border border-border p-4 bg-background/40">
-              <div className="flex items-center justify-between">
-                <span className="font-display text-lg text-gold">{t.label}</span>
-                <span className="text-xs text-muted-foreground">Nível ~{t.lv}</span>
-              </div>
-              <dl className="mt-3 space-y-1.5 text-sm">
-                <div className="flex justify-between"><dt className="text-muted-foreground">HP recomendado</dt><dd className="font-semibold">{t.hp.toLocaleString("pt-BR")}</dd></div>
-                <div className="flex justify-between"><dt className="text-muted-foreground">Dano médio/turno</dt><dd>{t.damage.toLocaleString("pt-BR")}</dd></div>
-                <div className="flex justify-between"><dt className="text-muted-foreground">XP concedido</dt><dd className="text-gold">+{t.xpReward.toLocaleString("pt-BR")}</dd></div>
-                <div className="flex justify-between"><dt className="text-muted-foreground">Ryo</dt><dd className="text-gold">+{t.ryo.toLocaleString("pt-BR")}</dd></div>
-              </dl>
-              <div className="mt-3 pt-3 border-t border-border">
-                <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Loot sugerido</div>
-                <p className="text-xs">{t.drops}</p>
-              </div>
-              <div className="mt-3 text-[10px] text-muted-foreground">
-                {t.label === "Fácil" && "Ideal para Genin iniciantes. Spawn frequente (60–80%)."}
-                {t.label === "Médio" && "Chunin em campo. Spawn moderado (25–40%), grupos de 2–3."}
-                {t.label === "Difícil" && "Elite Jounin/S-rank. Spawn raro (5–10%), recompense parties."}
-              </div>
+        {(["Fácil","Médio","Difícil"] as Difficulty[]).map((diff) => (
+          <div key={diff} className="mt-6">
+            <h4 className="font-display text-lg mb-2">
+              Dificuldade: <span className={diff === "Fácil" ? "text-emerald-400" : diff === "Médio" ? "text-amber-400" : "text-rose-400"}>{diff}</span>
+            </h4>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {rankCards.filter((c) => c.difficulty === diff).map((c) => (
+                <div key={c.key} className={`rounded-md border p-4 ${DIFF_STYLE[c.difficulty]}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="font-display text-lg text-gold">{c.label}</span>
+                    <span className="text-xs text-muted-foreground">Nível ~{c.lv}</span>
+                  </div>
+                  <dl className="mt-3 space-y-1 text-sm">
+                    <div className="flex justify-between"><dt className="text-muted-foreground">HP</dt><dd className="font-semibold">{c.stats.hp_max.toLocaleString("pt-BR")}</dd></div>
+                    <div className="flex justify-between"><dt className="text-muted-foreground">Energia</dt><dd>{c.stats.energy_max.toLocaleString("pt-BR")}</dd></div>
+                    <div className="flex justify-between"><dt className="text-muted-foreground">Dano médio</dt><dd>{c.stats.avg_damage.toLocaleString("pt-BR")}</dd></div>
+                    <div className="flex justify-between"><dt className="text-muted-foreground">Crítico</dt><dd>{c.stats.crit_chance}% × {c.stats.crit_multiplier}</dd></div>
+                    <div className="flex justify-between"><dt className="text-muted-foreground">Recompensa XP</dt><dd className="text-gold">+{c.stats.reward_xp.toLocaleString("pt-BR")}</dd></div>
+                    <div className="flex justify-between"><dt className="text-muted-foreground">Recompensa Ryō</dt><dd className="text-gold">+{c.stats.reward_ryo.toLocaleString("pt-BR")}</dd></div>
+                  </dl>
+                  <div className="mt-3 flex flex-col sm:flex-row gap-2">
+                    <Button size="sm" className="flex-1" disabled={applying !== null} onClick={() => handleApplyAll(c.label, c.stats)}>
+                      {applying === c.label + "-all" ? "Aplicando…" : "Aplicar a todos"}
+                    </Button>
+                    <Button size="sm" variant="outline" className="flex-1" disabled={applying !== null} onClick={() => openPicker(c.label, c.stats)}>
+                      Escolher NPC
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
       </div>
+
+      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Aplicar "{pendingStats?.label}" a um NPC</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Label>Selecione o NPC</Label>
+            <Select value={pickedNpc} onValueChange={setPickedNpc}>
+              <SelectTrigger><SelectValue placeholder={npcs.length ? "Escolha um NPC" : "Carregando…"} /></SelectTrigger>
+              <SelectContent>
+                {npcs.map((n) => (
+                  <SelectItem key={n.id} value={n.id}>{n.name} <span className="text-muted-foreground">({n.kind ?? "—"})</span></SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {pendingStats && (
+              <p className="text-xs text-muted-foreground">
+                HP {pendingStats.stats.hp_max} · Energia {pendingStats.stats.energy_max} · Dano {pendingStats.stats.avg_damage} · Crit {pendingStats.stats.crit_chance}%×{pendingStats.stats.crit_multiplier} · +{pendingStats.stats.reward_xp} XP · +{pendingStats.stats.reward_ryo} Ryō
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPickerOpen(false)}>Cancelar</Button>
+            <Button onClick={confirmPicker} disabled={!pickedNpc || applying !== null}>Aplicar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
