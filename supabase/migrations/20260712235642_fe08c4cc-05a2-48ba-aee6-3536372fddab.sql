@@ -1,0 +1,2 @@
+ALTER TABLE public.location_messages ADD COLUMN IF NOT EXISTS is_pinned boolean NOT NULL DEFAULT false;
+CREATE INDEX IF NOT EXISTS location_messages_pinned_idx ON public.location_messages(location_id) WHERE is_pinned = true;

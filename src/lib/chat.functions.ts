@@ -50,3 +50,24 @@ export const sendLocationMessage = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { id: msg.id };
   });
+
+export const togglePinMessage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ messageId: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { data: msg, error: mErr } = await context.supabase
+      .from("location_messages")
+      .select("id,is_pinned,character_id,characters!inner(user_id)")
+      .eq("id", data.messageId).maybeSingle();
+    if (mErr) throw new Error(mErr.message);
+    if (!msg) throw new Error("Mensagem não encontrada.");
+    const ownerUserId = (msg as any).characters?.user_id as string | undefined;
+    const { data: roles } = await context.supabase
+      .from("user_roles").select("role").eq("user_id", context.userId);
+    const isAdmin = (roles ?? []).some((r: any) => r.role === "admin");
+    if (ownerUserId !== context.userId && !isAdmin) throw new Error("Sem permissão para marcar esta mensagem.");
+    const { error } = await context.supabase
+      .from("location_messages").update({ is_pinned: !(msg as any).is_pinned }).eq("id", data.messageId);
+    if (error) throw new Error(error.message);
+    return { pinned: !(msg as any).is_pinned };
+  });
