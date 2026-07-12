@@ -20,6 +20,7 @@ type Npc = {
   battle_bg_url: string | null;
   hp_max: number; xp: number; energy_max: number;
   reward_xp: number; reward_ryo: number; drop_table: DropRow[];
+  avg_damage?: number; crit_chance?: number; crit_multiplier?: number;
   kind: NpcKind; dialog_intro: string | null; dialog_outro: string | null;
   shop_items: ShopRow[]; reward_items: RewardRow[]; reward_cooldown_hours: number;
   required_mission_id: string | null;
