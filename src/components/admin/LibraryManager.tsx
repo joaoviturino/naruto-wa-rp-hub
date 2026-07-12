@@ -235,6 +235,7 @@ function BookEditor({ book, setBook, sections, items, adminUserId, onSave, onCan
   book: Partial<Book>; setBook: (b: Partial<Book>) => void;
   sections: Section[]; items: Item[]; adminUserId: string; onSave: () => void; onCancel: () => void;
 }) {
+  const SKILL_CLASSES = useProficiencies();
   const grants: any[] = Array.isArray(book.proficiency_grants) ? book.proficiency_grants : [];
   const rewards: any = book.rewards ?? {};
   const rewardItems: any[] = Array.isArray(rewards.items) ? rewards.items : [];
