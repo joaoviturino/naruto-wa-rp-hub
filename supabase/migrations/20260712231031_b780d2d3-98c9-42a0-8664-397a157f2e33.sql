@@ -1,0 +1,4 @@
+ALTER TABLE public.npcs
+  ADD COLUMN IF NOT EXISTS avg_damage integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS crit_chance integer NOT NULL DEFAULT 10,
+  ADD COLUMN IF NOT EXISTS crit_multiplier numeric NOT NULL DEFAULT 1.5;
