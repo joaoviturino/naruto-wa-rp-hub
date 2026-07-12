@@ -59,13 +59,12 @@ function computeStats(xp: number) {
   return { ef: half, em: xp - half, chakra: xp };
 }
 
-function damageTargetPlayer(p: Player, dmg: number): { pool: Pool; taken: number } {
-  // O dano é aplicado ao HP (HP máximo = XP do personagem).
+function damageTargetPlayer(p: Player, dmg: number): { pool: "hp"; taken: number } {
+  // Dano de NPC vai direto na vida (HP máximo = XP do personagem).
   const taken = Math.min(dmg, Math.max(0, p.hp));
   p.hp = Math.max(0, p.hp - taken);
   if (p.hp <= 0) p.alive = false;
-  // Mantemos a tipagem retornando "chakra" como pool simbólica (mensagem trata como HP).
-  return { pool: "chakra", taken };
+  return { pool: "hp", taken };
 }
 
 async function loadMyChar(context: { supabase: any; userId: string }) {
@@ -385,7 +384,7 @@ async function runNpcTurn(supabaseAdmin: any, npcId: string, state: CombatState,
     effective, damage: finalDamage, speed, crit_mul: Number(skill.bonus_critical),
     animation_url: (skill as any).animation_url ?? null,
     sound_url: (skill as any).sound_url ?? null,
-    msg: `${state.npc.name} usa ${skill.name} → ${target.nickname} perde ${taken.taken} de ${taken.pool.toUpperCase()}${speedPenalty < 1 ? " (reação lenta)" : ""}.`,
+    msg: `${state.npc.name} usa ${skill.name} → ${target.nickname} sofre ${taken.taken} de dano na vida${speedPenalty < 1 ? " (reação lenta)" : ""}.`,
   });
   return { energyRemaining: state.npc.energy - energy };
 }
