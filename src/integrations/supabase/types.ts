@@ -689,6 +689,33 @@ export type Database = {
         }
         Relationships: []
       }
+      level_config: {
+        Row: {
+          base_xp: number
+          created_at: string
+          growth_factor: number
+          id: boolean
+          max_level: number
+          updated_at: string
+        }
+        Insert: {
+          base_xp?: number
+          created_at?: string
+          growth_factor?: number
+          id?: boolean
+          max_level?: number
+          updated_at?: string
+        }
+        Update: {
+          base_xp?: number
+          created_at?: string
+          growth_factor?: number
+          id?: boolean
+          max_level?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       library_books: {
         Row: {
           active: boolean
