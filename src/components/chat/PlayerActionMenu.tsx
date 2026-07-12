@@ -5,7 +5,6 @@ import { Users, Sword, Heart, ScrollText } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { invitePartyMember } from "@/lib/party.functions";
 import { challengeDuel } from "@/lib/pvp.functions";
-import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { PublicCharacterView } from "./PublicCharacterView";
 
@@ -18,7 +17,6 @@ export function PlayerActionMenu({
 }) {
   const invite = useServerFn(invitePartyMember);
   const challenge = useServerFn(challengeDuel);
-  const navigate = useNavigate();
   const [viewOpen, setViewOpen] = useState(false);
   if (!target) return null;
   return (
