@@ -351,6 +351,7 @@ function BookEditor({ book, setBook, sections, items, adminUserId, onSave, onCan
 }
 
 function RequirementsEditor({ book, setBook }: { book: Partial<Book>; setBook: (b: Partial<Book>) => void }) {
+  const SKILL_CLASSES = useProficiencies();
   const reqProfs: any[] = Array.isArray(book.required_profs) ? book.required_profs : [];
   return (
     <div className="rounded border border-border p-3 space-y-2">
