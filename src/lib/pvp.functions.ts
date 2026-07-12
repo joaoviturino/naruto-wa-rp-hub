@@ -111,6 +111,7 @@ export const respondDuel = createServerFn({ method: "POST" })
     if (!chars || chars.length !== 2) throw new Error("Personagens não encontrados.");
     const ch = chars.find((c: any) => c.id === duel.challenger_id);
     const op = chars.find((c: any) => c.id === duel.opponent_id);
+    if (!ch || !op) throw new Error("Personagens não encontrados.");
 
     const state = { challenger: initSide(ch), opponent: initSide(op) };
     const { error } = await context.supabase.from("pvp_duels").update({
