@@ -14,7 +14,7 @@ import { Sword, Flag, Zap, FlaskConical, Users } from "lucide-react";
 type Skill = {
   id: string; name: string; energy_type: "ef" | "em" | "chakra"; base_cost: number;
   bonus_speed: number; bonus_critical: number; bonus_energetic: number;
-  cooldown_turns?: number; description?: string | null;
+  cooldown_turns?: number; description?: string | null; cost_percent?: number;
 };
 type BagEntry = { item_id: string; qty: number };
 type Item = { id: string; name: string; image_url: string | null; type: string };
@@ -45,11 +45,11 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   async function loadSkills() {
     const { data } = await supabase
       .from("character_skills")
-      .select("skill:skills(id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,description)")
+      .select("skill:skills(id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,description)")
       .eq("character_id", myCharId);
     const list = ((data as any[]) ?? []).map((r) => r.skill).filter(Boolean) as Skill[];
     setSkills(list);
-    if (list.length && !selectedSkill) { setSelectedSkill(list[0].id); setEnergy(list[0].base_cost); }
+    if (list.length && !selectedSkill) { setSelectedSkill(list[0].id); setEnergy(1); }
   }
   async function loadBag() {
     const { data: inv } = await supabase.from("inventory").select("ninja_bag,secondary_slots").eq("character_id", myCharId).maybeSingle();
@@ -103,6 +103,18 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const currentSkill = skills.find((s) => s.id === selectedSkill);
   const myCooldowns: Record<string, number> = (me?.cooldowns as any) ?? {};
   const currentCd = currentSkill ? (myCooldowns[currentSkill.id] ?? 0) : 0;
+  const currentPool: "ef" | "em" | "chakra" | null = currentSkill?.energy_type ?? null;
+  const currentPoolMax = currentPool && me ? (me[`${currentPool}_max` as const] as number) : 0;
+  const currentPct = Math.max(1, Math.min(100, Number(currentSkill?.cost_percent ?? 20)));
+  const currentMaxEnergy = currentPool ? Math.max(1, Math.floor((currentPoolMax * currentPct) / 100)) : 1;
+  const [skillTab, setSkillTab] = useState<"ef" | "em" | "chakra">("chakra");
+  useEffect(() => {
+    if (currentSkill) setSkillTab(currentSkill.energy_type);
+  }, [selectedSkill]);
+  useEffect(() => {
+    if (energy > currentMaxEnergy) setEnergy(currentMaxEnergy);
+  }, [currentMaxEnergy]);
+  const skillsByTab = useMemo(() => skills.filter((s) => s.energy_type === skillTab), [skills, skillTab]);
   const consumables = useMemo(() => bag.filter((e) => itemMap[e.item_id]?.type === "consumable"), [bag, itemMap]);
 
   // Enfileira TODAS as novas entradas do log (jogador + resposta do NPC vêm juntas do backend)
@@ -190,6 +202,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
 
   async function doAttack() {
     if (!currentSkill) return;
+    if (energy > currentMaxEnergy) { toast.error(`Custo máximo: ${currentMaxEnergy} (${currentPct}% de ${currentPool?.toUpperCase()}).`); return; }
     setBusy(true);
     try {
       await attack({ data: { session_id: sessionId, skill_id: currentSkill.id, energy_used: energy } });
@@ -305,6 +318,13 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="text-xs font-display truncate">{p.nickname} {isMe && "(você)"}</div>
+                    <div className="flex items-center gap-1 mb-0.5" title={`HP ${p.hp}/${p.hp_max}`}>
+                      <span className="text-[9px] text-muted-foreground w-5">HP</span>
+                      <div className="h-1.5 flex-1 rounded overflow-hidden bg-input">
+                        <div className="h-full bg-emerald-500" style={{ width: `${p.hp_max > 0 ? (p.hp / p.hp_max) * 100 : 0}%` }} />
+                      </div>
+                      <span className="text-[9px] text-muted-foreground tabular-nums">{p.hp}/{p.hp_max}</span>
+                    </div>
                     <div className="grid grid-cols-3 gap-0.5">
                       {(["ef","em","chakra"] as const).map((k) => {
                         const v = p[k]; const m = p[`${k}_max` as const];
@@ -343,13 +363,34 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
               </TabsList>
               <TabsContent value="skills" className="mt-2">
                 {skills.length === 0 && <p className="text-sm text-muted-foreground p-4 text-center">Você não conhece nenhuma habilidade.</p>}
+                <div className="mb-2">
+                  <div className="grid grid-cols-3 gap-1 rounded-md bg-input/40 p-1 text-[10px] sm:text-xs">
+                    {([
+                      { k: "ef", label: "Física" },
+                      { k: "em", label: "Mental" },
+                      { k: "chakra", label: "Ninjutsu" },
+                    ] as const).map((t) => {
+                      const count = skills.filter((s) => s.energy_type === t.k).length;
+                      const active = skillTab === t.k;
+                      return (
+                        <button key={t.k} onClick={() => setSkillTab(t.k)}
+                          className={`rounded px-2 py-1.5 transition ${active ? "bg-gold/20 text-gold border border-gold/60" : "border border-transparent hover:bg-secondary/50"}`}>
+                          {t.label} <span className="opacity-60">({count})</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
                 <div className="grid gap-2 sm:grid-cols-2 max-h-56 overflow-y-auto pr-1">
-                  {skills.map((s) => {
+                  {skillsByTab.length === 0 && <p className="text-xs text-muted-foreground p-3 text-center col-span-full">Nenhuma habilidade nesta categoria.</p>}
+                  {skillsByTab.map((s) => {
                     const cd = myCooldowns[s.id] ?? 0;
                     const chosen = s.id === selectedSkill;
+                    const poolMaxS = me ? (me[`${s.energy_type}_max` as const] as number) : 0;
+                    const maxES = Math.max(1, Math.floor((poolMaxS * Math.max(1, Math.min(100, Number(s.cost_percent ?? 20)))) / 100));
                     return (
                       <button key={s.id} disabled={cd > 0}
-                        onClick={() => { setSelectedSkill(s.id); setEnergy(s.base_cost); }}
+                        onClick={() => { setSelectedSkill(s.id); setEnergy(maxES); }}
                         className={`text-left rounded-md border p-2 transition ${chosen ? "border-gold bg-gold/10" : "border-border hover:border-gold/60"} ${cd > 0 ? "opacity-40 cursor-not-allowed" : ""}`}>
                         <div className="flex items-center justify-between">
                           <span className="font-display text-sm">{s.name}</span>
@@ -358,6 +399,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                         <div className="text-[10px] text-muted-foreground mt-1">
                           ×{s.bonus_energetic} energ • ×{s.bonus_critical} crit • ×{s.bonus_speed} spd
                           {cd > 0 ? ` • ⏳ ${cd}` : (s.cooldown_turns ? ` • CD ${s.cooldown_turns}` : "")}
+                          <span className="ml-1">• máx {maxES} ({s.cost_percent ?? 20}%)</span>
                         </div>
                       </button>
                     );
@@ -365,9 +407,11 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                 </div>
                 <div className="flex items-end gap-2 mt-3">
                   <div className="flex-1">
-                    <div className="text-xs text-muted-foreground mb-1">Energia ({currentSkill?.energy_type.toUpperCase() ?? "—"})</div>
-                    <Input type="number" min={currentSkill?.base_cost ?? 1} value={energy}
-                      onChange={(e) => setEnergy(Math.max(1, Number(e.target.value)))} />
+                    <div className="text-xs text-muted-foreground mb-1">
+                      Energia ({currentSkill?.energy_type.toUpperCase() ?? "—"}) — máx {currentMaxEnergy} ({currentPct}%)
+                    </div>
+                    <Input type="number" min={1} max={currentMaxEnergy} value={energy}
+                      onChange={(e) => setEnergy(Math.max(1, Math.min(currentMaxEnergy, Number(e.target.value))))} />
                   </div>
                   <Button onClick={doAttack} disabled={!currentSkill || busy || currentCd > 0} className="shrink-0">
                     <Sword size={14} className="mr-1" /> {busy ? "..." : "Atacar"}

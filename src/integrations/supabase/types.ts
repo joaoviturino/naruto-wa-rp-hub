@@ -252,6 +252,7 @@ export type Database = {
           element_primary: Database["public"]["Enums"]["element"]
           em_current: number | null
           history: string | null
+          hp_current: number | null
           id: string
           inventory_bg_url: string | null
           last_spawn_roll_at: string | null
@@ -282,6 +283,7 @@ export type Database = {
           element_primary: Database["public"]["Enums"]["element"]
           em_current?: number | null
           history?: string | null
+          hp_current?: number | null
           id?: string
           inventory_bg_url?: string | null
           last_spawn_roll_at?: string | null
@@ -312,6 +314,7 @@ export type Database = {
           element_primary?: Database["public"]["Enums"]["element"]
           em_current?: number | null
           history?: string | null
+          hp_current?: number | null
           id?: string
           inventory_bg_url?: string | null
           last_spawn_roll_at?: string | null
@@ -1549,6 +1552,7 @@ export type Database = {
             | Database["public"]["Enums"]["skill_classification"]
             | null
           cooldown_turns: number
+          cost_percent: number
           description: string | null
           element: Database["public"]["Enums"]["element"] | null
           energy_type: string
@@ -1579,6 +1583,7 @@ export type Database = {
             | Database["public"]["Enums"]["skill_classification"]
             | null
           cooldown_turns?: number
+          cost_percent?: number
           description?: string | null
           element?: Database["public"]["Enums"]["element"] | null
           energy_type?: string
@@ -1609,6 +1614,7 @@ export type Database = {
             | Database["public"]["Enums"]["skill_classification"]
             | null
           cooldown_turns?: number
+          cost_percent?: number
           description?: string | null
           element?: Database["public"]["Enums"]["element"] | null
           energy_type?: string

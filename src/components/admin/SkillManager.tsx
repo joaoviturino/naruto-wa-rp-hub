@@ -184,8 +184,9 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
               </SelectContent>
             </Select>
           </Field>
-          <Field label="Custo mínimo (energia)">
-            <Input type="number" min={0} value={f.base_cost ?? 10} onChange={(e) => up("base_cost", Number(e.target.value))} />
+          <Field label="Custo máximo (% da pool)">
+            <Input type="number" min={1} max={100} value={f.cost_percent ?? 20} onChange={(e) => up("cost_percent", Math.max(1, Math.min(100, Number(e.target.value))))} />
+            <div className="text-[10px] text-muted-foreground mt-1">O jogador pode gastar de 1 até esse % da pool escolhida.</div>
           </Field>
           <Field label="Bônus de velocidade">
             <Input type="number" step="0.1" min={0} value={f.bonus_speed ?? 1} onChange={(e) => up("bonus_speed", Number(e.target.value))} />
@@ -219,7 +220,8 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
                 sound_url: f.sound_url || null,
                 skill_class: f.skill_class || null,
                 energy_type: f.energy_type ?? "chakra",
-                base_cost: Number(f.base_cost ?? 10),
+                base_cost: 0,
+                cost_percent: Math.max(1, Math.min(100, Number(f.cost_percent ?? 20))),
                 bonus_speed: Number(f.bonus_speed ?? 1),
                 bonus_critical: Number(f.bonus_critical ?? 1),
                 bonus_energetic: Number(f.bonus_energetic ?? 1),
