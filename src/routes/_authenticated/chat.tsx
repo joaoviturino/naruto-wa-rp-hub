@@ -15,6 +15,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { listMinigamesForMyLocation } from "@/lib/minigame.functions";
 import { MinigameDialog } from "@/components/minigame/MinigameDialog";
 import { NpcInteractPanel } from "@/components/chat/NpcInteractPanel";
+import { DuelInvitesInline } from "@/components/chat/DuelInvitesInline";
 
 export const Route = createFileRoute("/_authenticated/chat")({ component: ChatPage });
 
@@ -234,12 +235,15 @@ function ChatPage() {
 
   const sidebar = (
     <div className="space-y-3">
-      <Button asChild variant="outline" size="sm" className="w-full justify-between">
-        <Link to="/party">
-          <span className="flex items-center gap-1"><Users size={14} /> Meu time{partyMemberCount > 0 ? ` (${partyMemberCount})` : ""}</span>
-          {invites.length > 0 && <span className="text-[10px] bg-blood text-white rounded-full px-1.5">{invites.length}</span>}
-        </Link>
-      </Button>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-1 sm:gap-3">
+        <Button asChild variant="outline" size="sm" className="w-full justify-between h-auto py-2">
+          <Link to="/party">
+            <span className="flex items-center gap-1 min-w-0"><Users size={14} className="shrink-0" /> <span className="truncate">Meu time{partyMemberCount > 0 ? ` (${partyMemberCount})` : ""}</span></span>
+            {invites.length > 0 && <span className="text-[10px] bg-blood text-white rounded-full px-1.5 shrink-0">{invites.length}</span>}
+          </Link>
+        </Button>
+        <DuelInvitesInline />
+      </div>
       <div>
         <div className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1"><MapPin size={12} /> Você está em</div>
         <div className="font-display text-xl text-gold flex items-center gap-2 min-w-0">
