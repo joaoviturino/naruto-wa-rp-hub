@@ -73,13 +73,26 @@ export const challengeDuel = createServerFn({ method: "POST" })
     if (!target) throw new Error("Personagem alvo não encontrado.");
     if (target.current_location_id !== me.current_location_id) throw new Error("Vocês precisam estar no mesmo local.");
 
-    // Bloqueia se já há duelo ativo/pendente entre eles
-    const { data: existing } = await context.supabase.from("pvp_duels")
-      .select("id,status")
+    // Convites pendentes expiram após 2 minutos e são cancelados automaticamente.
+    const { data: existingList } = await context.supabase.from("pvp_duels")
+      .select("id,status,created_at,challenger_id,opponent_id")
       .in("status", ["pending", "active"])
-      .or(`and(challenger_id.eq.${me.id},opponent_id.eq.${target.id}),and(challenger_id.eq.${target.id},opponent_id.eq.${me.id})`)
-      .maybeSingle();
-    if (existing) throw new Error("Já existe um duelo ativo ou pendente entre vocês.");
+      .or(`and(challenger_id.eq.${me.id},opponent_id.eq.${target.id}),and(challenger_id.eq.${target.id},opponent_id.eq.${me.id})`);
+    const now = Date.now();
+    for (const row of existingList ?? []) {
+      if (row.status === "active") {
+        throw new Error("Vocês já estão em um duelo ativo.");
+      }
+      const age = now - new Date(row.created_at).getTime();
+      if (age > 120_000) {
+        await context.supabase.from("pvp_duels").update({ status: "cancelled", ended_at: new Date().toISOString() }).eq("id", row.id);
+        continue;
+      }
+      if (row.challenger_id === me.id) {
+        throw new Error("Você já tem um convite pendente para esse jogador. Cancele-o antes de enviar outro.");
+      }
+      throw new Error("Esse jogador já te desafiou. Responda ao convite pendente primeiro.");
+    }
 
     const { data: inserted, error } = await context.supabase.from("pvp_duels").insert({
       challenger_id: me.id, opponent_id: target.id, location_id: me.current_location_id,
@@ -99,6 +112,11 @@ export const respondDuel = createServerFn({ method: "POST" })
     if (!duel) throw new Error("Duelo não encontrado.");
     if (duel.opponent_id !== me.id) throw new Error("Apenas o desafiado pode responder.");
     if (duel.status !== "pending") throw new Error("Este duelo já foi respondido.");
+    // Expira convites com mais de 2 minutos
+    if (Date.now() - new Date(duel.created_at).getTime() > 120_000) {
+      await context.supabase.from("pvp_duels").update({ status: "cancelled", ended_at: new Date().toISOString() }).eq("id", duel.id);
+      throw new Error("Convite expirado.");
+    }
 
     if (!data.accept) {
       await context.supabase.from("pvp_duels").update({ status: "cancelled", ended_at: new Date().toISOString() }).eq("id", duel.id);

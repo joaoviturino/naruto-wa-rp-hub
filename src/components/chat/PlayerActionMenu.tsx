@@ -5,7 +5,6 @@ import { Users, Sword, Heart, ScrollText } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { invitePartyMember } from "@/lib/party.functions";
 import { challengeDuel } from "@/lib/pvp.functions";
-import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { PublicCharacterView } from "./PublicCharacterView";
 
@@ -18,7 +17,6 @@ export function PlayerActionMenu({
 }) {
   const invite = useServerFn(invitePartyMember);
   const challenge = useServerFn(challengeDuel);
-  const navigate = useNavigate();
   const [viewOpen, setViewOpen] = useState(false);
   if (!target) return null;
   return (
@@ -45,10 +43,9 @@ export function PlayerActionMenu({
           </Button>
           <Button variant="outline" className="w-full justify-start" onClick={async () => {
             try {
-              const res: any = await challenge({ data: { opponent_character_id: target.id } } as any);
-              toast.success("Convite enviado. Aguardando resposta...");
+              await challenge({ data: { opponent_character_id: target.id } } as any);
+              toast.success("Desafio enviado. Você tem 2 minutos para receber a resposta.");
               onOpenChange(false);
-              navigate({ to: "/duel/$id", params: { id: res.duel_id } });
             } catch (e: any) { toast.error(e.message); }
           }}>
             <Sword size={14} className="mr-2" /> Desafiar para duelo
