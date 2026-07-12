@@ -2,6 +2,7 @@ import { createFileRoute, Outlet, redirect, Link, useNavigate } from "@tanstack/
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { PvpInvitesWatcher } from "@/components/chat/PvpInvitesWatcher";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -43,6 +44,7 @@ function AuthedLayout() {
           </nav>
         </div>
       </header>
+      <PvpInvitesWatcher />
       <Outlet />
     </div>
   );

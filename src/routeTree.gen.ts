@@ -18,6 +18,7 @@ import { Route as AuthenticatedLibraryRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated/chat'
 import { Route as AuthenticatedCharacterRouteImport } from './routes/_authenticated/character'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedDuelIdRouteImport } from './routes/_authenticated/duel.$id'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
@@ -63,6 +64,11 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedDuelIdRoute = AuthenticatedDuelIdRouteImport.update({
+  id: '/duel/$id',
+  path: '/duel/$id',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -73,6 +79,7 @@ export interface FileRoutesByFullPath {
   '/chat': typeof AuthenticatedChatRoute
   '/library': typeof AuthenticatedLibraryRoute
   '/party': typeof AuthenticatedPartyRoute
+  '/duel/$id': typeof AuthenticatedDuelIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -83,6 +90,7 @@ export interface FileRoutesByTo {
   '/chat': typeof AuthenticatedChatRoute
   '/library': typeof AuthenticatedLibraryRoute
   '/party': typeof AuthenticatedPartyRoute
+  '/duel/$id': typeof AuthenticatedDuelIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -95,6 +103,7 @@ export interface FileRoutesById {
   '/_authenticated/chat': typeof AuthenticatedChatRoute
   '/_authenticated/library': typeof AuthenticatedLibraryRoute
   '/_authenticated/party': typeof AuthenticatedPartyRoute
+  '/_authenticated/duel/$id': typeof AuthenticatedDuelIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -107,6 +116,7 @@ export interface FileRouteTypes {
     | '/chat'
     | '/library'
     | '/party'
+    | '/duel/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -117,6 +127,7 @@ export interface FileRouteTypes {
     | '/chat'
     | '/library'
     | '/party'
+    | '/duel/$id'
   id:
     | '__root__'
     | '/'
@@ -128,6 +139,7 @@ export interface FileRouteTypes {
     | '/_authenticated/chat'
     | '/_authenticated/library'
     | '/_authenticated/party'
+    | '/_authenticated/duel/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -202,6 +214,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/duel/$id': {
+      id: '/_authenticated/duel/$id'
+      path: '/duel/$id'
+      fullPath: '/duel/$id'
+      preLoaderRoute: typeof AuthenticatedDuelIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
@@ -211,6 +230,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedChatRoute: typeof AuthenticatedChatRoute
   AuthenticatedLibraryRoute: typeof AuthenticatedLibraryRoute
   AuthenticatedPartyRoute: typeof AuthenticatedPartyRoute
+  AuthenticatedDuelIdRoute: typeof AuthenticatedDuelIdRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -219,6 +239,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedChatRoute: AuthenticatedChatRoute,
   AuthenticatedLibraryRoute: AuthenticatedLibraryRoute,
   AuthenticatedPartyRoute: AuthenticatedPartyRoute,
+  AuthenticatedDuelIdRoute: AuthenticatedDuelIdRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
