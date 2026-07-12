@@ -14,7 +14,7 @@ import { Sword, Flag, Zap, FlaskConical, Users } from "lucide-react";
 type Skill = {
   id: string; name: string; energy_type: "ef" | "em" | "chakra"; base_cost: number;
   bonus_speed: number; bonus_critical: number; bonus_energetic: number;
-  cooldown_turns?: number; description?: string | null;
+  cooldown_turns?: number; description?: string | null; cost_percent?: number;
 };
 type BagEntry = { item_id: string; qty: number };
 type Item = { id: string; name: string; image_url: string | null; type: string };
@@ -45,11 +45,11 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   async function loadSkills() {
     const { data } = await supabase
       .from("character_skills")
-      .select("skill:skills(id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,description)")
+      .select("skill:skills(id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,description)")
       .eq("character_id", myCharId);
     const list = ((data as any[]) ?? []).map((r) => r.skill).filter(Boolean) as Skill[];
     setSkills(list);
-    if (list.length && !selectedSkill) { setSelectedSkill(list[0].id); setEnergy(list[0].base_cost); }
+    if (list.length && !selectedSkill) { setSelectedSkill(list[0].id); setEnergy(1); }
   }
   async function loadBag() {
     const { data: inv } = await supabase.from("inventory").select("ninja_bag,secondary_slots").eq("character_id", myCharId).maybeSingle();
@@ -103,6 +103,18 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const currentSkill = skills.find((s) => s.id === selectedSkill);
   const myCooldowns: Record<string, number> = (me?.cooldowns as any) ?? {};
   const currentCd = currentSkill ? (myCooldowns[currentSkill.id] ?? 0) : 0;
+  const currentPool: "ef" | "em" | "chakra" | null = currentSkill?.energy_type ?? null;
+  const currentPoolMax = currentPool && me ? (me[`${currentPool}_max` as const] as number) : 0;
+  const currentPct = Math.max(1, Math.min(100, Number(currentSkill?.cost_percent ?? 20)));
+  const currentMaxEnergy = currentPool ? Math.max(1, Math.floor((currentPoolMax * currentPct) / 100)) : 1;
+  const [skillTab, setSkillTab] = useState<"ef" | "em" | "chakra">("chakra");
+  useEffect(() => {
+    if (currentSkill) setSkillTab(currentSkill.energy_type);
+  }, [selectedSkill]);
+  useEffect(() => {
+    if (energy > currentMaxEnergy) setEnergy(currentMaxEnergy);
+  }, [currentMaxEnergy]);
+  const skillsByTab = useMemo(() => skills.filter((s) => s.energy_type === skillTab), [skills, skillTab]);
   const consumables = useMemo(() => bag.filter((e) => itemMap[e.item_id]?.type === "consumable"), [bag, itemMap]);
 
   // Enfileira TODAS as novas entradas do log (jogador + resposta do NPC vêm juntas do backend)
@@ -190,6 +202,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
 
   async function doAttack() {
     if (!currentSkill) return;
+    if (energy > currentMaxEnergy) { toast.error(`Custo máximo: ${currentMaxEnergy} (${currentPct}% de ${currentPool?.toUpperCase()}).`); return; }
     setBusy(true);
     try {
       await attack({ data: { session_id: sessionId, skill_id: currentSkill.id, energy_used: energy } });
