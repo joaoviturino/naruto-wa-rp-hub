@@ -1,0 +1,2 @@
+ALTER TABLE public.characters ADD COLUMN IF NOT EXISTS hp_current integer;
+ALTER TABLE public.skills ADD COLUMN IF NOT EXISTS cost_percent integer NOT NULL DEFAULT 20 CHECK (cost_percent BETWEEN 1 AND 100);
