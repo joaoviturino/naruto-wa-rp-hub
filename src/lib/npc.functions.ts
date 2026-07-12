@@ -128,3 +128,47 @@ export const updateLocationDangerZone = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+const npcTemplateStats = z.object({
+  hp_max: z.number().int().min(1).max(1_000_000),
+  energy_max: z.number().int().min(1).max(1_000_000),
+  xp: z.number().int().min(0).max(1_000_000),
+  avg_damage: z.number().int().min(0).max(1_000_000),
+  crit_chance: z.number().int().min(0).max(100),
+  crit_multiplier: z.number().min(1).max(10),
+  reward_xp: z.number().int().min(0).max(1_000_000),
+  reward_ryo: z.number().int().min(0).max(10_000_000),
+});
+
+export const applyNpcTemplate = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    target: z.enum(["all", "one"]),
+    npc_id: z.string().uuid().nullish(),
+    only_aggressive: z.boolean().default(true),
+    stats: npcTemplateStats,
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    let q = supabaseAdmin.from("npcs").update(data.stats as any);
+    if (data.target === "one") {
+      if (!data.npc_id) throw new Error("npc_id obrigatório");
+      q = q.eq("id", data.npc_id);
+    } else if (data.only_aggressive) {
+      q = q.eq("kind", "aggressive");
+    }
+    const { error, count } = await q.select("id", { count: "exact", head: true });
+    if (error) throw new Error(error.message);
+    return { ok: true, updated: count ?? 0 };
+  });
+
+export const listNpcsBasic = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin.from("npcs").select("id,name,kind").order("name");
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
