@@ -347,3 +347,70 @@ function BookEditor({ book, setBook, sections, items, adminUserId, onSave, onCan
     </div>
   );
 }
+
+function RequirementsEditor({ book, setBook }: { book: Partial<Book>; setBook: (b: Partial<Book>) => void }) {
+  const reqProfs: any[] = Array.isArray(book.required_profs) ? book.required_profs : [];
+  return (
+    <div className="rounded border border-border p-3 space-y-2">
+      <div className="text-xs uppercase tracking-widest text-muted-foreground">Requisitos para ler</div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <Label>Nível mínimo</Label>
+          <Input type="number" min={1} value={book.required_level ?? 1}
+            onChange={(e) => setBook({ ...book, required_level: Math.max(1, Number(e.target.value) || 1) })} />
+        </div>
+        <div>
+          <Label>Patente mínima</Label>
+          <Select value={book.required_rank ?? "none"} onValueChange={(v) => setBook({ ...book, required_rank: v === "none" ? null : v })}>
+            <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">— Qualquer —</SelectItem>
+              {NINJA_RANKS.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div className="space-y-1">
+        <Label>Proficiências mínimas</Label>
+        {reqProfs.map((p: any, i: number) => (
+          <div key={i} className="grid grid-cols-[1fr_90px_90px_auto] gap-2 items-center">
+            <Select value={p.skill_class ?? ""} onValueChange={(v) => {
+              const arr = [...reqProfs]; arr[i] = { ...arr[i], skill_class: v };
+              setBook({ ...book, required_profs: arr });
+            }}>
+              <SelectTrigger><SelectValue placeholder="Classe..." /></SelectTrigger>
+              <SelectContent className="max-h-72">{SKILL_CLASSES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+            </Select>
+            <Select value={p.nivel ?? "none"} onValueChange={(v) => {
+              const arr = [...reqProfs]; arr[i] = { ...arr[i], nivel: v === "none" ? null : v };
+              setBook({ ...book, required_profs: arr });
+            }}>
+              <SelectTrigger><SelectValue placeholder="Nível" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">—</SelectItem>
+                {SKILL_RANKS.map((r) => <SelectItem key={r} value={r}>Nv {r}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={p.maestria ?? "none"} onValueChange={(v) => {
+              const arr = [...reqProfs]; arr[i] = { ...arr[i], maestria: v === "none" ? null : v };
+              setBook({ ...book, required_profs: arr });
+            }}>
+              <SelectTrigger><SelectValue placeholder="Maestria" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">—</SelectItem>
+                {SKILL_RANKS.map((r) => <SelectItem key={r} value={r}>Ms {r}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Button size="icon" variant="destructive" onClick={() => {
+              const arr = reqProfs.filter((_, idx) => idx !== i);
+              setBook({ ...book, required_profs: arr });
+            }}><Trash2 size={14}/></Button>
+          </div>
+        ))}
+        <Button size="sm" variant="outline" onClick={() => setBook({ ...book, required_profs: [...reqProfs, { skill_class: "", nivel: null, maestria: null }] })}>
+          <Plus size={14}/> Adicionar proficiência
+        </Button>
+      </div>
+    </div>
+  );
+}
