@@ -53,8 +53,8 @@ export function PartyManager() {
 
       <section>
         <h4 className="font-display text-sm uppercase tracking-wider text-muted-foreground mb-2">Parties ativas ({parties.length})</h4>
-        <div className="scroll-panel rounded-lg overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="scroll-panel rounded-lg overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px]">
             <thead className="bg-secondary/50 text-xs uppercase tracking-wider">
               <tr>
                 <th className="text-left p-2">Líder</th>
@@ -96,8 +96,8 @@ export function PartyManager() {
 
       <section>
         <h4 className="font-display text-sm uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1"><Mail size={14} /> Convites ({invites.length})</h4>
-        <div className="scroll-panel rounded-lg overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="scroll-panel rounded-lg overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px]">
             <thead className="bg-secondary/50 text-xs uppercase tracking-wider">
               <tr>
                 <th className="text-left p-2">De</th>

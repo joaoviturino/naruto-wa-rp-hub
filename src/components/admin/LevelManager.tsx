@@ -84,7 +84,7 @@ export function LevelManager() {
 
       <div className="scroll-panel rounded-lg p-6">
         <h3 className="font-display text-xl text-gold">Prévia da curva</h3>
-        <table className="w-full text-sm mt-3">
+        <table className="w-full text-sm mt-3 min-w-[420px]">
           <thead className="text-xs text-muted-foreground">
             <tr>
               <th className="text-left p-2">Nível</th>

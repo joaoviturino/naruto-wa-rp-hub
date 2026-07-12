@@ -38,8 +38,8 @@ export function SkillManager({ adminUserId }: { adminUserId: string }) {
         <h3 className="font-display text-xl text-gold">Habilidades ({skills.length})</h3>
         <Button size="sm" onClick={() => { setEditing({}); setOpen(true); }}><Plus size={14} /> Nova habilidade</Button>
       </div>
-      <div className="scroll-panel rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="scroll-panel rounded-lg overflow-x-auto">
+        <table className="w-full text-sm min-w-[640px]">
           <thead className="bg-secondary/50 text-xs uppercase tracking-wider">
             <tr>
               <th className="text-left p-2">Img</th>

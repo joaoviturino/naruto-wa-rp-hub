@@ -79,8 +79,8 @@ export function ProficiencyManager() {
         </div>
       )}
 
-      <div className="scroll-panel rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="scroll-panel rounded-lg overflow-x-auto">
+        <table className="w-full text-sm min-w-[640px]">
           <thead className="bg-secondary/50">
             <tr>
               <th className="text-left p-3">Ordem</th>
