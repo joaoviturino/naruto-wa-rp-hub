@@ -34,6 +34,27 @@ export function LevelManager() {
     return rows;
   }, [cfg]);
 
+  const npcTiers = useMemo(() => {
+    const max = cfg.max_level;
+    const easyLv = Math.max(1, Math.round(max * 0.1));
+    const mediumLv = Math.max(easyLv + 1, Math.round(max * 0.4));
+    const hardLv = Math.max(mediumLv + 1, Math.round(max * 0.75));
+
+    const build = (label: string, lv: number, dmgPct: number, xpPct: number, ryoBase: number, drops: string) => {
+      const hp = totalXpForLevel(lv, cfg); // HP = XP acumulado (regra do jogo)
+      const damage = Math.max(5, Math.round(hp * dmgPct));
+      const xpReward = Math.max(10, Math.round(hp * xpPct));
+      const ryo = Math.round(ryoBase * lv);
+      return { label, lv, hp, damage, xpReward, ryo, drops };
+    };
+
+    return [
+      build("Fácil", easyLv, 0.06, 0.08, 25, "Consumíveis comuns (5–15%) · Ryo baixo"),
+      build("Médio", mediumLv, 0.09, 0.12, 60, "Itens incomuns (3–10%) · Pergaminhos raros (1–3%)"),
+      build("Difícil", hardLv, 0.14, 0.18, 150, "Itens raros (2–6%) · Habilidades exclusivas (0.5–2%)"),
+    ];
+  }, [cfg]);
+
   async function handleSave() {
     setSaving(true);
     try {
@@ -102,6 +123,46 @@ export function LevelManager() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="scroll-panel rounded-lg p-6 lg:col-span-2">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h3 className="font-display text-xl text-gold">Recomendações de NPCs por dificuldade</h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              Sugestões calculadas a partir da curva atual. Use como base ao configurar NPCs em <em>Danger Zones</em> — ajuste conforme necessário.
+            </p>
+          </div>
+          <div className="text-[10px] text-muted-foreground">
+            HP = XP acumulado do nível · Dano por turno é uma média sugerida.
+          </div>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-3 mt-4">
+          {npcTiers.map((t) => (
+            <div key={t.label} className="rounded-md border border-border p-4 bg-background/40">
+              <div className="flex items-center justify-between">
+                <span className="font-display text-lg text-gold">{t.label}</span>
+                <span className="text-xs text-muted-foreground">Nível ~{t.lv}</span>
+              </div>
+              <dl className="mt-3 space-y-1.5 text-sm">
+                <div className="flex justify-between"><dt className="text-muted-foreground">HP recomendado</dt><dd className="font-semibold">{t.hp.toLocaleString("pt-BR")}</dd></div>
+                <div className="flex justify-between"><dt className="text-muted-foreground">Dano médio/turno</dt><dd>{t.damage.toLocaleString("pt-BR")}</dd></div>
+                <div className="flex justify-between"><dt className="text-muted-foreground">XP concedido</dt><dd className="text-gold">+{t.xpReward.toLocaleString("pt-BR")}</dd></div>
+                <div className="flex justify-between"><dt className="text-muted-foreground">Ryo</dt><dd className="text-gold">+{t.ryo.toLocaleString("pt-BR")}</dd></div>
+              </dl>
+              <div className="mt-3 pt-3 border-t border-border">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Loot sugerido</div>
+                <p className="text-xs">{t.drops}</p>
+              </div>
+              <div className="mt-3 text-[10px] text-muted-foreground">
+                {t.label === "Fácil" && "Ideal para Genin iniciantes. Spawn frequente (60–80%)."}
+                {t.label === "Médio" && "Chunin em campo. Spawn moderado (25–40%), grupos de 2–3."}
+                {t.label === "Difícil" && "Elite Jounin/S-rank. Spawn raro (5–10%), recompense parties."}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
