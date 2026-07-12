@@ -19,7 +19,7 @@ type Character = {
   village: keyof typeof VILLAGES_MAP; element_primary: string; age: number | null;
   appearance: string | null; personality: string | null; history: string | null; bio: string | null;
   avatar_url: string | null; banner_url: string | null; inventory_bg_url: string | null;
-  xp: number; ryo: number | null;
+  xp: number; ryo: number | null; hp_current: number | null;
   ef_current: number | null; em_current: number | null; chakra_current: number | null;
   clan: { name: string; rarity: string; element_bonus: string | null } | null;
 };
@@ -35,7 +35,7 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
   async function load() {
     const { data } = await supabase
       .from("characters")
-      .select("id,user_id,nickname,phone_e164,village,element_primary,age,appearance,personality,history,bio,avatar_url,banner_url,inventory_bg_url,xp,ryo,ef_current,em_current,chakra_current,clan:clans(name,rarity,element_bonus)")
+      .select("id,user_id,nickname,phone_e164,village,element_primary,age,appearance,personality,history,bio,avatar_url,banner_url,inventory_bg_url,xp,ryo,hp_current,ef_current,em_current,chakra_current,clan:clans(name,rarity,element_bonus)")
       .eq("id", characterId).single();
     setChar(data as any);
   }
@@ -52,6 +52,8 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
   const efCur = char.ef_current == null ? s.ef : Math.min(s.ef, char.ef_current);
   const emCur = char.em_current == null ? s.em : Math.min(s.em, char.em_current);
   const ckCur = char.chakra_current == null ? s.chakra : Math.min(s.chakra, char.chakra_current);
+  const hpMax = Math.max(1, char.xp);
+  const hpCur = char.hp_current == null ? hpMax : Math.max(0, Math.min(hpMax, char.hp_current));
 
   async function updateField(field: string, url: string) {
     try {
@@ -100,6 +102,15 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
 
       {/* Status */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 p-4 sm:p-6">
+        <div className="sm:col-span-3 scroll-panel rounded-lg p-3 sm:p-4">
+          <div className="flex items-center justify-between mb-1">
+            <div className="text-[10px] sm:text-xs uppercase tracking-widest text-muted-foreground">Vida (HP = XP)</div>
+            <div className="text-xs tabular-nums text-emerald-400">{hpCur.toLocaleString("pt-BR")} / {hpMax.toLocaleString("pt-BR")}</div>
+          </div>
+          <div className="h-2 rounded overflow-hidden bg-input">
+            <div className="h-full bg-emerald-500 transition-all" style={{ width: `${(hpCur / hpMax) * 100}%` }} />
+          </div>
+        </div>
         <StatBlock label="Energia Física (EF)" value={`${efCur} / ${s.ef}`} accent="oklch(0.55 0.22 25)" />
         <StatBlock label="Energia Mental (EM)" value={`${emCur} / ${s.em}`} accent="oklch(0.6 0.15 220)" />
         <StatBlock label="Chakra total" value={`${ckCur} / ${s.chakra}`} accent="oklch(0.78 0.15 80)" />
