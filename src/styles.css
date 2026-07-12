@@ -9,6 +9,14 @@
  * Paleta ninja: preto profundo, vermelho sangue Uchiha, dourado da chama.
  */
 
+@font-face {
+  font-family: "Ninja Naruto";
+  src: url("/__l5e/assets-v1/b6b9d3b8-af11-4371-8771-dca5db7805e9/ninja-naruto.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
