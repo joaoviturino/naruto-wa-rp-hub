@@ -19,6 +19,7 @@ type Player = {
   nickname: string;
   avatar_url: string | null;
   sprite_url?: string | null;
+  hp: number; hp_max: number;
   ef: number; em: number; chakra: number;
   ef_max: number; em_max: number; chakra_max: number;
   alive: boolean;
@@ -59,24 +60,17 @@ function computeStats(xp: number) {
 }
 
 function damageTargetPlayer(p: Player, dmg: number): { pool: Pool; taken: number } {
-  // Retira do maior pool primeiro.
-  const pools: { key: Pool; v: number }[] = (
-    [
-      { key: "ef" as const, v: p.ef },
-      { key: "em" as const, v: p.em },
-      { key: "chakra" as const, v: p.chakra },
-    ]
-  ).sort((a, b) => b.v - a.v);
-  const target = pools[0];
-  const taken = Math.min(dmg, target.v);
-  p[target.key] = target.v - taken;
-  if (p.ef <= 0 && p.em <= 0 && p.chakra <= 0) p.alive = false;
-  return { pool: target.key, taken };
+  // O dano é aplicado ao HP (HP máximo = XP do personagem).
+  const taken = Math.min(dmg, Math.max(0, p.hp));
+  p.hp = Math.max(0, p.hp - taken);
+  if (p.hp <= 0) p.alive = false;
+  // Mantemos a tipagem retornando "chakra" como pool simbólica (mensagem trata como HP).
+  return { pool: "chakra", taken };
 }
 
 async function loadMyChar(context: { supabase: any; userId: string }) {
   const { data, error } = await context.supabase
-    .from("characters").select("id,nickname,avatar_url,inventory_bg_url,xp,current_location_id,ef_current,em_current,chakra_current").eq("user_id", context.userId).maybeSingle();
+    .from("characters").select("id,nickname,avatar_url,inventory_bg_url,xp,current_location_id,ef_current,em_current,chakra_current,hp_current").eq("user_id", context.userId).maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Sem personagem.");
   return data;
@@ -117,7 +111,7 @@ export const rollSpawn = createServerFn({ method: "POST" })
       const { data: party } = await supabaseAdmin.from("parties").select("leader_id").eq("id", partyIdEarly).maybeSingle();
       if (!party || party.leader_id !== me.id) return { session_id: null }; // só líder dispara
       const { data: mems } = await supabaseAdmin
-        .from("party_members").select("character:characters(id,nickname,avatar_url,inventory_bg_url,xp,current_location_id,ef_current,em_current,chakra_current)").eq("party_id", partyIdEarly);
+        .from("party_members").select("character:characters(id,nickname,avatar_url,inventory_bg_url,xp,current_location_id,ef_current,em_current,chakra_current,hp_current)").eq("party_id", partyIdEarly);
       partyMembersEarly = ((mems as any[]) ?? []).map((m: any) => m.character).filter(Boolean);
       // Todos os membros precisam estar no local
       const allHere = partyMembersEarly.every((c: any) => c.current_location_id === loc.id);
@@ -150,7 +144,7 @@ export const rollSpawn = createServerFn({ method: "POST" })
     const partyId: string | null = partyIdEarly;
     let members: any[] = partyIdEarly ? partyMembersEarly : [{
       id: me.id, nickname: me.nickname, avatar_url: me.avatar_url, inventory_bg_url: (me as any).inventory_bg_url, xp: me.xp,
-      ef_current: me.ef_current, em_current: me.em_current, chakra_current: me.chakra_current,
+      ef_current: me.ef_current, em_current: me.em_current, chakra_current: me.chakra_current, hp_current: (me as any).hp_current,
     }];
 
     const players: Player[] = members.map((c: any) => {
@@ -158,11 +152,14 @@ export const rollSpawn = createServerFn({ method: "POST" })
       const ef = c.ef_current == null ? s.ef : Math.min(s.ef, c.ef_current);
       const em = c.em_current == null ? s.em : Math.min(s.em, c.em_current);
       const ck = c.chakra_current == null ? s.chakra : Math.min(s.chakra, c.chakra_current);
+      const hpMax = Math.max(1, Number(c.xp ?? 0));
+      const hp = c.hp_current == null ? hpMax : Math.max(0, Math.min(hpMax, Number(c.hp_current)));
       return {
         character_id: c.id, nickname: c.nickname, avatar_url: c.avatar_url, sprite_url: c.inventory_bg_url ?? null,
+        hp, hp_max: hpMax,
         ef, em, chakra: ck,
         ef_max: s.ef, em_max: s.em, chakra_max: s.chakra,
-        alive: (ef + em + ck) > 0,
+        alive: hp > 0,
         cooldowns: {},
       };
     });
@@ -224,11 +221,14 @@ export const playerAttack = createServerFn({ method: "POST" })
       .from("character_skills").select("skill_id").eq("character_id", me.id).eq("skill_id", data.skill_id).maybeSingle();
     if (!owned) throw new Error("Você não conhece essa habilidade.");
     const { data: skill } = await context.supabase.from("skills")
-      .select("id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class,animation_url,sound_url").eq("id", data.skill_id).maybeSingle();
+      .select("id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class,animation_url,sound_url").eq("id", data.skill_id).maybeSingle();
     if (!skill) throw new Error("Habilidade inexistente.");
-    if (data.energy_used < skill.base_cost) throw new Error(`Custo mínimo: ${skill.base_cost}.`);
-
     const pool = (skill.energy_type as Pool);
+    const poolMax = pool === "ef" ? activePlayer.ef_max : pool === "em" ? activePlayer.em_max : activePlayer.chakra_max;
+    const costPct = Math.max(1, Math.min(100, Number((skill as any).cost_percent ?? 20)));
+    const maxEnergy = Math.max(1, Math.floor((poolMax * costPct) / 100));
+    if (data.energy_used < 1) throw new Error("Energia mínima: 1.");
+    if (data.energy_used > maxEnergy) throw new Error(`Custo máximo desta habilidade: ${maxEnergy} (${costPct}% da pool ${pool.toUpperCase()}).`);
     if (activePlayer[pool] < data.energy_used) throw new Error(`Energia insuficiente (${pool.toUpperCase()}).`);
     activePlayer[pool] -= data.energy_used;
 
@@ -306,7 +306,7 @@ export const playerAttack = createServerFn({ method: "POST" })
 async function persistPools(supabaseAdmin: any, state: CombatState) {
   for (const p of state.players) {
     await supabaseAdmin.from("characters").update({
-      ef_current: p.ef, em_current: p.em, chakra_current: p.chakra,
+      ef_current: p.ef, em_current: p.em, chakra_current: p.chakra, hp_current: p.hp,
     }).eq("id", p.character_id);
   }
 }
@@ -453,22 +453,24 @@ export const consumeInCombat = createServerFn({ method: "POST" })
     await supabaseAdmin.from("inventory").update(patch).eq("character_id", me.id);
 
     const restore = (item as any).meta?.restore as
-      | { pool: "ef" | "em" | "chakra" | "all"; mode: "flat" | "percent"; amount: number } | null | undefined;
+      | { pool: "ef" | "em" | "chakra" | "hp" | "all"; mode: "flat" | "percent"; amount: number } | null | undefined;
     let restoredMsg = "";
     if (restore && restore.amount > 0) {
-      const pools: Pool[] = restore.pool === "all" ? ["ef","em","chakra"] : [restore.pool as Pool];
-      const maxOf = { ef: activePlayer.ef_max, em: activePlayer.em_max, chakra: activePlayer.chakra_max } as const;
+      const targets: Array<"ef"|"em"|"chakra"|"hp"> = restore.pool === "all"
+        ? ["hp","ef","em","chakra"]
+        : [restore.pool];
+      const maxOf = { ef: activePlayer.ef_max, em: activePlayer.em_max, chakra: activePlayer.chakra_max, hp: activePlayer.hp_max } as const;
       const gains: string[] = [];
-      for (const p of pools) {
+      for (const p of targets) {
         const gain = restore.mode === "percent"
           ? Math.round((maxOf[p] * restore.amount) / 100)
           : Math.round(restore.amount);
-        const before = activePlayer[p];
-        activePlayer[p] = Math.min(maxOf[p], before + gain);
-        gains.push(`${p.toUpperCase()} +${activePlayer[p] - before}`);
+        const before = (activePlayer as any)[p] as number;
+        (activePlayer as any)[p] = Math.min(maxOf[p], before + gain);
+        gains.push(`${p.toUpperCase()} +${(activePlayer as any)[p] - before}`);
       }
       restoredMsg = ` (${gains.join(", ")})`;
-      activePlayer.alive = (activePlayer.ef + activePlayer.em + activePlayer.chakra) > 0;
+      activePlayer.alive = activePlayer.hp > 0;
     }
 
     log.push({
