@@ -266,6 +266,8 @@ function BookEditor({ book, setBook, sections, items, adminUserId, onSave, onCan
         {adminUserId && <ImageUpload label="Capa" bucket="library" userId={adminUserId} onUploaded={(url) => setBook({ ...book, cover_url: url })} />}
       </div>
 
+      <RequirementsEditor book={book} setBook={setBook} />
+
       <div className="rounded border border-border p-3 space-y-2">
         <div className="text-xs uppercase tracking-widest text-muted-foreground">Recompensas ao concluir a leitura</div>
         <div className="grid grid-cols-2 gap-2">
