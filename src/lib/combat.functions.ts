@@ -352,6 +352,11 @@ async function applyRewards(supabaseAdmin: any, npcId: string, state: CombatStat
 }
 
 async function runNpcTurn(supabaseAdmin: any, npcId: string, state: CombatState, log: LogEntry[], incomingSpeed: number) {
+  const { data: npcCfg } = await supabaseAdmin
+    .from("npcs").select("avg_damage,crit_chance,crit_multiplier").eq("id", npcId).maybeSingle();
+  const avgDamage = Number(npcCfg?.avg_damage ?? 0);
+  const critChance = Math.max(0, Math.min(100, Number(npcCfg?.crit_chance ?? 10)));
+  const critMul = Math.max(1, Number(npcCfg?.crit_multiplier ?? 1.5));
   const { data: skills } = await supabaseAdmin
     .from("npc_skills").select("skill:skills(id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic,animation_url,sound_url)").eq("npc_id", npcId);
   const pool = ((skills as any[]) ?? []).map((r: any) => r.skill).filter(Boolean);
@@ -365,7 +370,17 @@ async function runNpcTurn(supabaseAdmin: any, npcId: string, state: CombatState,
   const energy = Math.min(state.npc.energy, Math.max(skill.base_cost, Math.floor(state.npc.energy_max / 4)));
   const effective = energy * Number(skill.bonus_energetic);
   const speed = effective * Number(skill.bonus_speed);
-  const damage = Math.round(effective * Number(skill.bonus_critical));
+  // Base do dano: dano_medio configurado (variação ±20%) ou fórmula por energia.
+  let baseDamage: number;
+  if (avgDamage > 0) {
+    const variance = 0.8 + Math.random() * 0.4; // 0.8x..1.2x
+    baseDamage = Math.max(1, Math.round(avgDamage * variance));
+  } else {
+    baseDamage = Math.round(effective * Number(skill.bonus_critical));
+  }
+  // Rolagem de crítico do NPC.
+  const isCrit = Math.random() * 100 < critChance;
+  const damage = isCrit ? Math.round(baseDamage * critMul) : baseDamage;
 
   // Regra "quem é mais rápido pega primeiro": se speed do jogador for maior E jogador matou o NPC, NPC não age.
   // Aqui já sabemos que NPC não morreu — mas se a fala for do jogador mais rápido, aplicamos multiplicador de dano reduzido (30% menos) como penalidade por reação.
@@ -381,10 +396,10 @@ async function runNpcTurn(supabaseAdmin: any, npcId: string, state: CombatState,
   log.push({
     seq: log.length + 1, actor: "npc", actor_name: state.npc.name, target_name: target.nickname,
     skill_name: skill.name, energy_type: skill.energy_type as Pool, energy_used: energy,
-    effective, damage: finalDamage, speed, crit_mul: Number(skill.bonus_critical),
+    effective, damage: finalDamage, speed, crit_mul: isCrit ? critMul : Number(skill.bonus_critical),
     animation_url: (skill as any).animation_url ?? null,
     sound_url: (skill as any).sound_url ?? null,
-    msg: `${state.npc.name} usa ${skill.name} → ${target.nickname} sofre ${taken.taken} de dano na vida${speedPenalty < 1 ? " (reação lenta)" : ""}.`,
+    msg: `${state.npc.name} usa ${skill.name}${isCrit ? " (CRÍTICO!)" : ""} → ${target.nickname} sofre ${taken.taken} de dano na vida${speedPenalty < 1 ? " (reação lenta)" : ""}.`,
   });
   return { energyRemaining: state.npc.energy - energy };
 }
