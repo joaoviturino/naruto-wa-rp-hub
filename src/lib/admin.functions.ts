@@ -40,7 +40,7 @@ const restoreEffect = z.object({
 }).nullable().optional();
 const metaSchema = z.object({
   restore: restoreEffect,
-}).partial().nullable().optional();
+}).partial().passthrough().nullable().optional();
 
 /** Send a test message via the bot queue. */
 export const enqueueMessage = createServerFn({ method: "POST" })
