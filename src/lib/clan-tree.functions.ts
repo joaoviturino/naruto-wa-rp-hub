@@ -30,7 +30,7 @@ export const getClanTree = createServerFn({ method: "POST" })
   });
 
 const nodeInput = z.object({
-  id: z.string().uuid().optional(),
+  id: z.string().optional(),
   kind: z.enum(["skill","buff"]),
   skill_id: z.string().uuid().nullish(),
   buff_type: z.enum(["hp_bonus","energy_bonus","skill_power_bonus","skill_cost_reduction"]).nullish(),
