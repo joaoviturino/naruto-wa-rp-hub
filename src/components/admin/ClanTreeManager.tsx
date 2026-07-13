@@ -7,11 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useServerFn } from "@tanstack/react-start";
 import { getClanTree, saveClanTree } from "@/lib/clan-tree.functions";
 import { toast } from "sonner";
-import { Link2, Plus, Save, Trash2, X, Zap, Sparkles } from "lucide-react";
+import { Plus, Save, Trash2, Zap, Sparkles } from "lucide-react";
 
 type Skill = { id: string; name: string; rank: string; image_url: string | null };
 type Node = {
-  id: string; // uuid ou tmp-*
+  id: string;
   kind: "skill" | "buff";
   skill_id: string | null;
   buff_type: "hp_bonus" | "energy_bonus" | "skill_power_bonus" | "skill_cost_reduction" | null;
@@ -35,17 +35,18 @@ const BUFF_LABEL: Record<string, string> = {
   skill_cost_reduction: "Custo % -",
 };
 
+type Handle = "t" | "r" | "b" | "l";
+
 export function ClanTreeManager() {
   const [clans, setClans] = useState<any[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [clanId, setClanId] = useState<string>("");
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
-  const [connectMode, setConnectMode] = useState(false);
-  const [pendingA, setPendingA] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ id: string; offX: number; offY: number; moved: boolean } | null>(null);
+  const [wire, setWire] = useState<{ from: string; x: number; y: number } | null>(null);
 
   const getTree = useServerFn(getClanTree);
   const save = useServerFn(saveClanTree);
@@ -61,7 +62,7 @@ export function ClanTreeManager() {
     const res: any = await getTree({ data: { clan_id: id } });
     setNodes((res.nodes ?? []).map((n: any) => ({ ...n })));
     setEdges((res.edges ?? []).map((e: any) => ({ ...e })));
-    setSelectedId(null); setPendingA(null);
+    setSelectedId(null);
   }, [getTree]);
 
   useEffect(() => { loadAll(); }, []);
@@ -97,37 +98,61 @@ export function ClanTreeManager() {
     setNodes((ns) => ns.filter((n) => n.id !== id));
     setEdges((es) => es.filter((e) => e.from_node_id !== id && e.to_node_id !== id));
     if (selectedId === id) setSelectedId(null);
-    if (pendingA === id) setPendingA(null);
   }
 
-  function onPointerDown(e: React.PointerEvent, id: string) {
-    if (connectMode) return;
-    const el = wrapRef.current!; const r = el.getBoundingClientRect();
-    const n = nodes.find((x) => x.id === id)!;
-    dragRef.current = { id, offX: e.clientX - r.left - n.x, offY: e.clientY - r.top - n.y, moved: false };
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  function relCoords(e: React.PointerEvent) {
+    const el = wrapRef.current!;
+    const rect = el.getBoundingClientRect();
+    return { x: e.clientX - rect.left + el.scrollLeft, y: e.clientY - rect.top + el.scrollTop };
   }
-  function onPointerMove(e: React.PointerEvent) {
+
+  function onNodePointerDown(e: React.PointerEvent, id: string) {
+    e.stopPropagation();
+    const { x, y } = relCoords(e);
+    const n = nodes.find((x) => x.id === id)!;
+    dragRef.current = { id, offX: x - n.x, offY: y - n.y, moved: false };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }
+  function onNodePointerMove(e: React.PointerEvent) {
     if (!dragRef.current) return;
-    const el = wrapRef.current!; const r = el.getBoundingClientRect();
+    const { x, y } = relCoords(e);
     const { id, offX, offY } = dragRef.current;
     dragRef.current.moved = true;
-    const x = Math.max(0, e.clientX - r.left - offX);
-    const y = Math.max(0, e.clientY - r.top - offY);
-    setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, x, y } : n)));
+    const nx = Math.max(0, x - offX);
+    const ny = Math.max(0, y - offY);
+    setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, x: nx, y: ny } : n)));
   }
-  function onPointerUp() { dragRef.current = null; }
+  function onNodePointerUp() {
+    if (!dragRef.current) return;
+    const { id, moved } = dragRef.current;
+    dragRef.current = null;
+    if (!moved) setSelectedId(id);
+  }
 
-  function handleClick(id: string) {
-    if (dragRef.current?.moved) return;
-    if (!connectMode) { setSelectedId(id); return; }
-    if (!pendingA) { setPendingA(id); return; }
-    if (pendingA === id) { setPendingA(null); return; }
-    const exists = edges.find((e) => e.from_node_id === pendingA && e.to_node_id === id);
-    if (exists) { toast.info("Já existe conexão."); setPendingA(null); return; }
-    setEdges((es) => [...es, { from_node_id: pendingA!, to_node_id: id }]);
-    setPendingA(null);
+  function onHandlePointerDown(e: React.PointerEvent, id: string) {
+    e.stopPropagation();
+    const { x, y } = relCoords(e);
+    setWire({ from: id, x, y });
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   }
+  function onHandlePointerMove(e: React.PointerEvent) {
+    if (!wire) return;
+    const { x, y } = relCoords(e);
+    setWire({ ...wire, x, y });
+  }
+  function onHandlePointerUp(e: React.PointerEvent) {
+    if (!wire) return;
+    const target = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+    const nodeEl = target?.closest("[data-node-id]") as HTMLElement | null;
+    const toId = nodeEl?.dataset.nodeId;
+    const fromId = wire.from;
+    setWire(null);
+    if (!toId || toId === fromId) return;
+    const exists = edges.find((e) => e.from_node_id === fromId && e.to_node_id === toId);
+    if (exists) { toast.info("Já existe conexão."); return; }
+    setEdges((es) => [...es, { from_node_id: fromId, to_node_id: toId }]);
+  }
+
   function removeEdge(idx: number) {
     setEdges((es) => es.filter((_, i) => i !== idx));
   }
@@ -153,8 +178,8 @@ export function ClanTreeManager() {
     } catch (e: any) { toast.error(e.message); }
   }
 
-  const maxX = Math.max(700, ...nodes.map((n) => n.x + NODE_W + 40));
-  const maxY = Math.max(500, ...nodes.map((n) => n.y + NODE_H + 40));
+  const maxX = Math.max(700, ...nodes.map((n) => n.x + NODE_W + 60));
+  const maxY = Math.max(500, ...nodes.map((n) => n.y + NODE_H + 80));
 
   return (
     <div className="space-y-4">
@@ -167,10 +192,6 @@ export function ClanTreeManager() {
           </Select>
         </div>
         <Button variant="outline" size="sm" disabled={!clanId} onClick={addBuffNode}><Sparkles size={14} className="mr-1" />Buff</Button>
-        <Button variant={connectMode ? "default" : "outline"} size="sm" disabled={!clanId}
-          onClick={() => { setConnectMode((v) => !v); setPendingA(null); }}>
-          <Link2 size={14} className="mr-1" />{connectMode ? "Conectando..." : "Conectar"}
-        </Button>
         <Button disabled={!clanId} onClick={persist}><Save size={14} className="mr-1" />Salvar</Button>
       </div>
 
@@ -178,12 +199,13 @@ export function ClanTreeManager() {
         <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
           <div className="scroll-panel rounded-lg p-3">
             <div className="text-xs text-muted-foreground mb-2">
-              {connectMode ? (pendingA ? "Clique no destino…" : "Clique no nó de origem") : "Arraste para mover · clique para editar · clique na linha para remover"}
+              Arraste o corpo do nó para mover · arraste um ponto azul até outro nó para conectar · clique numa linha para remover
             </div>
             <div ref={wrapRef}
-              className="relative w-full overflow-auto rounded border border-border bg-[url('/textures/wood.jpg')] bg-black/40"
-              style={{ height: 520, touchAction: "none" }}
-              onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
+              className="relative w-full overflow-auto rounded border border-border bg-black/40"
+              style={{ height: 520, touchAction: "none", backgroundImage: "radial-gradient(oklch(0.4 0.02 260 / 0.4) 1px, transparent 1px)", backgroundSize: "24px 24px" }}
+              onPointerMove={(e) => { onNodePointerMove(e); onHandlePointerMove(e); }}
+              onPointerUp={(e) => { onNodePointerUp(); onHandlePointerUp(e); }}>
               <div className="relative" style={{ width: maxX, height: maxY }}>
                 <svg className="absolute inset-0 pointer-events-none" width={maxX} height={maxY}>
                   {edges.map((e, idx) => {
@@ -192,31 +214,38 @@ export function ClanTreeManager() {
                     if (!a || !b) return null;
                     const x1 = a.x + NODE_W / 2, y1 = a.y + NODE_H / 2;
                     const x2 = b.x + NODE_W / 2, y2 = b.y + NODE_H / 2;
+                    const mx = (x1 + x2) / 2;
+                    const d = `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`;
                     return (
                       <g key={idx} className="pointer-events-auto">
-                        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="oklch(0.7 0.15 80)" strokeWidth={3} strokeOpacity={0.6} />
-                        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="transparent" strokeWidth={16}
+                        <path d={d} fill="none" stroke="oklch(0.7 0.18 240)" strokeWidth={2.5} strokeOpacity={0.7} />
+                        <path d={d} fill="none" stroke="transparent" strokeWidth={16}
                           style={{ cursor: "pointer" }}
                           onClick={() => { if (confirm("Remover esta conexão?")) removeEdge(idx); }} />
                       </g>
                     );
                   })}
+                  {wire && (() => {
+                    const a = nodes.find((n) => n.id === wire.from); if (!a) return null;
+                    const x1 = a.x + NODE_W / 2, y1 = a.y + NODE_H / 2;
+                    const mx = (x1 + wire.x) / 2;
+                    return <path d={`M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${wire.y}, ${wire.x} ${wire.y}`}
+                      fill="none" stroke="oklch(0.75 0.2 240)" strokeWidth={2.5} strokeDasharray="6 4" />;
+                  })()}
                 </svg>
                 {nodes.map((n) => {
                   const isSel = selectedId === n.id;
-                  const isPending = pendingA === n.id;
                   const s = n.skill_id ? skillMap.get(n.skill_id) : null;
                   return (
                     <div key={n.id}
-                      onPointerDown={(e) => onPointerDown(e, n.id)}
-                      onClick={() => handleClick(n.id)}
+                      data-node-id={n.id}
+                      onPointerDown={(e) => onNodePointerDown(e, n.id)}
                       title={n.kind === "skill" ? s?.name : (n.buff_label ?? "Buff")}
-                      className={`absolute select-none rounded-full border-4 shadow-lg flex items-center justify-center overflow-hidden ${
-                        isPending ? "border-blood"
-                          : isSel ? "border-gold"
+                      className={`absolute select-none rounded-full border-4 shadow-lg flex items-center justify-center overflow-hidden group cursor-grab active:cursor-grabbing ${
+                        isSel ? "border-gold"
                           : n.kind === "buff" ? "border-emerald-500/70"
                           : "border-slate-500/70"
-                      } ${connectMode ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"}`}
+                      }`}
                       style={{ left: n.x, top: n.y, width: NODE_W, height: NODE_H, background: "hsl(var(--card))" }}>
                       {n.kind === "skill" ? (
                         s?.image_url
@@ -228,6 +257,19 @@ export function ClanTreeManager() {
                           <div className="text-[10px] font-bold">{n.buff_label ?? BUFF_LABEL[n.buff_type ?? ""] ?? "Buff"}</div>
                         </div>
                       )}
+                      {(["t","r","b","l"] as Handle[]).map((h) => {
+                        const style: React.CSSProperties =
+                          h === "t" ? { top: -6, left: "50%", transform: "translateX(-50%)" } :
+                          h === "b" ? { bottom: -6, left: "50%", transform: "translateX(-50%)" } :
+                          h === "l" ? { left: -6, top: "50%", transform: "translateY(-50%)" } :
+                                      { right: -6, top: "50%", transform: "translateY(-50%)" };
+                        return (
+                          <span key={h}
+                            onPointerDown={(e) => onHandlePointerDown(e, n.id)}
+                            className="absolute w-3.5 h-3.5 rounded-full bg-sky-400 border-2 border-background shadow hover:ring-2 hover:ring-sky-300/60 cursor-crosshair opacity-70 group-hover:opacity-100 z-10"
+                            style={style} />
+                        );
+                      })}
                     </div>
                   );
                 })}
