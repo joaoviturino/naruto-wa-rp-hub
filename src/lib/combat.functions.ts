@@ -226,15 +226,16 @@ export const playerAttack = createServerFn({ method: "POST" })
       .from("character_skills").select("skill_id").eq("character_id", me.id).eq("skill_id", data.skill_id).maybeSingle();
     if (!owned) throw new Error("Você não conhece essa habilidade.");
     const { data: skill } = await context.supabase.from("skills")
-      .select("id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class,animation_url,sound_url").eq("id", data.skill_id).maybeSingle();
+      .select("id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class,skill_class,meta,animation_url,sound_url").eq("id", data.skill_id).maybeSingle();
     if (!skill) throw new Error("Habilidade inexistente.");
+    const combatClass = String((skill as any).skill_class ?? skill.req_class ?? "").toLowerCase();
 
     // Shurikenjutsu: consome N "ferramentas" (kunai/shuriken/etc.) da bolsa
     // e usa o bônus crítico da primeira ferramenta encontrada.
     let toolCritMul = 1;
     let toolConsumedLabel: string | null = null;
     let toolQtyConsumed = 0;
-    if (skill.req_class === "shurikenjutsu") {
+    if (combatClass === "shurikenjutsu") {
       const toolQtyNeeded = Math.max(1, Number((skill as any).meta?.tool_qty ?? 1));
       const { data: inv } = await supabaseAdmin.from("inventory")
         .select("ninja_bag,secondary_slots").eq("character_id", me.id).maybeSingle();
@@ -278,7 +279,7 @@ export const playerAttack = createServerFn({ method: "POST" })
     // porcentagem (skill.meta.durability_cost_pct, padrão 10%) da durabilidade
     // MÁXIMA da arma a cada golpe. Se ambos slots estiverem quebrados, bloqueia.
     const brokenWeapons: string[] = [];
-    if (skill.req_class === "kenjutsu") {
+    if (combatClass === "kenjutsu") {
       const { data: inv } = await supabaseAdmin.from("inventory")
         .select("primary_weapon_id,secondary_weapon_id,primary_weapon_durability,secondary_weapon_durability")
         .eq("character_id", me.id).maybeSingle();
@@ -294,12 +295,16 @@ export const playerAttack = createServerFn({ method: "POST" })
         ? await supabaseAdmin.from("items").select("id,name,durability").in("id", weaponIds)
         : { data: [] as any[] };
       const rowOf = (id: string) => (itemRows ?? []).find((r: any) => r.id === id);
-      // Precisa haver ao menos uma arma com durabilidade > 0 (ou nula = infinita).
+      // Precisa haver ao menos uma arma utilizável. Armas equipadas antes da
+      // coluna de durabilidade podem estar com durabilidade atual nula; nesse
+      // caso inicializamos pelo valor máximo do item e aplicamos o desgaste.
       const usable = slots.filter((s) => {
         const wid = (inv as any)[s.idCol];
         if (!wid) return false;
+        const row = rowOf(wid);
         const cur = (inv as any)[s.durCol];
-        return cur === null || cur === undefined || Number(cur) > 0;
+        if (cur === null || cur === undefined) return row?.durability == null || Number(row.durability) > 0;
+        return Number(cur) > 0;
       });
       if (usable.length === 0) {
         throw new Error("Todas as suas espadas estão quebradas. Repare ou substitua antes de usar Kenjutsu.");
@@ -309,12 +314,20 @@ export const playerAttack = createServerFn({ method: "POST" })
       for (const s of slots) {
         const wid = (inv as any)[s.idCol] as string | null;
         if (!wid) continue;
-        const cur = (inv as any)[s.durCol];
-        if (cur === null || cur === undefined) continue; // infinita
         const row = rowOf(wid);
-        const maxDur = Math.max(1, Number(row?.durability ?? cur));
+        const itemMaxDur = row?.durability;
+        if (itemMaxDur === null || itemMaxDur === undefined) continue; // arma sem durabilidade configurada = infinita
+        const maxDur = Math.max(1, Number(itemMaxDur));
+        const cur = (inv as any)[s.durCol];
+        const currentDur = cur === null || cur === undefined ? maxDur : Number(cur);
+        if (currentDur <= 0) {
+          patch[s.idCol] = null;
+          patch[s.durCol] = null;
+          brokenWeapons.push(row?.name ?? "arma");
+          continue;
+        }
         const wear = Math.max(1, Math.ceil((maxDur * pct) / 100));
-        const next = Number(cur) - wear;
+        const next = currentDur - wear;
         if (next <= 0) {
           patch[s.idCol] = null;
           patch[s.durCol] = null;
