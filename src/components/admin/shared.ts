@@ -29,7 +29,7 @@ export const VILLAGES = [
 export const ELEMENTS = ["katon","suiton","fuuton","doton","raiton"] as const;
 
 export const ITEM_TYPES = [
-  "consumable","tool","armor_helmet","armor_vest","armor_pants","armor_boots","weapon_primary","weapon_secondary",
+  "consumable","tool","armor_helmet","armor_vest","armor_pants","armor_boots","weapon","weapon_primary","weapon_secondary",
 ] as const;
 
 export const CLASSIFICATIONS = ["ofensivo","defensivo","suplementar"] as const;

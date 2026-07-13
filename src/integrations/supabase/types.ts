@@ -657,9 +657,11 @@ export type Database = {
           ninja_bag: Json
           pants_id: string | null
           primary_unlocked: boolean
+          primary_weapon_durability: number | null
           primary_weapon_id: string | null
           secondary_slots: Json
           secondary_unlocked: boolean
+          secondary_weapon_durability: number | null
           secondary_weapon_id: string | null
           updated_at: string
           vest_id: string | null
@@ -671,9 +673,11 @@ export type Database = {
           ninja_bag?: Json
           pants_id?: string | null
           primary_unlocked?: boolean
+          primary_weapon_durability?: number | null
           primary_weapon_id?: string | null
           secondary_slots?: Json
           secondary_unlocked?: boolean
+          secondary_weapon_durability?: number | null
           secondary_weapon_id?: string | null
           updated_at?: string
           vest_id?: string | null
@@ -685,9 +689,11 @@ export type Database = {
           ninja_bag?: Json
           pants_id?: string | null
           primary_unlocked?: boolean
+          primary_weapon_durability?: number | null
           primary_weapon_id?: string | null
           secondary_slots?: Json
           secondary_unlocked?: boolean
+          secondary_weapon_durability?: number | null
           secondary_weapon_id?: string | null
           updated_at?: string
           vest_id?: string | null
@@ -2110,6 +2116,7 @@ export type Database = {
         | "armor_boots"
         | "weapon_primary"
         | "weapon_secondary"
+        | "weapon"
       minigame_kind: "cleanup" | "sequence"
       msg_status: "pending" | "sent" | "failed"
       ninja_rank:
@@ -2341,6 +2348,7 @@ export const Constants = {
         "armor_boots",
         "weapon_primary",
         "weapon_secondary",
+        "weapon",
       ],
       minigame_kind: ["cleanup", "sequence"],
       msg_status: ["pending", "sent", "failed"],

@@ -242,12 +242,20 @@ export const equipItem = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { char, inv } = await loadOwnInventory(context);
     const { data: item, error: itErr } = await context.supabase
-      .from("items").select("id,type,name").eq("id", data.item_id).maybeSingle();
+      .from("items").select("id,type,name,durability").eq("id", data.item_id).maybeSingle();
     if (itErr) throw new Error(itErr.message);
     if (!item) throw new Error("Item inexistente.");
-    const slotCol = SLOT_BY_TYPE[item.type];
-    if (!slotCol) throw new Error("Este item não pode ser equipado.");
     const unlocks = weaponUnlocks((char as any).proficiencies);
+    let slotCol = SLOT_BY_TYPE[item.type];
+    // Arma genérica: escolhe primeiro slot livre (primário → secundário).
+    if (item.type === "weapon") {
+      if (unlocks.primary && !inv.primary_weapon_id) slotCol = "primary_weapon_id";
+      else if (unlocks.secondary && !inv.secondary_weapon_id) slotCol = "secondary_weapon_id";
+      else if (unlocks.primary) slotCol = "primary_weapon_id";
+      else if (unlocks.secondary) slotCol = "secondary_weapon_id";
+      else throw new Error("Nenhum slot de arma disponível. Requer Kenjutsu Nível E.");
+    }
+    if (!slotCol) throw new Error("Este item não pode ser equipado.");
     if (item.type === "weapon_primary" && !unlocks.primary) throw new Error("Slot primário bloqueado. Requer Kenjutsu Nível E.");
     if (item.type === "weapon_secondary" && !unlocks.secondary) throw new Error("Slot secundário bloqueado. Requer Kenjutsu Maestria E.");
 
@@ -262,6 +270,12 @@ export const equipItem = createServerFn({ method: "POST" })
     const patch: any = { ninja_bag: bag };
     if (data.source === "secondary_slots") patch.secondary_slots = src;
     patch[slotCol] = data.item_id;
+    // Inicializa a durabilidade individual da arma no slot correspondente.
+    if (slotCol === "primary_weapon_id") {
+      patch.primary_weapon_durability = item.durability ?? null;
+    } else if (slotCol === "secondary_weapon_id") {
+      patch.secondary_weapon_durability = item.durability ?? null;
+    }
     const { error } = await context.supabase.from("inventory").update(patch).eq("character_id", char.id);
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -280,6 +294,8 @@ export const unequipItem = createServerFn({ method: "POST" })
     const bag = await addWithCapacity(context.supabase, normalizeBag(inv.ninja_bag), currentId, 1, NINJA_BAG_CAP);
     const patch: any = { ninja_bag: bag };
     patch[data.slot] = null;
+    if (data.slot === "primary_weapon_id") patch.primary_weapon_durability = null;
+    if (data.slot === "secondary_weapon_id") patch.secondary_weapon_durability = null;
     const { error } = await context.supabase.from("inventory").update(patch).eq("character_id", char.id);
     if (error) throw new Error(error.message);
     return { ok: true };
