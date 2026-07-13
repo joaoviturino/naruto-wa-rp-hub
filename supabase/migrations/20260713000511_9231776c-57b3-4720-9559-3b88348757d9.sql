@@ -1,0 +1,1 @@
+ALTER TABLE public.npcs ADD COLUMN IF NOT EXISTS music_url text;
