@@ -260,6 +260,45 @@ export const playerAttack = createServerFn({ method: "POST" })
       await supabaseAdmin.from("inventory").update(patch).eq("character_id", me.id);
     }
 
+    // Kenjutsu: reduz durabilidade das armas equipadas (ambos os slots, se houver).
+    const brokenWeapons: string[] = [];
+    if (skill.req_class === "kenjutsu") {
+      const { data: inv } = await supabaseAdmin.from("inventory")
+        .select("primary_weapon_id,secondary_weapon_id,primary_weapon_durability,secondary_weapon_durability,ninja_bag")
+        .eq("character_id", me.id).maybeSingle();
+      if (!inv || (!inv.primary_weapon_id && !inv.secondary_weapon_id)) {
+        throw new Error("Você precisa de uma arma equipada para usar Kenjutsu.");
+      }
+      const slots: Array<{ idCol: "primary_weapon_id" | "secondary_weapon_id"; durCol: "primary_weapon_durability" | "secondary_weapon_durability" }> = [
+        { idCol: "primary_weapon_id", durCol: "primary_weapon_durability" },
+        { idCol: "secondary_weapon_id", durCol: "secondary_weapon_durability" },
+      ];
+      const patch: any = {};
+      const weaponIds = slots.map((s) => inv[s.idCol]).filter(Boolean) as string[];
+      const { data: itemRows } = weaponIds.length
+        ? await supabaseAdmin.from("items").select("id,name").in("id", weaponIds)
+        : { data: [] as any[] };
+      const nameOf = (id: string) => (itemRows ?? []).find((r: any) => r.id === id)?.name ?? "arma";
+      for (const s of slots) {
+        const wid = inv[s.idCol] as string | null;
+        if (!wid) continue;
+        const cur = inv[s.durCol];
+        // Durabilidade nula = infinita, apenas ignora.
+        if (cur === null || cur === undefined) continue;
+        const next = Number(cur) - 1;
+        if (next <= 0) {
+          patch[s.idCol] = null;
+          patch[s.durCol] = null;
+          brokenWeapons.push(nameOf(wid));
+        } else {
+          patch[s.durCol] = next;
+        }
+      }
+      if (Object.keys(patch).length) {
+        await supabaseAdmin.from("inventory").update(patch).eq("character_id", me.id);
+      }
+    }
+
     const pool = (skill.energy_type as Pool);
     const poolMax = pool === "ef" ? activePlayer.ef_max : pool === "em" ? activePlayer.em_max : activePlayer.chakra_max;
     const costPct = Math.max(1, Math.min(100, Number((skill as any).cost_percent ?? 20)));
