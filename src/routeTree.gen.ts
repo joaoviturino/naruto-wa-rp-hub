@@ -15,6 +15,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedPartyRouteImport } from './routes/_authenticated/party'
 import { Route as AuthenticatedLibraryRouteImport } from './routes/_authenticated/library'
+import { Route as AuthenticatedClanTreeRouteImport } from './routes/_authenticated/clan-tree'
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated/chat'
 import { Route as AuthenticatedCharacterRouteImport } from './routes/_authenticated/character'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
@@ -49,6 +50,11 @@ const AuthenticatedLibraryRoute = AuthenticatedLibraryRouteImport.update({
   path: '/library',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedClanTreeRoute = AuthenticatedClanTreeRouteImport.update({
+  id: '/clan-tree',
+  path: '/clan-tree',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedChatRoute = AuthenticatedChatRouteImport.update({
   id: '/chat',
   path: '/chat',
@@ -77,6 +83,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AuthenticatedAdminRoute
   '/character': typeof AuthenticatedCharacterRoute
   '/chat': typeof AuthenticatedChatRoute
+  '/clan-tree': typeof AuthenticatedClanTreeRoute
   '/library': typeof AuthenticatedLibraryRoute
   '/party': typeof AuthenticatedPartyRoute
   '/duel/$id': typeof AuthenticatedDuelIdRoute
@@ -88,6 +95,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AuthenticatedAdminRoute
   '/character': typeof AuthenticatedCharacterRoute
   '/chat': typeof AuthenticatedChatRoute
+  '/clan-tree': typeof AuthenticatedClanTreeRoute
   '/library': typeof AuthenticatedLibraryRoute
   '/party': typeof AuthenticatedPartyRoute
   '/duel/$id': typeof AuthenticatedDuelIdRoute
@@ -101,6 +109,7 @@ export interface FileRoutesById {
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/character': typeof AuthenticatedCharacterRoute
   '/_authenticated/chat': typeof AuthenticatedChatRoute
+  '/_authenticated/clan-tree': typeof AuthenticatedClanTreeRoute
   '/_authenticated/library': typeof AuthenticatedLibraryRoute
   '/_authenticated/party': typeof AuthenticatedPartyRoute
   '/_authenticated/duel/$id': typeof AuthenticatedDuelIdRoute
@@ -114,6 +123,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/character'
     | '/chat'
+    | '/clan-tree'
     | '/library'
     | '/party'
     | '/duel/$id'
@@ -125,6 +135,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/character'
     | '/chat'
+    | '/clan-tree'
     | '/library'
     | '/party'
     | '/duel/$id'
@@ -137,6 +148,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin'
     | '/_authenticated/character'
     | '/_authenticated/chat'
+    | '/_authenticated/clan-tree'
     | '/_authenticated/library'
     | '/_authenticated/party'
     | '/_authenticated/duel/$id'
@@ -193,6 +205,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLibraryRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/clan-tree': {
+      id: '/_authenticated/clan-tree'
+      path: '/clan-tree'
+      fullPath: '/clan-tree'
+      preLoaderRoute: typeof AuthenticatedClanTreeRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/chat': {
       id: '/_authenticated/chat'
       path: '/chat'
@@ -228,6 +247,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedCharacterRoute: typeof AuthenticatedCharacterRoute
   AuthenticatedChatRoute: typeof AuthenticatedChatRoute
+  AuthenticatedClanTreeRoute: typeof AuthenticatedClanTreeRoute
   AuthenticatedLibraryRoute: typeof AuthenticatedLibraryRoute
   AuthenticatedPartyRoute: typeof AuthenticatedPartyRoute
   AuthenticatedDuelIdRoute: typeof AuthenticatedDuelIdRoute
@@ -237,6 +257,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedCharacterRoute: AuthenticatedCharacterRoute,
   AuthenticatedChatRoute: AuthenticatedChatRoute,
+  AuthenticatedClanTreeRoute: AuthenticatedClanTreeRoute,
   AuthenticatedLibraryRoute: AuthenticatedLibraryRoute,
   AuthenticatedPartyRoute: AuthenticatedPartyRoute,
   AuthenticatedDuelIdRoute: AuthenticatedDuelIdRoute,
