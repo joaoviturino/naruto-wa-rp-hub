@@ -202,7 +202,7 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
           <Field label="Cooldown (turnos)">
             <Input type="number" min={0} max={50} value={f.cooldown_turns ?? 0} onChange={(e) => up("cooldown_turns", Number(e.target.value))} />
           </Field>
-          {f.req_class === "shurikenjutsu" && (
+          {(f.req_class === "shurikenjutsu" || f.skill_class === "shurikenjutsu") && (
             <Field label="Qtd. de ferramentas consumidas por uso">
               <Input type="number" min={1} max={999}
                 value={f.meta?.tool_qty ?? 1}
@@ -213,7 +213,7 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
               </div>
             </Field>
           )}
-          {f.req_class === "kenjutsu" && (
+          {(f.req_class === "kenjutsu" || f.skill_class === "kenjutsu") && (
             <Field label="Desgaste da espada por golpe (% da durabilidade máx.)">
               <Input type="number" min={1} max={100}
                 value={f.meta?.durability_cost_pct ?? 10}
