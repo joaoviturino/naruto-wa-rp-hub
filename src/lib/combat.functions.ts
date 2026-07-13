@@ -226,7 +226,13 @@ export const playerAttack = createServerFn({ method: "POST" })
     const pool = (skill.energy_type as Pool);
     const poolMax = pool === "ef" ? activePlayer.ef_max : pool === "em" ? activePlayer.em_max : activePlayer.chakra_max;
     const costPct = Math.max(1, Math.min(100, Number((skill as any).cost_percent ?? 20)));
-    const maxEnergy = Math.max(1, Math.floor((poolMax * costPct) / 100));
+    // Buffs de clã: reduzem custo e amplificam dano
+    const { getCharBuffs } = await import("./clan-tree.functions");
+    const buffs = await getCharBuffs(context.supabase, me.id);
+    const costReduction = Math.max(0, Math.min(90, Number(buffs.skill_cost_reduction ?? 0)));
+    const powerBonus = Math.max(0, Number(buffs.skill_power_bonus ?? 0));
+    const maxEnergyBase = Math.max(1, Math.floor((poolMax * costPct) / 100));
+    const maxEnergy = Math.max(1, Math.floor(maxEnergyBase * (1 - costReduction / 100)));
     if (data.energy_used < 1) throw new Error("Energia mínima: 1.");
     if (data.energy_used > maxEnergy) throw new Error(`Custo máximo desta habilidade: ${maxEnergy} (${costPct}% da pool ${pool.toUpperCase()}).`);
     if (activePlayer[pool] < data.energy_used) throw new Error(`Energia insuficiente (${pool.toUpperCase()}).`);
@@ -244,7 +250,8 @@ export const playerAttack = createServerFn({ method: "POST" })
     }
     const effective = data.energy_used * Number(skill.bonus_energetic);
     const speed = effective * Number(skill.bonus_speed);
-    const damage = Math.round(effective * Number(skill.bonus_critical) * masteryMul);
+    const powerMul = 1 + powerBonus / 100;
+    const damage = Math.round(effective * Number(skill.bonus_critical) * masteryMul * powerMul);
 
     // Aplica cooldown
     if (Number(skill.cooldown_turns ?? 0) > 0) {
