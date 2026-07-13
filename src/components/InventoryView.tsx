@@ -278,6 +278,11 @@ function BagCell({ item, entry, onEquip, onConsume, onDrop, onMove, moveLabel }:
         </div>
         <div className="text-[10px] text-muted-foreground px-2 -mt-1 capitalize">{item.type?.replace(/_/g, " ")}</div>
         {item.description && <div className="text-[11px] text-muted-foreground px-2 pb-1">{item.description}</div>}
+        {(item.type === "weapon" || item.type === "weapon_primary" || item.type === "weapon_secondary") && (
+          <div className="text-[11px] px-2 pb-1">
+            Durabilidade máx.: <span className="font-semibold">{item.durability ?? "∞"}</span>
+          </div>
+        )}
         {canEquip && <Button variant="secondary" size="sm" className="w-full justify-start" onClick={onEquip}>Equipar</Button>}
         {canConsume && <Button variant="secondary" size="sm" className="w-full justify-start" onClick={onConsume}>Consumir</Button>}
         <Button variant="ghost" size="sm" className="w-full justify-start" onClick={onMove}>
