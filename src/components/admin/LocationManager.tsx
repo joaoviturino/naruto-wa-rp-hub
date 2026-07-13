@@ -137,7 +137,15 @@ export function LocationManager() {
     : null;
 
   return (
-    <div className="grid gap-4 md:grid-cols-[320px_1fr]">
+    <div className="space-y-4">
+      <LocationMapEditor
+        locations={locs.map((l) => ({ id: l.id, name: l.name, image_url: l.image_url, map_x: l.map_x ?? 0, map_y: l.map_y ?? 0 }))}
+        connections={conns}
+        selectedId={selected}
+        onSelect={setSelected}
+        onChange={load}
+      />
+      <div className="grid gap-4 md:grid-cols-[320px_1fr]">
       <div className="space-y-3">
         <div className="scroll-panel rounded-lg p-4 space-y-2">
           <h3 className="font-display text-lg text-gold">Novo local</h3>
@@ -334,6 +342,7 @@ export function LocationManager() {
       ) : (
         <div className="text-muted-foreground text-sm p-6">Selecione um local à esquerda para editar suas conexões.</div>
       )}
+      </div>
     </div>
   );
 }
