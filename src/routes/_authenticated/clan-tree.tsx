@@ -17,6 +17,8 @@ function ClanTreePage() {
   const load = useServerFn(getClanTree);
   const unlock = useServerFn(unlockClanNode);
   const [state, setState] = useState<any>(null);
+  const [myXp, setMyXp] = useState<number>(0);
+  const [myRank, setMyRank] = useState<string>("estudante");
 
   const reload = useCallback(async () => {
     // precisa saber o clan do char primeiro; getClanTree exige clan_id.
@@ -26,6 +28,9 @@ function ClanTreePage() {
     if (!me.user) return;
     const { data: ch } = await supabase.from("characters").select("clan_id").eq("user_id", me.user.id).maybeSingle();
     if (!ch?.clan_id) { setState({ empty: true }); return; }
+    const { data: full } = await supabase.from("characters").select("xp,rank").eq("user_id", me.user.id).maybeSingle();
+    setMyXp(full?.xp ?? 0);
+    setMyRank(full?.rank ?? "estudante");
     const res: any = await load({ data: { clan_id: ch.clan_id } });
     setState(res);
   }, [load]);
@@ -42,10 +47,23 @@ function ClanTreePage() {
   const maxX = Math.max(700, ...nodes.map((n) => n.x + NODE_W + 40));
   const maxY = Math.max(500, ...nodes.map((n) => n.y + NODE_H + 40));
 
+  const RANKS = ["estudante","genin","chunin","jonin","anbu","kage"];
+  function requirementsFor(node: any) {
+    const incoming = edges.filter((e) => e.to_node_id === node.id).map((e) => e.from_node_id);
+    const unlockedCount = incoming.filter((id) => progress.has(id)).length;
+    const needed = node.min_prereqs != null ? Math.min(node.min_prereqs, incoming.length) : incoming.length;
+    const prereqOk = unlockedCount >= needed;
+    const xpOk = node.xp_required == null || myXp >= node.xp_required;
+    const rankOk = !node.rank_required || RANKS.indexOf(myRank) >= RANKS.indexOf(node.rank_required);
+    const missing: string[] = [];
+    if (!prereqOk) missing.push(`${unlockedCount}/${needed} pré-requisito(s) conectado(s)`);
+    if (!xpOk) missing.push(`${node.xp_required} XP (você tem ${myXp})`);
+    if (!rankOk) missing.push(`patente ${node.rank_required}`);
+    return { ok: prereqOk && xpOk && rankOk, missing };
+  }
   function canUnlock(nodeId: string) {
-    const incoming = edges.filter((e) => e.to_node_id === nodeId).map((e) => e.from_node_id);
-    if (!incoming.length) return true;
-    return incoming.every((id) => progress.has(id));
+    const n = nodes.find((x) => x.id === nodeId);
+    return n ? requirementsFor(n).ok : false;
   }
 
   async function onUnlock(n: any) {
@@ -77,13 +95,17 @@ function ClanTreePage() {
           </svg>
           {nodes.map((n) => {
             const owned = progress.has(n.id);
-            const avail = !owned && canUnlock(n.id);
+            const req = requirementsFor(n);
+            const avail = !owned && req.ok;
             const border = owned ? "border-emerald-500" : avail ? "border-gold animate-pulse" : "border-slate-600 opacity-60";
             return (
               <button key={n.id}
                 onClick={() => avail && onUnlock(n)}
                 disabled={!avail}
-                title={n.kind === "skill" ? n.skill?.name : n.buff_label}
+                title={
+                  (n.kind === "skill" ? n.skill?.name : n.buff_label) +
+                  (owned ? "" : req.missing.length ? `\nRequer: ${req.missing.join(" · ")}` : "")
+                }
                 className={`absolute rounded-full border-4 shadow-lg overflow-hidden flex items-center justify-center bg-card ${border} ${avail ? "cursor-pointer hover:scale-105 transition-transform" : "cursor-default"}`}
                 style={{ left: n.x, top: n.y, width: NODE_W, height: NODE_H }}>
                 {n.kind === "skill" ? (
