@@ -248,8 +248,8 @@ export const playerAttack = createServerFn({ method: "POST" })
       if (idx >= 0) source = "bag";
       else { idx = pickFrom(sec); if (idx >= 0) source = "sec"; }
       if (source === null) throw new Error("Você não possui ferramentas (kunai, shuriken, etc.) para usar essa habilidade.");
-      const arr = source === "bag" ? bag : sec;
-      const entry = arr[idx];
+      const arr: any[] = source === "bag" ? bag : sec;
+      const entry: any = arr[idx];
       const qty = Number(entry.qty ?? 1) - 1;
       if (qty <= 0) arr.splice(idx, 1); else arr[idx] = { ...entry, qty };
       const toolRow = (itemRows ?? []).find((r: any) => r.id === entry.item_id);
