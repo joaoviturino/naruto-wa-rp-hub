@@ -228,6 +228,38 @@ export const playerAttack = createServerFn({ method: "POST" })
     const { data: skill } = await context.supabase.from("skills")
       .select("id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class,animation_url,sound_url").eq("id", data.skill_id).maybeSingle();
     if (!skill) throw new Error("Habilidade inexistente.");
+
+    // Shurikenjutsu: consome 1 "ferramenta" da bolsa e usa seu bônus crítico.
+    let toolCritMul = 1;
+    let toolConsumedName: string | null = null;
+    if (skill.req_class === "shurikenjutsu") {
+      const { data: inv } = await supabaseAdmin.from("inventory")
+        .select("ninja_bag,secondary_slots").eq("character_id", me.id).maybeSingle();
+      const bag = Array.isArray(inv?.ninja_bag) ? [...inv!.ninja_bag] : [];
+      const sec = Array.isArray(inv?.secondary_slots) ? [...inv!.secondary_slots] : [];
+      const ids = Array.from(new Set([...bag, ...sec].map((e: any) => e?.item_id).filter(Boolean)));
+      const { data: itemRows } = ids.length
+        ? await supabaseAdmin.from("items").select("id,name,meta").in("id", ids)
+        : { data: [] as any[] };
+      const toolIds = new Set((itemRows ?? []).filter((r: any) => r?.meta?.is_tool).map((r: any) => r.id));
+      const pickFrom = (arr: any[]) => arr.findIndex((e: any) => toolIds.has(e?.item_id));
+      let source: "bag" | "sec" | null = null;
+      let idx = pickFrom(bag);
+      if (idx >= 0) source = "bag";
+      else { idx = pickFrom(sec); if (idx >= 0) source = "sec"; }
+      if (source === null) throw new Error("Você não possui ferramentas (kunai, shuriken, etc.) para usar essa habilidade.");
+      const arr = source === "bag" ? bag : sec;
+      const entry = arr[idx];
+      const qty = Number(entry.qty ?? 1) - 1;
+      if (qty <= 0) arr.splice(idx, 1); else arr[idx] = { ...entry, qty };
+      const toolRow = (itemRows ?? []).find((r: any) => r.id === entry.item_id);
+      toolConsumedName = toolRow?.name ?? "ferramenta";
+      toolCritMul = 1 + Math.max(0, Number(toolRow?.meta?.crit_bonus ?? 0)) / 100;
+      const patch: any = {};
+      if (source === "bag") patch.ninja_bag = bag; else patch.secondary_slots = sec;
+      await supabaseAdmin.from("inventory").update(patch).eq("character_id", me.id);
+    }
+
     const pool = (skill.energy_type as Pool);
     const poolMax = pool === "ef" ? activePlayer.ef_max : pool === "em" ? activePlayer.em_max : activePlayer.chakra_max;
     const costPct = Math.max(1, Math.min(100, Number((skill as any).cost_percent ?? 20)));
@@ -256,7 +288,7 @@ export const playerAttack = createServerFn({ method: "POST" })
     const effective = data.energy_used * Number(skill.bonus_energetic);
     const speed = effective * Number(skill.bonus_speed);
     const powerMul = 1 + powerBonus / 100;
-    const damage = Math.round(effective * Number(skill.bonus_critical) * masteryMul * powerMul);
+    const damage = Math.round(effective * Number(skill.bonus_critical) * masteryMul * powerMul * toolCritMul);
 
     // Aplica cooldown
     if (Number(skill.cooldown_turns ?? 0) > 0) {
@@ -270,6 +302,7 @@ export const playerAttack = createServerFn({ method: "POST" })
       animation_url: (skill as any).animation_url ?? null,
       sound_url: (skill as any).sound_url ?? null,
       msg: `${activePlayer.nickname} usa ${skill.name} (${pool.toUpperCase()} ${data.energy_used})${masteryMul > 1 ? ` [Maestria ×${masteryMul.toFixed(1)}]` : ""} → ${damage} de dano.`,
+      ...(toolConsumedName ? { tool_consumed: toolConsumedName, tool_crit_mul: toolCritMul } : {}),
     });
     state.npc.hp = Math.max(0, state.npc.hp - damage);
 
