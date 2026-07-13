@@ -236,6 +236,30 @@ export function NpcManager() {
                   <input ref={bgRef} type="file" accept="image/*" className="hidden" onChange={uploadBattleBg} />
                 </div>
                 )}
+                <div className="pt-2 border-t border-border/40">
+                  <div className="text-xs text-muted-foreground mb-1">Música de fundo (toca ao interagir)</div>
+                  <Input
+                    placeholder="Link direto mp3/ogg (opcional)"
+                    defaultValue={sel.music_url ?? ""}
+                    onBlur={async (e) => {
+                      const v = e.target.value.trim() || null;
+                      if ((sel.music_url ?? null) === v) return;
+                      await save({ data: { ...sel, music_url: v } } as any);
+                      load();
+                    }}
+                    className="mb-2"
+                  />
+                  <div className="flex gap-2 items-center">
+                    <Button variant="outline" size="sm" onClick={() => musicRef.current?.click()}>
+                      <Upload size={14} className="mr-1" /> Upload áudio
+                    </Button>
+                    {sel.music_url && (
+                      <Button variant="ghost" size="sm" onClick={async () => { await save({ data: { ...sel, music_url: null } } as any); load(); }}>Remover</Button>
+                    )}
+                    {sel.music_url && <audio src={sel.music_url} controls className="h-8 max-w-[220px]" />}
+                  </div>
+                  <input ref={musicRef} type="file" accept="audio/*" className="hidden" onChange={uploadMusic} />
+                </div>
               </div>
             </div>
             {sel.kind === "aggressive" && (
