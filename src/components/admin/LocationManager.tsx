@@ -10,8 +10,10 @@ import { useServerFn } from "@tanstack/react-start";
 import { updateLocationDangerZone, setLocationNpcs } from "@/lib/npc.functions";
 import { setLocationMinigames } from "@/lib/minigame.functions";
 import { setLocationLibraries } from "@/lib/library.functions";
+import { LocationMapEditor } from "./LocationMapEditor";
 
 type Loc = { id: string; name: string; description: string | null; image_url: string | null;
+  map_x?: number; map_y?: number;
   is_danger_zone?: boolean; spawn_chance?: number; spawn_tick_seconds?: number };
 type Conn = { id: string; a_id: string; b_id: string };
 type Npc = { id: string; name: string; kind: "aggressive" | "shop" | "reward" | "learning" };
@@ -39,7 +41,7 @@ export function LocationManager() {
 
   async function load() {
     const [l, c, n, ln, mg, lmg, ls, llb] = await Promise.all([
-      supabase.from("locations").select("id,name,description,image_url,is_danger_zone,spawn_chance,spawn_tick_seconds").order("name"),
+      supabase.from("locations").select("id,name,description,image_url,map_x,map_y,is_danger_zone,spawn_chance,spawn_tick_seconds").order("name"),
       supabase.from("location_connections").select("id,a_id,b_id"),
       supabase.from("npcs").select("id,name,kind").order("name"),
       supabase.from("location_npcs").select("location_id,npc_id"),
