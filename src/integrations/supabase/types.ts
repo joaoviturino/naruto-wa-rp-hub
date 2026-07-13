@@ -469,9 +469,11 @@ export type Database = {
           created_at: string
           id: string
           kind: string
+          min_prereqs: number | null
           rank_required: string | null
           skill_id: string | null
           x: number
+          xp_required: number | null
           y: number
         }
         Insert: {
@@ -483,9 +485,11 @@ export type Database = {
           created_at?: string
           id?: string
           kind: string
+          min_prereqs?: number | null
           rank_required?: string | null
           skill_id?: string | null
           x?: number
+          xp_required?: number | null
           y?: number
         }
         Update: {
@@ -497,9 +501,11 @@ export type Database = {
           created_at?: string
           id?: string
           kind?: string
+          min_prereqs?: number | null
           rank_required?: string | null
           skill_id?: string | null
           x?: number
+          xp_required?: number | null
           y?: number
         }
         Relationships: [
