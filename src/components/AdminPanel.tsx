@@ -9,6 +9,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { enqueueMessage, resetBotSession, requestBotQr, setUserXp, restoreEnergies } from "@/lib/admin.functions";
 import { toast } from "sonner";
 import { PlayerEditor } from "@/components/admin/PlayerEditor";
+import { AdminPlayerViewer } from "@/components/admin/AdminPlayerViewer";
 import { ItemManager } from "@/components/admin/ItemManager";
 import { SkillManager } from "@/components/admin/SkillManager";
 import { MissionManager } from "@/components/admin/MissionManager";
@@ -22,7 +23,7 @@ import { LibraryManager } from "@/components/admin/LibraryManager";
 import { LevelManager } from "@/components/admin/LevelManager";
 import { ProficiencyManager } from "@/components/admin/ProficiencyManager";
 import { NINJA_RANKS } from "@/components/admin/shared";
-import { Pencil, BatteryCharging } from "lucide-react";
+import { Pencil, BatteryCharging, Eye } from "lucide-react";
 
 export function AdminPanel() {
   const [adminUserId, setAdminUserId] = useState<string>("");
@@ -101,6 +102,8 @@ function Players() {
   const [chars, setChars] = useState<any[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [viewingId, setViewingId] = useState<string | null>(null);
+  const [viewOpen, setViewOpen] = useState(false);
   const setXpFn = useServerFn(setUserXp);
   const restoreFn = useServerFn(restoreEnergies);
   async function load() {
@@ -151,6 +154,10 @@ function Players() {
                   <Button size="sm" variant="outline" onClick={() => { setEditingId(c.id); setOpen(true); }}>
                     <Pencil size={14} /> Editar
                   </Button>
+                  <Button size="sm" variant="outline" onClick={() => { setViewingId(c.id); setViewOpen(true); }}
+                    title="Ver ficha, inventário e databook do jogador">
+                    <Eye size={14} /> Ver
+                  </Button>
                 </div>
               </td>
             </tr>
@@ -160,6 +167,7 @@ function Players() {
       </table>
     </div>
     <PlayerEditor characterId={editingId} open={open} onOpenChange={setOpen} onSaved={load} />
+    <AdminPlayerViewer characterId={viewingId} open={viewOpen} onOpenChange={setViewOpen} />
     </>
   );
 }
