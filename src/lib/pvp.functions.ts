@@ -201,6 +201,72 @@ export const submitTurn = createServerFn({ method: "POST" })
       const invest = Math.round(eMax * (pct / 100));
       if (eCur < invest) throw new Error(`Energia insuficiente (${eCur}/${invest}).`);
 
+      // Kenjutsu também desgasta as espadas no duelo narrativo. A classe real
+      // da técnica fica em skill_class; req_class é só requisito de aprendizado.
+      const combatClass = String(skill.skill_class ?? skill.req_class ?? "").toLowerCase();
+      if (combatClass === "kenjutsu") {
+        const { data: inv } = await context.supabase.from("inventory")
+          .select("primary_weapon_id,secondary_weapon_id,primary_weapon_durability,secondary_weapon_durability")
+          .eq("character_id", me.id).maybeSingle();
+        if (!inv || (!inv.primary_weapon_id && !inv.secondary_weapon_id)) {
+          throw new Error("Você precisa de uma espada equipada para usar Kenjutsu.");
+        }
+        const slots = [
+          { idCol: "primary_weapon_id", durCol: "primary_weapon_durability" },
+          { idCol: "secondary_weapon_id", durCol: "secondary_weapon_durability" },
+        ] as const;
+        const weaponIds = slots.map((s) => (inv as any)[s.idCol]).filter(Boolean) as string[];
+        const { data: itemRows } = weaponIds.length
+          ? await context.supabase.from("items").select("id,name,durability").in("id", weaponIds)
+          : { data: [] as any[] };
+        const rowOf = (id: string) => (itemRows ?? []).find((r: any) => r.id === id);
+        const usable = slots.filter((s) => {
+          const wid = (inv as any)[s.idCol];
+          if (!wid) return false;
+          const row = rowOf(wid);
+          const cur = (inv as any)[s.durCol];
+          if (cur === null || cur === undefined) return row?.durability == null || Number(row.durability) > 0;
+          return Number(cur) > 0;
+        });
+        if (usable.length === 0) {
+          throw new Error("Todas as suas espadas estão quebradas. Repare ou substitua antes de usar Kenjutsu.");
+        }
+        const durabilityPct = Math.max(1, Math.min(100, Number((skill as any).meta?.durability_cost_pct ?? 10)));
+        const patch: any = {};
+        const brokenWeapons: string[] = [];
+        for (const s of slots) {
+          const wid = (inv as any)[s.idCol] as string | null;
+          if (!wid) continue;
+          const row = rowOf(wid);
+          const itemMaxDur = row?.durability;
+          if (itemMaxDur === null || itemMaxDur === undefined) continue;
+          const maxDur = Math.max(1, Number(itemMaxDur));
+          const cur = (inv as any)[s.durCol];
+          const currentDur = cur === null || cur === undefined ? maxDur : Number(cur);
+          if (currentDur <= 0) {
+            patch[s.idCol] = null;
+            patch[s.durCol] = null;
+            brokenWeapons.push(row?.name ?? "arma");
+            continue;
+          }
+          const wear = Math.max(1, Math.ceil((maxDur * durabilityPct) / 100));
+          const next = currentDur - wear;
+          if (next <= 0) {
+            patch[s.idCol] = null;
+            patch[s.durCol] = null;
+            brokenWeapons.push(row?.name ?? "arma");
+          } else {
+            patch[s.durCol] = next;
+          }
+        }
+        if (Object.keys(patch).length) {
+          const { error: invErr } = await context.supabase.from("inventory").update(patch).eq("character_id", me.id);
+          if (invErr) throw new Error(invErr.message);
+        }
+        effects.weapon_durability_cost_pct = durabilityPct;
+        if (brokenWeapons.length) effects.broken_weapons = brokenWeapons;
+      }
+
       // Proficiência de maestria do atacante para a classe da habilidade
       const profs = (me.proficiencies ?? {}) as Record<string, { nivel?: string; maestria?: string }>;
       const mLetter = skill.skill_class ? profs[skill.skill_class]?.maestria : undefined;
