@@ -18,6 +18,7 @@ type LearnBlock = { id: string; kind: "text" | "image"; text?: string | null; im
 type Npc = {
   id: string; name: string; image_url: string | null; description: string | null;
   battle_bg_url: string | null;
+  music_url: string | null;
   hp_max: number; xp: number; energy_max: number;
   reward_xp: number; reward_ryo: number; drop_table: DropRow[];
   avg_damage?: number; crit_chance?: number; crit_multiplier?: number;
@@ -76,6 +77,7 @@ export function NpcManager() {
       ...r,
       kind: (r.kind ?? "aggressive") as NpcKind,
       battle_bg_url: r.battle_bg_url ?? null,
+      music_url: r.music_url ?? null,
       drop_table: Array.isArray(r.drop_table) ? r.drop_table : [],
       shop_items: Array.isArray(r.shop_items) ? r.shop_items : [],
       reward_items: Array.isArray(r.reward_items) ? r.reward_items : [],
