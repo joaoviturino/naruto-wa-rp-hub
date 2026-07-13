@@ -275,6 +275,31 @@ export function ClanTreeManager() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs">XP mínimo</Label>
+                    <Input type="number" min={0} value={selected.xp_required ?? ""}
+                      placeholder="—"
+                      onChange={(e) => {
+                        const v = e.target.value.trim();
+                        updateSelected({ xp_required: v === "" ? null : Math.max(0, Number(v)) });
+                      }} />
+                  </div>
+                  <div>
+                    <Label className="text-xs" title="Quantos nós conectados de entrada precisam estar destravados. Vazio = exige todos.">
+                      Prérequisitos min.
+                    </Label>
+                    <Input type="number" min={0} value={selected.min_prereqs ?? ""}
+                      placeholder="todos"
+                      onChange={(e) => {
+                        const v = e.target.value.trim();
+                        updateSelected({ min_prereqs: v === "" ? null : Math.max(0, Number(v)) });
+                      }} />
+                  </div>
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Vazio em "Prérequisitos min." = exige todos os nós conectados de entrada destravados.
+                </p>
                 {selected.kind === "buff" && (
                   <>
                     <div>
