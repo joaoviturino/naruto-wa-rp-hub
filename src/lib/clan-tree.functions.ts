@@ -14,7 +14,7 @@ export const getClanTree = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const [{ data: nodes }, { data: edges }] = await Promise.all([
       context.supabase.from("clan_tree_nodes")
-        .select("id,clan_id,kind,skill_id,buff_type,buff_value,buff_label,buff_icon_url,x,y,rank_required, skill:skills(id,name,rank,image_url,description)")
+        .select("id,clan_id,kind,skill_id,buff_type,buff_value,buff_label,buff_icon_url,x,y,rank_required,min_prereqs,xp_required, skill:skills(id,name,rank,image_url,description)")
         .eq("clan_id", data.clan_id),
       context.supabase.from("clan_tree_edges").select("id,from_node_id,to_node_id").eq("clan_id", data.clan_id),
     ]);
@@ -40,6 +40,8 @@ const nodeInput = z.object({
   x: z.number().int(),
   y: z.number().int(),
   rank_required: z.string().max(24).nullish(),
+  min_prereqs: z.number().int().min(0).max(50).nullish(),
+  xp_required: z.number().int().min(0).nullish(),
 });
 const edgeInput = z.object({ from_node_id: z.string(), to_node_id: z.string() });
 
@@ -73,6 +75,8 @@ export const saveClanTree = createServerFn({ method: "POST" })
         buff_icon_url: n.buff_icon_url ?? null,
         x: n.x, y: n.y,
         rank_required: n.rank_required ?? null,
+        min_prereqs: n.min_prereqs ?? null,
+        xp_required: n.xp_required ?? null,
       };
       if (n.id && existingIds.has(n.id)) {
         const { error } = await supabaseAdmin.from("clan_tree_nodes").update(payload).eq("id", n.id);
@@ -113,19 +117,31 @@ export const unlockClanNode = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ node_id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
     const { data: me } = await context.supabase.from("characters")
-      .select("id,clan_id,xp").eq("user_id", context.userId).maybeSingle();
+      .select("id,clan_id,xp,rank").eq("user_id", context.userId).maybeSingle();
     if (!me?.id) throw new Error("Sem personagem.");
     const { data: node } = await context.supabase.from("clan_tree_nodes")
-      .select("id,clan_id,kind,buff_type,buff_value,rank_required").eq("id", data.node_id).maybeSingle();
+      .select("id,clan_id,kind,buff_type,buff_value,rank_required,min_prereqs,xp_required").eq("id", data.node_id).maybeSingle();
     if (!node) throw new Error("Nó inexistente.");
     if (node.clan_id !== me.clan_id) throw new Error("Este nó não pertence ao seu clã.");
+
+    // XP mínimo
+    if (node.xp_required != null && (me.xp ?? 0) < node.xp_required) {
+      throw new Error(`XP insuficiente. Requer ${node.xp_required} XP.`);
+    }
+    // Rank mínimo
+    if (node.rank_required) {
+      const order = ["estudante","genin","chunin","jonin","anbu","kage"];
+      const need = order.indexOf(node.rank_required);
+      const have = order.indexOf(me.rank ?? "estudante");
+      if (need > -1 && have < need) throw new Error(`Requer patente ${node.rank_required} ou superior.`);
+    }
 
     // Já destravado?
     const { data: has } = await context.supabase.from("character_clan_progress")
       .select("node_id").eq("character_id", me.id).eq("node_id", node.id).maybeSingle();
     if (has) return { ok: true, already: true };
 
-    // Verificar pré-requisitos (todas as edges de origem devem estar destravadas)
+    // Verificar pré-requisitos (nós conectados de entrada)
     const { data: incoming } = await context.supabase.from("clan_tree_edges")
       .select("from_node_id").eq("to_node_id", node.id);
     const reqIds = ((incoming as any[]) ?? []).map((r) => r.from_node_id);
@@ -133,8 +149,11 @@ export const unlockClanNode = createServerFn({ method: "POST" })
       const { data: unlocked } = await context.supabase.from("character_clan_progress")
         .select("node_id").eq("character_id", me.id).in("node_id", reqIds);
       const unlockedSet = new Set(((unlocked as any[]) ?? []).map((r) => r.node_id));
-      const missing = reqIds.filter((id: string) => !unlockedSet.has(id));
-      if (missing.length) throw new Error("Você ainda não destravou os nós anteriores.");
+      const unlockedCount = reqIds.filter((id: string) => unlockedSet.has(id)).length;
+      const needed = node.min_prereqs != null ? Math.min(node.min_prereqs, reqIds.length) : reqIds.length;
+      if (unlockedCount < needed) {
+        throw new Error(`Pré-requisitos: destrave ${needed} nó(s) conectado(s) (${unlockedCount}/${needed}).`);
+      }
     }
 
     const { error } = await context.supabase.from("character_clan_progress")
