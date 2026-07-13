@@ -202,6 +202,28 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
           <Field label="Cooldown (turnos)">
             <Input type="number" min={0} max={50} value={f.cooldown_turns ?? 0} onChange={(e) => up("cooldown_turns", Number(e.target.value))} />
           </Field>
+          {f.req_class === "shurikenjutsu" && (
+            <Field label="Qtd. de ferramentas consumidas por uso">
+              <Input type="number" min={1} max={999}
+                value={f.meta?.tool_qty ?? 1}
+                onChange={(e) => up("meta", { ...(f.meta ?? {}), tool_qty: Math.max(1, Number(e.target.value)) })}
+              />
+              <div className="text-[10px] text-muted-foreground mt-1">
+                Ex.: 1 (shuriken simples), 5 (grande chuva de shurikens). Consome de kunais/shurikens da bolsa.
+              </div>
+            </Field>
+          )}
+          {f.req_class === "kenjutsu" && (
+            <Field label="Desgaste da espada por golpe (% da durabilidade máx.)">
+              <Input type="number" min={1} max={100}
+                value={f.meta?.durability_cost_pct ?? 10}
+                onChange={(e) => up("meta", { ...(f.meta ?? {}), durability_cost_pct: Math.max(1, Math.min(100, Number(e.target.value))) })}
+              />
+              <div className="text-[10px] text-muted-foreground mt-1">
+                Cada uso desta técnica reduz esse percentual da durabilidade máxima da(s) espada(s) equipada(s).
+              </div>
+            </Field>
+          )}
           {f.classification === "suplementar" && (
             <RestoreEffectFields
               value={f.meta?.restore ?? null}

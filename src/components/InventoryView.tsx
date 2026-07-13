@@ -9,7 +9,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { equipItem, unequipItem, consumeItem, dropItem, moveItemBetweenBags } from "@/lib/character.functions";
 import { toast } from "sonner";
 
-type Item = { id: string; name: string; type: string; slot_size: number; image_url?: string | null; description?: string | null; rank?: string };
+type Item = { id: string; name: string; type: string; slot_size: number; image_url?: string | null; description?: string | null; rank?: string; durability?: number | null };
 type BagEntry = { item_id: string; qty: number };
 type Inv = {
   character_id: string;
@@ -18,6 +18,8 @@ type Inv = {
   helmet_id: string | null; vest_id: string | null; pants_id: string | null; boots_id: string | null;
   primary_weapon_id: string | null; primary_unlocked: boolean;
   secondary_weapon_id: string | null; secondary_unlocked: boolean;
+  primary_weapon_durability?: number | null;
+  secondary_weapon_durability?: number | null;
 };
 
 type SlotKey = "helmet_id" | "vest_id" | "pants_id" | "boots_id" | "primary_weapon_id" | "secondary_weapon_id";
@@ -108,6 +110,7 @@ export function InventoryView({ characterId, userId, bgUrl, onBgChange }: {
           <EquipSlot icon={<Shirt />} label="Colete" slot="vest_id" itemId={inv.vest_id} items={items}
             onUnequip={() => run(() => unequip({ data: { slot: "vest_id" } } as any), "Desequipado.")} />
           <EquipSlot icon={<Sword />} label="Arma Primária" slot="primary_weapon_id" itemId={inv.primary_weapon_id} items={items} locked={!primaryUnlocked} lockedHint="Requer Kenjutsu Nível E"
+            currentDurability={inv.primary_weapon_durability ?? null}
             onUnequip={() => run(() => unequip({ data: { slot: "primary_weapon_id" } } as any), "Desequipado.")} />
         </div>
 
@@ -131,6 +134,7 @@ export function InventoryView({ characterId, userId, bgUrl, onBgChange }: {
           <EquipSlot icon={<Footprints />} label="Botas" slot="boots_id" itemId={inv.boots_id} items={items}
             onUnequip={() => run(() => unequip({ data: { slot: "boots_id" } } as any), "Desequipado.")} />
           <EquipSlot icon={<Swords />} label="Arma Secundária" slot="secondary_weapon_id" itemId={inv.secondary_weapon_id} items={items} locked={!secondaryUnlocked} lockedHint="Requer Kenjutsu Maestria E"
+            currentDurability={inv.secondary_weapon_durability ?? null}
             onUnequip={() => run(() => unequip({ data: { slot: "secondary_weapon_id" } } as any), "Desequipado.")} />
         </div>
       </div>
@@ -160,12 +164,17 @@ export function InventoryView({ characterId, userId, bgUrl, onBgChange }: {
   );
 }
 
-function EquipSlot({ icon, label, slot, itemId, items, locked, lockedHint, onUnequip }: {
+function EquipSlot({ icon, label, slot, itemId, items, locked, lockedHint, currentDurability, onUnequip }: {
   icon: React.ReactNode; label: string; slot: SlotKey; itemId: string | null;
-  items: Record<string, Item>; locked?: boolean; lockedHint?: string; onUnequip: () => void;
+  items: Record<string, Item>; locked?: boolean; lockedHint?: string;
+  currentDurability?: number | null; onUnequip: () => void;
 }) {
   const item = itemId ? items[itemId] : null;
   const disabled = locked || !item;
+  const isWeaponSlot = slot === "primary_weapon_id" || slot === "secondary_weapon_id";
+  const maxDur = item?.durability ?? null;
+  const curDur = currentDurability;
+  const durPct = isWeaponSlot && maxDur && curDur != null ? Math.max(0, Math.min(100, Math.round((curDur / maxDur) * 100))) : null;
   const inner = (
     <div className={`w-full text-left rounded-lg border p-3 flex items-center gap-3 transition ${locked ? "opacity-60 border-dashed" : "border-border"} ${item && !locked ? "hover:border-gold cursor-pointer" : ""}`} title={locked ? lockedHint : undefined}>
       <div className="w-10 h-10 rounded flex items-center justify-center overflow-hidden bg-input/60 border border-border/50 shrink-0 text-gold">
@@ -180,6 +189,20 @@ function EquipSlot({ icon, label, slot, itemId, items, locked, lockedHint, onUne
       <div className="flex-1 min-w-0">
         <div className="text-[10px] uppercase tracking-widest text-muted-foreground">{label}</div>
         <div className="text-sm truncate">{locked ? (lockedHint ?? "Bloqueado") : item?.name ?? "Vazio"}</div>
+        {isWeaponSlot && item && durPct != null && (
+          <div className="mt-1">
+            <div className="flex items-center justify-between text-[9px] text-muted-foreground">
+              <span>Durabilidade</span>
+              <span className={durPct <= 20 ? "text-blood" : durPct <= 50 ? "text-gold" : ""}>{curDur}/{maxDur} ({durPct}%)</span>
+            </div>
+            <div className="h-1 bg-input rounded overflow-hidden">
+              <div className={`h-full ${durPct <= 20 ? "bg-blood" : durPct <= 50 ? "bg-gold" : "bg-emerald-500"}`} style={{ width: `${durPct}%` }} />
+            </div>
+          </div>
+        )}
+        {isWeaponSlot && item && maxDur == null && (
+          <div className="text-[9px] text-muted-foreground mt-0.5">Durabilidade infinita</div>
+        )}
       </div>
     </div>
   );
@@ -190,6 +213,11 @@ function EquipSlot({ icon, label, slot, itemId, items, locked, lockedHint, onUne
       <PopoverContent className="w-56 p-2 space-y-1">
         <div className="text-xs font-semibold px-2 py-1">{item!.name}</div>
         {item!.description && <div className="text-[11px] text-muted-foreground px-2 pb-1">{item!.description}</div>}
+        {isWeaponSlot && durPct != null && (
+          <div className="text-[11px] px-2 pb-1">
+            Durabilidade: <span className={durPct <= 20 ? "text-blood font-semibold" : "font-semibold"}>{curDur}/{maxDur} ({durPct}%)</span>
+          </div>
+        )}
         <Button variant="secondary" size="sm" className="w-full justify-start" onClick={onUnequip}>Desequipar</Button>
       </PopoverContent>
     </Popover>
@@ -226,7 +254,7 @@ function BagCell({ item, entry, onEquip, onConsume, onDrop, onMove, moveLabel }:
       </Popover>
     );
   }
-  const canEquip = item.type?.startsWith("armor_") || item.type === "weapon_primary" || item.type === "weapon_secondary";
+  const canEquip = item.type?.startsWith("armor_") || item.type === "weapon_primary" || item.type === "weapon_secondary" || item.type === "weapon";
   const canConsume = item.type === "consumable";
   return (
     <Popover>
@@ -250,6 +278,11 @@ function BagCell({ item, entry, onEquip, onConsume, onDrop, onMove, moveLabel }:
         </div>
         <div className="text-[10px] text-muted-foreground px-2 -mt-1 capitalize">{item.type?.replace(/_/g, " ")}</div>
         {item.description && <div className="text-[11px] text-muted-foreground px-2 pb-1">{item.description}</div>}
+        {(item.type === "weapon" || item.type === "weapon_primary" || item.type === "weapon_secondary") && (
+          <div className="text-[11px] px-2 pb-1">
+            Durabilidade máx.: <span className="font-semibold">{item.durability ?? "∞"}</span>
+          </div>
+        )}
         {canEquip && <Button variant="secondary" size="sm" className="w-full justify-start" onClick={onEquip}>Equipar</Button>}
         {canConsume && <Button variant="secondary" size="sm" className="w-full justify-start" onClick={onConsume}>Consumir</Button>}
         <Button variant="ghost" size="sm" className="w-full justify-start" onClick={onMove}>
