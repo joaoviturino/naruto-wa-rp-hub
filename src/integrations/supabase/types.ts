@@ -1286,6 +1286,7 @@ export type Database = {
           kind: Database["public"]["Enums"]["npc_kind"]
           learning_min_read_seconds: number
           linked_minigame_id: string | null
+          music_url: string | null
           name: string
           required_mission_id: string | null
           reward_cooldown_hours: number
@@ -1314,6 +1315,7 @@ export type Database = {
           kind?: Database["public"]["Enums"]["npc_kind"]
           learning_min_read_seconds?: number
           linked_minigame_id?: string | null
+          music_url?: string | null
           name: string
           required_mission_id?: string | null
           reward_cooldown_hours?: number
@@ -1342,6 +1344,7 @@ export type Database = {
           kind?: Database["public"]["Enums"]["npc_kind"]
           learning_min_read_seconds?: number
           linked_minigame_id?: string | null
+          music_url?: string | null
           name?: string
           required_mission_id?: string | null
           reward_cooldown_hours?: number

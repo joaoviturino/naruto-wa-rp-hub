@@ -18,6 +18,7 @@ type LearnBlock = { id: string; kind: "text" | "image"; text?: string | null; im
 type Npc = {
   id: string; name: string; image_url: string | null; description: string | null;
   battle_bg_url: string | null;
+  music_url: string | null;
   hp_max: number; xp: number; energy_max: number;
   reward_xp: number; reward_ryo: number; drop_table: DropRow[];
   avg_damage?: number; crit_chance?: number; crit_multiplier?: number;
@@ -58,6 +59,7 @@ export function NpcManager() {
   const [name, setName] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const bgRef = useRef<HTMLInputElement>(null);
+  const musicRef = useRef<HTMLInputElement>(null);
   const save = useServerFn(upsertNpc);
   const del = useServerFn(deleteNpc);
   const setSkillsFn = useServerFn(setNpcSkills);
@@ -76,6 +78,7 @@ export function NpcManager() {
       ...r,
       kind: (r.kind ?? "aggressive") as NpcKind,
       battle_bg_url: r.battle_bg_url ?? null,
+      music_url: r.music_url ?? null,
       drop_table: Array.isArray(r.drop_table) ? r.drop_table : [],
       shop_items: Array.isArray(r.shop_items) ? r.shop_items : [],
       reward_items: Array.isArray(r.reward_items) ? r.reward_items : [],
@@ -151,6 +154,22 @@ export function NpcManager() {
     load();
   }
 
+  async function uploadMusic(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f || !selected) return;
+    if (f.size > 15 * 1024 * 1024) return toast.error("Máx 15MB.");
+    const ext = f.name.split(".").pop() ?? "mp3";
+    const path = `${selected}/music/${Date.now()}.${ext}`;
+    const up = await supabase.storage.from("npcs").upload(path, f, { upsert: true, contentType: f.type });
+    if (up.error) return toast.error(up.error.message);
+    const signed = await supabase.storage.from("npcs").createSignedUrl(path, 60 * 60 * 24 * 365);
+    if (!signed.data?.signedUrl) return;
+    const npc = npcs.find((x) => x.id === selected)!;
+    await save({ data: { ...npc, music_url: signed.data.signedUrl } } as any);
+    if (musicRef.current) musicRef.current.value = "";
+    load();
+  }
+
   const sel = npcs.find((n) => n.id === selected);
   const selSkills = selected ? assigned[selected] ?? new Set<string>() : new Set<string>();
 
@@ -217,6 +236,30 @@ export function NpcManager() {
                   <input ref={bgRef} type="file" accept="image/*" className="hidden" onChange={uploadBattleBg} />
                 </div>
                 )}
+                <div className="pt-2 border-t border-border/40">
+                  <div className="text-xs text-muted-foreground mb-1">Música de fundo (toca ao interagir)</div>
+                  <Input
+                    placeholder="Link direto mp3/ogg (opcional)"
+                    defaultValue={sel.music_url ?? ""}
+                    onBlur={async (e) => {
+                      const v = e.target.value.trim() || null;
+                      if ((sel.music_url ?? null) === v) return;
+                      await save({ data: { ...sel, music_url: v } } as any);
+                      load();
+                    }}
+                    className="mb-2"
+                  />
+                  <div className="flex gap-2 items-center">
+                    <Button variant="outline" size="sm" onClick={() => musicRef.current?.click()}>
+                      <Upload size={14} className="mr-1" /> Upload áudio
+                    </Button>
+                    {sel.music_url && (
+                      <Button variant="ghost" size="sm" onClick={async () => { await save({ data: { ...sel, music_url: null } } as any); load(); }}>Remover</Button>
+                    )}
+                    {sel.music_url && <audio src={sel.music_url} controls className="h-8 max-w-[220px]" />}
+                  </div>
+                  <input ref={musicRef} type="file" accept="audio/*" className="hidden" onChange={uploadMusic} />
+                </div>
               </div>
             </div>
             {sel.kind === "aggressive" && (

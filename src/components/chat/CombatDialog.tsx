@@ -8,6 +8,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useServerFn } from "@tanstack/react-start";
 import { playerAttack, fleeCombat, consumeInCombat } from "@/lib/combat.functions";
+import { NpcMusic } from "@/components/NpcMusic";
 import { toast } from "sonner";
 import { Sword, Flag, Zap, FlaskConical, Users } from "lucide-react";
 
@@ -226,6 +227,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   return (
     <Dialog open onOpenChange={(v) => !v && session.status !== "active" && onClose()}>
       <DialogContent className="max-w-4xl w-[calc(100vw-1rem)] p-0 overflow-hidden border-blood/30 max-h-[95vh] overflow-y-auto">
+        <NpcMusic src={(npc as any).music_url} />
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 px-3 pt-3 text-sm sm:text-base">
             <Sword size={16} /> Combate: {npc.name}

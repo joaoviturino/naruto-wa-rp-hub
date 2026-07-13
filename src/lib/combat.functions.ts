@@ -29,6 +29,7 @@ type Player = {
 type NpcState = {
   id: string; name: string; image_url: string | null;
   battle_bg_url?: string | null;
+  music_url?: string | null;
   hp: number; hp_max: number;
   energy: number; energy_max: number;
 };
@@ -130,7 +131,7 @@ export const rollSpawn = createServerFn({ method: "POST" })
 
     // Escolhe um NPC do local
     const { data: pool } = await context.supabase
-      .from("location_npcs").select("npc_id,weight,npc:npcs(id,name,image_url,battle_bg_url,hp_max,energy_max,xp,kind)").eq("location_id", loc.id);
+      .from("location_npcs").select("npc_id,weight,npc:npcs(id,name,image_url,battle_bg_url,music_url,hp_max,energy_max,xp,kind)").eq("location_id", loc.id);
     const rows = ((pool as any[]) ?? []).filter((r) => (r.npc?.kind ?? "aggressive") === "aggressive");
     if (!rows.length) return { session_id: null };
     const total = rows.reduce((s, r) => s + (r.weight ?? 1), 0);
@@ -163,7 +164,7 @@ export const rollSpawn = createServerFn({ method: "POST" })
       };
     });
     const state: CombatState = {
-      npc: { id: npc.id, name: npc.name, image_url: npc.image_url, battle_bg_url: npc.battle_bg_url ?? null, hp: npc.hp_max, hp_max: npc.hp_max, energy: npc.energy_max, energy_max: npc.energy_max },
+      npc: { id: npc.id, name: npc.name, image_url: npc.image_url, battle_bg_url: npc.battle_bg_url ?? null, music_url: (npc as any).music_url ?? null, hp: npc.hp_max, hp_max: npc.hp_max, energy: npc.energy_max, energy_max: npc.energy_max },
       players, active: 0,
     };
 

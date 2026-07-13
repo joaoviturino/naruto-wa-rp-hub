@@ -11,11 +11,13 @@ import { Store, Gift, MessageSquare, Coins, Minus, Plus, Lock, GraduationCap } f
 import { listLocationInteractNpcs, buyFromShop, claimNpcReward } from "@/lib/npc-interact.functions";
 import { listNpcLearningSteps } from "@/lib/minigame.functions";
 import { MinigameDialog } from "@/components/minigame/MinigameDialog";
+import { NpcMusic } from "@/components/NpcMusic";
 
 type LearnBlock = { id: string; kind: "text" | "image"; text?: string | null; image_url?: string | null };
 type Npc = {
   id: string; name: string; image_url: string | null; kind: "shop" | "reward" | "learning";
   dialog_intro: string | null; dialog_outro: string | null;
+  music_url?: string | null;
   shop_items?: { item_id: string; price: number; stock: number }[];
   reward_items?: { item_id: string; qty: number }[];
   reward_xp?: number; reward_ryo?: number;
@@ -123,6 +125,7 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
         <DialogContent className="max-w-2xl">
           {open && (
             <>
+              <NpcMusic src={open.music_url} />
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded overflow-hidden bg-secondary shrink-0 border border-border">
