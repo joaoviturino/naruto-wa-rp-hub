@@ -10,8 +10,10 @@ import { useServerFn } from "@tanstack/react-start";
 import { updateLocationDangerZone, setLocationNpcs } from "@/lib/npc.functions";
 import { setLocationMinigames } from "@/lib/minigame.functions";
 import { setLocationLibraries } from "@/lib/library.functions";
+import { LocationMapEditor } from "./LocationMapEditor";
 
 type Loc = { id: string; name: string; description: string | null; image_url: string | null;
+  map_x?: number; map_y?: number;
   is_danger_zone?: boolean; spawn_chance?: number; spawn_tick_seconds?: number };
 type Conn = { id: string; a_id: string; b_id: string };
 type Npc = { id: string; name: string; kind: "aggressive" | "shop" | "reward" | "learning" };
@@ -39,7 +41,7 @@ export function LocationManager() {
 
   async function load() {
     const [l, c, n, ln, mg, lmg, ls, llb] = await Promise.all([
-      supabase.from("locations").select("id,name,description,image_url,is_danger_zone,spawn_chance,spawn_tick_seconds").order("name"),
+      supabase.from("locations").select("id,name,description,image_url,map_x,map_y,is_danger_zone,spawn_chance,spawn_tick_seconds").order("name"),
       supabase.from("location_connections").select("id,a_id,b_id"),
       supabase.from("npcs").select("id,name,kind").order("name"),
       supabase.from("location_npcs").select("location_id,npc_id"),
@@ -135,7 +137,15 @@ export function LocationManager() {
     : null;
 
   return (
-    <div className="grid gap-4 md:grid-cols-[320px_1fr]">
+    <div className="space-y-4">
+      <LocationMapEditor
+        locations={locs.map((l) => ({ id: l.id, name: l.name, image_url: l.image_url, map_x: l.map_x ?? 0, map_y: l.map_y ?? 0 }))}
+        connections={conns}
+        selectedId={selected}
+        onSelect={setSelected}
+        onChange={load}
+      />
+      <div className="grid gap-4 md:grid-cols-[320px_1fr]">
       <div className="space-y-3">
         <div className="scroll-panel rounded-lg p-4 space-y-2">
           <h3 className="font-display text-lg text-gold">Novo local</h3>
@@ -332,6 +342,7 @@ export function LocationManager() {
       ) : (
         <div className="text-muted-foreground text-sm p-6">Selecione um local à esquerda para editar suas conexões.</div>
       )}
+      </div>
     </div>
   );
 }

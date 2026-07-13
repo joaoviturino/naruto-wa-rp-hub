@@ -1,0 +1,3 @@
+ALTER TABLE public.locations
+  ADD COLUMN IF NOT EXISTS map_x integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS map_y integer NOT NULL DEFAULT 0;

@@ -1010,6 +1010,8 @@ export type Database = {
           id: string
           image_url: string | null
           is_danger_zone: boolean
+          map_x: number
+          map_y: number
           name: string
           spawn_chance: number
           spawn_tick_seconds: number
@@ -1021,6 +1023,8 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_danger_zone?: boolean
+          map_x?: number
+          map_y?: number
           name: string
           spawn_chance?: number
           spawn_tick_seconds?: number
@@ -1032,6 +1036,8 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_danger_zone?: boolean
+          map_x?: number
+          map_y?: number
           name?: string
           spawn_chance?: number
           spawn_tick_seconds?: number
