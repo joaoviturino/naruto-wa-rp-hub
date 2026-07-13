@@ -29,6 +29,7 @@ type Player = {
 type NpcState = {
   id: string; name: string; image_url: string | null;
   battle_bg_url?: string | null;
+  music_url?: string | null;
   hp: number; hp_max: number;
   energy: number; energy_max: number;
 };
@@ -163,7 +164,7 @@ export const rollSpawn = createServerFn({ method: "POST" })
       };
     });
     const state: CombatState = {
-      npc: { id: npc.id, name: npc.name, image_url: npc.image_url, battle_bg_url: npc.battle_bg_url ?? null, hp: npc.hp_max, hp_max: npc.hp_max, energy: npc.energy_max, energy_max: npc.energy_max },
+      npc: { id: npc.id, name: npc.name, image_url: npc.image_url, battle_bg_url: npc.battle_bg_url ?? null, music_url: (npc as any).music_url ?? null, hp: npc.hp_max, hp_max: npc.hp_max, energy: npc.energy_max, energy_max: npc.energy_max },
       players, active: 0,
     };
 
