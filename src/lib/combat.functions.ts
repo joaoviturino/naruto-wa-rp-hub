@@ -343,6 +343,12 @@ export const playerAttack = createServerFn({ method: "POST" })
       msg: `${activePlayer.nickname} usa ${skill.name} (${pool.toUpperCase()} ${data.energy_used})${masteryMul > 1 ? ` [Maestria ×${masteryMul.toFixed(1)}]` : ""} → ${damage} de dano.`,
       ...(toolConsumedName ? { tool_consumed: toolConsumedName, tool_crit_mul: toolCritMul } : {}),
     });
+    if (brokenWeapons.length) {
+      log.push({
+        seq: log.length + 1, actor: "system", actor_name: "sistema", target_name: activePlayer.nickname,
+        msg: `${brokenWeapons.join(" e ")} quebrou pelo uso! Arma desequipada.`,
+      } as any);
+    }
     state.npc.hp = Math.max(0, state.npc.hp - damage);
 
     let status = sess.status as string;
