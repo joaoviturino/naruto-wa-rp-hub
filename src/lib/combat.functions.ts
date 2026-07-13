@@ -229,67 +229,96 @@ export const playerAttack = createServerFn({ method: "POST" })
       .select("id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class,animation_url,sound_url").eq("id", data.skill_id).maybeSingle();
     if (!skill) throw new Error("Habilidade inexistente.");
 
-    // Shurikenjutsu: consome 1 "ferramenta" da bolsa e usa seu bônus crítico.
+    // Shurikenjutsu: consome N "ferramentas" (kunai/shuriken/etc.) da bolsa
+    // e usa o bônus crítico da primeira ferramenta encontrada.
     let toolCritMul = 1;
-    let toolConsumedName: string | null = null;
+    let toolConsumedLabel: string | null = null;
+    let toolQtyConsumed = 0;
     if (skill.req_class === "shurikenjutsu") {
+      const toolQtyNeeded = Math.max(1, Number((skill as any).meta?.tool_qty ?? 1));
       const { data: inv } = await supabaseAdmin.from("inventory")
         .select("ninja_bag,secondary_slots").eq("character_id", me.id).maybeSingle();
-      const bag = Array.isArray(inv?.ninja_bag) ? [...inv!.ninja_bag] : [];
-      const sec = Array.isArray(inv?.secondary_slots) ? [...inv!.secondary_slots] : [];
+      const bag: any[] = Array.isArray(inv?.ninja_bag) ? inv!.ninja_bag.map((e: any) => ({ ...e })) : [];
+      const sec: any[] = Array.isArray(inv?.secondary_slots) ? inv!.secondary_slots.map((e: any) => ({ ...e })) : [];
       const ids = Array.from(new Set([...bag, ...sec].map((e: any) => e?.item_id).filter(Boolean)));
       const { data: itemRows } = ids.length
         ? await supabaseAdmin.from("items").select("id,name,meta").in("id", ids)
         : { data: [] as any[] };
       const toolIds = new Set((itemRows ?? []).filter((r: any) => r?.meta?.is_tool).map((r: any) => r.id));
-      const pickFrom = (arr: any[]) => arr.findIndex((e: any) => toolIds.has(e?.item_id));
-      let source: "bag" | "sec" | null = null;
-      let idx = pickFrom(bag);
-      if (idx >= 0) source = "bag";
-      else { idx = pickFrom(sec); if (idx >= 0) source = "sec"; }
-      if (source === null) throw new Error("Você não possui ferramentas (kunai, shuriken, etc.) para usar essa habilidade.");
-      const arr: any[] = source === "bag" ? bag : sec;
-      const entry: any = arr[idx];
-      const qty = Number(entry.qty ?? 1) - 1;
-      if (qty <= 0) arr.splice(idx, 1); else arr[idx] = { ...entry, qty };
-      const toolRow = (itemRows ?? []).find((r: any) => r.id === entry.item_id);
-      toolConsumedName = toolRow?.name ?? "ferramenta";
-      toolCritMul = 1 + Math.max(0, Number(toolRow?.meta?.crit_bonus ?? 0)) / 100;
-      const patch: any = {};
-      if (source === "bag") patch.ninja_bag = bag; else patch.secondary_slots = sec;
-      await supabaseAdmin.from("inventory").update(patch).eq("character_id", me.id);
+      const totalAvailable = (arr: any[]) =>
+        arr.filter((e: any) => toolIds.has(e?.item_id)).reduce((s: number, e: any) => s + Number(e.qty ?? 1), 0);
+      const available = totalAvailable(bag) + totalAvailable(sec);
+      if (available < toolQtyNeeded) {
+        throw new Error(`Ferramentas insuficientes — necessário ${toolQtyNeeded}, você tem ${available}.`);
+      }
+      let remaining = toolQtyNeeded;
+      const consumeFrom = (arr: any[]) => {
+        for (let i = 0; i < arr.length && remaining > 0; i++) {
+          const e = arr[i];
+          if (!toolIds.has(e?.item_id)) continue;
+          const take = Math.min(Number(e.qty ?? 1), remaining);
+          e.qty = Number(e.qty ?? 1) - take;
+          remaining -= take;
+          if (!toolConsumedLabel) {
+            const row = (itemRows ?? []).find((r: any) => r.id === e.item_id);
+            toolConsumedLabel = row?.name ?? "ferramenta";
+            toolCritMul = 1 + Math.max(0, Number(row?.meta?.crit_bonus ?? 0)) / 100;
+          }
+        }
+        // limpa pilhas zeradas
+        for (let i = arr.length - 1; i >= 0; i--) if (Number(arr[i].qty ?? 0) <= 0) arr.splice(i, 1);
+      };
+      consumeFrom(bag);
+      if (remaining > 0) consumeFrom(sec);
+      toolQtyConsumed = toolQtyNeeded;
+      await supabaseAdmin.from("inventory").update({ ninja_bag: bag, secondary_slots: sec }).eq("character_id", me.id);
     }
 
-    // Kenjutsu: reduz durabilidade das armas equipadas (ambos os slots, se houver).
+    // Kenjutsu: exige espada equipada com durabilidade > 0 e consome uma
+    // porcentagem (skill.meta.durability_cost_pct, padrão 10%) da durabilidade
+    // MÁXIMA da arma a cada golpe. Se ambos slots estiverem quebrados, bloqueia.
     const brokenWeapons: string[] = [];
     if (skill.req_class === "kenjutsu") {
       const { data: inv } = await supabaseAdmin.from("inventory")
-        .select("primary_weapon_id,secondary_weapon_id,primary_weapon_durability,secondary_weapon_durability,ninja_bag")
+        .select("primary_weapon_id,secondary_weapon_id,primary_weapon_durability,secondary_weapon_durability")
         .eq("character_id", me.id).maybeSingle();
       if (!inv || (!inv.primary_weapon_id && !inv.secondary_weapon_id)) {
-        throw new Error("Você precisa de uma arma equipada para usar Kenjutsu.");
+        throw new Error("Você precisa de uma espada equipada para usar Kenjutsu.");
       }
-      const slots: Array<{ idCol: "primary_weapon_id" | "secondary_weapon_id"; durCol: "primary_weapon_durability" | "secondary_weapon_durability" }> = [
+      const slots = [
         { idCol: "primary_weapon_id", durCol: "primary_weapon_durability" },
         { idCol: "secondary_weapon_id", durCol: "secondary_weapon_durability" },
-      ];
-      const patch: any = {};
-      const weaponIds = slots.map((s) => inv[s.idCol]).filter(Boolean) as string[];
+      ] as const;
+      const weaponIds = slots.map((s) => (inv as any)[s.idCol]).filter(Boolean) as string[];
       const { data: itemRows } = weaponIds.length
-        ? await supabaseAdmin.from("items").select("id,name").in("id", weaponIds)
+        ? await supabaseAdmin.from("items").select("id,name,durability").in("id", weaponIds)
         : { data: [] as any[] };
-      const nameOf = (id: string) => (itemRows ?? []).find((r: any) => r.id === id)?.name ?? "arma";
+      const rowOf = (id: string) => (itemRows ?? []).find((r: any) => r.id === id);
+      // Precisa haver ao menos uma arma com durabilidade > 0 (ou nula = infinita).
+      const usable = slots.filter((s) => {
+        const wid = (inv as any)[s.idCol];
+        if (!wid) return false;
+        const cur = (inv as any)[s.durCol];
+        return cur === null || cur === undefined || Number(cur) > 0;
+      });
+      if (usable.length === 0) {
+        throw new Error("Todas as suas espadas estão quebradas. Repare ou substitua antes de usar Kenjutsu.");
+      }
+      const pct = Math.max(1, Math.min(100, Number((skill as any).meta?.durability_cost_pct ?? 10)));
+      const patch: any = {};
       for (const s of slots) {
-        const wid = inv[s.idCol] as string | null;
+        const wid = (inv as any)[s.idCol] as string | null;
         if (!wid) continue;
-        const cur = inv[s.durCol];
-        // Durabilidade nula = infinita, apenas ignora.
-        if (cur === null || cur === undefined) continue;
-        const next = Number(cur) - 1;
+        const cur = (inv as any)[s.durCol];
+        if (cur === null || cur === undefined) continue; // infinita
+        const row = rowOf(wid);
+        const maxDur = Math.max(1, Number(row?.durability ?? cur));
+        const wear = Math.max(1, Math.ceil((maxDur * pct) / 100));
+        const next = Number(cur) - wear;
         if (next <= 0) {
           patch[s.idCol] = null;
           patch[s.durCol] = null;
-          brokenWeapons.push(nameOf(wid));
+          brokenWeapons.push(row?.name ?? "arma");
         } else {
           patch[s.durCol] = next;
         }
@@ -340,8 +369,8 @@ export const playerAttack = createServerFn({ method: "POST" })
       effective, damage, speed, crit_mul: Number(skill.bonus_critical),
       animation_url: (skill as any).animation_url ?? null,
       sound_url: (skill as any).sound_url ?? null,
-      msg: `${activePlayer.nickname} usa ${skill.name} (${pool.toUpperCase()} ${data.energy_used})${masteryMul > 1 ? ` [Maestria ×${masteryMul.toFixed(1)}]` : ""} → ${damage} de dano.`,
-      ...(toolConsumedName ? { tool_consumed: toolConsumedName, tool_crit_mul: toolCritMul } : {}),
+      msg: `${activePlayer.nickname} usa ${skill.name} (${pool.toUpperCase()} ${data.energy_used})${masteryMul > 1 ? ` [Maestria ×${masteryMul.toFixed(1)}]` : ""}${toolConsumedLabel ? ` [-${toolQtyConsumed} ${toolConsumedLabel}]` : ""} → ${damage} de dano.`,
+      ...(toolConsumedLabel ? { tool_consumed: toolConsumedLabel, tool_qty: toolQtyConsumed, tool_crit_mul: toolCritMul } : {}),
     });
     if (brokenWeapons.length) {
       log.push({
