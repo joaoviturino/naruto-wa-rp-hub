@@ -159,6 +159,23 @@ function ItemDialog({ open, onOpenChange, initial, missions, skills, adminUserId
               title="Restauração de energia (consumível)"
             />
           )}
+          <Field label="Ferramenta de Shurikenjutsu">
+            <SimpleSelect
+              value={f.meta?.is_tool ? "yes" : "no"}
+              onChange={(v: string) => up("meta", { ...(f.meta ?? {}), is_tool: v === "yes" })}
+              options={[{ value: "no", label: "Não" }, { value: "yes", label: "Sim (kunai, shuriken, etc.)" }]}
+            />
+          </Field>
+          <Field label="Bônus crítico de Shurikenjutsu (%)">
+            <Input
+              type="number"
+              min={0}
+              max={500}
+              disabled={!f.meta?.is_tool}
+              value={f.meta?.crit_bonus ?? ""}
+              onChange={(e) => up("meta", { ...(f.meta ?? {}), crit_bonus: e.target.value === "" ? null : Number(e.target.value) })}
+            />
+          </Field>
         </div>
         <div className="flex justify-end gap-2 mt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
