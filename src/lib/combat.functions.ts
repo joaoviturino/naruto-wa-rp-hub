@@ -147,22 +147,27 @@ export const rollSpawn = createServerFn({ method: "POST" })
       ef_current: me.ef_current, em_current: me.em_current, chakra_current: me.chakra_current, hp_current: (me as any).hp_current,
     }];
 
-    const players: Player[] = members.map((c: any) => {
+    const { getCharBuffs } = await import("./clan-tree.functions");
+    const players: Player[] = [];
+    for (const c of members as any[]) {
       const s = computeStats(c.xp ?? 0);
-      const ef = c.ef_current == null ? s.ef : Math.min(s.ef, c.ef_current);
-      const em = c.em_current == null ? s.em : Math.min(s.em, c.em_current);
-      const ck = c.chakra_current == null ? s.chakra : Math.min(s.chakra, c.chakra_current);
-      const hpMax = Math.max(1, Number(c.xp ?? 0));
+      const buffs = await getCharBuffs(supabaseAdmin, c.id);
+      const enBonus = Math.max(0, Number(buffs.energy_bonus ?? 0));
+      const efMax = s.ef + enBonus, emMax = s.em + enBonus, chakraMax = s.chakra + enBonus;
+      const ef = c.ef_current == null ? efMax : Math.min(efMax, c.ef_current);
+      const em = c.em_current == null ? emMax : Math.min(emMax, c.em_current);
+      const ck = c.chakra_current == null ? chakraMax : Math.min(chakraMax, c.chakra_current);
+      const hpMax = Math.max(1, Number(c.xp ?? 0) + Number(buffs.hp_bonus ?? 0));
       const hp = c.hp_current == null ? hpMax : Math.max(0, Math.min(hpMax, Number(c.hp_current)));
-      return {
+      players.push({
         character_id: c.id, nickname: c.nickname, avatar_url: c.avatar_url, sprite_url: c.inventory_bg_url ?? null,
         hp, hp_max: hpMax,
         ef, em, chakra: ck,
-        ef_max: s.ef, em_max: s.em, chakra_max: s.chakra,
+        ef_max: efMax, em_max: emMax, chakra_max: chakraMax,
         alive: hp > 0,
         cooldowns: {},
-      };
-    });
+      });
+    }
     const state: CombatState = {
       npc: { id: npc.id, name: npc.name, image_url: npc.image_url, battle_bg_url: npc.battle_bg_url ?? null, music_url: (npc as any).music_url ?? null, hp: npc.hp_max, hp_max: npc.hp_max, energy: npc.energy_max, energy_max: npc.energy_max },
       players, active: 0,
@@ -226,7 +231,13 @@ export const playerAttack = createServerFn({ method: "POST" })
     const pool = (skill.energy_type as Pool);
     const poolMax = pool === "ef" ? activePlayer.ef_max : pool === "em" ? activePlayer.em_max : activePlayer.chakra_max;
     const costPct = Math.max(1, Math.min(100, Number((skill as any).cost_percent ?? 20)));
-    const maxEnergy = Math.max(1, Math.floor((poolMax * costPct) / 100));
+    // Buffs de clã: reduzem custo e amplificam dano
+    const { getCharBuffs } = await import("./clan-tree.functions");
+    const buffs = await getCharBuffs(context.supabase, me.id);
+    const costReduction = Math.max(0, Math.min(90, Number(buffs.skill_cost_reduction ?? 0)));
+    const powerBonus = Math.max(0, Number(buffs.skill_power_bonus ?? 0));
+    const maxEnergyBase = Math.max(1, Math.floor((poolMax * costPct) / 100));
+    const maxEnergy = Math.max(1, Math.floor(maxEnergyBase * (1 - costReduction / 100)));
     if (data.energy_used < 1) throw new Error("Energia mínima: 1.");
     if (data.energy_used > maxEnergy) throw new Error(`Custo máximo desta habilidade: ${maxEnergy} (${costPct}% da pool ${pool.toUpperCase()}).`);
     if (activePlayer[pool] < data.energy_used) throw new Error(`Energia insuficiente (${pool.toUpperCase()}).`);
@@ -244,7 +255,8 @@ export const playerAttack = createServerFn({ method: "POST" })
     }
     const effective = data.energy_used * Number(skill.bonus_energetic);
     const speed = effective * Number(skill.bonus_speed);
-    const damage = Math.round(effective * Number(skill.bonus_critical) * masteryMul);
+    const powerMul = 1 + powerBonus / 100;
+    const damage = Math.round(effective * Number(skill.bonus_critical) * masteryMul * powerMul);
 
     // Aplica cooldown
     if (Number(skill.cooldown_turns ?? 0) > 0) {

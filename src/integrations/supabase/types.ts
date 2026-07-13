@@ -104,6 +104,39 @@ export type Database = {
           },
         ]
       }
+      character_clan_progress: {
+        Row: {
+          character_id: string
+          node_id: string
+          unlocked_at: string
+        }
+        Insert: {
+          character_id: string
+          node_id: string
+          unlocked_at?: string
+        }
+        Update: {
+          character_id?: string
+          node_id?: string
+          unlocked_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "character_clan_progress_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "character_clan_progress_node_id_fkey"
+            columns: ["node_id"]
+            isOneToOne: false
+            referencedRelation: "clan_tree_nodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       character_knowledges: {
         Row: {
           character_id: string
@@ -373,6 +406,112 @@ export type Database = {
           },
           {
             foreignKeyName: "clan_skills_skill_id_fkey"
+            columns: ["skill_id"]
+            isOneToOne: false
+            referencedRelation: "skills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clan_tree_edges: {
+        Row: {
+          clan_id: string
+          created_at: string
+          from_node_id: string
+          id: string
+          to_node_id: string
+        }
+        Insert: {
+          clan_id: string
+          created_at?: string
+          from_node_id: string
+          id?: string
+          to_node_id: string
+        }
+        Update: {
+          clan_id?: string
+          created_at?: string
+          from_node_id?: string
+          id?: string
+          to_node_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clan_tree_edges_clan_id_fkey"
+            columns: ["clan_id"]
+            isOneToOne: false
+            referencedRelation: "clans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clan_tree_edges_from_node_id_fkey"
+            columns: ["from_node_id"]
+            isOneToOne: false
+            referencedRelation: "clan_tree_nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clan_tree_edges_to_node_id_fkey"
+            columns: ["to_node_id"]
+            isOneToOne: false
+            referencedRelation: "clan_tree_nodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clan_tree_nodes: {
+        Row: {
+          buff_icon_url: string | null
+          buff_label: string | null
+          buff_type: Database["public"]["Enums"]["clan_buff_type"] | null
+          buff_value: number | null
+          clan_id: string
+          created_at: string
+          id: string
+          kind: string
+          rank_required: string | null
+          skill_id: string | null
+          x: number
+          y: number
+        }
+        Insert: {
+          buff_icon_url?: string | null
+          buff_label?: string | null
+          buff_type?: Database["public"]["Enums"]["clan_buff_type"] | null
+          buff_value?: number | null
+          clan_id: string
+          created_at?: string
+          id?: string
+          kind: string
+          rank_required?: string | null
+          skill_id?: string | null
+          x?: number
+          y?: number
+        }
+        Update: {
+          buff_icon_url?: string | null
+          buff_label?: string | null
+          buff_type?: Database["public"]["Enums"]["clan_buff_type"] | null
+          buff_value?: number | null
+          clan_id?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          rank_required?: string | null
+          skill_id?: string | null
+          x?: number
+          y?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clan_tree_nodes_clan_id_fkey"
+            columns: ["clan_id"]
+            isOneToOne: false
+            referencedRelation: "clans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clan_tree_nodes_skill_id_fkey"
             columns: ["skill_id"]
             isOneToOne: false
             referencedRelation: "skills"
@@ -1949,6 +2088,11 @@ export type Database = {
     Enums: {
       app_role: "admin" | "user"
       bot_status: "disconnected" | "qr" | "connecting" | "connected"
+      clan_buff_type:
+        | "hp_bonus"
+        | "energy_bonus"
+        | "skill_power_bonus"
+        | "skill_cost_reduction"
       clan_rarity: "common" | "uncommon" | "rare" | "epic" | "legendary"
       element: "katon" | "suiton" | "fuuton" | "doton" | "raiton"
       item_type:
@@ -2174,6 +2318,12 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "user"],
       bot_status: ["disconnected", "qr", "connecting", "connected"],
+      clan_buff_type: [
+        "hp_bonus",
+        "energy_bonus",
+        "skill_power_bonus",
+        "skill_cost_reduction",
+      ],
       clan_rarity: ["common", "uncommon", "rare", "epic", "legendary"],
       element: ["katon", "suiton", "fuuton", "doton", "raiton"],
       item_type: [

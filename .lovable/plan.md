@@ -1,67 +1,64 @@
-# Sistema de Minigames — Fase 1: Limpeza do Ichiraku
+## Árvore de Clã Visual com Buffs e Progressão
 
-## Visão geral
-- Nova aba **Minigames** no painel admin: cadastro genérico de minigames (tipo, imagens, diálogos, recompensas, cooldown) + habilitação por local.
-- Em **Locais**, novo bloco "Minigames ativos" (multi-select) — igual ao padrão da Danger Zone.
-- No **Chat**, quando o local tem minigame ativo E o cooldown do player expirou, aparece botão **Iniciar Missão**.
-- Fluxo do jogo: popup fullscreen → diálogo de abertura (dono) → tela de limpeza → diálogo de agradecimento → recompensas concedidas → cooldown iniciado.
-- Na **ficha do personagem**: painel "Missões Diárias" listando cada minigame já jogado com contador regressivo para o próximo uso.
+Transformar `clan_skills` (lista linear) em uma **árvore de nós** com posicionamento livre (drag), conexões (pré-requisitos) e novos tipos de nó (buffs), semelhante à imagem enviada.
 
-## Estrutura de dados (nova migration)
+### 1. Banco de dados (nova migration)
 
-Tabela `minigames`:
-- `id`, `slug` (único, ex.: `ichiraku_cleanup`), `kind` (enum: `cleanup` por enquanto), `name`, `description`
-- `background_url`, `tileset_url`, `npc_portrait_url`
-- `dialog_intro` (texto), `dialog_outro` (texto), `npc_name`
-- `config` (jsonb): parâmetros do tipo — para `cleanup`: `{ duration_seconds, dirt_count, tools: [{ id, name, sprite_index }] }`
-- `rewards` (jsonb): `{ xp, ryo, items:[{item_id, qty}] }`
-- `cooldown_hours` (int, default 24)
-- `active` (bool)
+- Nova tabela `clan_tree_nodes`:
+  - `id`, `clan_id`, `kind` (`skill` | `buff`)
+  - `skill_id` (nullable — quando kind=skill)
+  - `buff_type` (nullable enum: `hp_bonus`, `energy_bonus`, `skill_power_bonus`, `skill_cost_reduction`)
+  - `buff_value` (int — ex: +50 hp, +10% dano)
+  - `buff_label`, `buff_icon_url` (para exibir no card)
+  - `x`, `y` (int — posição no canvas)
+  - `rank_required` (rank mínimo do player, opcional)
 
-Tabela `location_minigames`: `location_id`, `minigame_id` (many-to-many).
+- Nova tabela `clan_tree_edges`: `id`, `clan_id`, `from_node_id`, `to_node_id` (pré-requisito → destino).
 
-Tabela `minigame_runs`: `character_id`, `minigame_id`, `completed_at`, `score`, `success`. Índice `(character_id, minigame_id, completed_at desc)` para consulta rápida do último run.
+- Nova tabela `character_clan_progress`: `character_id`, `node_id`, `unlocked_at`. Marca quais nós o jogador destravou.
 
-Bucket público `minigames` (imagens de fundo/tileset/retrato).
+- Migrar dados atuais de `clan_skills` para `clan_tree_nodes` (kind=skill, x/y auto-distribuídos, edges em cadeia mantendo a ordem `position`).
 
-## Server functions (`src/lib/minigame.functions.ts`)
-- `listMinigamesForLocation({ location_id })` — retorna minigames ativos no local + `next_available_at` do caller.
-- `startMinigameRun({ minigame_id, location_id })` — valida cooldown + presença no local, retorna config e intro.
-- `completeMinigameRun({ minigame_id, score, success })` — grava run, aplica recompensas (xp, ryo, itens na bolsa), devolve outro.
-- Admin (com `has_role('admin')`): `upsertMinigame`, `deleteMinigame`, `setLocationMinigames`.
+- RLS: nós/edges leitura pública autenticada; escrita apenas admin. `character_clan_progress` leitura/escrita apenas do próprio dono (via `auth.uid()`), admin full.
 
-## Admin UI (`src/components/admin/MinigameManager.tsx`)
-- Lista + editor lado a lado (padrão dos outros managers).
-- Uploads das 3 imagens (fundo, tileset, retrato).
-- Textareas para diálogos intro/outro + nome do NPC.
-- Bloco recompensas: XP / Ryo / adicionar itens da lista.
-- Cooldown em horas (24 padrão).
-- Para `cleanup`: duração (s), quantidade de manchas, e lista de ferramentas do tileset (mop/vassoura/esponja com índice/sprite).
-- Registrar aba em `AdminPanel.tsx`.
+### 2. Server functions (`src/lib/clan-tree.functions.ts`)
 
-## LocationManager
-- Novo bloco "Minigames disponíveis neste local" com checkboxes dos minigames ativos, mesma UX do bloco de NPCs.
+- `getClanTree({ clan_id })` — retorna `{ nodes, edges }` + progresso do caller.
+- `saveClanTree({ clan_id, nodes, edges })` — admin; upsert atômico (delete missing + insert/update).
+- `unlockClanNode({ node_id })` — valida: player pertence ao clã, rank suficiente, todos os `from` do node já estão em `character_clan_progress`. Insere progresso e aplica efeito (HP/energy_max update na `characters` para buffs de stat; buffs de skill ficam derivados em runtime via join).
+- `getMyClanBuffs({ character_id })` — agrega buffs ativos para uso em combate.
 
-## Chat (`src/routes/_authenticated/chat.tsx`)
-- Ao carregar local, chamar `listMinigamesForLocation`.
-- Botão **Iniciar Missão** (por minigame) abre `<MinigameDialog>`. Disabled + timer se em cooldown.
+### 3. Editor admin — reescrita completa de `ClanTreeManager.tsx`
 
-## Minigame runner (`src/components/minigame/MinigameDialog.tsx` + `CleanupGame.tsx`)
-- Passo 1: card com retrato do NPC + diálogo intro + botão "Começar".
-- Passo 2: canvas/DOM com fundo do restaurante; N manchas posicionadas aleatoriamente por cima; timer regressivo.
-  - Jogador seleciona ferramenta (mop/vassoura/esponja) do tileset e clica nas manchas — cada clique remove a mancha correspondente (ferramenta certa para tipo certo → bônus; ferramenta qualquer → limpa mais devagar).
-  - Score = manchas limpas / total no tempo.
-- Passo 3: diálogo de outro + resumo das recompensas.
+Canvas SVG/DOM com fundo estilizado:
+- Nós arrastáveis (posição salva em x/y).
+- Botão "+ Habilidade" abre picker de skill; "+ Buff" abre modal (tipo/valor/rótulo/ícone).
+- Modo "conectar": clica no nó A → clica no nó B → cria edge. Clique na linha remove.
+- Sidebar lateral com propriedades do nó selecionado (rank_required, editar buff, deletar).
+- Botão "Salvar" persiste tudo via `saveClanTree`.
 
-## Ficha (`CharacterSheet.tsx`)
-- Nova seção "Missões Diárias": para cada minigame, mostra nome + "Disponível agora" ou "Próxima em Xh Ym Zs" (contador ao vivo). Query em `minigame_runs` + `cooldown_hours`.
+### 4. Player view — nova rota `_authenticated/clan-tree.tsx`
 
-## Detalhes técnicos
-- Tileset como sprite sheet horizontal: recorto via `background-image` + `background-position` a partir do índice configurado.
-- Manchas são divs absolutas geradas do lado do cliente (posição aleatória seedada por `run_id` só para visual — servidor não valida posição).
-- Recompensas aplicadas server-side dentro de `completeMinigameRun` para evitar trapaça no front (mas score em si é confiado no cliente por enquanto — flag TODO).
+- Renderiza o mesmo canvas em modo read-only.
+- Cores dos nós: verde=destravado, amarelo=disponível (pré-requisitos OK), cinza=bloqueado.
+- Clicar em nó disponível → confirma e chama `unlockClanNode`.
+- Painel lateral com buffs ativos totais.
 
-## Fora do escopo desta fase
-- Outros tipos de minigame (`kind`) — a estrutura já suporta, adiciono no futuro.
-- Ranking/leaderboard.
-- Validação anti-trapaça do score.
+### 5. Integração de combate
+
+- Em `combat.functions.ts`, ao iniciar sessão, buscar `getMyClanBuffs` do player e aplicar:
+  - `hp_bonus` → adiciona ao HP inicial do combate
+  - `energy_bonus` → adiciona à energia máx
+  - `skill_power_bonus` → multiplicador de dano no cálculo
+  - `skill_cost_reduction` → reduz custo de habilidades
+
+### 6. UI/UX
+
+- Grid snap opcional (a cada 20px) para manter organizado como na referência.
+- Linhas desenhadas em SVG com curva bezier suave.
+- Miniaturas usam `skill.image_url` (habilidades) ou `buff_icon_url` (buffs).
+
+### Fora do escopo desta fase
+
+- Respec / reset de progressão (posso adicionar depois).
+- Árvore com múltiplas ramificações condicionais (ex: escolha exclusiva A ou B) — por ora todos os nós disponíveis desbloqueiam independentemente se pré-requisitos OK.
