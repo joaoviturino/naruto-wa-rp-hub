@@ -20,6 +20,8 @@ type Node = {
   buff_icon_url: string | null;
   x: number; y: number;
   rank_required: string | null;
+  min_prereqs: number | null;
+  xp_required: number | null;
   skill?: Skill | null;
 };
 type Edge = { id?: string; from_node_id: string; to_node_id: string };
@@ -74,7 +76,7 @@ export function ClanTreeManager() {
       id: `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       kind: "skill", skill_id, buff_type: null, buff_value: null, buff_label: null, buff_icon_url: null,
       x: 40 + (nodes.length % 6) * 120, y: 40 + Math.floor(nodes.length / 6) * 120,
-      rank_required: null, skill: s,
+      rank_required: null, min_prereqs: null, xp_required: null, skill: s,
     };
     setNodes((n) => [...n, tmp]); setSelectedId(tmp.id);
   }
@@ -83,7 +85,7 @@ export function ClanTreeManager() {
       id: `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       kind: "buff", skill_id: null, buff_type: "hp_bonus", buff_value: 10, buff_label: "HP +10", buff_icon_url: null,
       x: 40 + (nodes.length % 6) * 120, y: 40 + Math.floor(nodes.length / 6) * 120,
-      rank_required: null,
+      rank_required: null, min_prereqs: null, xp_required: null,
     };
     setNodes((n) => [...n, tmp]); setSelectedId(tmp.id);
   }
@@ -139,7 +141,10 @@ export function ClanTreeManager() {
           id: n.id.startsWith("tmp-") ? undefined : n.id,
           kind: n.kind, skill_id: n.skill_id, buff_type: n.buff_type, buff_value: n.buff_value,
           buff_label: n.buff_label, buff_icon_url: n.buff_icon_url,
-          x: Math.round(n.x), y: Math.round(n.y), rank_required: n.rank_required,
+          x: Math.round(n.x), y: Math.round(n.y),
+          rank_required: n.rank_required,
+          min_prereqs: n.min_prereqs,
+          xp_required: n.xp_required,
         })),
         edges: edges.map((e) => ({ from_node_id: e.from_node_id, to_node_id: e.to_node_id })),
       } } as any);
