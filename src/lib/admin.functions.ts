@@ -351,7 +351,7 @@ export const upsertItem = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin.from("items").upsert(data);
+    const { error } = await supabaseAdmin.from("items").upsert(data as any);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -404,7 +404,7 @@ export const upsertSkill = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin.from("skills").upsert(data);
+    const { error } = await supabaseAdmin.from("skills").upsert(data as any);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
