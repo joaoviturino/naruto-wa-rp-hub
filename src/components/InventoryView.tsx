@@ -254,7 +254,7 @@ function BagCell({ item, entry, onEquip, onConsume, onDrop, onMove, moveLabel }:
       </Popover>
     );
   }
-  const canEquip = item.type?.startsWith("armor_") || item.type === "weapon_primary" || item.type === "weapon_secondary";
+  const canEquip = item.type?.startsWith("armor_") || item.type === "weapon_primary" || item.type === "weapon_secondary" || item.type === "weapon";
   const canConsume = item.type === "consumable";
   return (
     <Popover>
