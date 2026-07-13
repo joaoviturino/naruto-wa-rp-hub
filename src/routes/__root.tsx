@@ -13,7 +13,6 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
-import { BackgroundMusicPlayer } from "@/components/BackgroundMusicPlayer";
 
 function NotFoundComponent() {
   return (
@@ -139,7 +138,6 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <Outlet />
       <Toaster theme="dark" />
-      <BackgroundMusicPlayer />
     </QueryClientProvider>
   );
 }
