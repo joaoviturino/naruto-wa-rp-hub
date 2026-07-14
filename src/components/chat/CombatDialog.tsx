@@ -49,6 +49,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
     from: { x: number; y: number };
     to: { x: number; y: number };
     isVideo: boolean;
+    mirror?: boolean;
   }>(null);
   const attack = useServerFn(playerAttack);
   const flee = useServerFn(fleeCombat);
