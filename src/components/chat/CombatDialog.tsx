@@ -266,7 +266,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
 
   const poolColor: Record<string, string> = { ef: "oklch(0.55 0.22 25)", em: "oklch(0.6 0.15 220)", chakra: "oklch(0.78 0.15 80)" };
   const lastEntry = log[log.length - 1];
-  const npcActive = session.status === "active" && lastEntry?.actor === "player" ? false : (lastEntry?.actor === "npc" && anim?.side === "npc");
+  const npcActive = session.status === "active" && lastEntry?.actor === "npc" && Object.keys(poses).length === 0;
   const bgUrl = npc.battle_bg_url as string | null;
 
   return (
@@ -351,7 +351,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
             <div className="flex items-end gap-1 sm:gap-3 max-w-[45%] justify-end flex-wrap">
               {players.map((p: any) => {
                 const isActive = session.status === "active" && !npcActive && p.character_id === activePlayer?.character_id && p.alive;
-                const sprite = p.sprite_url || sprites[p.character_id];
+                const sprite = poses[p.character_id] || p.sprite_url || sprites[p.character_id];
                 const size = players.length > 2 ? "h-[110px] sm:h-[150px]" : "h-[140px] sm:h-[190px]";
                 return (
                   <div key={p.character_id} className="flex flex-col items-center gap-1">
@@ -368,16 +368,6 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
               })}
             </div>
 
-            {/* Skill animation overlay — center of stage, visible to everyone */}
-            {anim && (
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-20">
-                <img
-                  src={anim.url}
-                  alt=""
-                  className="w-[70%] max-w-[420px] h-[70%] max-h-[280px] object-contain animate-scale-in drop-shadow-[0_0_30px_rgba(0,0,0,0.8)]"
-                />
-              </div>
-            )}
           </div>
         </div>
 
