@@ -37,16 +37,20 @@ export function MaintenanceGate({ isAdmin, children }: { isAdmin: boolean; child
   if (!cfg?.maintenance_enabled || isAdmin) return <>{children}</>;
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-4">
-      <div className="scroll-panel rounded-lg max-w-lg w-full p-6 sm:p-8 text-center space-y-4">
+    <div className="min-h-[100dvh] bg-background text-foreground flex items-center justify-center p-3 sm:p-6">
+      <div className="scroll-panel rounded-lg w-full max-w-[min(92vw,640px)] p-4 sm:p-6 md:p-8 text-center space-y-4 max-h-[calc(100dvh-1.5rem)] overflow-y-auto">
         <div className="inline-flex items-center gap-2 rounded-full bg-gold/10 text-gold px-3 py-1 text-xs uppercase tracking-widest">
           <Wrench size={14} /> Manutenção
         </div>
         {cfg.maintenance_image_url && (
-          <img src={cfg.maintenance_image_url} alt="Manutenção" className="rounded-md mx-auto max-h-64 object-cover w-full" />
+          <img
+            src={cfg.maintenance_image_url}
+            alt="Manutenção"
+            className="rounded-md mx-auto block h-auto w-auto max-w-full max-h-[min(50dvh,420px)] object-contain"
+          />
         )}
-        <h1 className="font-display text-3xl sm:text-4xl font-black text-gold">{cfg.maintenance_title}</h1>
-        <p className="whitespace-pre-wrap text-muted-foreground text-sm sm:text-base">{cfg.maintenance_message}</p>
+        <h1 className="font-display text-2xl sm:text-3xl md:text-4xl font-black text-gold break-words">{cfg.maintenance_title}</h1>
+        <p className="whitespace-pre-wrap break-words text-muted-foreground text-sm sm:text-base">{cfg.maintenance_message}</p>
         {cfg.maintenance_eta && (
           <div className="text-xs text-muted-foreground">
             Previsão de retorno: <span className="text-foreground font-semibold">{new Date(cfg.maintenance_eta).toLocaleString()}</span>
