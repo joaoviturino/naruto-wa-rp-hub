@@ -16,6 +16,7 @@ import { listMinigamesForMyLocation } from "@/lib/minigame.functions";
 import { MinigameDialog } from "@/components/minigame/MinigameDialog";
 import { NpcInteractPanel } from "@/components/chat/NpcInteractPanel";
 import { DuelInvitesInline } from "@/components/chat/DuelInvitesInline";
+import { ChatHud } from "@/components/chat/ChatHud";
 
 export const Route = createFileRoute("/_authenticated/chat")({ component: ChatPage });
 
@@ -342,6 +343,7 @@ function ChatPage() {
 
   return (
     <div className="mx-auto max-w-6xl md:grid md:gap-4 md:grid-cols-[280px_1fr] md:p-4">
+      {character && <ChatHud characterId={character.id} />}
       {/* Barra mobile */}
       <div className="md:hidden sticky top-0 z-30 flex items-center gap-2 border-b border-border bg-card/95 backdrop-blur px-3 py-2">
         <Sheet open={navOpen} onOpenChange={setNavOpen}>

@@ -284,6 +284,7 @@ export type Database = {
           ef_current: number | null
           element_primary: Database["public"]["Enums"]["element"]
           em_current: number | null
+          eyes_frame_url: string | null
           history: string | null
           hp_current: number | null
           id: string
@@ -315,6 +316,7 @@ export type Database = {
           ef_current?: number | null
           element_primary: Database["public"]["Enums"]["element"]
           em_current?: number | null
+          eyes_frame_url?: string | null
           history?: string | null
           hp_current?: number | null
           id?: string
@@ -346,6 +348,7 @@ export type Database = {
           ef_current?: number | null
           element_primary?: Database["public"]["Enums"]["element"]
           em_current?: number | null
+          eyes_frame_url?: string | null
           history?: string | null
           hp_current?: number | null
           id?: string

@@ -232,6 +232,7 @@ export const updatePlayer = createServerFn({ method: "POST" })
     inventory_bg_url: z.string().url().nullable().optional(),
     avatar_url: z.string().url().nullable().optional(),
     banner_url: z.string().url().nullable().optional(),
+    eyes_frame_url: z.string().url().nullable().optional(),
   }).parse(input))
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
