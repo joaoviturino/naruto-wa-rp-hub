@@ -89,6 +89,9 @@ type LogEntry = {
   msg: string;
   animation_url?: string | null;
   sound_url?: string | null;
+  raw_damage?: number;
+  defense?: number;
+  hit_cap?: number;
 };
 
 function computeStats(xp: number) {
@@ -441,7 +444,16 @@ export const playerAttack = createServerFn({ method: "POST" })
     const effective = data.energy_used * Number(skill.bonus_energetic);
     const speed = effective * Number(skill.bonus_speed);
     const powerMul = 1 + powerBonus / 100;
-    const damage = Math.round(effective * Number(skill.bonus_critical) * masteryMul * powerMul * toolCritMul);
+    const rawDamage = Math.round(effective * Number(skill.bonus_critical) * masteryMul * powerMul * toolCritMul);
+
+    // Mitigação e cap por golpe vindos do NPC alvo
+    const { data: npcCfg } = await supabaseAdmin
+      .from("npcs").select("defense,max_hit_percent").eq("id", state.npc.id).maybeSingle();
+    const defense = Math.max(0, Math.min(90, Number((npcCfg as any)?.defense ?? 0)));
+    const maxHitPct = Math.max(10, Math.min(100, Number((npcCfg as any)?.max_hit_percent ?? 50)));
+    const afterDef = Math.max(1, Math.round(rawDamage * (1 - defense / 100)));
+    const hitCap = Math.max(1, Math.ceil((state.npc.hp_max ?? 0) * maxHitPct / 100));
+    const damage = Math.min(afterDef, hitCap);
 
     // Aplica cooldown
     if (Number(skill.cooldown_turns ?? 0) > 0) {
@@ -451,10 +463,10 @@ export const playerAttack = createServerFn({ method: "POST" })
     log.push({
       seq: log.length + 1, actor: "player", actor_name: activePlayer.nickname, target_name: state.npc.name,
       skill_name: skill.name, energy_type: pool, energy_used: data.energy_used,
-      effective, damage, speed, crit_mul: Number(skill.bonus_critical),
+      effective, damage, raw_damage: rawDamage, defense, hit_cap: hitCap, speed, crit_mul: Number(skill.bonus_critical),
       animation_url: (skill as any).animation_url ?? null,
       sound_url: (skill as any).sound_url ?? null,
-      msg: `${activePlayer.nickname} usa ${skill.name} (${pool.toUpperCase()} ${data.energy_used})${masteryMul > 1 ? ` [Maestria ×${masteryMul.toFixed(1)}]` : ""}${toolConsumedLabel ? ` [-${toolQtyConsumed} ${toolConsumedLabel}]` : ""} → ${damage} de dano.`,
+      msg: `${activePlayer.nickname} usa ${skill.name} (${pool.toUpperCase()} ${data.energy_used})${masteryMul > 1 ? ` [Maestria ×${masteryMul.toFixed(1)}]` : ""}${toolConsumedLabel ? ` [-${toolQtyConsumed} ${toolConsumedLabel}]` : ""} → ${damage} de dano${defense > 0 ? ` (def ${defense}%)` : ""}${damage < afterDef ? ` [cap ${maxHitPct}%]` : ""}.`,
       ...(toolConsumedLabel ? { tool_consumed: toolConsumedLabel, tool_qty: toolQtyConsumed, tool_crit_mul: toolCritMul } : {}),
     });
     if (brokenWeapons.length) {

@@ -1522,6 +1522,7 @@ export type Database = {
           created_at: string
           crit_chance: number
           crit_multiplier: number
+          defense: number
           description: string | null
           dialog_intro: string | null
           dialog_outro: string | null
@@ -1533,6 +1534,7 @@ export type Database = {
           kind: Database["public"]["Enums"]["npc_kind"]
           learning_min_read_seconds: number
           linked_minigame_id: string | null
+          max_hit_percent: number
           music_url: string | null
           name: string
           required_mission_id: string | null
@@ -1551,6 +1553,7 @@ export type Database = {
           created_at?: string
           crit_chance?: number
           crit_multiplier?: number
+          defense?: number
           description?: string | null
           dialog_intro?: string | null
           dialog_outro?: string | null
@@ -1562,6 +1565,7 @@ export type Database = {
           kind?: Database["public"]["Enums"]["npc_kind"]
           learning_min_read_seconds?: number
           linked_minigame_id?: string | null
+          max_hit_percent?: number
           music_url?: string | null
           name: string
           required_mission_id?: string | null
@@ -1580,6 +1584,7 @@ export type Database = {
           created_at?: string
           crit_chance?: number
           crit_multiplier?: number
+          defense?: number
           description?: string | null
           dialog_intro?: string | null
           dialog_outro?: string | null
@@ -1591,6 +1596,7 @@ export type Database = {
           kind?: Database["public"]["Enums"]["npc_kind"]
           learning_min_read_seconds?: number
           linked_minigame_id?: string | null
+          max_hit_percent?: number
           music_url?: string | null
           name?: string
           required_mission_id?: string | null
