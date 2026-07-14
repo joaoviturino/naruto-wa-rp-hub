@@ -427,6 +427,8 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
             </div>
 
           </div>
+          {/* Camada de animação de habilidade (GIF/vídeo) */}
+          {fx && <SkillFxLayer fx={fx} />}
         </div>
 
         {/* Party bar */}
