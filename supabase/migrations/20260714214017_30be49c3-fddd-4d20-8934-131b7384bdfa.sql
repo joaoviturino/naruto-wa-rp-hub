@@ -1,0 +1,1 @@
+ALTER TABLE public.skills ADD COLUMN IF NOT EXISTS animation_mode text NOT NULL DEFAULT 'overlay' CHECK (animation_mode IN ('projectile','front','overlay'));
