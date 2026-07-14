@@ -237,13 +237,19 @@ function PosesTab({ characterId }: { characterId: string }) {
                 <div className="text-sm font-semibold truncate">{s.name}</div>
                 <div className="text-[10px] text-muted-foreground">Rank {s.rank}</div>
               </div>
-              <Select value={map[s.id] ?? "__none__"} onValueChange={(v) => assign(s.id, v === "__none__" ? null : v)}>
-                <SelectTrigger className="w-40 h-8"><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">— Nenhuma —</SelectItem>
-                  {poses.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <select
+                value={poses.some((p) => p.id === map[s.id]) ? map[s.id] : "__none__"}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  void assign(s.id, v === "__none__" ? null : v);
+                }}
+                className="w-40 h-8 rounded border border-border bg-input/40 text-xs px-2"
+              >
+                <option value="__none__">— Nenhuma —</option>
+                {poses.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
             </div>
           ))}
         </div>
