@@ -1,0 +1,3 @@
+CREATE POLICY "avatars banners inventory admin write" ON storage.objects FOR INSERT WITH CHECK (bucket_id = ANY(ARRAY['avatars','banners','inventory']) AND has_role(auth.uid(),'admin'));
+CREATE POLICY "avatars banners inventory admin update" ON storage.objects FOR UPDATE USING (bucket_id = ANY(ARRAY['avatars','banners','inventory']) AND has_role(auth.uid(),'admin'));
+CREATE POLICY "avatars banners inventory admin delete" ON storage.objects FOR DELETE USING (bucket_id = ANY(ARRAY['avatars','banners','inventory']) AND has_role(auth.uid(),'admin'));
