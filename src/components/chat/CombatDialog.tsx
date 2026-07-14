@@ -413,7 +413,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                 const size = players.length > 2 ? "h-[110px] sm:h-[150px]" : "h-[140px] sm:h-[190px]";
                 return (
                   <div key={p.character_id} className="flex flex-col items-center gap-1">
-                    <div className={`relative transition-all ${isActive ? "drop-shadow-[0_0_18px_rgba(52,211,153,0.9)] scale-105" : ""} ${!p.alive ? "opacity-30 grayscale" : ""}`}>
+                    <div ref={(el) => { playerRefs.current[p.character_id] = el; }} className={`relative transition-all ${isActive ? "drop-shadow-[0_0_18px_rgba(52,211,153,0.9)] scale-105" : ""} ${!p.alive ? "opacity-30 grayscale" : ""}`}>
                       {sprite ? (
                         <img src={sprite} alt={p.nickname} className={`${size} w-auto object-contain`} style={{ transform: "scaleX(-1)", filter: isActive ? "drop-shadow(0 0 10px rgb(52 211 153))" : undefined }} />
                       ) : (
