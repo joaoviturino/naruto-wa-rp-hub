@@ -464,13 +464,22 @@ export const playerAttack = createServerFn({ method: "POST" })
       } as any);
     }
     state.npc.hp = Math.max(0, state.npc.hp - damage);
+    if (state.npc.hp <= 0) state.npc.alive = false;
+    // Reflete mudança no array (state.npc é referência, mas garantimos)
+    state.npcs[targetIdx] = state.npc;
 
     let status = sess.status as string;
     let ended_at: string | null = null;
 
-    if (state.npc.hp <= 0) {
+    const allDead = state.npcs.every((n) => !n.alive);
+    if (allDead) {
       status = "won"; ended_at = new Date().toISOString();
     } else {
+      // Auto-pick próximo alvo vivo caso o atual tenha morrido
+      if (!state.npc.alive) {
+        const nxt = nextAliveNpcIdx(state, targetIdx);
+        if (nxt >= 0) { state.target = nxt; state.npc = state.npcs[nxt]; }
+      }
       // Turno do NPC
       const npcTurn = await runNpcTurn(supabaseAdmin, sess.npc_id, state, log, speed);
       state.npc.energy = npcTurn.energyRemaining;
