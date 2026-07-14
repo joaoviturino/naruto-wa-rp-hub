@@ -88,9 +88,12 @@ type LogEntry = {
   crit_mul: number;
   msg: string;
   animation_url?: string | null;
+  animation_mode?: "projectile" | "front" | "overlay" | null;
   sound_url?: string | null;
   pose_url?: string | null;
   actor_char_id?: string | null;
+  target_char_id?: string | null;
+  target_npc_idx?: number | null;
   raw_damage?: number;
   defense?: number;
   hit_cap?: number;
