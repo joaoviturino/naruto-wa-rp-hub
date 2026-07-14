@@ -152,6 +152,21 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
     lastLogSeq.current = fresh[fresh.length - 1].seq;
     for (const entry of fresh) {
       if (entry.animation_url || entry.sound_url) animQueue.current.push(entry);
+      // Números de dano flutuantes
+      if (Number(entry.damage) > 0) {
+        const id = `${entry.seq}-${Math.random().toString(36).slice(2, 7)}`;
+        const crit = Number(entry.crit_mul ?? 1) > 1 && entry.damage > 0;
+        if (entry.actor === "player") {
+          // dano no NPC alvo — usa o nome como fallback para achar o slot
+          const idx = npcs.findIndex((n: any) => n.name === entry.target_name);
+          const key = `npc:${idx >= 0 ? idx : 0}`;
+          pushBurst(key, { id, amount: Number(entry.damage), crit });
+        } else if (entry.actor === "npc") {
+          // dano no jogador target_name
+          const p = players.find((x: any) => x.nickname === entry.target_name);
+          if (p) pushBurst(`player:${p.character_id}`, { id, amount: Number(entry.damage), crit });
+        }
+      }
     }
     void runQueue();
 
