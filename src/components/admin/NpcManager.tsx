@@ -506,6 +506,7 @@ export function NpcManager() {
       ) : (
         <div className="text-muted-foreground text-sm p-6">Selecione um NPC à esquerda para editar HP, XP, imagem e habilidades.</div>
       )}
+      </div>
     </div>
   );
 }
