@@ -344,8 +344,14 @@ function ChatPage() {
   return (
     <div className="mx-auto max-w-6xl md:grid md:gap-4 md:grid-cols-[280px_1fr] md:p-4">
       {character && <ChatHud characterId={character.id} />}
+      {/* HUD mobile (barra superior) */}
+      {character && (
+        <div className="md:hidden">
+          <ChatHud characterId={character.id} variant="mobile-bar" />
+        </div>
+      )}
       {/* Barra mobile */}
-      <div className="md:hidden sticky top-0 z-30 flex items-center gap-2 border-b border-border bg-card/95 backdrop-blur px-3 py-2">
+      <div className="md:hidden sticky top-[44px] z-30 flex items-center gap-2 border-b border-border bg-card/95 backdrop-blur px-3 py-2">
         <Sheet open={navOpen} onOpenChange={setNavOpen}>
           <SheetTrigger asChild>
             <Button variant="outline" size="icon" className="h-8 w-8"><Menu size={16} /></Button>
