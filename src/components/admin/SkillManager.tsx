@@ -247,7 +247,7 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
             />
           )}
           {f.classification === "suplementar" &&
-            (f.skill_class === "iryo" || f.req_class === "iryo") && (
+            (f.skill_class === "ninjutsu_medico" || f.req_class === "ninjutsu_medico") && (
               <div className="sm:col-span-2 rounded-md border border-emerald-500/40 bg-emerald-500/5 p-3 space-y-2">
                 <div className="text-xs font-display text-emerald-300">
                   Ninjutsu Médico — cura de HP
