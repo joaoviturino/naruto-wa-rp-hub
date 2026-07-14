@@ -203,7 +203,10 @@ function PosesTab({ characterId }: { characterId: string }) {
         if (poseId) n[skillId] = poseId; else delete n[skillId];
         return n;
       });
-    } catch (e: any) { toast.error(e.message); }
+    } catch (e: any) {
+      const msg = e?.message ?? e?.statusText ?? "Falha ao atribuir pose.";
+      toast.error(String(msg));
+    }
   }
 
   return (
