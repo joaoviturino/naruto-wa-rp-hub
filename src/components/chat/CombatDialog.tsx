@@ -331,7 +331,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
 
   return (
     <Dialog open onOpenChange={(v) => !v && session.status !== "active" && onClose()}>
-      <DialogContent className="max-w-4xl w-[calc(100vw-1rem)] p-0 overflow-hidden border-blood/30 max-h-[95vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl w-[calc(100vw-1rem)] p-0 overflow-hidden border-blood/30 max-h-[95vh] overflow-y-auto no-scrollbar">
         <NpcMusic src={(npc as any).music_url} />
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 px-3 pt-3 text-sm sm:text-base">
@@ -341,7 +341,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
         </DialogHeader>
 
         {/* Turn order strip */}
-        <div className="flex items-center gap-1 px-2 py-1.5 border-b border-border bg-input/40 overflow-x-auto">
+        <div className="flex items-center gap-1 px-2 py-1.5 border-b border-border bg-input/40 overflow-x-auto no-scrollbar">
           <span className="text-[10px] uppercase text-muted-foreground mr-2 shrink-0">Turno</span>
           {[...npcs.map((n: any, i: number) => ({ kind: "npc" as const, e: n, i })),
             ...players.map((p: any) => ({ kind: "player" as const, e: p, i: -1 }))].map((row, i) => {
@@ -471,7 +471,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
         </div>
 
         {/* Log */}
-        <div className="mx-2 mt-2 border border-border rounded p-2 max-h-24 sm:max-h-28 overflow-y-auto text-xs space-y-1 bg-input/40">
+        <div className="mx-2 mt-2 border border-border rounded p-2 max-h-24 sm:max-h-28 overflow-y-auto no-scrollbar text-xs space-y-1 bg-input/40">
           {log.slice(-8).map((l: any) => (
             <div key={l.seq} className={l.actor === "player" ? "text-emerald-300" : "text-red-300"}>
               #{l.seq} {l.msg}
@@ -509,7 +509,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                     })}
                   </div>
                 </div>
-                <div className="grid gap-2 sm:grid-cols-2 max-h-56 overflow-y-auto pr-1">
+                <div className="grid gap-2 sm:grid-cols-2 max-h-56 overflow-y-auto no-scrollbar pr-1">
                   {skillsByTab.length === 0 && <p className="text-xs text-muted-foreground p-3 text-center col-span-full">Nenhuma habilidade nesta categoria.</p>}
                   {skillsByTab.map((s) => {
                     const cd = myCooldowns[s.id] ?? 0;
@@ -548,7 +548,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
               </TabsContent>
               <TabsContent value="items" className="mt-2">
                 {consumables.length === 0 && <p className="text-sm text-muted-foreground p-4 text-center">Sem consumíveis na bolsa.</p>}
-                <div className="grid gap-2 sm:grid-cols-2 max-h-56 overflow-y-auto pr-1">
+                <div className="grid gap-2 sm:grid-cols-2 max-h-56 overflow-y-auto no-scrollbar pr-1">
                   {consumables.map((e) => {
                     const it = itemMap[e.item_id];
                     return (

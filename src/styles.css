@@ -380,3 +380,14 @@
   animation: target-pulse 1.4s ease-in-out infinite;
 }
 
+/* Hide scrollbars while keeping scroll behavior */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
