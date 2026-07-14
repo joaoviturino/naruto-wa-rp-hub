@@ -34,7 +34,7 @@ const proficienciesMap = z.record(skillClassEnum, proficiencyEntry);
 
 /** Efeito reutilizável de restauração de energia (itens consumíveis e habilidades suplementares). */
 const restoreEffect = z.object({
-  pool: z.enum(["ef","em","chakra","all"]),
+  pool: z.enum(["hp","ef","em","chakra","all"]),
   mode: z.enum(["flat","percent"]),
   amount: z.number().min(0).max(100000),
 }).nullable().optional();
