@@ -19,7 +19,7 @@ type HudChar = {
   eyes_frame_url: string | null;
 };
 
-export function ChatHud({ characterId }: { characterId: string }) {
+export function ChatHud({ characterId, variant = "floating" }: { characterId: string; variant?: "floating" | "mobile-bar" }) {
   const [c, setC] = useState<HudChar | null>(null);
   const [open, setOpen] = useState(false);
   const update = useServerFn(updateCharacter);
@@ -55,9 +55,65 @@ export function ChatHud({ characterId }: { characterId: string }) {
   const emCur = c.em_current == null ? s.em : Math.min(s.em, c.em_current);
   const ckCur = c.chakra_current == null ? s.chakra : Math.min(s.chakra, c.chakra_current);
 
+  if (variant === "mobile-bar") {
+    return (
+      <div className="sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="w-full flex items-center gap-2 px-3 py-1.5"
+        >
+          <div className="relative h-8 w-8 shrink-0 rounded-full overflow-hidden ring-1 ring-gold/40 bg-secondary">
+            {c.eyes_frame_url ? (
+              <img src={c.eyes_frame_url} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <ImagePlus className="w-3 h-3 text-muted-foreground" />
+              </div>
+            )}
+          </div>
+          <div className="flex-1 min-w-0 flex flex-col gap-1">
+            <MiniBar cur={hpCur} max={hpMax} from="#10b981" to="#34d399" />
+          </div>
+          <ChevronDown
+            size={14}
+            className={`text-white/60 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+          />
+        </button>
+        <div
+          className={`overflow-hidden transition-all duration-200 ${open ? "max-h-64" : "max-h-0"}`}
+        >
+          <div className="px-3 pb-3 pt-1 space-y-2 border-t border-border/50">
+            <div className="flex items-center gap-2">
+              <div className="text-[10px] uppercase tracking-[0.2em] text-white/50">Shinobi</div>
+              <div className="font-display text-xs text-gold truncate flex-1">{c.nickname}</div>
+              <ImageUpload
+                label="Frame"
+                bucket="avatars"
+                userId={c.user_id}
+                compact
+                onUploaded={async (url) => {
+                  try {
+                    await update({ data: { eyes_frame_url: url } });
+                    toast.success("Frame atualizado.");
+                    load();
+                  } catch (e: any) { toast.error(e.message); }
+                }}
+              />
+            </div>
+            <Bar label="HP" cur={hpCur} max={hpMax} from="#10b981" to="#34d399" />
+            <Bar label="EF" cur={efCur} max={s.ef} from="#ef4444" to="#f87171" />
+            <Bar label="EM" cur={emCur} max={s.em} from="#0ea5e9" to="#38bdf8" />
+            <Bar label="CK" cur={ckCur} max={s.chakra} from="#f59e0b" to="#fbbf24" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
-      className="fixed z-40 pointer-events-none select-none top-[calc(env(safe-area-inset-top)+50px)] left-1/2 -translate-x-1/2 sm:top-3 sm:right-3 sm:left-auto sm:translate-x-0"
+      className="fixed z-40 pointer-events-none select-none hidden sm:block sm:top-3 sm:right-3"
       style={{ width: "min(380px, calc(100vw - 100px))" }}
     >
       <div className="pointer-events-auto flex flex-col items-center gap-1.5">
