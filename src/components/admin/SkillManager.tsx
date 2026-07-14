@@ -128,15 +128,6 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
               <ImageUpload label="Enviar" bucket="skills" userId={adminUserId} onUploaded={(url) => up("image_url", url)} />
             </div>
           </Field>
-          <Field label="Animação (GIF/PNG/MP4 — aparece no golpe)">
-            <div className="flex items-center gap-2">
-              {f.animation_url && <img src={f.animation_url} alt="" className="w-12 h-12 rounded object-cover" />}
-              <ImageUpload label="Enviar" bucket="skills" userId={adminUserId}
-                accept="image/gif,image/png,image/webp,video/mp4,video/webm" maxMb={15}
-                onUploaded={(url) => up("animation_url", url)} />
-              {f.animation_url && <Button size="sm" variant="ghost" onClick={() => up("animation_url", null)}>Remover</Button>}
-            </div>
-          </Field>
           <Field label="Som (MP3/OGG/WAV — sonoplastia)">
             <div className="flex items-center gap-2">
               {f.sound_url && <audio controls src={f.sound_url} className="h-8 max-w-[180px]" />}

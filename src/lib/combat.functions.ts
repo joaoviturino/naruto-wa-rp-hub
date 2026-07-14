@@ -89,6 +89,8 @@ type LogEntry = {
   msg: string;
   animation_url?: string | null;
   sound_url?: string | null;
+  pose_url?: string | null;
+  actor_char_id?: string | null;
   raw_damage?: number;
   defense?: number;
   hit_cap?: number;
@@ -460,11 +462,24 @@ export const playerAttack = createServerFn({ method: "POST" })
       activePlayer.cooldowns[data.skill_id] = Number(skill.cooldown_turns);
     }
 
+    // Pose configurada pelo jogador para esta habilidade (troca de sprite durante o golpe).
+    let poseUrl: string | null = null;
+    {
+      const { data: csp } = await supabaseAdmin
+        .from("character_skill_poses")
+        .select("pose:character_poses(image_url)")
+        .eq("character_id", activePlayer.character_id)
+        .eq("skill_id", data.skill_id)
+        .maybeSingle();
+      poseUrl = ((csp as any)?.pose?.image_url as string | undefined) ?? null;
+    }
+
     log.push({
       seq: log.length + 1, actor: "player", actor_name: activePlayer.nickname, target_name: state.npc.name,
       skill_name: skill.name, energy_type: pool, energy_used: data.energy_used,
       effective, damage, raw_damage: rawDamage, defense, hit_cap: hitCap, speed, crit_mul: Number(skill.bonus_critical),
-      animation_url: (skill as any).animation_url ?? null,
+      pose_url: poseUrl,
+      actor_char_id: activePlayer.character_id,
       sound_url: (skill as any).sound_url ?? null,
       msg: `${activePlayer.nickname} usa ${skill.name} (${pool.toUpperCase()} ${data.energy_used})${masteryMul > 1 ? ` [Maestria ×${masteryMul.toFixed(1)}]` : ""}${toolConsumedLabel ? ` [-${toolQtyConsumed} ${toolConsumedLabel}]` : ""} → ${damage} de dano${defense > 0 ? ` (def ${defense}%)` : ""}${damage < afterDef ? ` [cap ${maxHitPct}%]` : ""}.`,
       ...(toolConsumedLabel ? { tool_consumed: toolConsumedLabel, tool_qty: toolQtyConsumed, tool_crit_mul: toolCritMul } : {}),

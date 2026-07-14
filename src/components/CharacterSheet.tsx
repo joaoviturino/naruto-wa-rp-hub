@@ -13,6 +13,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { getLevelConfig } from "@/lib/level.functions";
 import { levelProgress, DEFAULT_LEVEL_CONFIG, type LevelConfig } from "@/lib/level";
+import { listMyPoses, listMySkillPoses, setSkillPose } from "@/lib/pose.functions";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Character = {
   id: string; user_id: string; nickname: string; phone_e164: string;
@@ -134,10 +136,11 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
       </div>
 
       <Tabs defaultValue="ficha" className="p-4 sm:p-6">
-        <TabsList className="w-full sm:w-auto grid grid-cols-3 sm:inline-flex">
+        <TabsList className="w-full sm:w-auto grid grid-cols-4 sm:inline-flex">
           <TabsTrigger value="ficha" className="text-xs sm:text-sm">Ficha</TabsTrigger>
           <TabsTrigger value="inventario" className="text-xs sm:text-sm">Inventário</TabsTrigger>
           <TabsTrigger value="databook" className="text-xs sm:text-sm">Databook</TabsTrigger>
+          <TabsTrigger value="poses" className="text-xs sm:text-sm">Poses</TabsTrigger>
         </TabsList>
         <TabsContent value="ficha" className="mt-4">
           <div className="scroll-panel rounded-lg p-4 sm:p-6 space-y-4">
@@ -160,7 +163,91 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
         <TabsContent value="databook" className="mt-4">
           <Databook characterId={characterId} />
         </TabsContent>
+        <TabsContent value="poses" className="mt-4">
+          <PosesTab characterId={characterId} />
+        </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function PosesTab({ characterId }: { characterId: string }) {
+  const listPoses = useServerFn(listMyPoses);
+  const listMap = useServerFn(listMySkillPoses);
+  const setPose = useServerFn(setSkillPose);
+  const [poses, setPoses] = useState<any[]>([]);
+  const [skills, setSkills] = useState<any[]>([]);
+  const [map, setMap] = useState<Record<string, string>>({});
+
+  async function loadAll() {
+    try {
+      const [p, m, cs] = await Promise.all([
+        listPoses({} as any),
+        listMap({} as any),
+        supabase.from("character_skills").select("skill_id, skills(id,name,rank)").eq("character_id", characterId),
+      ]);
+      setPoses(p as any);
+      const mp: Record<string, string> = {};
+      (m as any[]).forEach((r) => { if (r.pose_id) mp[r.skill_id] = r.pose_id; });
+      setMap(mp);
+      setSkills(((cs.data ?? []) as any[]).map((r) => r.skills).filter(Boolean));
+    } catch (e: any) { toast.error(e.message); }
+  }
+  useEffect(() => { loadAll(); }, [characterId]);
+
+  async function assign(skillId: string, poseId: string | null) {
+    try {
+      await setPose({ data: { skill_id: skillId, pose_id: poseId } } as any);
+      setMap((m) => {
+        const n = { ...m };
+        if (poseId) n[skillId] = poseId; else delete n[skillId];
+        return n;
+      });
+    } catch (e: any) { toast.error(e.message); }
+  }
+
+  return (
+    <div className="scroll-panel rounded-lg p-4 sm:p-6 space-y-4">
+      <div>
+        <h3 className="font-display text-lg text-gold">Minhas poses</h3>
+        <p className="text-xs text-muted-foreground">Poses são concedidas pelos admins. Durante o combate, seu sprite troca para a pose atribuída à habilidade usada.</p>
+      </div>
+      {poses.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Nenhuma pose disponível. Peça a um admin.</p>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2">
+          {poses.map((p) => (
+            <div key={p.id} className="border border-border rounded p-2 bg-input/30">
+              <div className="h-24 flex items-center justify-center bg-black/30 rounded overflow-hidden">
+                <img src={p.image_url} alt={p.name} className="max-h-full max-w-full object-contain" />
+              </div>
+              <div className="text-[11px] text-center mt-1 truncate">{p.name}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div>
+        <h3 className="font-display text-lg text-gold mt-4">Atribuir por habilidade</h3>
+        {skills.length === 0 && <p className="text-sm text-muted-foreground">Nenhuma habilidade aprendida.</p>}
+        <div className="grid gap-2 mt-2">
+          {skills.map((s) => (
+            <div key={s.id} className="flex items-center gap-2 border border-border rounded p-2 bg-input/20">
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold truncate">{s.name}</div>
+                <div className="text-[10px] text-muted-foreground">Rank {s.rank}</div>
+              </div>
+              <Select value={map[s.id] ?? "__none__"} onValueChange={(v) => assign(s.id, v === "__none__" ? null : v)}>
+                <SelectTrigger className="w-40 h-8"><SelectValue placeholder="—" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Nenhuma —</SelectItem>
+                  {poses.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

@@ -31,7 +31,8 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const [itemMap, setItemMap] = useState<Record<string, Item>>({});
   const [avatars, setAvatars] = useState<Record<string, string | null>>({});
   const [sprites, setSprites] = useState<Record<string, string | null>>({});
-  const [anim, setAnim] = useState<{ url: string; side: "npc" | "player"; until: number } | null>(null);
+  // Pose ativa por jogador (character_id → url) durante um ataque.
+  const [poses, setPoses] = useState<Record<string, string | null>>({});
   const lastLogSeq = useRef<number>(0);
   const animQueue = useRef<any[]>([]);
   const animRunning = useRef<boolean>(false);
@@ -152,7 +153,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
     if (!fresh.length) return;
     lastLogSeq.current = fresh[fresh.length - 1].seq;
     for (const entry of fresh) {
-      if (entry.animation_url || entry.sound_url) animQueue.current.push(entry);
+      if (entry.pose_url || entry.sound_url) animQueue.current.push(entry);
       // Números de dano flutuantes
       if (Number(entry.damage) > 0) {
         const id = `${entry.seq}-${Math.random().toString(36).slice(2, 7)}`;
@@ -182,18 +183,19 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
     }
 
     async function playOne(entry: any) {
-      const animUrl: string | undefined = entry.animation_url;
+      const poseUrl: string | undefined = entry.pose_url;
+      const actorCharId: string | undefined = entry.actor_char_id;
       const soundUrl: string | undefined = entry.sound_url;
       const MAX_WAIT = 5000;
-      const ANIM_MS = 2400;
+      const POSE_MS = 1400;
 
-      const waitImg = animUrl ? new Promise<boolean>((res) => {
+      const waitImg = poseUrl ? new Promise<boolean>((res) => {
         const img = new Image();
         let done = false;
         const finish = (ok: boolean) => { if (done) return; done = true; res(ok); };
         img.onload = () => finish(true);
         img.onerror = () => finish(false);
-        img.src = animUrl;
+        img.src = poseUrl;
         setTimeout(() => finish(false), MAX_WAIT);
       }) : Promise.resolve(false);
 
@@ -227,15 +229,17 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
         audioDuration = Number.isFinite(a2.duration) ? a2.duration * 1000 : 0;
       }
 
-      // Mostrar animação
-      if (animUrl && imgOk) {
-        setAnim({ url: animUrl, side: entry.actor, until: Date.now() + ANIM_MS });
+      // Troca de pose para o jogador que agiu
+      if (poseUrl && imgOk && actorCharId) {
+        setPoses((p) => ({ ...p, [actorCharId]: poseUrl }));
       }
 
-      // Aguarda o maior entre duração do áudio e a animação (mínimo 1.2s, máximo 6s)
-      const wait = Math.max(1200, Math.min(6000, Math.max(audioDuration || 0, animUrl && imgOk ? ANIM_MS : 0)));
+      // Aguarda o maior entre duração do áudio e a pose (mínimo 1.2s, máximo 6s)
+      const wait = Math.max(1200, Math.min(6000, Math.max(audioDuration || 0, poseUrl && imgOk ? POSE_MS : 0)));
       await new Promise((r) => setTimeout(r, wait));
-      setAnim(null);
+      if (poseUrl && imgOk && actorCharId) {
+        setPoses((p) => { const { [actorCharId]: _drop, ...rest } = p; return rest; });
+      }
     }
   }, [log.length]);
 
@@ -262,7 +266,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
 
   const poolColor: Record<string, string> = { ef: "oklch(0.55 0.22 25)", em: "oklch(0.6 0.15 220)", chakra: "oklch(0.78 0.15 80)" };
   const lastEntry = log[log.length - 1];
-  const npcActive = session.status === "active" && lastEntry?.actor === "player" ? false : (lastEntry?.actor === "npc" && anim?.side === "npc");
+  const npcActive = session.status === "active" && lastEntry?.actor === "npc" && Object.keys(poses).length === 0;
   const bgUrl = npc.battle_bg_url as string | null;
 
   return (
@@ -347,7 +351,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
             <div className="flex items-end gap-1 sm:gap-3 max-w-[45%] justify-end flex-wrap">
               {players.map((p: any) => {
                 const isActive = session.status === "active" && !npcActive && p.character_id === activePlayer?.character_id && p.alive;
-                const sprite = p.sprite_url || sprites[p.character_id];
+                const sprite = poses[p.character_id] || p.sprite_url || sprites[p.character_id];
                 const size = players.length > 2 ? "h-[110px] sm:h-[150px]" : "h-[140px] sm:h-[190px]";
                 return (
                   <div key={p.character_id} className="flex flex-col items-center gap-1">
@@ -364,16 +368,6 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
               })}
             </div>
 
-            {/* Skill animation overlay — center of stage, visible to everyone */}
-            {anim && (
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-20">
-                <img
-                  src={anim.url}
-                  alt=""
-                  className="w-[70%] max-w-[420px] h-[70%] max-h-[280px] object-contain animate-scale-in drop-shadow-[0_0_30px_rgba(0,0,0,0.8)]"
-                />
-              </div>
-            )}
           </div>
         </div>
 
