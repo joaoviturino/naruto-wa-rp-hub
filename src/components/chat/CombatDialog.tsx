@@ -130,6 +130,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const currentCd = currentSkill ? (myCooldowns[currentSkill.id] ?? 0) : 0;
   const currentPool: "ef" | "em" | "chakra" | null = currentSkill?.energy_type ?? null;
   const currentPoolMax = currentPool && me ? (me[`${currentPool}_max` as const] as number) : 0;
+  const currentPoolNow = currentPool && me ? (me[currentPool as "ef" | "em" | "chakra"] as number) : 0;
   const currentPct = Math.max(1, Math.min(100, Number(currentSkill?.cost_percent ?? 20)));
   const currentMaxEnergy = currentPool ? Math.max(1, Math.floor((currentPoolMax * currentPct) / 100)) : 1;
   const [skillTab, setSkillTab] = useState<"ef" | "em" | "chakra">("chakra");
