@@ -130,6 +130,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const currentCd = currentSkill ? (myCooldowns[currentSkill.id] ?? 0) : 0;
   const currentPool: "ef" | "em" | "chakra" | null = currentSkill?.energy_type ?? null;
   const currentPoolMax = currentPool && me ? (me[`${currentPool}_max` as const] as number) : 0;
+  const currentPoolNow = currentPool && me ? (me[currentPool as "ef" | "em" | "chakra"] as number) : 0;
   const currentPct = Math.max(1, Math.min(100, Number(currentSkill?.cost_percent ?? 20)));
   const currentMaxEnergy = currentPool ? Math.max(1, Math.floor((currentPoolMax * currentPct) / 100)) : 1;
   const [skillTab, setSkillTab] = useState<"ef" | "em" | "chakra">("chakra");
@@ -243,6 +244,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   async function doAttack() {
     if (!currentSkill) return;
     if (energy > currentMaxEnergy) { toast.error(`Custo máximo: ${currentMaxEnergy} (${currentPct}% de ${currentPool?.toUpperCase()}).`); return; }
+    if (energy > currentPoolNow) { toast.error(`Energia insuficiente. Você tem ${currentPoolNow} ${currentPool?.toUpperCase()}.`); return; }
     setBusy(true);
     try {
       await attack({ data: { session_id: sessionId, skill_id: currentSkill.id, energy_used: energy, target_index: targetIdx } });
