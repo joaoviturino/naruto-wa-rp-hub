@@ -263,6 +263,7 @@ export const playerAttack = createServerFn({ method: "POST" })
     session_id: z.string().uuid(),
     skill_id: z.string().uuid(),
     energy_used: z.number().int().min(1).max(100000),
+    target_index: z.number().int().min(0).max(10).optional(),
   }).parse(i))
   .handler(async ({ data, context }) => {
     const me = await loadMyChar(context);
@@ -270,8 +271,17 @@ export const playerAttack = createServerFn({ method: "POST" })
 
     const { data: sess } = await supabaseAdmin.from("combat_sessions").select("*").eq("id", data.session_id).maybeSingle();
     if (!sess || sess.status !== "active") throw new Error("Combate encerrado.");
-    const state: CombatState = sess.state as any;
+    const state: CombatState = normalizeState(sess.state as any);
     const log: LogEntry[] = sess.log as any;
+
+    // Escolhe alvo: usa target_index enviado, ou o `state.target`, ou o primeiro vivo.
+    let targetIdx = typeof data.target_index === "number" ? data.target_index : (state.target ?? 0);
+    if (!state.npcs[targetIdx] || !state.npcs[targetIdx].alive) {
+      targetIdx = nextAliveNpcIdx(state, 0);
+      if (targetIdx < 0) throw new Error("Todos os inimigos já caíram.");
+    }
+    state.target = targetIdx;
+    state.npc = state.npcs[targetIdx];
 
     const activeIdx = state.active;
     const activePlayer = state.players[activeIdx];
