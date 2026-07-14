@@ -175,3 +175,79 @@ export const listNpcsBasic = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return data ?? [];
   });
+// ============ NPC GROUPS ============
+
+/** Lista todos os grupos com seus membros. */
+export const listNpcGroups = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const [{ data: groups, error: gErr }, { data: mems, error: mErr }] = await Promise.all([
+      supabaseAdmin.from("npc_groups").select("*").order("name"),
+      supabaseAdmin.from("npc_group_members").select("group_id,npc_id,weight"),
+    ]);
+    if (gErr) throw new Error(gErr.message);
+    if (mErr) throw new Error(mErr.message);
+    return { groups: groups ?? [], members: mems ?? [] };
+  });
+
+/** Cria ou atualiza um grupo (nome/descrição). */
+export const upsertNpcGroup = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    id: z.string().uuid().optional(),
+    name: z.string().trim().min(2).max(80),
+    description: z.string().max(500).nullish(),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    if (data.id) {
+      const { error } = await supabaseAdmin.from("npc_groups")
+        .update({ name: data.name, description: data.description ?? null })
+        .eq("id", data.id);
+      if (error) throw new Error(error.message);
+      return { id: data.id };
+    }
+    const { data: row, error } = await supabaseAdmin.from("npc_groups")
+      .insert({ name: data.name, description: data.description ?? null })
+      .select("id").single();
+    if (error) throw new Error(error.message);
+    return { id: row.id };
+  });
+
+/** Remove um grupo (membros são apagados por cascade). */
+export const deleteNpcGroup = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.from("npc_group_members").delete().eq("group_id", data.id);
+    const { error } = await supabaseAdmin.from("npc_groups").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/** Substitui os membros do grupo. Cada linha traz npc_id + weight (peso do sorteio). */
+export const setNpcGroupMembers = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    group_id: z.string().uuid(),
+    members: z.array(z.object({
+      npc_id: z.string().uuid(),
+      weight: z.number().int().min(1).max(99).default(1),
+    })).max(20),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.from("npc_group_members").delete().eq("group_id", data.group_id);
+    if (data.members.length) {
+      const rows = data.members.map((m) => ({ group_id: data.group_id, npc_id: m.npc_id, weight: m.weight }));
+      const { error } = await supabaseAdmin.from("npc_group_members").insert(rows);
+      if (error) throw new Error(error.message);
+    }
+    return { ok: true };
+  });
