@@ -629,12 +629,17 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                   <div className="flex-1">
                     <div className="text-xs text-muted-foreground mb-1">
                       Energia ({currentSkill?.energy_type.toUpperCase() ?? "—"}) — máx {currentMaxEnergy} ({currentPct}%)
+                      {isHealSkill && (
+                        <span className="ml-2 text-emerald-300">
+                          • cura ≈ energia gasta{healTarget === "team" ? " (time inteiro)" : " (alvo único — clique num aliado)"}
+                        </span>
+                      )}
                     </div>
                     <Input type="number" min={1} max={currentMaxEnergy} value={energy}
                       onChange={(e) => setEnergy(Math.max(1, Math.min(currentMaxEnergy, Number(e.target.value))))} />
                   </div>
                   <Button onClick={doAttack} disabled={!currentSkill || busy || currentCd > 0} className="shrink-0">
-                    <Sword size={14} className="mr-1" /> {busy ? "..." : "Atacar"}
+                    <Sword size={14} className="mr-1" /> {busy ? "..." : isHealSkill ? "Curar" : "Atacar"}
                   </Button>
                 </div>
               </TabsContent>
