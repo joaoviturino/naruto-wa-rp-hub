@@ -261,17 +261,43 @@ export function LocationManager() {
                   Tempo médio estimado até um encontro: <span className="text-gold">{avgSpawnSec ? `${avgSpawnSec}s (${(avgSpawnSec/60).toFixed(1)} min)` : "—"}</span>
                 </p>
                 <div>
-                  <Label>NPCs que podem aparecer aqui</Label>
-                  <div className="grid gap-1 max-h-[220px] overflow-y-auto pr-2 mt-1">
-                    {aggressiveNpcs.map((n) => (
-                      <label key={n.id} className="flex items-center gap-2 text-sm p-1 hover:bg-secondary/40 rounded">
-                        <input type="checkbox" checked={selNpcs.has(n.id)}
-                          onChange={(e) => toggleNpc(n.id, e.target.checked)} />
-                        <span>{n.name}</span>
-                      </label>
-                    ))}
-                    {aggressiveNpcs.length === 0 && <p className="text-xs text-muted-foreground">Cadastre NPCs agressivos primeiro.</p>}
+                  <Label>O que pode aparecer aqui</Label>
+                  <div className="flex gap-1 mt-1 mb-2">
+                    <button type="button" onClick={() => setDzTab("solo")}
+                      className={`px-3 py-1 rounded text-xs font-semibold border ${dzTab==="solo" ? "bg-gold text-background border-gold" : "border-border text-muted-foreground hover:bg-secondary/40"}`}>
+                      NPCs solos ({aggressiveNpcs.length})
+                    </button>
+                    <button type="button" onClick={() => setDzTab("group")}
+                      className={`px-3 py-1 rounded text-xs font-semibold border ${dzTab==="group" ? "bg-gold text-background border-gold" : "border-border text-muted-foreground hover:bg-secondary/40"}`}>
+                      Grupos ({groups.length})
+                    </button>
                   </div>
+                  {dzTab === "solo" ? (
+                    <div className="grid gap-1 max-h-[220px] overflow-y-auto pr-2">
+                      {aggressiveNpcs.map((n) => (
+                        <label key={n.id} className="flex items-center gap-2 text-sm p-1 hover:bg-secondary/40 rounded">
+                          <input type="checkbox" checked={selNpcs.has(n.id)}
+                            onChange={(e) => toggleNpc(n.id, e.target.checked)} />
+                          <span>{n.name}</span>
+                        </label>
+                      ))}
+                      {aggressiveNpcs.length === 0 && <p className="text-xs text-muted-foreground">Cadastre NPCs agressivos primeiro.</p>}
+                    </div>
+                  ) : (
+                    <div className="grid gap-1 max-h-[220px] overflow-y-auto pr-2">
+                      {groups.map((g) => (
+                        <label key={g.id} className="flex items-center gap-2 text-sm p-1 hover:bg-secondary/40 rounded">
+                          <input type="checkbox" checked={selGroups.has(g.id)}
+                            onChange={(e) => toggleGroup(g.id, e.target.checked)} />
+                          <span>{g.name}</span>
+                        </label>
+                      ))}
+                      {groups.length === 0 && <p className="text-xs text-muted-foreground">Nenhum grupo criado. Vá em NPCs → Grupos.</p>}
+                    </div>
+                  )}
+                  <p className="text-[11px] text-muted-foreground mt-2">
+                    Quando há grupos marcados, o spawn prioriza grupos. Se nenhum for marcado, cai no sorteio de NPCs solos.
+                  </p>
                 </div>
               </>
             )}
