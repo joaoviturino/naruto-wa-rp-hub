@@ -1,52 +1,48 @@
-## O que vai mudar
+## Diagnóstico
 
-### 1. Animação de números de dano (PvE + PvP)
-- Novo componente `FloatingDamage.tsx` que emite números que sobem/caem próximos ao sprite atingido (vermelho para dano, verde para cura, dourado para crítico).
-- Integrar em `CombatDialog.tsx` (PvE) e `duel.$id.tsx` (PvP) usando a lista de turnos como gatilho: cada novo turno com `damage>0` dispara um número no sprite do alvo.
-- CSS: keyframe `damage-float` (translate-y -60px + fade + scale) em `src/styles.css`.
+Investiguei uma sessão real (`Voadora`, EF 3699, dano 3699 → NPC com 3031 HP morto em 1 hit) e o código de `playerAttack` / `CombatDialog`.
 
-### 2. Grupos de NPCs + combate multi-alvo
-Schema (migration):
-- `npc_groups` (id, name, description, created_at) — grupo nomeado.
-- `npc_group_members` (group_id, npc_id, weight int) — quais NPCs compõem.
-- `locations.spawn_group_ids uuid[]` — grupos possíveis naquela danger zone (mantém `location_npcs` como fallback individual).
-- `combat_sessions.enemy_ids uuid[]` — múltiplos inimigos por sessão.
-- `combat_sessions.enemy_state jsonb` — array com HP/energia/status por inimigo.
+Causas encontradas:
 
-Admin:
-- Aba nova em `NpcManager.tsx` — "Grupos": criar grupo, adicionar NPCs, atribuir pesos.
-- Em `LocationManager.tsx` — selecionar grupos de spawn (multiselect).
+1. **UI enche energia no máximo** — ao clicar na habilidade, `onClick` executa `setEnergy(maxES)` (linha 463 de `CombatDialog.tsx`). Ou seja, por default o jogador vai gastar 20 % do pool inteiro na primeira jogada.
+2. **Backend não valida `cost_percent`** — `playerAttack` aceita `energy_used` até 100000, sem checar o teto da habilidade. Se o front tiver bug/state velho, o servidor engole.
+3. **Não existe defesa/mitigação** — dano = `energy × bonus_energetic × bonus_critical × maestria × poder`. Sem redutor, NPC de 3031 HP cai com um único ataque de habilidade S ou de personagem alto-nível.
+4. **NPC não tem cap contra "one-shot"** — nenhuma regra impede que um golpe leve o HP direto a 0.
 
-Combate:
-- Ao iniciar batalha em danger zone: se houver grupos → sortear 1 grupo → instanciar todos os membros como inimigos ativos.
-- `CombatDialog.tsx`: renderiza array de inimigos, cada um com sua barra HP e sprite.
-- Novo fluxo de turno: **1º clique** seleciona alvo (aura vermelha pulsante no selecionado), **2º clique** escolhe habilidade/ação → aplica no alvo.
-- NPCs vivos atacam em sequência no turno inimigo; inimigos mortos ficam com sprite dessaturado + "K.O.".
-- Vitória só quando todos os inimigos = 0 HP; recompensas somam drops de todos.
+## Plano
 
-### 3. Duelo no chat (arena compartilhada)
-- Remover redirect para `/duel/:id`. Duelo aceito agora fica com `status=active` e é renderizado **inline no chat** de quem estiver na mesma `current_location_id` de ambos os duelistas.
-- Novo componente `chat/DuelArena.tsx` (banner grande dentro do feed do chat) que:
-  - Exibe fighters, HP/energias, feed narrativo dos turnos.
-  - Se `meId ∈ (challenger, opponent)` → mostra painel de ação (mesmo do PvP atual).
-  - Senão → modo espectador: só assiste; botão "Parar de assistir" fecha o banner.
-- `location_messages` ganha bloqueio: enquanto houver duelo `active` na location, apenas participantes conseguem enviar mensagem (RPC/policy check). Espectadores veem "Duelo em andamento — aguarde o fim para conversar".
-- Ao trocar de localização, o duelo continua rolando em background para os participantes (o banner some para quem saiu). Duelistas continuam vendo o painel em qualquer chat até `finished`.
-- Rota `/duel/:id` mantida como fallback direto (link antigo), mas o fluxo padrão é dentro do chat.
+### 1. Servidor (`src/lib/combat.functions.ts`)
+
+- Recalcular `maxAllowed = floor(pool_max × cost_percent / 100)`. Se `energy_used > maxAllowed`, faz `clamp` (não erro) e registra `energy_used = maxAllowed`. Evita quebrar clientes antigos e garante o teto.
+- Ler `npcs.defense` (novo campo, ver §3) e aplicar: `damage = max(1, round(rawDamage × (1 − defense/100)))`.
+- Aplicar cap "anti one-shot": `damage = min(damage, ceil(npc.hp_max × maxHitPct))` — `maxHitPct` vem do NPC (novo campo `max_hit_percent`, default 50). Se o admin quiser permitir one-shot, sobe pra 100.
+- Log passa a mostrar `raw` e `damage` para transparência.
+
+### 2. UI (`src/components/chat/CombatDialog.tsx`)
+
+- Ao selecionar habilidade, default `energy = max(1, base_cost)` (não `maxES`).
+- Slider/Input já limita a `currentMaxEnergy`; mostrar hint "recomendado: base_cost".
+- Mostrar defesa e cap do alvo no popup de alvo (opcional, só se `defense>0`).
+
+### 3. Banco (`npcs`)
+
+- `ALTER TABLE public.npcs ADD COLUMN defense int NOT NULL DEFAULT 0;` (0–90).
+- `ALTER TABLE public.npcs ADD COLUMN max_hit_percent int NOT NULL DEFAULT 50;` (10–100).
+
+### 4. Admin (`NpcManager.tsx`)
+
+- Dois inputs novos: **Defesa (%)** e **Dano máximo por golpe (% do HP)**, com sliders 0–100.
+
+### 5. Teste
+
+- Rodar `bunx tsgo --noEmit`.
+- Simular combate com NPC de 3000 HP, defesa 20 %, cap 40 %:
+  - Voadora com energy=740 (20 % de 3699 EF) → raw=740, com defesa=592, com cap=1200 → 592 de dano (≈20 % da vida).
+  - Mesma skill com bonus_energetic=2.5 → raw=1850, defesa=1480, cap=1200 → 1200 (cap atua).
+- Confirmar que o servidor impede burla mesmo se o cliente enviar `energy_used` fora do teto.
 
 ## Detalhes técnicos
 
-- Migration em uma call: cria `npc_groups`, `npc_group_members`, colunas em `locations`/`combat_sessions`, policies + GRANTs, RLS.
-- `combat.functions.ts.startCombat`: aceita seleção de grupo, materializa `enemy_state`.
-- `combat.functions.ts.playerTurn`: recebe `target_index` além de skill/item.
-- `pvp.functions.ts`: nada novo além de expor `location_id` do duelo (já existe via characters).
-- Chat realtime: já assina `pvp_duels` filtrado por location dos duelistas — adicionar canal `duel_at_location_<loc>`.
-- Bloqueio de mensagens durante duelo: policy `location_messages_insert` passa a checar `NOT EXISTS (select 1 from pvp_duels where status='active' and location_id=... and user não é participante)` — ou trigger BEFORE INSERT (mais simples e sem quebrar policy existente).
-
-## Ordem de entrega
-
-1. Migration (schema + policies).
-2. Animação de dano (componente + CSS + integração PvE/PvP).
-3. Grupos de NPC (admin + spawn + combate multi-alvo com target-select).
-4. Duelo no chat (DuelArena + bloqueio de mensagens + espectadores).
-5. Build + typecheck.
+- Todos os campos novos têm defaults, então NPCs existentes não quebram (defesa 0, cap 50 %).
+- `normalizeState` não precisa mudar (defesa é lida do NPC row a cada ataque, não persistida no state).
+- Balance secundário (mudar `bonus_energetic` das skills existentes) fica fora do escopo — o admin já pode editar por skill.
