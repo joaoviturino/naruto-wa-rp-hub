@@ -89,6 +89,8 @@ type LogEntry = {
   msg: string;
   animation_url?: string | null;
   sound_url?: string | null;
+  pose_url?: string | null;
+  actor_char_id?: string | null;
   raw_damage?: number;
   defense?: number;
   hit_cap?: number;
