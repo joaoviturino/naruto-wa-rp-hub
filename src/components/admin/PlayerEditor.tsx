@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useServerFn } from "@tanstack/react-start";
 import { updatePlayer, grantSkill, revokeSkill, grantItem, revokeItem, completeMission, uncompleteMission, giftRyo } from "@/lib/admin.functions";
+import { adminListPoses, adminUpsertPose, adminDeletePose } from "@/lib/pose.functions";
 import { toast } from "sonner";
 import { NINJA_RANKS, SKILL_RANKS, VILLAGES, ELEMENTS, labelize } from "./shared";
 import { useProficiencies } from "@/hooks/useProficiencies";
@@ -84,6 +85,7 @@ export function PlayerEditor({ characterId, open, onOpenChange, onSaved }: {
             <TabsTrigger value="skills">Habilidades</TabsTrigger>
             <TabsTrigger value="items">Itens</TabsTrigger>
             <TabsTrigger value="missions">Missões</TabsTrigger>
+            <TabsTrigger value="poses">Poses</TabsTrigger>
           </TabsList>
 
           <TabsContent value="stats" className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -264,9 +266,68 @@ export function PlayerEditor({ characterId, open, onOpenChange, onSaved }: {
               {missions.length === 0 && <p className="text-xs text-muted-foreground">Nenhuma missão criada. Vá em Missões.</p>}
             </div>
           </TabsContent>
+
+          <TabsContent value="poses" className="mt-4">
+            <PosesTab characterId={char.id} adminUserId={char.user_id} />
+          </TabsContent>
         </Tabs>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function PosesTab({ characterId, adminUserId }: { characterId: string; adminUserId: string }) {
+  const listFn = useServerFn(adminListPoses);
+  const upFn = useServerFn(adminUpsertPose);
+  const delFn = useServerFn(adminDeletePose);
+  const [rows, setRows] = useState<any[]>([]);
+  const [name, setName] = useState("");
+  async function load() {
+    try { setRows(await listFn({ data: { character_id: characterId } } as any) as any); }
+    catch (e: any) { toast.error(e.message); }
+  }
+  useEffect(() => { load(); }, [characterId]);
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-muted-foreground">
+        Poses são PNGs que o jogador pode atribuir às suas habilidades. Durante o golpe, o sprite dele troca para a pose por ~1,4s.
+      </p>
+      <div className="border border-border rounded p-3 space-y-2 bg-secondary/20">
+        <Label>Nova pose</Label>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Input placeholder="Nome (ex: Rasengan pose)" value={name} onChange={(e) => setName(e.target.value)} className="sm:flex-1" />
+          <ImageUpload label="Enviar imagem" bucket="skills" userId={adminUserId}
+            accept="image/png,image/webp" maxMb={5}
+            onUploaded={async (url) => {
+              const nm = name.trim() || "Pose";
+              try {
+                await upFn({ data: { character_id: characterId, name: nm, image_url: url, sort_order: rows.length } } as any);
+                toast.success("Pose adicionada."); setName(""); load();
+              } catch (e: any) { toast.error(e.message); }
+            }} />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+        {rows.map((p) => (
+          <div key={p.id} className="border border-border rounded p-2 space-y-2 bg-input/40">
+            <div className="h-28 bg-black/30 rounded flex items-center justify-center overflow-hidden">
+              <img src={p.image_url} alt={p.name} className="max-h-full max-w-full object-contain" />
+            </div>
+            <Input value={p.name} onChange={(e) => setRows((rs) => rs.map((r) => r.id === p.id ? { ...r, name: e.target.value } : r))}
+              onBlur={async () => {
+                try { await upFn({ data: { id: p.id, character_id: characterId, name: p.name, image_url: p.image_url } } as any); }
+                catch (e: any) { toast.error(e.message); }
+              }} className="h-7 text-xs" />
+            <Button size="sm" variant="ghost" className="w-full text-red-400 hover:text-red-300" onClick={async () => {
+              if (!confirm(`Remover pose "${p.name}"?`)) return;
+              try { await delFn({ data: { id: p.id } } as any); toast.success("Removida."); load(); }
+              catch (e: any) { toast.error(e.message); }
+            }}>Remover</Button>
+          </div>
+        ))}
+        {rows.length === 0 && <p className="text-xs text-muted-foreground col-span-full">Nenhuma pose ainda.</p>}
+      </div>
+    </div>
   );
 }
 
