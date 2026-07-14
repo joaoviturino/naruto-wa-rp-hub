@@ -356,7 +356,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
         </div>
 
         {/* Battle stage */}
-        <div className="relative overflow-hidden border-y border-border" style={{
+        <div ref={stageRef} className="relative overflow-hidden border-y border-border" style={{
           backgroundImage: bgUrl ? `url(${bgUrl})` : undefined,
           backgroundSize: "cover",
           backgroundPosition: "center",
@@ -390,10 +390,12 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                     className={`relative flex flex-col items-center gap-1 group ${canPick ? "cursor-pointer" : "cursor-default"}`}
                   >
                     <div className={`relative transition-all ${isActing ? "drop-shadow-[0_0_18px_rgba(239,68,68,0.9)] scale-105" : ""} ${isTarget && !isActing ? "drop-shadow-[0_0_14px_rgba(239,68,68,0.75)] scale-[1.03]" : ""} ${dead ? "opacity-30 grayscale" : "group-hover:scale-105"}`}>
+                      <div ref={(el) => { npcRefs.current[i] = el; }} className="contents">
                       {n.image_url ? (
                         <img src={n.image_url} alt={n.name} className={`${size} w-auto object-contain`} style={{ filter: isActing ? "drop-shadow(0 0 10px rgb(239 68 68))" : undefined }} />
                       ) : <div className={`${size} w-24 bg-secondary rounded`} />}
                       <FloatingDamageLayer bursts={bursts[`npc:${i}`] ?? []} onExpire={(id) => expireBurst(`npc:${i}`, id)} />
+                      </div>
                     </div>
                     <div className={`rounded px-2 py-1 min-w-[110px] sm:min-w-[140px] transition-colors ${isTarget ? "bg-red-600/80 ring-1 ring-red-300" : "bg-black/70"}`}>
                       <div className="font-display text-[11px] sm:text-xs text-white truncate">{n.name}</div>
