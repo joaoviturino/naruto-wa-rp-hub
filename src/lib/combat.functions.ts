@@ -35,15 +35,45 @@ type NpcState = {
   alive?: boolean;
 };
 type CombatState = {
-  /** @deprecated compat com sessões antigas — sempre preferir `npcs[]` */
-  npc?: NpcState;
-  /** Array de inimigos. NPCs abatidos ficam com `alive=false`. */
+  /** Alvo atual (referência ao mesmo objeto em `npcs`). Mantido por compat. */
+  npc: NpcState;
+  /** Todos os inimigos do encontro. NPCs abatidos ficam com `alive=false`. */
   npcs: NpcState[];
   players: Player[];
   active: number; // index do jogador cuja vez é
   /** Índice do inimigo em `npcs` que o jogador atacará neste turno. */
   target?: number;
 };
+
+/** Normaliza sessões antigas (`state.npc` sem `state.npcs`) migrando para array. */
+function normalizeState(state: any): CombatState {
+  if (!state) return state;
+  if (!Array.isArray(state.npcs) || state.npcs.length === 0) {
+    if (state.npc) {
+      state.npcs = [{ ...state.npc, alive: (state.npc.hp ?? 0) > 0 }];
+    } else {
+      state.npcs = [];
+    }
+  }
+  // Sincroniza flag `alive` a partir do hp
+  for (const n of state.npcs) if (n.alive === undefined) n.alive = (n.hp ?? 0) > 0;
+  // target inicial
+  if (typeof state.target !== "number") {
+    state.target = state.npcs.findIndex((n: NpcState) => n.alive);
+    if (state.target < 0) state.target = 0;
+  }
+  state.npc = state.npcs[state.target] ?? state.npcs[0];
+  return state;
+}
+
+/** Seleciona próximo NPC vivo. Retorna -1 se todos mortos. */
+function nextAliveNpcIdx(state: CombatState, from = 0): number {
+  for (let i = 0; i < state.npcs.length; i++) {
+    const idx = (from + i) % state.npcs.length;
+    if (state.npcs[idx].alive) return idx;
+  }
+  return -1;
+}
 type LogEntry = {
   seq: number;
   actor: "player" | "npc";
