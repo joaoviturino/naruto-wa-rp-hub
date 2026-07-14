@@ -58,9 +58,11 @@ export function DuelInvitesInline() {
       if (!me?.id || cancelled) return;
       setMyId(me.id);
       await refresh(me.id);
-      const channel = supabase.channel(`pvp_inline_${me.id}`)
-        .on("postgres_changes", { event: "*", schema: "public", table: "pvp_duels" }, () => refresh(me.id));
-      channel.subscribe();
+      const suffix = Math.random().toString(36).slice(2, 10);
+      const channel = supabase
+        .channel(`pvp_inline_${me.id}_${suffix}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "pvp_duels" }, () => refresh(me.id))
+        .subscribe();
       chRef.current = channel;
     })();
     return () => { cancelled = true; if (chRef.current) supabase.removeChannel(chRef.current); };
