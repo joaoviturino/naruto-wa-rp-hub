@@ -36,7 +36,7 @@ export function ChatHud({ characterId, variant = "floating" }: { characterId: st
 
   useEffect(() => {
     const ch = supabase
-      .channel(`hud:${characterId}`)
+      .channel(`hud:${characterId}:${Math.random().toString(36).slice(2)}`)
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "characters", filter: `id=eq.${characterId}` },
