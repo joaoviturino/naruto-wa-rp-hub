@@ -51,7 +51,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
       .eq("character_id", myCharId);
     const list = ((data as any[]) ?? []).map((r) => r.skill).filter(Boolean) as Skill[];
     setSkills(list);
-    if (list.length && !selectedSkill) { setSelectedSkill(list[0].id); setEnergy(1); }
+    if (list.length && !selectedSkill) { setSelectedSkill(list[0].id); setEnergy(Math.max(1, Number(list[0].base_cost) || 1)); }
   }
   async function loadBag() {
     const { data: inv } = await supabase.from("inventory").select("ninja_bag,secondary_slots").eq("character_id", myCharId).maybeSingle();
