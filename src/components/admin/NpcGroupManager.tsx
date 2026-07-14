@@ -12,6 +12,15 @@ import { toast } from "sonner";
 import { ImageUpload } from "@/components/ImageUpload";
 import { supabase } from "@/integrations/supabase/client";
 
+function GroupUpload({ bucket, label, accept, maxMb, onUploaded }: {
+  bucket: "scenes"; label: string; accept?: string; maxMb?: number; onUploaded: (url: string) => void;
+}) {
+  const [uid, setUid] = useState<string>("");
+  useEffect(() => { supabase.auth.getUser().then(({ data }) => setUid(data.user?.id ?? "")); }, []);
+  if (!uid) return null;
+  return <ImageUpload label={label} bucket={bucket} userId={uid} accept={accept} maxMb={maxMb} onUploaded={onUploaded} compact />;
+}
+
 type Group = { id: string; name: string; description: string | null; battle_bg_url?: string | null; music_url?: string | null };
 type Member = { group_id: string; npc_id: string; weight: number };
 type NpcLite = { id: string; name: string; kind: string | null };
