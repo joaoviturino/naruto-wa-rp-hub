@@ -216,19 +216,21 @@ export const upsertNpcGroup = createServerFn({ method: "POST" })
     id: z.string().uuid().optional(),
     name: z.string().trim().min(2).max(80),
     description: z.string().max(500).nullish(),
+    battle_bg_url: z.string().nullish(),
+    music_url: z.string().nullish(),
   }).parse(i))
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     if (data.id) {
       const { error } = await supabaseAdmin.from("npc_groups")
-        .update({ name: data.name, description: data.description ?? null })
+        .update({ name: data.name, description: data.description ?? null, battle_bg_url: data.battle_bg_url ?? null, music_url: data.music_url ?? null })
         .eq("id", data.id);
       if (error) throw new Error(error.message);
       return { id: data.id };
     }
     const { data: row, error } = await supabaseAdmin.from("npc_groups")
-      .insert({ name: data.name, description: data.description ?? null })
+      .insert({ name: data.name, description: data.description ?? null, battle_bg_url: data.battle_bg_url ?? null, music_url: data.music_url ?? null })
       .select("id").single();
     if (error) throw new Error(error.message);
     return { id: row.id };

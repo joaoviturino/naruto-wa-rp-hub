@@ -1502,21 +1502,27 @@ export type Database = {
       }
       npc_groups: {
         Row: {
+          battle_bg_url: string | null
           created_at: string
           description: string | null
           id: string
+          music_url: string | null
           name: string
         }
         Insert: {
+          battle_bg_url?: string | null
           created_at?: string
           description?: string | null
           id?: string
+          music_url?: string | null
           name: string
         }
         Update: {
+          battle_bg_url?: string | null
           created_at?: string
           description?: string | null
           id?: string
+          music_url?: string | null
           name?: string
         }
         Relationships: []

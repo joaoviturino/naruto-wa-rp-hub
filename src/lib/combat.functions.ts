@@ -176,11 +176,17 @@ export const rollSpawn = createServerFn({ method: "POST" })
     // Escolhe inimigos: preferimos grupos configurados no local; se não houver, cai para
     // sorteio individual em `location_npcs`.
     let chosenNpcs: any[] = [];
+    let groupBattleBg: string | null = null;
+    let groupMusic: string | null = null;
     const { data: locFull } = await context.supabase
       .from("locations").select("spawn_group_ids").eq("id", loc.id).maybeSingle();
     const groupIds = ((locFull as any)?.spawn_group_ids ?? []) as string[];
     if (groupIds.length) {
       const groupId = groupIds[Math.floor(Math.random() * groupIds.length)];
+      const { data: gRow } = await context.supabase
+        .from("npc_groups").select("battle_bg_url,music_url").eq("id", groupId).maybeSingle();
+      groupBattleBg = (gRow as any)?.battle_bg_url ?? null;
+      groupMusic = (gRow as any)?.music_url ?? null;
       const { data: mems } = await context.supabase
         .from("npc_group_members")
         .select("npc:npcs(id,name,image_url,battle_bg_url,music_url,hp_max,energy_max,xp,kind)")
@@ -232,7 +238,8 @@ export const rollSpawn = createServerFn({ method: "POST" })
     }
     const npcsState: NpcState[] = chosenNpcs.map((n) => ({
       id: n.id, name: n.name, image_url: n.image_url,
-      battle_bg_url: n.battle_bg_url ?? null, music_url: (n as any).music_url ?? null,
+      battle_bg_url: groupBattleBg ?? n.battle_bg_url ?? null,
+      music_url: groupMusic ?? (n as any).music_url ?? null,
       hp: n.hp_max, hp_max: n.hp_max,
       energy: n.energy_max, energy_max: n.energy_max,
       alive: true,
