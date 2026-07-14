@@ -32,6 +32,7 @@ export function LocationMapEditor({ locations, connections, selectedId, onSelect
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
   const dragRef = useRef<{ id: string; offX: number; offY: number; moved: boolean } | null>(null);
   const [wire, setWire] = useState<{ from: string; x: number; y: number } | null>(null);
+  const panRef = useRef<{ startX: number; startY: number; scrollLeft: number; scrollTop: number } | null>(null);
 
   useEffect(() => {
     setPositions((prev) => {
@@ -87,6 +88,22 @@ export function LocationMapEditor({ locations, connections, selectedId, onSelect
     else if (!moved) onSelect(id);
   }
 
+  function onBgPointerDown(e: React.PointerEvent) {
+    if (dragRef.current || wire) return;
+    const el = wrapRef.current;
+    if (!el) return;
+    panRef.current = { startX: e.clientX, startY: e.clientY, scrollLeft: el.scrollLeft, scrollTop: el.scrollTop };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }
+  function onBgPointerMove(e: React.PointerEvent) {
+    if (!panRef.current) return;
+    const el = wrapRef.current;
+    if (!el) return;
+    el.scrollLeft = panRef.current.scrollLeft - (e.clientX - panRef.current.startX);
+    el.scrollTop = panRef.current.scrollTop - (e.clientY - panRef.current.startY);
+  }
+  function onBgPointerUp() { panRef.current = null; }
+
   function onHandlePointerDown(e: React.PointerEvent, id: string) {
     e.stopPropagation();
     const { x, y } = relCoords(e);
@@ -133,10 +150,12 @@ export function LocationMapEditor({ locations, connections, selectedId, onSelect
         </span>
       </div>
       <div ref={wrapRef}
-        className="relative w-full overflow-auto rounded border border-border bg-black/30"
+        className="relative w-full overflow-auto rounded border border-border bg-black/30 cursor-grab active:cursor-grabbing"
         style={{ height: 460, touchAction: "none", backgroundImage: "radial-gradient(oklch(0.4 0.02 260 / 0.4) 1px, transparent 1px)", backgroundSize: "24px 24px" }}
-        onPointerMove={(e) => { onNodePointerMove(e); onHandlePointerMove(e); }}
-        onPointerUp={(e) => { onNodePointerUp(); onHandlePointerUp(e); }}>
+        onPointerDown={onBgPointerDown}
+        onPointerMove={(e) => { onNodePointerMove(e); onHandlePointerMove(e); onBgPointerMove(e); }}
+        onPointerUp={(e) => { onNodePointerUp(); onHandlePointerUp(e); onBgPointerUp(); }}
+        onPointerCancel={onBgPointerUp}>
         <div className="relative" style={{ width: maxX, height: maxY }}>
           <svg className="absolute inset-0 pointer-events-none" width={maxX} height={maxY}>
             {connections.map((c) => {
