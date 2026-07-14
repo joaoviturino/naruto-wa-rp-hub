@@ -167,3 +167,197 @@
   pointer-events: none !important;
 }
 
+/* ============================================================
+ * Admin Shell — modern bento layout, animated fields, toggles.
+ * ============================================================ */
+@utility admin-shell {
+  background:
+    radial-gradient(1200px 600px at 10% -10%, oklch(0.42 0.22 25 / 0.18), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, oklch(0.78 0.15 80 / 0.10), transparent 60%),
+    linear-gradient(180deg, oklch(0.13 0.02 25) 0%, oklch(0.10 0.02 25) 100%);
+  min-height: 100dvh;
+}
+
+@utility admin-card {
+  position: relative;
+  border-radius: 1rem;
+  background: linear-gradient(180deg, oklch(0.19 0.03 25 / 0.9) 0%, oklch(0.13 0.02 25 / 0.9) 100%);
+  border: 1px solid oklch(0.3 0.05 30);
+  box-shadow:
+    0 1px 0 0 oklch(1 0 0 / 0.04) inset,
+    0 20px 40px -20px oklch(0 0 0 / 0.6);
+  backdrop-filter: blur(6px);
+  transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+@utility admin-card-hover {
+  &:hover {
+    transform: translateY(-2px);
+    border-color: oklch(0.78 0.15 80 / 0.55);
+    box-shadow:
+      0 1px 0 0 oklch(1 0 0 / 0.06) inset,
+      0 25px 50px -20px oklch(0 0 0 / 0.7),
+      0 0 0 1px oklch(0.78 0.15 80 / 0.25);
+  }
+}
+
+@utility admin-tile-accent {
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, oklch(0.78 0.15 80 / 0.6), transparent 40%, oklch(0.55 0.22 25 / 0.5));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    pointer-events: none;
+  }
+}
+
+/* --- Sidebar nav --- */
+@utility admin-nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.85rem;
+  border-radius: 0.65rem;
+  font-size: 0.875rem;
+  color: oklch(0.75 0.02 60);
+  transition: color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+@utility admin-nav-item-hover {
+  &:hover {
+    color: var(--foreground);
+    background: oklch(0.22 0.03 30 / 0.6);
+    transform: translateX(2px);
+  }
+}
+@utility admin-nav-item-active {
+  color: var(--foreground);
+  background: linear-gradient(90deg, oklch(0.55 0.22 25 / 0.25), oklch(0.78 0.15 80 / 0.12));
+  border-color: oklch(0.78 0.15 80 / 0.45);
+  box-shadow: 0 0 0 1px oklch(0.78 0.15 80 / 0.15) inset, 0 8px 20px -12px oklch(0 0 0 / 0.6);
+}
+@utility admin-nav-item-active::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 25%;
+  bottom: 25%;
+  width: 3px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, var(--gold), var(--blood));
+  box-shadow: 0 0 12px oklch(0.78 0.15 80 / 0.6);
+}
+
+/* --- Form controls inside admin scope --- */
+.admin-scope input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+.admin-scope textarea,
+.admin-scope select {
+  background: linear-gradient(180deg, oklch(0.20 0.03 30) 0%, oklch(0.17 0.03 30) 100%);
+  border: 1px solid oklch(0.3 0.05 30);
+  border-radius: 0.55rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+}
+.admin-scope input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):focus,
+.admin-scope textarea:focus,
+.admin-scope select:focus {
+  outline: none;
+  border-color: oklch(0.78 0.15 80 / 0.7);
+  box-shadow: 0 0 0 3px oklch(0.78 0.15 80 / 0.18);
+}
+.admin-scope label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: oklch(0.72 0.02 60);
+  font-weight: 600;
+}
+
+/* Native checkboxes → toggle switches inside admin scope */
+.admin-scope input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  width: 2.25rem;
+  height: 1.25rem;
+  border-radius: 999px;
+  background: oklch(0.24 0.03 30);
+  border: 1px solid oklch(0.3 0.05 30);
+  cursor: pointer;
+  transition: background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+.admin-scope input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 999px;
+  background: linear-gradient(180deg, oklch(0.9 0.01 80), oklch(0.75 0.02 60));
+  transform: translate(0, -50%);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.25s ease;
+  box-shadow: 0 2px 6px oklch(0 0 0 / 0.45);
+}
+.admin-scope input[type="checkbox"]:checked {
+  background: linear-gradient(90deg, oklch(0.55 0.22 25), oklch(0.78 0.15 80));
+  border-color: oklch(0.78 0.15 80 / 0.7);
+  box-shadow: 0 0 0 3px oklch(0.78 0.15 80 / 0.15);
+}
+.admin-scope input[type="checkbox"]:checked::after {
+  transform: translate(1rem, -50%);
+  background: #fff;
+}
+.admin-scope input[type="checkbox"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* --- Table polish --- */
+.admin-scope table thead {
+  background: linear-gradient(180deg, oklch(0.22 0.03 30) 0%, oklch(0.18 0.03 25) 100%);
+}
+.admin-scope table th {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+  color: oklch(0.72 0.02 60);
+  font-weight: 700;
+}
+.admin-scope table tbody tr {
+  transition: background-color 0.15s ease;
+}
+.admin-scope table tbody tr:hover {
+  background: oklch(0.78 0.15 80 / 0.05);
+}
+
+/* --- Micro animations --- */
+@keyframes admin-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@utility animate-admin-rise {
+  animation: admin-rise 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes admin-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@utility admin-shimmer-text {
+  background: linear-gradient(90deg, var(--foreground) 0%, var(--gold) 50%, var(--foreground) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+          background-clip: text;
+  color: transparent;
+  animation: admin-shimmer 6s linear infinite;
+}
+
