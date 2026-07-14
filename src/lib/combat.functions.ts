@@ -565,23 +565,22 @@ async function applyRewards(supabaseAdmin: any, npcId: string, state: CombatStat
   return { xp: xpGain, ryo: ryoGain, drops: rolled };
 }
 
-async function runNpcTurn(supabaseAdmin: any, npcId: string, state: CombatState, log: LogEntry[], incomingSpeed: number) {
+async function runSingleNpcAttack(supabaseAdmin: any, npcState: NpcState, state: CombatState, log: LogEntry[], incomingSpeed: number) {
+  if (!npcState.alive) return;
   const { data: npcCfg } = await supabaseAdmin
-    .from("npcs").select("avg_damage,crit_chance,crit_multiplier").eq("id", npcId).maybeSingle();
+    .from("npcs").select("avg_damage,crit_chance,crit_multiplier").eq("id", npcState.id).maybeSingle();
   const avgDamage = Number(npcCfg?.avg_damage ?? 0);
   const critChance = Math.max(0, Math.min(100, Number(npcCfg?.crit_chance ?? 10)));
   const critMul = Math.max(1, Number(npcCfg?.crit_multiplier ?? 1.5));
   const { data: skills } = await supabaseAdmin
-    .from("npc_skills").select("skill:skills(id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic,animation_url,sound_url)").eq("npc_id", npcId);
+    .from("npc_skills").select("skill:skills(id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic,animation_url,sound_url)").eq("npc_id", npcState.id);
   const pool = ((skills as any[]) ?? []).map((r: any) => r.skill).filter(Boolean);
-  if (pool.length === 0) return { energyRemaining: state.npc.energy };
-
-  // NPC escolhe skill com maior speed×critical de energia disponível
-  const affordable = pool.filter((s: any) => state.npc.energy >= s.base_cost);
-  if (affordable.length === 0) return { energyRemaining: state.npc.energy };
+  if (pool.length === 0) return;
+  const affordable = pool.filter((s: any) => npcState.energy >= s.base_cost);
+  if (affordable.length === 0) return;
 
   const skill = affordable[Math.floor(Math.random() * affordable.length)];
-  const energy = Math.min(state.npc.energy, Math.max(skill.base_cost, Math.floor(state.npc.energy_max / 4)));
+  const energy = Math.min(npcState.energy, Math.max(skill.base_cost, Math.floor(npcState.energy_max / 4)));
   const effective = energy * Number(skill.bonus_energetic);
   const speed = effective * Number(skill.bonus_speed);
   // Base do dano: dano_medio configurado (variação ±20%) ou fórmula por energia.
@@ -603,19 +602,32 @@ async function runNpcTurn(supabaseAdmin: any, npcId: string, state: CombatState,
 
   // Escolhe um jogador vivo aleatório como alvo
   const alive = state.players.filter((p) => p.alive);
-  if (!alive.length) return { energyRemaining: state.npc.energy };
+  if (!alive.length) return;
   const target = alive[Math.floor(Math.random() * alive.length)];
   const taken = damageTargetPlayer(target, finalDamage);
 
   log.push({
-    seq: log.length + 1, actor: "npc", actor_name: state.npc.name, target_name: target.nickname,
+    seq: log.length + 1, actor: "npc", actor_name: npcState.name, target_name: target.nickname,
     skill_name: skill.name, energy_type: skill.energy_type as Pool, energy_used: energy,
     effective, damage: finalDamage, speed, crit_mul: isCrit ? critMul : Number(skill.bonus_critical),
     animation_url: (skill as any).animation_url ?? null,
     sound_url: (skill as any).sound_url ?? null,
-    msg: `${state.npc.name} usa ${skill.name}${isCrit ? " (CRÍTICO!)" : ""} → ${target.nickname} sofre ${taken.taken} de dano na vida${speedPenalty < 1 ? " (reação lenta)" : ""}.`,
+    msg: `${npcState.name} usa ${skill.name}${isCrit ? " (CRÍTICO!)" : ""} → ${target.nickname} sofre ${taken.taken} de dano na vida${speedPenalty < 1 ? " (reação lenta)" : ""}.`,
   });
-  return { energyRemaining: state.npc.energy - energy };
+  npcState.energy = Math.max(0, npcState.energy - energy);
+}
+
+async function runNpcTurn(supabaseAdmin: any, _npcId: string, state: CombatState, log: LogEntry[], incomingSpeed: number) {
+  for (const n of state.npcs) {
+    if (!n.alive) continue;
+    if (state.players.every((p) => !p.alive)) break;
+    await runSingleNpcAttack(supabaseAdmin, n, state, log, incomingSpeed);
+  }
+  if (!state.npc.alive) {
+    const nxt = nextAliveNpcIdx(state, state.target ?? 0);
+    if (nxt >= 0) { state.target = nxt; state.npc = state.npcs[nxt]; }
+  }
+  return { energyRemaining: state.npc.energy };
 }
 
 export const fleeCombat = createServerFn({ method: "POST" })
