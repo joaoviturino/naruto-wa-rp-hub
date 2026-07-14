@@ -9,8 +9,10 @@ import { useServerFn } from "@tanstack/react-start";
 import { listNpcGroups, upsertNpcGroup, deleteNpcGroup, setNpcGroupMembers } from "@/lib/npc.functions";
 import { Plus, Trash2, Users, Pencil, X } from "lucide-react";
 import { toast } from "sonner";
+import { ImageUpload } from "@/components/ImageUpload";
+import { supabase } from "@/integrations/supabase/client";
 
-type Group = { id: string; name: string; description: string | null };
+type Group = { id: string; name: string; description: string | null; battle_bg_url?: string | null; music_url?: string | null };
 type Member = { group_id: string; npc_id: string; weight: number };
 type NpcLite = { id: string; name: string; kind: string | null };
 
@@ -44,7 +46,7 @@ export function NpcGroupManager({ npcs }: { npcs: NpcLite[] }) {
         </Button>
       </div>
       <p className="text-[11px] text-muted-foreground">
-        Conjuntos de NPCs que aparecem juntos numa mesma batalha. Vincule ao local em "Locais → Zona de perigo".
+        Conjuntos de NPCs que aparecem juntos numa mesma batalha. O cenário e a música definidos aqui sobrescrevem os individuais dos NPCs.
       </p>
 
       {groups.length === 0 ? (
@@ -98,6 +100,8 @@ function GroupDialog({ open, onOpenChange, group, npcs, currentMembers, onSaved 
   const setMembers = useServerFn(setNpcGroupMembers);
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
+  const [bgUrl, setBgUrl] = useState<string>("");
+  const [musicUrl, setMusicUrl] = useState<string>("");
   const [rows, setRows] = useState<{ npc_id: string; weight: number }[]>([]);
   const [pick, setPick] = useState<string>("");
 
@@ -105,6 +109,8 @@ function GroupDialog({ open, onOpenChange, group, npcs, currentMembers, onSaved 
     if (!open) return;
     setName(group?.name ?? "");
     setDesc(group?.description ?? "");
+    setBgUrl(group?.battle_bg_url ?? "");
+    setMusicUrl(group?.music_url ?? "");
     setRows(currentMembers.map((m) => ({ npc_id: m.npc_id, weight: m.weight })));
     setPick("");
   }, [open, group?.id]);
@@ -114,7 +120,13 @@ function GroupDialog({ open, onOpenChange, group, npcs, currentMembers, onSaved 
   async function save() {
     if (!name.trim()) { toast.error("Dê um nome ao grupo."); return; }
     try {
-      const { id } = await upsert({ data: { id: group?.id || undefined, name: name.trim(), description: desc.trim() || null } } as any) as any;
+      const { id } = await upsert({ data: {
+        id: group?.id || undefined,
+        name: name.trim(),
+        description: desc.trim() || null,
+        battle_bg_url: bgUrl.trim() || null,
+        music_url: musicUrl.trim() || null,
+      } } as any) as any;
       await setMembers({ data: { group_id: id, members: rows } } as any);
       toast.success("Grupo salvo.");
       onSaved();
@@ -142,6 +154,28 @@ function GroupDialog({ open, onOpenChange, group, npcs, currentMembers, onSaved 
           <div>
             <Label>Descrição (opcional)</Label>
             <Textarea rows={2} value={desc} onChange={(e) => setDesc(e.target.value)} />
+          </div>
+          <div className="grid grid-cols-1 gap-3 border-t border-border pt-3">
+            <div>
+              <Label>Cenário de batalha (imagem)</Label>
+              <div className="flex gap-2 items-center">
+                <Input value={bgUrl} onChange={(e) => setBgUrl(e.target.value)} placeholder="URL da imagem de fundo" />
+                <GroupUpload bucket="scenes" label="Upload" onUploaded={setBgUrl} />
+                {bgUrl && <Button size="icon" variant="ghost" onClick={() => setBgUrl("")}><X size={14} /></Button>}
+              </div>
+              {bgUrl && <img src={bgUrl} alt="" className="mt-1 h-20 w-full object-cover rounded border border-border" />}
+              <p className="text-[10px] text-muted-foreground mt-1">Sobrescreve o cenário individual dos NPCs quando este grupo é sorteado.</p>
+            </div>
+            <div>
+              <Label>Música de fundo (loop)</Label>
+              <div className="flex gap-2 items-center">
+                <Input value={musicUrl} onChange={(e) => setMusicUrl(e.target.value)} placeholder="URL do áudio (.mp3, .ogg...)" />
+                <GroupUpload bucket="scenes" label="Upload" accept="audio/*" maxMb={15} onUploaded={setMusicUrl} />
+                {musicUrl && <Button size="icon" variant="ghost" onClick={() => setMusicUrl("")}><X size={14} /></Button>}
+              </div>
+              {musicUrl && <audio src={musicUrl} controls className="mt-1 w-full h-8" />}
+              <p className="text-[10px] text-muted-foreground mt-1">Sobrescreve a música individual dos NPCs.</p>
+            </div>
           </div>
           <div className="border-t border-border pt-3">
             <Label>Membros ({rows.length})</Label>
