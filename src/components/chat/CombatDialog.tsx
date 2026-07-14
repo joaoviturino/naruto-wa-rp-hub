@@ -31,7 +31,8 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const [itemMap, setItemMap] = useState<Record<string, Item>>({});
   const [avatars, setAvatars] = useState<Record<string, string | null>>({});
   const [sprites, setSprites] = useState<Record<string, string | null>>({});
-  const [anim, setAnim] = useState<{ url: string; side: "npc" | "player"; until: number } | null>(null);
+  // Pose ativa por jogador (character_id → url) durante um ataque.
+  const [poses, setPoses] = useState<Record<string, string | null>>({});
   const lastLogSeq = useRef<number>(0);
   const animQueue = useRef<any[]>([]);
   const animRunning = useRef<boolean>(false);
@@ -152,7 +153,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
     if (!fresh.length) return;
     lastLogSeq.current = fresh[fresh.length - 1].seq;
     for (const entry of fresh) {
-      if (entry.animation_url || entry.sound_url) animQueue.current.push(entry);
+      if (entry.pose_url || entry.sound_url) animQueue.current.push(entry);
       // Números de dano flutuantes
       if (Number(entry.damage) > 0) {
         const id = `${entry.seq}-${Math.random().toString(36).slice(2, 7)}`;
@@ -182,18 +183,19 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
     }
 
     async function playOne(entry: any) {
-      const animUrl: string | undefined = entry.animation_url;
+      const poseUrl: string | undefined = entry.pose_url;
+      const actorCharId: string | undefined = entry.actor_char_id;
       const soundUrl: string | undefined = entry.sound_url;
       const MAX_WAIT = 5000;
-      const ANIM_MS = 2400;
+      const POSE_MS = 1400;
 
-      const waitImg = animUrl ? new Promise<boolean>((res) => {
+      const waitImg = poseUrl ? new Promise<boolean>((res) => {
         const img = new Image();
         let done = false;
         const finish = (ok: boolean) => { if (done) return; done = true; res(ok); };
         img.onload = () => finish(true);
         img.onerror = () => finish(false);
-        img.src = animUrl;
+        img.src = poseUrl;
         setTimeout(() => finish(false), MAX_WAIT);
       }) : Promise.resolve(false);
 
@@ -227,15 +229,17 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
         audioDuration = Number.isFinite(a2.duration) ? a2.duration * 1000 : 0;
       }
 
-      // Mostrar animação
-      if (animUrl && imgOk) {
-        setAnim({ url: animUrl, side: entry.actor, until: Date.now() + ANIM_MS });
+      // Troca de pose para o jogador que agiu
+      if (poseUrl && imgOk && actorCharId) {
+        setPoses((p) => ({ ...p, [actorCharId]: poseUrl }));
       }
 
-      // Aguarda o maior entre duração do áudio e a animação (mínimo 1.2s, máximo 6s)
-      const wait = Math.max(1200, Math.min(6000, Math.max(audioDuration || 0, animUrl && imgOk ? ANIM_MS : 0)));
+      // Aguarda o maior entre duração do áudio e a pose (mínimo 1.2s, máximo 6s)
+      const wait = Math.max(1200, Math.min(6000, Math.max(audioDuration || 0, poseUrl && imgOk ? POSE_MS : 0)));
       await new Promise((r) => setTimeout(r, wait));
-      setAnim(null);
+      if (poseUrl && imgOk && actorCharId) {
+        setPoses((p) => { const { [actorCharId]: _drop, ...rest } = p; return rest; });
+      }
     }
   }, [log.length]);
 
