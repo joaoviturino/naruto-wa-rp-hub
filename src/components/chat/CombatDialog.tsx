@@ -189,9 +189,15 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
     async function runQueue() {
       if (animRunning.current) return;
       animRunning.current = true;
+      let lastActor: string | null = null;
       while (animQueue.current.length) {
         const entry = animQueue.current.shift();
+        // Pausa dramática: o NPC "respira" 3s após tomar o golpe antes de revidar.
+        if (lastActor === "player" && entry?.actor === "npc") {
+          await new Promise((r) => setTimeout(r, 3000));
+        }
         await playOne(entry);
+        if (entry?.actor) lastActor = entry.actor;
       }
       animRunning.current = false;
     }
