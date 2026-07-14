@@ -89,6 +89,9 @@ type LogEntry = {
   msg: string;
   animation_url?: string | null;
   sound_url?: string | null;
+  raw_damage?: number;
+  defense?: number;
+  hit_cap?: number;
 };
 
 function computeStats(xp: number) {
