@@ -10,7 +10,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { playerAttack, fleeCombat, consumeInCombat } from "@/lib/combat.functions";
 import { NpcMusic } from "@/components/NpcMusic";
 import { toast } from "sonner";
-import { Sword, Flag, Zap, FlaskConical, Users } from "lucide-react";
+import { Sword, Flag, Zap, FlaskConical, Users, Target } from "lucide-react";
+import { FloatingDamageLayer, type DamageBurst } from "@/components/chat/FloatingDamage";
 
 type Skill = {
   id: string; name: string; energy_type: "ef" | "em" | "chakra"; base_cost: number;
