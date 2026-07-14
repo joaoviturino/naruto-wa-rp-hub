@@ -365,7 +365,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
         }}>
           {!bgUrl && <div className="absolute inset-0 bg-gradient-to-b from-background to-secondary/60" />}
           <div className="absolute inset-0 bg-black/25" />
-          <div className="relative h-[240px] sm:h-[320px] flex items-end justify-between px-3 sm:px-6 pb-3 gap-2">
+          <div className="relative h-[240px] sm:h-[320px] flex items-end justify-between px-3 sm:px-6 pb-3 gap-2 overflow-hidden">
             {/* Selected target badge */}
             {myTurn && npcs[targetIdx] && (npcs[targetIdx].alive !== false) && (
               <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-black/75 backdrop-blur-sm border border-red-500/60 rounded-full px-3 py-1 shadow-lg animate-fade-in">
@@ -376,28 +376,28 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
               </div>
             )}
             {/* NPCs (left) */}
-            <div className="flex items-end gap-2 sm:gap-3 max-w-[55%] flex-wrap">
+            <div className="inline-flex items-end gap-2 sm:gap-3 flex-1 min-w-0 flex-nowrap overflow-x-auto no-scrollbar">
               {npcs.map((n: any, i: number) => {
                 const dead = n.alive === false || n.hp <= 0;
                 const isTarget = i === targetIdx && !dead;
                 const isActing = npcActive && i === (state.target ?? 0);
                 const canPick = !dead && myTurn;
-                const size = npcs.length > 2 ? "h-[110px] sm:h-[160px]" : "h-[140px] sm:h-[200px]";
+                const size = npcs.length > 2 ? "max-h-[110px] sm:max-h-[150px]" : "max-h-[150px] sm:max-h-[200px]";
                 return (
                   <button
                     key={n.id ?? i}
                     type="button"
                     disabled={!canPick}
                     onClick={() => canPick && setTargetIdx(i)}
-                    className={`relative flex flex-col items-center gap-1 group ${canPick ? "cursor-pointer" : "cursor-default"}`}
+                    className={`relative flex flex-col items-center gap-1 group shrink-0 ${canPick ? "cursor-pointer" : "cursor-default"}`}
                   >
                     <div ref={(el) => { npcRefs.current[i] = el; }} className={`relative transition-all ${isActing ? "drop-shadow-[0_0_18px_rgba(239,68,68,0.9)] scale-105" : ""} ${isTarget && !isActing ? "drop-shadow-[0_0_14px_rgba(239,68,68,0.75)] scale-[1.03]" : ""} ${dead ? "opacity-30 grayscale" : "group-hover:scale-105"}`}>
                       {n.image_url ? (
                         <img src={n.image_url} alt={n.name} className={`${size} w-auto object-contain`} style={{ filter: isActing ? "drop-shadow(0 0 10px rgb(239 68 68))" : undefined }} />
-                      ) : <div className={`${size} w-24 bg-secondary rounded`} />}
+                      ) : <div className={`${size} w-20 bg-secondary rounded`} />}
                       <FloatingDamageLayer bursts={bursts[`npc:${i}`] ?? []} onExpire={(id) => expireBurst(`npc:${i}`, id)} />
                     </div>
-                    <div className={`rounded px-2 py-1 min-w-[110px] sm:min-w-[140px] transition-colors ${isTarget ? "bg-red-600/80 ring-1 ring-red-300" : "bg-black/70"}`}>
+                    <div className={`rounded px-2 py-1 w-[110px] sm:w-[130px] transition-colors ${isTarget ? "bg-red-600/80 ring-1 ring-red-300" : "bg-black/70"}`}>
                       <div className="font-display text-[11px] sm:text-xs text-white truncate">{n.name}</div>
                       <div className="flex justify-between text-[9px] text-white/80"><span>HP</span><span>{n.hp}/{n.hp_max}</span></div>
                       <Progress value={n.hp_max ? (n.hp / n.hp_max) * 100 : 0} className="h-1.5" />
@@ -408,18 +408,18 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
             </div>
 
             {/* Allies (right) */}
-            <div className="flex items-end gap-1 sm:gap-3 max-w-[45%] justify-end flex-wrap">
+            <div className="inline-flex items-end gap-2 sm:gap-3 flex-1 min-w-0 flex-nowrap justify-end overflow-x-auto no-scrollbar">
               {players.map((p: any) => {
                 const isActive = session.status === "active" && !npcActive && p.character_id === activePlayer?.character_id && p.alive;
                 const sprite = poses[p.character_id] || p.sprite_url || sprites[p.character_id];
-                const size = players.length > 2 ? "h-[110px] sm:h-[150px]" : "h-[140px] sm:h-[190px]";
+                const size = players.length > 2 ? "max-h-[110px] sm:max-h-[150px]" : "max-h-[150px] sm:max-h-[200px]";
                 return (
-                  <div key={p.character_id} className="flex flex-col items-center gap-1">
+                  <div key={p.character_id} className="flex flex-col items-center gap-1 shrink-0">
                     <div ref={(el) => { playerRefs.current[p.character_id] = el; }} className={`relative transition-all ${isActive ? "drop-shadow-[0_0_18px_rgba(52,211,153,0.9)] scale-105" : ""} ${!p.alive ? "opacity-30 grayscale" : ""}`}>
                       {sprite ? (
                         <img src={sprite} alt={p.nickname} className={`${size} w-auto object-contain`} style={{ transform: "scaleX(-1)", filter: isActive ? "drop-shadow(0 0 10px rgb(52 211 153))" : undefined }} />
                       ) : (
-                        <div className={`${size} w-24 bg-secondary rounded`} />
+                        <div className={`${size} w-20 bg-secondary rounded`} />
                       )}
                       <FloatingDamageLayer bursts={bursts[`player:${p.character_id}`] ?? []} onExpire={(id) => expireBurst(`player:${p.character_id}`, id)} />
                     </div>
