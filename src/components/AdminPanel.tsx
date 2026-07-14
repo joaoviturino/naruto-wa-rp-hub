@@ -79,7 +79,7 @@ export function AdminPanel() {
         {/* Sidebar */}
         <aside
           className={
-            "admin-card fixed inset-y-0 left-0 z-40 w-[280px] overflow-y-auto p-4 transition-transform lg:sticky lg:top-6 lg:z-0 lg:h-[calc(100dvh-3rem)] lg:translate-x-0" +
+            "admin-card fixed inset-y-0 left-0 z-40 w-[280px] overflow-y-auto p-4 transition-transform lg:static lg:inset-auto lg:z-0 lg:w-full lg:h-[calc(100dvh-3rem)] lg:sticky lg:top-6 lg:translate-x-0" +
             (mobileOpen ? " translate-x-0" : " -translate-x-full")
           }
         >
