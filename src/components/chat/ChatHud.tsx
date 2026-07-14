@@ -58,7 +58,7 @@ export function ChatHud({ characterId }: { characterId: string }) {
   return (
     <div
       className="fixed z-40 pointer-events-none select-none top-[calc(env(safe-area-inset-top)+50px)] left-1/2 -translate-x-1/2 sm:top-3 sm:right-3 sm:left-auto sm:translate-x-0"
-      style={{ maxWidth: "min(380px, calc(100vw - 100px))" }}
+      style={{ width: "min(380px, calc(100vw - 100px))" }}
     >
       <div className="pointer-events-auto flex flex-col items-center gap-1.5">
         {/* Collapsed pill */}
