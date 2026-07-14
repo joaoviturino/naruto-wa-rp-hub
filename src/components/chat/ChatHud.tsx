@@ -57,8 +57,8 @@ export function ChatHud({ characterId }: { characterId: string }) {
 
   return (
     <div
-      className="fixed z-40 pointer-events-none select-none top-[calc(env(safe-area-inset-top)+56px)] left-1/2 -translate-x-1/2 sm:top-3 sm:right-3 sm:left-auto sm:translate-x-0"
-      style={{ maxWidth: "min(420px, calc(100vw - 96px))" }}
+      className="fixed z-40 pointer-events-none select-none top-[calc(env(safe-area-inset-top)+50px)] left-1/2 -translate-x-1/2 sm:top-3 sm:right-3 sm:left-auto sm:translate-x-0"
+      style={{ maxWidth: "min(380px, calc(100vw - 100px))" }}
     >
       <div className="pointer-events-auto flex flex-col items-center gap-1.5">
         {/* Collapsed pill */}
@@ -85,7 +85,7 @@ export function ChatHud({ characterId }: { characterId: string }) {
 
         {/* Expanded panel */}
         <div
-          className={`origin-top-right transition-all duration-200 ${
+          className={`origin-top transition-all duration-200 ${
             open ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 -translate-y-1 pointer-events-none"
           }`}
         >
