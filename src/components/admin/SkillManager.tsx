@@ -137,6 +137,30 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
               {f.sound_url && <Button size="sm" variant="ghost" onClick={() => up("sound_url", null)}>Remover</Button>}
             </div>
           </Field>
+          <Field label="Animação (GIF/PNG/MP4/WebM)">
+            <div className="flex items-center gap-2">
+              {f.animation_url && /\.(mp4|webm)$/i.test(f.animation_url)
+                ? <video src={f.animation_url} className="w-12 h-12 rounded object-cover" muted loop autoPlay />
+                : f.animation_url && <img src={f.animation_url} alt="" className="w-12 h-12 rounded object-cover" />}
+              <ImageUpload label="Enviar" bucket="skills" userId={adminUserId}
+                accept="image/gif,image/png,image/webp,video/mp4,video/webm" maxMb={8}
+                onUploaded={(url) => up("animation_url", url)} />
+              {f.animation_url && <Button size="sm" variant="ghost" onClick={() => up("animation_url", null)}>Remover</Button>}
+            </div>
+          </Field>
+          <Field label="Modo de animação">
+            <Select value={f.animation_mode ?? "overlay"} onValueChange={(v: any) => up("animation_mode", v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="projectile">Projétil (sai do usuário até o inimigo)</SelectItem>
+                <SelectItem value="front">Em frente ao inimigo</SelectItem>
+                <SelectItem value="overlay">Sobreposto ao inimigo (mesmo frame)</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="text-[10px] text-muted-foreground mt-1">
+              Define como o GIF/vídeo aparece no combate. Sem animação carregada, o valor é ignorado.
+            </div>
+          </Field>
           <Field label="Clã (opcional, define técnica de clã)">
             <NullableSelect value={f.clan_id} onChange={(v: any) => up("clan_id", v)} options={clans.map((c: any) => ({ value: c.id, label: `${c.name} (${c.village})` }))} />
           </Field>
@@ -232,6 +256,7 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
                 description: f.description || null,
                 image_url: f.image_url || null,
                 animation_url: f.animation_url || null,
+                animation_mode: f.animation_mode ?? "overlay",
                 sound_url: f.sound_url || null,
                 skill_class: f.skill_class || null,
                 energy_type: f.energy_type ?? "chakra",

@@ -2147,6 +2147,7 @@ export type Database = {
       }
       skills: {
         Row: {
+          animation_mode: string
           animation_url: string | null
           base_cost: number
           bonus_critical: number
@@ -2178,6 +2179,7 @@ export type Database = {
           type: string | null
         }
         Insert: {
+          animation_mode?: string
           animation_url?: string | null
           base_cost?: number
           bonus_critical?: number
@@ -2209,6 +2211,7 @@ export type Database = {
           type?: string | null
         }
         Update: {
+          animation_mode?: string
           animation_url?: string | null
           base_cost?: number
           bonus_critical?: number

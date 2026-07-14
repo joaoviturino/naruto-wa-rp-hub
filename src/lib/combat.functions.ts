@@ -88,9 +88,12 @@ type LogEntry = {
   crit_mul: number;
   msg: string;
   animation_url?: string | null;
+  animation_mode?: "projectile" | "front" | "overlay" | null;
   sound_url?: string | null;
   pose_url?: string | null;
   actor_char_id?: string | null;
+  target_char_id?: string | null;
+  target_npc_idx?: number | null;
   raw_damage?: number;
   defense?: number;
   hit_cap?: number;
@@ -303,7 +306,7 @@ export const playerAttack = createServerFn({ method: "POST" })
       .from("character_skills").select("skill_id").eq("character_id", me.id).eq("skill_id", data.skill_id).maybeSingle();
     if (!owned) throw new Error("Você não conhece essa habilidade.");
     const { data: skill } = await context.supabase.from("skills")
-      .select("id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class,skill_class,meta,animation_url,sound_url").eq("id", data.skill_id).maybeSingle();
+      .select("id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class,skill_class,meta,animation_url,animation_mode,sound_url").eq("id", data.skill_id).maybeSingle();
     if (!skill) throw new Error("Habilidade inexistente.");
     const combatClass = String((skill as any).skill_class ?? skill.req_class ?? "").toLowerCase();
 
@@ -480,6 +483,9 @@ export const playerAttack = createServerFn({ method: "POST" })
       effective, damage, raw_damage: rawDamage, defense, hit_cap: hitCap, speed, crit_mul: Number(skill.bonus_critical),
       pose_url: poseUrl,
       actor_char_id: activePlayer.character_id,
+      target_npc_idx: targetIdx,
+      animation_url: (skill as any).animation_url ?? null,
+      animation_mode: ((skill as any).animation_mode ?? "overlay") as any,
       sound_url: (skill as any).sound_url ?? null,
       msg: `${activePlayer.nickname} usa ${skill.name} (${pool.toUpperCase()} ${data.energy_used})${masteryMul > 1 ? ` [Maestria ×${masteryMul.toFixed(1)}]` : ""}${toolConsumedLabel ? ` [-${toolQtyConsumed} ${toolConsumedLabel}]` : ""} → ${damage} de dano${defense > 0 ? ` (def ${defense}%)` : ""}${damage < afterDef ? ` [cap ${maxHitPct}%]` : ""}.`,
       ...(toolConsumedLabel ? { tool_consumed: toolConsumedLabel, tool_qty: toolQtyConsumed, tool_crit_mul: toolCritMul } : {}),
@@ -600,7 +606,7 @@ async function runSingleNpcAttack(supabaseAdmin: any, npcState: NpcState, state:
   const critChance = Math.max(0, Math.min(100, Number(npcCfg?.crit_chance ?? 10)));
   const critMul = Math.max(1, Number(npcCfg?.crit_multiplier ?? 1.5));
   const { data: skills } = await supabaseAdmin
-    .from("npc_skills").select("skill:skills(id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic,animation_url,sound_url)").eq("npc_id", npcState.id);
+    .from("npc_skills").select("skill:skills(id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic,animation_url,animation_mode,sound_url)").eq("npc_id", npcState.id);
   const pool = ((skills as any[]) ?? []).map((r: any) => r.skill).filter(Boolean);
   if (pool.length === 0) return;
   const affordable = pool.filter((s: any) => npcState.energy >= s.base_cost);
@@ -638,6 +644,9 @@ async function runSingleNpcAttack(supabaseAdmin: any, npcState: NpcState, state:
     skill_name: skill.name, energy_type: skill.energy_type as Pool, energy_used: energy,
     effective, damage: finalDamage, speed, crit_mul: isCrit ? critMul : Number(skill.bonus_critical),
     animation_url: (skill as any).animation_url ?? null,
+    animation_mode: ((skill as any).animation_mode ?? "overlay") as any,
+    target_char_id: target.character_id,
+    actor_char_id: npcState.id,
     sound_url: (skill as any).sound_url ?? null,
     msg: `${npcState.name} usa ${skill.name}${isCrit ? " (CRÍTICO!)" : ""} → ${target.nickname} sofre ${taken.taken} de dano na vida${speedPenalty < 1 ? " (reação lenta)" : ""}.`,
   });

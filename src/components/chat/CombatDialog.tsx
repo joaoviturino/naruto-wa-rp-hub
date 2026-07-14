@@ -37,6 +37,19 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const animQueue = useRef<any[]>([]);
   const animRunning = useRef<boolean>(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Refs para calcular posições no palco (projetéis, overlays, etc.)
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const npcRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const playerRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  // GIF/vídeo ativo no palco (por entrada de log)
+  const [fx, setFx] = useState<null | {
+    id: string;
+    url: string;
+    mode: "projectile" | "front" | "overlay";
+    from: { x: number; y: number };
+    to: { x: number; y: number };
+    isVideo: boolean;
+  }>(null);
   const attack = useServerFn(playerAttack);
   const flee = useServerFn(fleeCombat);
   const consume = useServerFn(consumeInCombat);
@@ -153,7 +166,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
     if (!fresh.length) return;
     lastLogSeq.current = fresh[fresh.length - 1].seq;
     for (const entry of fresh) {
-      if (entry.pose_url || entry.sound_url) animQueue.current.push(entry);
+      if (entry.pose_url || entry.sound_url || entry.animation_url) animQueue.current.push(entry);
       // Números de dano flutuantes
       if (Number(entry.damage) > 0) {
         const id = `${entry.seq}-${Math.random().toString(36).slice(2, 7)}`;
@@ -186,6 +199,8 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
       const poseUrl: string | undefined = entry.pose_url;
       const actorCharId: string | undefined = entry.actor_char_id;
       const soundUrl: string | undefined = entry.sound_url;
+      const animUrl: string | undefined = entry.animation_url;
+      const animMode: "projectile" | "front" | "overlay" = entry.animation_mode ?? "overlay";
       const MAX_WAIT = 5000;
       const POSE_MS = 1400;
 
@@ -234,12 +249,55 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
         setPoses((p) => ({ ...p, [actorCharId]: poseUrl }));
       }
 
+      // Renderiza a animação (gif/vídeo) no palco, se houver
+      if (animUrl && stageRef.current) {
+        const stageRect = stageRef.current.getBoundingClientRect();
+        // origem = quem agiu
+        let fromEl: HTMLElement | null = null;
+        if (entry.actor === "player" && entry.actor_char_id) fromEl = playerRefs.current[entry.actor_char_id] ?? null;
+        else if (entry.actor === "npc") {
+          // achamos por nome como fallback
+          const idx = npcs.findIndex((n: any) => n.name === entry.actor_name);
+          if (idx >= 0) fromEl = npcRefs.current[idx] ?? null;
+        }
+        // alvo
+        let toEl: HTMLElement | null = null;
+        if (entry.actor === "player") {
+          const idx = typeof entry.target_npc_idx === "number"
+            ? entry.target_npc_idx
+            : npcs.findIndex((n: any) => n.name === entry.target_name);
+          if (idx >= 0) toEl = npcRefs.current[idx] ?? null;
+        } else if (entry.actor === "npc") {
+          const cid = entry.target_char_id
+            ?? players.find((p: any) => p.nickname === entry.target_name)?.character_id;
+          if (cid) toEl = playerRefs.current[cid] ?? null;
+        }
+        const rectCenter = (el: HTMLElement | null) => {
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          return { x: r.left + r.width / 2 - stageRect.left, y: r.top + r.height / 2 - stageRect.top };
+        };
+        const to = rectCenter(toEl);
+        const from = rectCenter(fromEl) ?? to;
+        if (to) {
+          setFx({
+            id: `${entry.seq}-fx`,
+            url: animUrl,
+            mode: animMode,
+            from: from!,
+            to,
+            isVideo: /\.(mp4|webm)$/i.test(animUrl),
+          });
+        }
+      }
+
       // Aguarda o maior entre duração do áudio e a pose (mínimo 1.2s, máximo 6s)
       const wait = Math.max(1200, Math.min(6000, Math.max(audioDuration || 0, poseUrl && imgOk ? POSE_MS : 0)));
       await new Promise((r) => setTimeout(r, wait));
       if (poseUrl && imgOk && actorCharId) {
         setPoses((p) => { const { [actorCharId]: _drop, ...rest } = p; return rest; });
       }
+      setFx(null);
     }
   }, [log.length]);
 
@@ -298,7 +356,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
         </div>
 
         {/* Battle stage */}
-        <div className="relative overflow-hidden border-y border-border" style={{
+        <div ref={stageRef} className="relative overflow-hidden border-y border-border" style={{
           backgroundImage: bgUrl ? `url(${bgUrl})` : undefined,
           backgroundSize: "cover",
           backgroundPosition: "center",
@@ -331,7 +389,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                     onClick={() => canPick && setTargetIdx(i)}
                     className={`relative flex flex-col items-center gap-1 group ${canPick ? "cursor-pointer" : "cursor-default"}`}
                   >
-                    <div className={`relative transition-all ${isActing ? "drop-shadow-[0_0_18px_rgba(239,68,68,0.9)] scale-105" : ""} ${isTarget && !isActing ? "drop-shadow-[0_0_14px_rgba(239,68,68,0.75)] scale-[1.03]" : ""} ${dead ? "opacity-30 grayscale" : "group-hover:scale-105"}`}>
+                    <div ref={(el) => { npcRefs.current[i] = el; }} className={`relative transition-all ${isActing ? "drop-shadow-[0_0_18px_rgba(239,68,68,0.9)] scale-105" : ""} ${isTarget && !isActing ? "drop-shadow-[0_0_14px_rgba(239,68,68,0.75)] scale-[1.03]" : ""} ${dead ? "opacity-30 grayscale" : "group-hover:scale-105"}`}>
                       {n.image_url ? (
                         <img src={n.image_url} alt={n.name} className={`${size} w-auto object-contain`} style={{ filter: isActing ? "drop-shadow(0 0 10px rgb(239 68 68))" : undefined }} />
                       ) : <div className={`${size} w-24 bg-secondary rounded`} />}
@@ -355,7 +413,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                 const size = players.length > 2 ? "h-[110px] sm:h-[150px]" : "h-[140px] sm:h-[190px]";
                 return (
                   <div key={p.character_id} className="flex flex-col items-center gap-1">
-                    <div className={`relative transition-all ${isActive ? "drop-shadow-[0_0_18px_rgba(52,211,153,0.9)] scale-105" : ""} ${!p.alive ? "opacity-30 grayscale" : ""}`}>
+                    <div ref={(el) => { playerRefs.current[p.character_id] = el; }} className={`relative transition-all ${isActive ? "drop-shadow-[0_0_18px_rgba(52,211,153,0.9)] scale-105" : ""} ${!p.alive ? "opacity-30 grayscale" : ""}`}>
                       {sprite ? (
                         <img src={sprite} alt={p.nickname} className={`${size} w-auto object-contain`} style={{ transform: "scaleX(-1)", filter: isActive ? "drop-shadow(0 0 10px rgb(52 211 153))" : undefined }} />
                       ) : (
@@ -369,6 +427,8 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
             </div>
 
           </div>
+          {/* Camada de animação de habilidade (GIF/vídeo) */}
+          {fx && <SkillFxLayer fx={fx} />}
         </div>
 
         {/* Party bar */}
@@ -535,5 +595,69 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function SkillFxLayer({ fx }: {
+  fx: {
+    id: string;
+    url: string;
+    mode: "projectile" | "front" | "overlay";
+    from: { x: number; y: number };
+    to: { x: number; y: number };
+    isVideo: boolean;
+  };
+}) {
+  // Tamanho do sprite da animação
+  const SIZE = 140;
+  // Posição alvo por modo:
+  //  - overlay: centro do alvo
+  //  - front: um pouco à frente do alvo (na direção do atacante)
+  //  - projectile: sai do atacante e vai até o alvo
+  let startX = fx.to.x, startY = fx.to.y, endX = fx.to.x, endY = fx.to.y;
+  if (fx.mode === "overlay") {
+    startX = endX = fx.to.x; startY = endY = fx.to.y;
+  } else if (fx.mode === "front") {
+    const dx = fx.from.x - fx.to.x;
+    const dy = fx.from.y - fx.to.y;
+    const len = Math.max(1, Math.hypot(dx, dy));
+    const off = 70;
+    startX = endX = fx.to.x + (dx / len) * off;
+    startY = endY = fx.to.y + (dy / len) * off;
+  } else {
+    // projectile
+    startX = fx.from.x; startY = fx.from.y;
+    endX = fx.to.x; endY = fx.to.y;
+  }
+  const style: React.CSSProperties = {
+    position: "absolute",
+    left: startX,
+    top: startY,
+    width: SIZE,
+    height: SIZE,
+    transform: `translate(-50%, -50%)`,
+    transition: fx.mode === "projectile" ? "left 700ms cubic-bezier(.4,.6,.4,1), top 700ms cubic-bezier(.4,.6,.4,1)" : undefined,
+    pointerEvents: "none",
+    zIndex: 25,
+    filter: "drop-shadow(0 0 12px rgba(255,220,120,0.6))",
+  };
+  const [pos, setPos] = useState({ x: startX, y: startY });
+  useEffect(() => {
+    if (fx.mode === "projectile") {
+      // Kick após 1 frame para animar
+      const r = requestAnimationFrame(() => setPos({ x: endX, y: endY }));
+      return () => cancelAnimationFrame(r);
+    }
+    setPos({ x: startX, y: startY });
+     
+  }, [fx.id]);
+  return (
+    <div style={{ ...style, left: pos.x, top: pos.y }} className="animate-fade-in">
+      {fx.isVideo ? (
+        <video src={fx.url} autoPlay muted playsInline loop className="w-full h-full object-contain" />
+      ) : (
+        <img src={fx.url} alt="" className="w-full h-full object-contain" />
+      )}
+    </div>
   );
 }
