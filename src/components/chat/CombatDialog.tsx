@@ -479,17 +479,28 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
               const renderPlayer = (p: any) => {
                 const isActive = session.status === "active" && !npcActive && p.character_id === activePlayer?.character_id && p.alive;
                 const sprite = poses[p.character_id] || p.sprite_url || sprites[p.character_id];
+                const isHealPick = isHealSkill && healTarget === "single" && myTurn && p.alive;
+                const chosenHeal = isHealPick && healTargetId === p.character_id;
                 return (
-                  <div key={p.character_id} className="flex flex-col items-center gap-1 min-w-0">
-                    <div ref={(el) => { playerRefs.current[p.character_id] = el; }} className={`relative transition-all ${isActive ? "drop-shadow-[0_0_18px_rgba(52,211,153,0.9)] scale-105" : ""} ${!p.alive ? "opacity-30 grayscale" : ""}`}>
+                  <button
+                    key={p.character_id}
+                    type="button"
+                    disabled={!isHealPick}
+                    onClick={() => isHealPick && setHealTargetId(p.character_id)}
+                    className={`flex flex-col items-center gap-1 min-w-0 ${isHealPick ? "cursor-pointer" : "cursor-default"}`}
+                  >
+                    <div ref={(el) => { playerRefs.current[p.character_id] = el; }} className={`relative transition-all ${isActive ? "drop-shadow-[0_0_18px_rgba(52,211,153,0.9)] scale-105" : ""} ${chosenHeal ? "drop-shadow-[0_0_18px_rgba(52,211,153,0.9)] scale-[1.04] ring-2 ring-emerald-400/70 rounded-md" : ""} ${!p.alive ? "opacity-30 grayscale" : ""}`}>
                       {sprite ? (
                         <img src={sprite} alt={p.nickname} className={`${sizeCls} w-auto object-contain`} style={{ transform: "scaleX(-1)", filter: isActive ? "drop-shadow(0 0 10px rgb(52 211 153))" : undefined }} />
                       ) : (
                         <div className={`${sizeCls} w-20 bg-secondary rounded`} />
                       )}
                       <FloatingDamageLayer bursts={bursts[`player:${p.character_id}`] ?? []} onExpire={(id) => expireBurst(`player:${p.character_id}`, id)} />
+                      {healOverlays[p.character_id] && (
+                        <HealParticles key={healOverlays[p.character_id]} />
+                      )}
                     </div>
-                  </div>
+                  </button>
                 );
               };
               return (
