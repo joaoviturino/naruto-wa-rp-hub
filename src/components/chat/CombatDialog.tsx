@@ -375,58 +375,90 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                 <div className="w-16 sm:w-20"><Progress value={npcs[targetIdx].hp_max ? (npcs[targetIdx].hp / npcs[targetIdx].hp_max) * 100 : 0} className="h-1" /></div>
               </div>
             )}
-            {/* NPCs (left) */}
-            <div className="inline-flex items-end gap-2 sm:gap-3 flex-1 min-w-0 flex-nowrap overflow-x-auto no-scrollbar">
-              {npcs.map((n: any, i: number) => {
-                const dead = n.alive === false || n.hp <= 0;
+            {/* NPCs (left half) — formação em 2 fileiras quando > 2 */}
+            {(() => {
+              const n = npcs.length;
+              const frontCount = n <= 2 ? n : Math.ceil(n / 2);
+              const front = npcs.slice(0, frontCount).map((v: any, i: number) => ({ v, i }));
+              const back = npcs.slice(frontCount).map((v: any, i: number) => ({ v, i: i + frontCount }));
+              const sizeCls = n > 2 ? "max-h-[95px] sm:max-h-[130px]" : "max-h-[150px] sm:max-h-[200px]";
+              const renderNpc = ({ v: nn, i }: { v: any; i: number }) => {
+                const dead = nn.alive === false || nn.hp <= 0;
                 const isTarget = i === targetIdx && !dead;
                 const isActing = npcActive && i === (state.target ?? 0);
                 const canPick = !dead && myTurn;
-                const size = npcs.length > 2 ? "max-h-[110px] sm:max-h-[150px]" : "max-h-[150px] sm:max-h-[200px]";
                 return (
                   <button
-                    key={n.id ?? i}
+                    key={nn.id ?? i}
                     type="button"
                     disabled={!canPick}
                     onClick={() => canPick && setTargetIdx(i)}
-                    className={`relative flex flex-col items-center gap-1 group shrink-0 ${canPick ? "cursor-pointer" : "cursor-default"}`}
+                    className={`relative flex flex-col items-center gap-1 group min-w-0 ${canPick ? "cursor-pointer" : "cursor-default"}`}
                   >
                     <div ref={(el) => { npcRefs.current[i] = el; }} className={`relative transition-all ${isActing ? "drop-shadow-[0_0_18px_rgba(239,68,68,0.9)] scale-105" : ""} ${isTarget && !isActing ? "drop-shadow-[0_0_14px_rgba(239,68,68,0.75)] scale-[1.03]" : ""} ${dead ? "opacity-30 grayscale" : "group-hover:scale-105"}`}>
-                      {n.image_url ? (
-                        <img src={n.image_url} alt={n.name} className={`${size} w-auto object-contain`} style={{ filter: isActing ? "drop-shadow(0 0 10px rgb(239 68 68))" : undefined }} />
-                      ) : <div className={`${size} w-20 bg-secondary rounded`} />}
+                      {nn.image_url ? (
+                        <img src={nn.image_url} alt={nn.name} className={`${sizeCls} w-auto object-contain`} style={{ filter: isActing ? "drop-shadow(0 0 10px rgb(239 68 68))" : undefined }} />
+                      ) : <div className={`${sizeCls} w-20 bg-secondary rounded`} />}
                       <FloatingDamageLayer bursts={bursts[`npc:${i}`] ?? []} onExpire={(id) => expireBurst(`npc:${i}`, id)} />
                     </div>
-                    <div className={`rounded px-2 py-1 w-[110px] sm:w-[130px] transition-colors ${isTarget ? "bg-red-600/80 ring-1 ring-red-300" : "bg-black/70"}`}>
-                      <div className="font-display text-[11px] sm:text-xs text-white truncate">{n.name}</div>
-                      <div className="flex justify-between text-[9px] text-white/80"><span>HP</span><span>{n.hp}/{n.hp_max}</span></div>
-                      <Progress value={n.hp_max ? (n.hp / n.hp_max) * 100 : 0} className="h-1.5" />
+                    <div className={`rounded px-1.5 py-0.5 max-w-[130px] w-full transition-colors ${isTarget ? "bg-red-600/80 ring-1 ring-red-300" : "bg-black/70"}`}>
+                      <div className="font-display text-[10px] sm:text-xs text-white truncate">{nn.name}</div>
+                      <div className="flex justify-between text-[9px] text-white/80"><span>HP</span><span>{nn.hp}/{nn.hp_max}</span></div>
+                      <Progress value={nn.hp_max ? (nn.hp / nn.hp_max) * 100 : 0} className="h-1" />
                     </div>
                   </button>
                 );
-              })}
-            </div>
+              };
+              return (
+                <div className="flex flex-col items-center justify-end flex-1 min-w-0 gap-1">
+                  {back.length > 0 && (
+                    <div className="flex items-end justify-center gap-2 sm:gap-3 w-full">
+                      {back.map(renderNpc)}
+                    </div>
+                  )}
+                  <div className="flex items-end justify-center gap-2 sm:gap-3 w-full">
+                    {front.map(renderNpc)}
+                  </div>
+                </div>
+              );
+            })()}
 
-            {/* Allies (right) */}
-            <div className="inline-flex items-end gap-2 sm:gap-3 flex-1 min-w-0 flex-nowrap justify-end overflow-x-auto no-scrollbar">
-              {players.map((p: any) => {
+            {/* Allies (right half) */}
+            {(() => {
+              const n = players.length;
+              const frontCount = n <= 2 ? n : Math.ceil(n / 2);
+              const front = players.slice(0, frontCount);
+              const back = players.slice(frontCount);
+              const sizeCls = n > 2 ? "max-h-[95px] sm:max-h-[130px]" : "max-h-[150px] sm:max-h-[200px]";
+              const renderPlayer = (p: any) => {
                 const isActive = session.status === "active" && !npcActive && p.character_id === activePlayer?.character_id && p.alive;
                 const sprite = poses[p.character_id] || p.sprite_url || sprites[p.character_id];
-                const size = players.length > 2 ? "max-h-[110px] sm:max-h-[150px]" : "max-h-[150px] sm:max-h-[200px]";
                 return (
-                  <div key={p.character_id} className="flex flex-col items-center gap-1 shrink-0">
+                  <div key={p.character_id} className="flex flex-col items-center gap-1 min-w-0">
                     <div ref={(el) => { playerRefs.current[p.character_id] = el; }} className={`relative transition-all ${isActive ? "drop-shadow-[0_0_18px_rgba(52,211,153,0.9)] scale-105" : ""} ${!p.alive ? "opacity-30 grayscale" : ""}`}>
                       {sprite ? (
-                        <img src={sprite} alt={p.nickname} className={`${size} w-auto object-contain`} style={{ transform: "scaleX(-1)", filter: isActive ? "drop-shadow(0 0 10px rgb(52 211 153))" : undefined }} />
+                        <img src={sprite} alt={p.nickname} className={`${sizeCls} w-auto object-contain`} style={{ transform: "scaleX(-1)", filter: isActive ? "drop-shadow(0 0 10px rgb(52 211 153))" : undefined }} />
                       ) : (
-                        <div className={`${size} w-20 bg-secondary rounded`} />
+                        <div className={`${sizeCls} w-20 bg-secondary rounded`} />
                       )}
                       <FloatingDamageLayer bursts={bursts[`player:${p.character_id}`] ?? []} onExpire={(id) => expireBurst(`player:${p.character_id}`, id)} />
                     </div>
                   </div>
                 );
-              })}
-            </div>
+              };
+              return (
+                <div className="flex flex-col items-center justify-end flex-1 min-w-0 gap-1">
+                  {back.length > 0 && (
+                    <div className="flex items-end justify-center gap-2 sm:gap-3 w-full">
+                      {back.map(renderPlayer)}
+                    </div>
+                  )}
+                  <div className="flex items-end justify-center gap-2 sm:gap-3 w-full">
+                    {front.map(renderPlayer)}
+                  </div>
+                </div>
+              );
+            })()}
 
           </div>
           {/* Camada de animação de habilidade (GIF/vídeo) */}
