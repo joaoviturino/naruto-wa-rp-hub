@@ -242,17 +242,17 @@
   background: linear-gradient(90deg, oklch(0.55 0.22 25 / 0.25), oklch(0.78 0.15 80 / 0.12));
   border-color: oklch(0.78 0.15 80 / 0.45);
   box-shadow: 0 0 0 1px oklch(0.78 0.15 80 / 0.15) inset, 0 8px 20px -12px oklch(0 0 0 / 0.6);
-}
-@utility admin-nav-item-active::before {
-  content: "";
-  position: absolute;
-  left: -1px;
-  top: 25%;
-  bottom: 25%;
-  width: 3px;
-  border-radius: 3px;
-  background: linear-gradient(180deg, var(--gold), var(--blood));
-  box-shadow: 0 0 12px oklch(0.78 0.15 80 / 0.6);
+  &::before {
+    content: "";
+    position: absolute;
+    left: -1px;
+    top: 25%;
+    bottom: 25%;
+    width: 3px;
+    border-radius: 3px;
+    background: linear-gradient(180deg, var(--gold), var(--blood));
+    box-shadow: 0 0 12px oklch(0.78 0.15 80 / 0.6);
+  }
 }
 
 /* --- Form controls inside admin scope --- */
