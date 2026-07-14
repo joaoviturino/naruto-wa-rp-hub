@@ -190,14 +190,14 @@ function Dashboard({ onNavigate }: { onNavigate: (id: string) => void }) {
         supabase.from("missions").select("*", { count: "exact", head: true }),
         supabase.from("locations").select("*", { count: "exact", head: true }),
         supabase.from("bot_sessions").select("status").eq("id", "default").maybeSingle(),
-        supabase.from("server_config").select("maintenance_mode").eq("id", "singleton").maybeSingle(),
+        supabase.from("server_config").select("maintenance_enabled").maybeSingle(),
       ]);
       setCounts({
         players: players ?? 0, characters: characters ?? 0, pending: pending ?? 0,
         npcs: npcs ?? 0, items: items ?? 0, skills: skills ?? 0, missions: missions ?? 0, locations: locations ?? 0,
       });
       setBotStatus(bot?.status ?? "disconnected");
-      setMaintenance(!!srv?.maintenance_mode);
+      setMaintenance(!!srv?.maintenance_enabled);
     })();
   }, []);
 
