@@ -94,6 +94,7 @@ export function PlayerEditor({ characterId, open, onOpenChange, onSaved }: {
                   { key: "avatar_url", label: "Avatar", bucket: "avatars" as const },
                   { key: "banner_url", label: "Banner", bucket: "banners" as const },
                   { key: "inventory_bg_url", label: "PNG do inventário (combate)", bucket: "inventory" as const },
+                  { key: "eyes_frame_url", label: "Frame dos olhos (HUD)", bucket: "avatars" as const },
                 ]).map((f) => (
                   <div key={f.key} className="space-y-2">
                     <div className="text-xs text-muted-foreground">{f.label}</div>
