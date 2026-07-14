@@ -9,6 +9,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { upsertNpc, deleteNpc, setNpcSkills } from "@/lib/npc.functions";
 import { setNpcLearningSteps } from "@/lib/minigame.functions";
 import { toast } from "sonner";
+import { NpcGroupManager } from "./NpcGroupManager";
 
 type DropRow = { item_id: string; qty: number; chance: number };
 type ShopRow = { item_id: string; price: number; stock: number };
@@ -175,8 +176,10 @@ export function NpcManager() {
   const selSkills = selected ? assigned[selected] ?? new Set<string>() : new Set<string>();
 
   return (
-    <div className="grid gap-4 md:grid-cols-[320px_1fr]">
-      <div className="space-y-3">
+    <div className="space-y-4">
+      <NpcGroupManager npcs={npcs.map((n) => ({ id: n.id, name: n.name, kind: n.kind }))} />
+      <div className="grid gap-4 md:grid-cols-[320px_1fr]">
+        <div className="space-y-3">
         <div className="scroll-panel rounded-lg p-4 space-y-2">
           <h3 className="font-display text-lg text-gold">Novo NPC</h3>
           <Input placeholder="Nome" value={name} onChange={(e) => setName(e.target.value)} />
