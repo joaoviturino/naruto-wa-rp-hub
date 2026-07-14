@@ -22,6 +22,7 @@ import { MinigameManager } from "@/components/admin/MinigameManager";
 import { LibraryManager } from "@/components/admin/LibraryManager";
 import { LevelManager } from "@/components/admin/LevelManager";
 import { ProficiencyManager } from "@/components/admin/ProficiencyManager";
+import { ServerControl } from "@/components/admin/ServerControl";
 import { NINJA_RANKS } from "@/components/admin/shared";
 import { Pencil, BatteryCharging, Eye } from "lucide-react";
 
@@ -47,6 +48,7 @@ export function AdminPanel() {
           <TabsTrigger value="levels">Níveis</TabsTrigger>
           <TabsTrigger value="parties">Parties</TabsTrigger>
           <TabsTrigger value="admins">Admins</TabsTrigger>
+          <TabsTrigger value="server">Servidor</TabsTrigger>
           <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
         </TabsList>
         <TabsContent value="dashboard" className="mt-4"><Dashboard /></TabsContent>
@@ -63,6 +65,7 @@ export function AdminPanel() {
         <TabsContent value="levels" className="mt-4"><LevelManager /></TabsContent>
         <TabsContent value="parties" className="mt-4"><PartyManager /></TabsContent>
         <TabsContent value="admins" className="mt-4"><AdminUsers /></TabsContent>
+        <TabsContent value="server" className="mt-4"><ServerControl /></TabsContent>
         <TabsContent value="whatsapp" className="mt-4"><BotPanel /></TabsContent>
       </Tabs>
     </div>

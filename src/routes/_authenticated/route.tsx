@@ -3,6 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { PvpInvitesWatcher } from "@/components/chat/PvpInvitesWatcher";
+import { MaintenanceGate } from "@/components/MaintenanceGate";
+import { GlobalBroadcasts } from "@/components/GlobalBroadcasts";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -25,6 +27,7 @@ function AuthedLayout() {
     navigate({ to: "/auth", replace: true });
   }
   return (
+    <MaintenanceGate isAdmin={isAdmin}>
     <div className="min-h-screen">
       <header className="border-b border-border bg-card/40 backdrop-blur">
         <div className="mx-auto max-w-6xl px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-2">
@@ -45,7 +48,9 @@ function AuthedLayout() {
         </div>
       </header>
       <PvpInvitesWatcher />
+      <GlobalBroadcasts />
       <Outlet />
     </div>
+    </MaintenanceGate>
   );
 }
