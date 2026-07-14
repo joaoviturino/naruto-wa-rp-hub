@@ -597,3 +597,67 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
     </Dialog>
   );
 }
+
+function SkillFxLayer({ fx }: {
+  fx: {
+    id: string;
+    url: string;
+    mode: "projectile" | "front" | "overlay";
+    from: { x: number; y: number };
+    to: { x: number; y: number };
+    isVideo: boolean;
+  };
+}) {
+  // Tamanho do sprite da animação
+  const SIZE = 140;
+  // Posição alvo por modo:
+  //  - overlay: centro do alvo
+  //  - front: um pouco à frente do alvo (na direção do atacante)
+  //  - projectile: sai do atacante e vai até o alvo
+  let startX = fx.to.x, startY = fx.to.y, endX = fx.to.x, endY = fx.to.y;
+  if (fx.mode === "overlay") {
+    startX = endX = fx.to.x; startY = endY = fx.to.y;
+  } else if (fx.mode === "front") {
+    const dx = fx.from.x - fx.to.x;
+    const dy = fx.from.y - fx.to.y;
+    const len = Math.max(1, Math.hypot(dx, dy));
+    const off = 70;
+    startX = endX = fx.to.x + (dx / len) * off;
+    startY = endY = fx.to.y + (dy / len) * off;
+  } else {
+    // projectile
+    startX = fx.from.x; startY = fx.from.y;
+    endX = fx.to.x; endY = fx.to.y;
+  }
+  const style: React.CSSProperties = {
+    position: "absolute",
+    left: startX,
+    top: startY,
+    width: SIZE,
+    height: SIZE,
+    transform: `translate(-50%, -50%)`,
+    transition: fx.mode === "projectile" ? "left 700ms cubic-bezier(.4,.6,.4,1), top 700ms cubic-bezier(.4,.6,.4,1)" : undefined,
+    pointerEvents: "none",
+    zIndex: 25,
+    filter: "drop-shadow(0 0 12px rgba(255,220,120,0.6))",
+  };
+  const [pos, setPos] = useState({ x: startX, y: startY });
+  useEffect(() => {
+    if (fx.mode === "projectile") {
+      // Kick após 1 frame para animar
+      const r = requestAnimationFrame(() => setPos({ x: endX, y: endY }));
+      return () => cancelAnimationFrame(r);
+    }
+    setPos({ x: startX, y: startY });
+     
+  }, [fx.id]);
+  return (
+    <div style={{ ...style, left: pos.x, top: pos.y }} className="animate-fade-in">
+      {fx.isVideo ? (
+        <video src={fx.url} autoPlay muted playsInline loop className="w-full h-full object-contain" />
+      ) : (
+        <img src={fx.url} alt="" className="w-full h-full object-contain" />
+      )}
+    </div>
+  );
+}
