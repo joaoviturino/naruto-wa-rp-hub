@@ -660,7 +660,7 @@ export const consumeInCombat = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: sess } = await supabaseAdmin.from("combat_sessions").select("*").eq("id", data.session_id).maybeSingle();
     if (!sess || sess.status !== "active") throw new Error("Combate encerrado.");
-    const state: CombatState = sess.state as any;
+    const state: CombatState = normalizeState(sess.state as any);
     const log: LogEntry[] = sess.log as any;
     const activeIdx = state.active;
     const activePlayer = state.players[activeIdx];
