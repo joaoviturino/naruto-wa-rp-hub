@@ -649,6 +649,36 @@ export type Database = {
           },
         ]
       }
+      global_broadcasts: {
+        Row: {
+          active: boolean
+          created_at: string
+          created_by: string | null
+          expires_at: string | null
+          id: string
+          message: string
+          variant: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          message: string
+          variant?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          message?: string
+          variant?: string
+        }
+        Relationships: []
+      }
       inventory: {
         Row: {
           boots_id: string | null
@@ -1934,6 +1964,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      server_config: {
+        Row: {
+          id: string
+          maintenance_enabled: boolean
+          maintenance_eta: string | null
+          maintenance_image_url: string | null
+          maintenance_message: string
+          maintenance_title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          maintenance_enabled?: boolean
+          maintenance_eta?: string | null
+          maintenance_image_url?: string | null
+          maintenance_message?: string
+          maintenance_title?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          maintenance_enabled?: boolean
+          maintenance_eta?: string | null
+          maintenance_image_url?: string | null
+          maintenance_message?: string
+          maintenance_title?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
       }
       skills: {
         Row: {
