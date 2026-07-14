@@ -460,7 +460,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                     const maxES = Math.max(1, Math.floor((poolMaxS * Math.max(1, Math.min(100, Number(s.cost_percent ?? 20)))) / 100));
                     return (
                       <button key={s.id} disabled={cd > 0}
-                        onClick={() => { setSelectedSkill(s.id); setEnergy(maxES); }}
+                        onClick={() => { setSelectedSkill(s.id); setEnergy(Math.max(1, Math.min(maxES, Number(s.base_cost) || 1))); }}
                         className={`text-left rounded-md border p-2 transition ${chosen ? "border-gold bg-gold/10" : "border-border hover:border-gold/60"} ${cd > 0 ? "opacity-40 cursor-not-allowed" : ""}`}>
                         <div className="flex items-center justify-between">
                           <span className="font-display text-sm">{s.name}</span>
