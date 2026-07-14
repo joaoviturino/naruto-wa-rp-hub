@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { NINJA_RANKS, SKILL_RANKS, VILLAGES, ELEMENTS, labelize } from "./shared";
 import { useProficiencies } from "@/hooks/useProficiencies";
 import { X, Plus } from "lucide-react";
+import { ImageUpload } from "@/components/ImageUpload";
 
 export function PlayerEditor({ characterId, open, onOpenChange, onSaved }: {
   characterId: string | null; open: boolean; onOpenChange: (v: boolean) => void; onSaved: () => void;
@@ -86,6 +87,40 @@ export function PlayerEditor({ characterId, open, onOpenChange, onSaved }: {
           </TabsList>
 
           <TabsContent value="stats" className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="sm:col-span-2 border border-border rounded p-3">
+              <Label className="text-gold">Imagens do jogador</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-2">
+                {([
+                  { key: "avatar_url", label: "Avatar", bucket: "avatars" as const },
+                  { key: "banner_url", label: "Banner", bucket: "banners" as const },
+                  { key: "inventory_bg_url", label: "PNG do inventário (combate)", bucket: "inventory" as const },
+                ]).map((f) => (
+                  <div key={f.key} className="space-y-2">
+                    <div className="text-xs text-muted-foreground">{f.label}</div>
+                    <div className="h-24 w-full rounded bg-secondary/40 border border-border overflow-hidden flex items-center justify-center">
+                      {char[f.key] ? <img src={char[f.key]} alt="" className="max-h-full max-w-full object-contain" /> : <span className="text-xs text-muted-foreground">—</span>}
+                    </div>
+                    <div className="flex gap-2">
+                      <ImageUpload label="Enviar" bucket={f.bucket} userId={char.user_id}
+                        onUploaded={async (url) => {
+                          try {
+                            await save({ data: { character_id: char.id, [f.key]: url } } as any);
+                            up(f.key, url); toast.success("Imagem atualizada."); onSaved();
+                          } catch (e: any) { toast.error(e.message); }
+                        }} />
+                      {char[f.key] && (
+                        <Button size="sm" variant="ghost" onClick={async () => {
+                          try {
+                            await save({ data: { character_id: char.id, [f.key]: null } } as any);
+                            up(f.key, null); toast.success("Imagem removida."); onSaved();
+                          } catch (e: any) { toast.error(e.message); }
+                        }}>Remover</Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
             <div><Label>XP</Label><Input type="number" min={0} value={char.xp} onChange={(e) => up("xp", Number(e.target.value))} /></div>
             <div><Label>Patente</Label>
               <Select value={char.rank} onValueChange={(v) => up("rank", v)}>
