@@ -306,7 +306,7 @@ export const playerAttack = createServerFn({ method: "POST" })
       .from("character_skills").select("skill_id").eq("character_id", me.id).eq("skill_id", data.skill_id).maybeSingle();
     if (!owned) throw new Error("Você não conhece essa habilidade.");
     const { data: skill } = await context.supabase.from("skills")
-      .select("id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class,skill_class,meta,animation_url,sound_url").eq("id", data.skill_id).maybeSingle();
+      .select("id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class,skill_class,meta,animation_url,animation_mode,sound_url").eq("id", data.skill_id).maybeSingle();
     if (!skill) throw new Error("Habilidade inexistente.");
     const combatClass = String((skill as any).skill_class ?? skill.req_class ?? "").toLowerCase();
 
