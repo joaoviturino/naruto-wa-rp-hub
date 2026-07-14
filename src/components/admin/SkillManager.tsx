@@ -289,6 +289,19 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button onClick={async () => {
             try {
+              // Normaliza meta.restore e faz cura HP roteada pelo sistema Iryo.
+              const meta = { ...(f.meta ?? {}) } as any;
+              const VALID_POOLS = ["hp", "ef", "em", "chakra", "all"];
+              if (meta.restore) {
+                if (!VALID_POOLS.includes(meta.restore.pool)) meta.restore.pool = "chakra";
+                if (!["flat", "percent"].includes(meta.restore.mode)) meta.restore.mode = "flat";
+                meta.restore.amount = Math.max(0, Number(meta.restore.amount ?? 0));
+                // Restore com pool=hp em skill = cura. Roteia para o motor Iryo
+                // (meta.heal) para que o combate aplique a cura corretamente.
+                if (meta.restore.pool === "hp" && !meta.heal) {
+                  meta.heal = { target: "single" };
+                }
+              }
               await save({ data: {
                 ...f,
                 description: f.description || null,
@@ -304,7 +317,7 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
                 bonus_critical: Number(f.bonus_critical ?? 1),
                 bonus_energetic: Number(f.bonus_energetic ?? 1),
                 cooldown_turns: Number(f.cooldown_turns ?? 0),
-                meta: f.meta ?? {},
+                meta,
               } } as any);
               toast.success("Habilidade salva."); onSaved();
             } catch (e: any) { toast.error(e.message); }
