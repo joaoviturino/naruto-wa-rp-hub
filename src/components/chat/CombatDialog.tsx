@@ -287,6 +287,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
             from: from!,
             to,
             isVideo: /\.(mp4|webm)$/i.test(animUrl),
+            mirror: entry.actor === "player",
           });
         }
       }
@@ -606,6 +607,7 @@ function SkillFxLayer({ fx }: {
     from: { x: number; y: number };
     to: { x: number; y: number };
     isVideo: boolean;
+    mirror?: boolean;
   };
 }) {
   // Tamanho do sprite da animação
@@ -654,9 +656,9 @@ function SkillFxLayer({ fx }: {
   return (
     <div style={{ ...style, left: pos.x, top: pos.y }} className="animate-fade-in">
       {fx.isVideo ? (
-        <video src={fx.url} autoPlay muted playsInline loop className="w-full h-full object-contain" />
+        <video src={fx.url} autoPlay muted playsInline loop className="w-full h-full object-contain" style={fx.mirror ? { transform: "scaleX(-1)" } : undefined} />
       ) : (
-        <img src={fx.url} alt="" className="w-full h-full object-contain" />
+        <img src={fx.url} alt="" className="w-full h-full object-contain" style={fx.mirror ? { transform: "scaleX(-1)" } : undefined} />
       )}
     </div>
   );
