@@ -12,11 +12,13 @@ import { NpcMusic } from "@/components/NpcMusic";
 import { toast } from "sonner";
 import { Sword, Flag, Zap, FlaskConical, Users, Target } from "lucide-react";
 import { FloatingDamageLayer, type DamageBurst } from "@/components/chat/FloatingDamage";
+import { HealParticles } from "@/components/chat/HealParticles";
 
 type Skill = {
   id: string; name: string; energy_type: "ef" | "em" | "chakra"; base_cost: number;
   bonus_speed: number; bonus_critical: number; bonus_energetic: number;
   cooldown_turns?: number; description?: string | null; cost_percent?: number;
+  meta?: any;
 };
 type BagEntry = { item_id: string; qty: number };
 type Item = { id: string; name: string; image_url: string | null; type: string };
@@ -62,7 +64,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   async function loadSkills() {
     const { data } = await supabase
       .from("character_skills")
-      .select("skill:skills(id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,description)")
+      .select("skill:skills(id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,description,meta)")
       .eq("character_id", myCharId);
     const list = ((data as any[]) ?? []).map((r) => r.skill).filter(Boolean) as Skill[];
     setSkills(list);
@@ -133,6 +135,17 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const expireBurst = (slotKey: string, id: string) => {
     setBursts((prev) => ({ ...prev, [slotKey]: (prev[slotKey] ?? []).filter((b) => b.id !== id) }));
   };
+  // Overlays de cura ativas por personagem (map charId → key para forçar remount).
+  const [healOverlays, setHealOverlays] = useState<Record<string, number>>({});
+  const triggerHeal = (cid: string) => {
+    setHealOverlays((prev) => ({ ...prev, [cid]: (prev[cid] ?? 0) + 1 }));
+    setTimeout(() => {
+      setHealOverlays((prev) => {
+        const { [cid]: _drop, ...rest } = prev;
+        return rest;
+      });
+    }, 1500);
+  };
   const log: any[] = Array.isArray(session?.log) ? session.log : [];
   const me = players.find((p: any) => p.character_id === myCharId);
   const activePlayer = players[state.active ?? 0];
@@ -141,6 +154,17 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const onlyAlivePlayer = players.filter((p: any) => p.alive).length === 1 && aliveMe;
   const myTurn = session?.status === "active" && aliveMe && (solo || onlyAlivePlayer || activePlayer?.character_id === myCharId);
   const currentSkill = skills.find((s) => s.id === selectedSkill);
+  const healTarget: "single" | "team" | null = currentSkill?.meta?.heal?.target ?? null;
+  const isHealSkill = !!healTarget;
+  const [healTargetId, setHealTargetId] = useState<string>("");
+  useEffect(() => {
+    if (isHealSkill && healTarget === "single") {
+      const alive = players.filter((p: any) => p.alive);
+      if (!alive.some((p: any) => p.character_id === healTargetId)) {
+        setHealTargetId(myCharId);
+      }
+    }
+  }, [selectedSkill, players.length]);
   const myCooldowns: Record<string, number> = (me?.cooldowns as any) ?? {};
   const currentCd = currentSkill ? (myCooldowns[currentSkill.id] ?? 0) : 0;
   const currentPool: "ef" | "em" | "chakra" | null = currentSkill?.energy_type ?? null;
@@ -172,7 +196,18 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
       if (Number(entry.damage) > 0) {
         const id = `${entry.seq}-${Math.random().toString(36).slice(2, 7)}`;
         const crit = Number(entry.crit_mul ?? 1) > 1 && entry.damage > 0;
-        if (entry.actor === "player") {
+        if (entry.heal) {
+          // Cura: burst verde e partículas em cada alvo curado.
+          const ids: string[] = Array.isArray(entry.heal_target_ids) && entry.heal_target_ids.length
+            ? entry.heal_target_ids
+            : (entry.heal_mode === "team"
+              ? players.filter((p: any) => p.alive).map((p: any) => p.character_id)
+              : [entry.actor_char_id].filter(Boolean));
+          for (const cid of ids) {
+            pushBurst(`player:${cid}`, { id: `${id}-${cid}`, amount: Number(entry.damage), heal: true });
+            triggerHeal(cid);
+          }
+        } else if (entry.actor === "player") {
           // dano no NPC alvo — usa o nome como fallback para achar o slot
           const idx = npcs.findIndex((n: any) => n.name === entry.target_name);
           const key = `npc:${idx >= 0 ? idx : 0}`;
@@ -315,9 +350,14 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
     if (!currentSkill) return;
     if (energy > currentMaxEnergy) { toast.error(`Custo máximo: ${currentMaxEnergy} (${currentPct}% de ${currentPool?.toUpperCase()}).`); return; }
     if (energy > currentPoolNow) { toast.error(`Energia insuficiente. Você tem ${currentPoolNow} ${currentPool?.toUpperCase()}.`); return; }
+    if (isHealSkill && healTarget === "single" && !healTargetId) { toast.error("Escolha um aliado para curar."); return; }
     setBusy(true);
     try {
-      await attack({ data: { session_id: sessionId, skill_id: currentSkill.id, energy_used: energy, target_index: targetIdx } });
+      await attack({ data: {
+        session_id: sessionId, skill_id: currentSkill.id, energy_used: energy,
+        target_index: targetIdx,
+        ...(isHealSkill && healTarget === "single" ? { heal_target_char_id: healTargetId } : {}),
+      } });
     } catch (e: any) { toast.error(e.message); }
     finally { setBusy(false); }
   }
@@ -439,17 +479,28 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
               const renderPlayer = (p: any) => {
                 const isActive = session.status === "active" && !npcActive && p.character_id === activePlayer?.character_id && p.alive;
                 const sprite = poses[p.character_id] || p.sprite_url || sprites[p.character_id];
+                const isHealPick = isHealSkill && healTarget === "single" && myTurn && p.alive;
+                const chosenHeal = isHealPick && healTargetId === p.character_id;
                 return (
-                  <div key={p.character_id} className="flex flex-col items-center gap-1 min-w-0">
-                    <div ref={(el) => { playerRefs.current[p.character_id] = el; }} className={`relative transition-all ${isActive ? "drop-shadow-[0_0_18px_rgba(52,211,153,0.9)] scale-105" : ""} ${!p.alive ? "opacity-30 grayscale" : ""}`}>
+                  <button
+                    key={p.character_id}
+                    type="button"
+                    disabled={!isHealPick}
+                    onClick={() => isHealPick && setHealTargetId(p.character_id)}
+                    className={`flex flex-col items-center gap-1 min-w-0 ${isHealPick ? "cursor-pointer" : "cursor-default"}`}
+                  >
+                    <div ref={(el) => { playerRefs.current[p.character_id] = el; }} className={`relative transition-all ${isActive ? "drop-shadow-[0_0_18px_rgba(52,211,153,0.9)] scale-105" : ""} ${chosenHeal ? "drop-shadow-[0_0_18px_rgba(52,211,153,0.9)] scale-[1.04] ring-2 ring-emerald-400/70 rounded-md" : ""} ${!p.alive ? "opacity-30 grayscale" : ""}`}>
                       {sprite ? (
                         <img src={sprite} alt={p.nickname} className={`${sizeCls} w-auto object-contain`} style={{ transform: "scaleX(-1)", filter: isActive ? "drop-shadow(0 0 10px rgb(52 211 153))" : undefined }} />
                       ) : (
                         <div className={`${sizeCls} w-20 bg-secondary rounded`} />
                       )}
                       <FloatingDamageLayer bursts={bursts[`player:${p.character_id}`] ?? []} onExpire={(id) => expireBurst(`player:${p.character_id}`, id)} />
+                      {healOverlays[p.character_id] && (
+                        <HealParticles key={healOverlays[p.character_id]} />
+                      )}
                     </div>
-                  </div>
+                  </button>
                 );
               };
               return (
@@ -578,12 +629,17 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                   <div className="flex-1">
                     <div className="text-xs text-muted-foreground mb-1">
                       Energia ({currentSkill?.energy_type.toUpperCase() ?? "—"}) — máx {currentMaxEnergy} ({currentPct}%)
+                      {isHealSkill && (
+                        <span className="ml-2 text-emerald-300">
+                          • cura ≈ energia gasta{healTarget === "team" ? " (time inteiro)" : " (alvo único — clique num aliado)"}
+                        </span>
+                      )}
                     </div>
                     <Input type="number" min={1} max={currentMaxEnergy} value={energy}
                       onChange={(e) => setEnergy(Math.max(1, Math.min(currentMaxEnergy, Number(e.target.value))))} />
                   </div>
                   <Button onClick={doAttack} disabled={!currentSkill || busy || currentCd > 0} className="shrink-0">
-                    <Sword size={14} className="mr-1" /> {busy ? "..." : "Atacar"}
+                    <Sword size={14} className="mr-1" /> {busy ? "..." : isHealSkill ? "Curar" : "Atacar"}
                   </Button>
                 </div>
               </TabsContent>

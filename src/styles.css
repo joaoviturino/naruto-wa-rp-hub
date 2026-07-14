@@ -380,6 +380,23 @@
   animation: target-pulse 1.4s ease-in-out infinite;
 }
 
+/* --- Heal particles (jutsus médicos) --- */
+@keyframes heal-rise {
+  0%   { opacity: 0; transform: translate(var(--tx, 0), 20px) scale(0.4); }
+  15%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--tx, 0), -110px) scale(1.1); }
+}
+@utility animate-heal-rise {
+  animation: heal-rise 1400ms cubic-bezier(0.25, 0.7, 0.3, 1) forwards;
+}
+@keyframes heal-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+  50%      { box-shadow: 0 0 30px 6px rgba(52, 211, 153, 0.55); }
+}
+@utility animate-heal-glow {
+  animation: heal-glow 1400ms ease-in-out forwards;
+}
+
 /* Hide scrollbars while keeping scroll behavior */
 .no-scrollbar {
   scrollbar-width: none;

@@ -97,6 +97,9 @@ type LogEntry = {
   raw_damage?: number;
   defense?: number;
   hit_cap?: number;
+  heal?: boolean;
+  heal_mode?: "single" | "team";
+  heal_target_ids?: string[];
 };
 
 function computeStats(xp: number) {
@@ -279,6 +282,7 @@ export const playerAttack = createServerFn({ method: "POST" })
     skill_id: z.string().uuid(),
     energy_used: z.number().int().min(1).max(100000),
     target_index: z.number().int().min(0).max(10).optional(),
+    heal_target_char_id: z.string().uuid().optional(),
   }).parse(i))
   .handler(async ({ data, context }) => {
     const me = await loadMyChar(context);
@@ -313,9 +317,115 @@ export const playerAttack = createServerFn({ method: "POST" })
       .from("character_skills").select("skill_id").eq("character_id", me.id).eq("skill_id", data.skill_id).maybeSingle();
     if (!owned) throw new Error("Você não conhece essa habilidade.");
     const { data: skill } = await context.supabase.from("skills")
-      .select("id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class,skill_class,meta,animation_url,animation_mode,sound_url").eq("id", data.skill_id).maybeSingle();
+      .select("id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class,skill_class,classification,meta,animation_url,animation_mode,sound_url").eq("id", data.skill_id).maybeSingle();
     if (!skill) throw new Error("Habilidade inexistente.");
     const combatClass = String((skill as any).skill_class ?? skill.req_class ?? "").toLowerCase();
+    const healCfg = (skill as any).meta?.heal as { target?: "single" | "team" } | undefined;
+    const isHealSkill = !!healCfg?.target;
+
+    // === Jutsu médico (Iryo suplementar): CURA em vez de dano ===
+    if (isHealSkill) {
+      const pool = (skill.energy_type as Pool);
+      const poolMax = pool === "ef" ? activePlayer.ef_max : pool === "em" ? activePlayer.em_max : activePlayer.chakra_max;
+      const costPct = Math.max(1, Math.min(100, Number((skill as any).cost_percent ?? 20)));
+      const { getCharBuffs } = await import("./clan-tree.functions");
+      const buffs = await getCharBuffs(context.supabase, me.id);
+      const costReduction = Math.max(0, Math.min(90, Number(buffs.skill_cost_reduction ?? 0)));
+      const powerBonus = Math.max(0, Number(buffs.skill_power_bonus ?? 0));
+      const maxEnergyBase = Math.max(1, Math.floor((poolMax * costPct) / 100));
+      const maxEnergy = Math.max(1, Math.floor(maxEnergyBase * (1 - costReduction / 100)));
+      if (data.energy_used > maxEnergy) throw new Error(`Custo máximo desta habilidade: ${maxEnergy} (${costPct}% da pool ${pool.toUpperCase()}).`);
+      if (activePlayer[pool] < data.energy_used) throw new Error(`Energia insuficiente (${pool.toUpperCase()}).`);
+      activePlayer[pool] -= data.energy_used;
+
+      // Bônus de maestria em Iryo
+      let masteryMul = 1;
+      if (skill.req_class || (skill as any).skill_class) {
+        const cls = (skill as any).skill_class ?? skill.req_class;
+        const { data: c } = await context.supabase
+          .from("characters").select("proficiencies").eq("id", me.id).maybeSingle();
+        const m = (c?.proficiencies as any)?.[cls]?.maestria as string | undefined;
+        const idx = ["E","D","C","B","A","S"].indexOf(m ?? "");
+        if (idx >= 0) masteryMul = 1 + idx * 0.1;
+      }
+      const powerMul = 1 + powerBonus / 100;
+      const healAmount = Math.max(1, Math.round(data.energy_used * powerMul * masteryMul));
+
+      // Cooldown
+      if (Number(skill.cooldown_turns ?? 0) > 0) {
+        activePlayer.cooldowns[data.skill_id] = Number(skill.cooldown_turns);
+      }
+
+      // Alvos
+      let targets: Player[] = [];
+      if (healCfg!.target === "team") {
+        targets = state.players.filter((p) => p.alive);
+      } else {
+        const tid = data.heal_target_char_id ?? activePlayer.character_id;
+        const t = state.players.find((p) => p.character_id === tid && p.alive);
+        if (!t) throw new Error("Alvo inválido para cura.");
+        targets = [t];
+      }
+      const healedIds: string[] = [];
+      const names: string[] = [];
+      for (const t of targets) {
+        const before = t.hp;
+        t.hp = Math.min(t.hp_max, t.hp + healAmount);
+        if (t.hp > before) healedIds.push(t.character_id);
+        names.push(t.nickname);
+      }
+
+      // Pose configurada
+      let poseUrl: string | null = null;
+      {
+        const { data: csp } = await supabaseAdmin
+          .from("character_skill_poses")
+          .select("pose:character_poses(image_url)")
+          .eq("character_id", activePlayer.character_id)
+          .eq("skill_id", data.skill_id)
+          .maybeSingle();
+        poseUrl = ((csp as any)?.pose?.image_url as string | undefined) ?? null;
+      }
+
+      log.push({
+        seq: log.length + 1, actor: "player", actor_name: activePlayer.nickname,
+        target_name: healCfg!.target === "team" ? "Time" : names[0] ?? activePlayer.nickname,
+        skill_name: skill.name, energy_type: pool, energy_used: data.energy_used,
+        effective: healAmount, damage: healAmount, speed: 0, crit_mul: 1,
+        heal: true, heal_mode: healCfg!.target, heal_target_ids: healedIds,
+        pose_url: poseUrl,
+        actor_char_id: activePlayer.character_id,
+        animation_url: (skill as any).animation_url ?? null,
+        animation_mode: ((skill as any).animation_mode ?? "overlay") as any,
+        sound_url: (skill as any).sound_url ?? null,
+        msg: `${activePlayer.nickname} usa ${skill.name} (cura ${pool.toUpperCase()} ${data.energy_used}) → ${healCfg!.target === "team" ? "time" : names[0]} +${healAmount} HP${masteryMul > 1 ? ` [Maestria ×${masteryMul.toFixed(1)}]` : ""}.`,
+      });
+
+      // NPC responde
+      let status = sess.status as string;
+      let ended_at: string | null = null;
+      const npcTurn = await runNpcTurn(supabaseAdmin, sess.npc_id, state, log, 0);
+      state.npc.energy = npcTurn.energyRemaining;
+      if (state.players.every((p) => !p.alive)) { status = "lost"; ended_at = new Date().toISOString(); }
+      else {
+        const total = state.players.length;
+        let next = (activeIdx + 1) % total;
+        for (let i = 0; i < total; i++) {
+          if (state.players[next].alive) break;
+          next = (next + 1) % total;
+        }
+        state.active = next;
+        const np = state.players[next];
+        if (np.cooldowns) {
+          for (const k of Object.keys(np.cooldowns)) {
+            np.cooldowns[k] = Math.max(0, (np.cooldowns[k] ?? 0) - 1);
+          }
+        }
+      }
+      await persistPools(supabaseAdmin, state);
+      await supabaseAdmin.from("combat_sessions").update({ state, log, status, ended_at, turn: "player" }).eq("id", sess.id);
+      return { ok: true, status };
+    }
 
     // Shurikenjutsu: consome N "ferramentas" (kunai/shuriken/etc.) da bolsa
     // e usa o bônus crítico da primeira ferramenta encontrada.
