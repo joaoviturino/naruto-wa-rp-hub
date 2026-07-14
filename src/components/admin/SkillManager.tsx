@@ -246,6 +246,44 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
               title="Restauração de energia (habilidade suplementar)"
             />
           )}
+          {f.classification === "suplementar" &&
+            (f.skill_class === "iryo" || f.req_class === "iryo") && (
+              <div className="sm:col-span-2 rounded-md border border-emerald-500/40 bg-emerald-500/5 p-3 space-y-2">
+                <div className="text-xs font-display text-emerald-300">
+                  Ninjutsu Médico — cura de HP
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  A quantidade de HP recuperada é igual à energia gasta, ampliada
+                  por buffs de clã (poder) e maestria em Iryo. A animação
+                  padrão são partículas verdes subindo do alvo — nenhum GIF é
+                  necessário.
+                </p>
+                <div>
+                  <Label>Alvo da cura</Label>
+                  <Select
+                    value={f.meta?.heal?.target ?? "__none__"}
+                    onValueChange={(v: any) =>
+                      up("meta", {
+                        ...(f.meta ?? {}),
+                        heal:
+                          v === "__none__"
+                            ? undefined
+                            : { target: v },
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Não é cura" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">— Não é cura —</SelectItem>
+                      <SelectItem value="single">Único alvo do time</SelectItem>
+                      <SelectItem value="team">Time inteiro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
         </div>
         <div className="flex justify-end gap-2 mt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
