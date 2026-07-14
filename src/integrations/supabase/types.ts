@@ -1198,6 +1198,7 @@ export type Database = {
           map_y: number
           name: string
           spawn_chance: number
+          spawn_group_ids: string[]
           spawn_tick_seconds: number
           updated_at: string
         }
@@ -1211,6 +1212,7 @@ export type Database = {
           map_y?: number
           name: string
           spawn_chance?: number
+          spawn_group_ids?: string[]
           spawn_tick_seconds?: number
           updated_at?: string
         }
@@ -1224,6 +1226,7 @@ export type Database = {
           map_y?: number
           name?: string
           spawn_chance?: number
+          spawn_group_ids?: string[]
           spawn_tick_seconds?: number
           updated_at?: string
         }
@@ -1380,6 +1383,60 @@ export type Database = {
           name?: string
           rank?: Database["public"]["Enums"]["ninja_rank"]
           reward_xp?: number
+        }
+        Relationships: []
+      }
+      npc_group_members: {
+        Row: {
+          group_id: string
+          npc_id: string
+          weight: number
+        }
+        Insert: {
+          group_id: string
+          npc_id: string
+          weight?: number
+        }
+        Update: {
+          group_id?: string
+          npc_id?: string
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "npc_group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "npc_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "npc_group_members_npc_id_fkey"
+            columns: ["npc_id"]
+            isOneToOne: false
+            referencedRelation: "npcs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      npc_groups: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
         }
         Relationships: []
       }
