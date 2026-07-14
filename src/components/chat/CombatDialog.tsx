@@ -434,12 +434,15 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
         </div>
 
         {/* Party bar */}
-        <div className="flex gap-2 px-2 py-2 border-b border-border bg-background/60 overflow-x-auto no-scrollbar">
+        <div
+          className="grid gap-2 px-2 py-2 border-b border-border bg-background/60"
+          style={{ gridTemplateColumns: `repeat(${Math.min(players.length, 6)}, minmax(0, 1fr))` }}
+        >
           {players.map((p: any) => {
             const isMe = p.character_id === myCharId;
             const active = players[state.active ?? 0]?.character_id === p.character_id;
             return (
-              <div key={p.character_id} className={`shrink-0 w-[150px] sm:w-[170px] rounded-md border p-2 ${active ? "border-gold" : "border-border"} ${!p.alive ? "opacity-40" : ""} ${isMe ? "bg-gold/10" : "bg-input/30"}`}>
+              <div key={p.character_id} className={`min-w-0 rounded-md border p-2 ${active ? "border-gold" : "border-border"} ${!p.alive ? "opacity-40" : ""} ${isMe ? "bg-gold/10" : "bg-input/30"}`}>
                 <div className="flex items-center gap-2">
                   <div className="w-10 h-10 rounded overflow-hidden bg-secondary shrink-0">
                     {avatars[p.character_id] && <img src={avatars[p.character_id]!} className="w-full h-full object-cover" alt="" />}
