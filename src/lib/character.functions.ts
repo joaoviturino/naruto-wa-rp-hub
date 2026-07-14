@@ -118,6 +118,7 @@ export const updateCharacter = createServerFn({ method: "POST" })
       avatar_url: z.string().url().optional(),
       banner_url: z.string().url().optional(),
       inventory_bg_url: z.string().url().optional(),
+      eyes_frame_url: z.string().url().optional(),
     }).parse(input),
   )
   .handler(async ({ data, context }) => {
