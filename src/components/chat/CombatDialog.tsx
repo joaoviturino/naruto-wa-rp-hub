@@ -244,6 +244,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   async function doAttack() {
     if (!currentSkill) return;
     if (energy > currentMaxEnergy) { toast.error(`Custo máximo: ${currentMaxEnergy} (${currentPct}% de ${currentPool?.toUpperCase()}).`); return; }
+    if (energy > currentPoolNow) { toast.error(`Energia insuficiente. Você tem ${currentPoolNow} ${currentPool?.toUpperCase()}.`); return; }
     setBusy(true);
     try {
       await attack({ data: { session_id: sessionId, skill_id: currentSkill.id, energy_used: energy, target_index: targetIdx } });
