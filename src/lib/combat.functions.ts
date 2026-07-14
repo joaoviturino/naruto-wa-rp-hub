@@ -165,16 +165,34 @@ export const rollSpawn = createServerFn({ method: "POST" })
 
     if (Math.random() * 100 >= loc.spawn_chance) return { session_id: null };
 
-    // Escolhe um NPC do local
-    const { data: pool } = await context.supabase
-      .from("location_npcs").select("npc_id,weight,npc:npcs(id,name,image_url,battle_bg_url,music_url,hp_max,energy_max,xp,kind)").eq("location_id", loc.id);
-    const rows = ((pool as any[]) ?? []).filter((r) => (r.npc?.kind ?? "aggressive") === "aggressive");
-    if (!rows.length) return { session_id: null };
-    const total = rows.reduce((s, r) => s + (r.weight ?? 1), 0);
-    let r = Math.random() * total;
-    let picked = rows[rows.length - 1];
-    for (const row of rows) { r -= row.weight ?? 1; if (r <= 0) { picked = row; break; } }
-    const npc = picked.npc;
+    // Escolhe inimigos: preferimos grupos configurados no local; se não houver, cai para
+    // sorteio individual em `location_npcs`.
+    let chosenNpcs: any[] = [];
+    const { data: locFull } = await context.supabase
+      .from("locations").select("spawn_group_ids").eq("id", loc.id).maybeSingle();
+    const groupIds = ((locFull as any)?.spawn_group_ids ?? []) as string[];
+    if (groupIds.length) {
+      const groupId = groupIds[Math.floor(Math.random() * groupIds.length)];
+      const { data: mems } = await context.supabase
+        .from("npc_group_members")
+        .select("npc:npcs(id,name,image_url,battle_bg_url,music_url,hp_max,energy_max,xp,kind)")
+        .eq("group_id", groupId);
+      chosenNpcs = ((mems as any[]) ?? [])
+        .map((r) => r.npc)
+        .filter((n: any) => n && (n.kind ?? "aggressive") === "aggressive");
+    }
+    if (!chosenNpcs.length) {
+      const { data: pool } = await context.supabase
+        .from("location_npcs").select("npc_id,weight,npc:npcs(id,name,image_url,battle_bg_url,music_url,hp_max,energy_max,xp,kind)").eq("location_id", loc.id);
+      const rows = ((pool as any[]) ?? []).filter((r) => (r.npc?.kind ?? "aggressive") === "aggressive");
+      if (!rows.length) return { session_id: null };
+      const total = rows.reduce((s, r) => s + (r.weight ?? 1), 0);
+      let r = Math.random() * total;
+      let picked = rows[rows.length - 1];
+      for (const row of rows) { r -= row.weight ?? 1; if (r <= 0) { picked = row; break; } }
+      chosenNpcs = [picked.npc];
+    }
+    const npc = chosenNpcs[0];
 
     // Participantes
     const partyId: string | null = partyIdEarly;
@@ -204,9 +222,17 @@ export const rollSpawn = createServerFn({ method: "POST" })
         cooldowns: {},
       });
     }
+    const npcsState: NpcState[] = chosenNpcs.map((n) => ({
+      id: n.id, name: n.name, image_url: n.image_url,
+      battle_bg_url: n.battle_bg_url ?? null, music_url: (n as any).music_url ?? null,
+      hp: n.hp_max, hp_max: n.hp_max,
+      energy: n.energy_max, energy_max: n.energy_max,
+      alive: true,
+    }));
     const state: CombatState = {
-      npc: { id: npc.id, name: npc.name, image_url: npc.image_url, battle_bg_url: npc.battle_bg_url ?? null, music_url: (npc as any).music_url ?? null, hp: npc.hp_max, hp_max: npc.hp_max, energy: npc.energy_max, energy_max: npc.energy_max },
-      players, active: 0,
+      npc: npcsState[0],
+      npcs: npcsState,
+      players, active: 0, target: 0,
     };
 
     const { data: session, error: sErr } = await supabaseAdmin.from("combat_sessions").insert({
