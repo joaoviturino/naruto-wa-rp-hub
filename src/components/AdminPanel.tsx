@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,80 +23,257 @@ import { LevelManager } from "@/components/admin/LevelManager";
 import { ProficiencyManager } from "@/components/admin/ProficiencyManager";
 import { ServerControl } from "@/components/admin/ServerControl";
 import { NINJA_RANKS } from "@/components/admin/shared";
-import { Pencil, BatteryCharging, Eye } from "lucide-react";
+import {
+  Pencil, BatteryCharging, Eye, LayoutDashboard, Users, Package, Sparkles,
+  ScrollText, GitBranch, MapPin, Ghost, Gamepad2, BookOpen, TrendingUp,
+  ShieldCheck, Server, MessageSquare, Award, UsersRound, Menu, X,
+} from "lucide-react";
+
+type NavItem = { id: string; label: string; icon: React.ComponentType<{ size?: number; className?: string }>; group: string };
+const NAV: NavItem[] = [
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, group: "Visão geral" },
+  { id: "players",   label: "Jogadores", icon: Users,           group: "Comunidade" },
+  { id: "parties",   label: "Parties",   icon: UsersRound,      group: "Comunidade" },
+  { id: "admins",    label: "Admins",    icon: ShieldCheck,     group: "Comunidade" },
+  { id: "items",     label: "Itens",     icon: Package,         group: "Conteúdo" },
+  { id: "skills",    label: "Habilidades", icon: Sparkles,      group: "Conteúdo" },
+  { id: "profs",     label: "Proficiências", icon: Award,       group: "Conteúdo" },
+  { id: "missions",  label: "Missões",   icon: ScrollText,      group: "Conteúdo" },
+  { id: "clans",     label: "Árvore de Clã", icon: GitBranch,   group: "Mundo" },
+  { id: "locations", label: "Locais",    icon: MapPin,          group: "Mundo" },
+  { id: "npcs",      label: "NPCs",      icon: Ghost,           group: "Mundo" },
+  { id: "minigames", label: "Minigames", icon: Gamepad2,        group: "Mundo" },
+  { id: "library",   label: "Biblioteca", icon: BookOpen,       group: "Mundo" },
+  { id: "levels",    label: "Níveis",    icon: TrendingUp,      group: "Sistema" },
+  { id: "server",    label: "Servidor",  icon: Server,          group: "Sistema" },
+  { id: "whatsapp",  label: "WhatsApp",  icon: MessageSquare,   group: "Sistema" },
+];
 
 export function AdminPanel() {
   const [adminUserId, setAdminUserId] = useState<string>("");
+  const [active, setActive] = useState<string>("dashboard");
+  const [mobileOpen, setMobileOpen] = useState(false);
   useEffect(() => { supabase.auth.getUser().then(({ data }) => setAdminUserId(data.user?.id ?? "")); }, []);
+
+  const groups = Array.from(new Set(NAV.map((n) => n.group)));
+  const current = NAV.find((n) => n.id === active) ?? NAV[0];
+  const Icon = current.icon;
+
   return (
-    <div className="mx-auto max-w-6xl p-3 sm:p-6">
-      <h1 className="font-display text-2xl sm:text-3xl font-black mb-4 sm:mb-6">Painel do Kage <span className="text-gold">影</span></h1>
-      <Tabs defaultValue="dashboard">
-        <TabsList className="flex flex-wrap h-auto gap-1 w-full justify-start text-xs sm:text-sm">
-          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-          <TabsTrigger value="players">Jogadores</TabsTrigger>
-          <TabsTrigger value="items">Itens</TabsTrigger>
-          <TabsTrigger value="skills">Habilidades</TabsTrigger>
-          <TabsTrigger value="profs">Proficiências</TabsTrigger>
-          <TabsTrigger value="missions">Missões</TabsTrigger>
-          <TabsTrigger value="clans">Árvore de Clã</TabsTrigger>
-          <TabsTrigger value="locations">Locais</TabsTrigger>
-          <TabsTrigger value="npcs">NPCs</TabsTrigger>
-          <TabsTrigger value="minigames">Minigames</TabsTrigger>
-          <TabsTrigger value="library">Biblioteca</TabsTrigger>
-          <TabsTrigger value="levels">Níveis</TabsTrigger>
-          <TabsTrigger value="parties">Parties</TabsTrigger>
-          <TabsTrigger value="admins">Admins</TabsTrigger>
-          <TabsTrigger value="server">Servidor</TabsTrigger>
-          <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
-        </TabsList>
-        <TabsContent value="dashboard" className="mt-4"><Dashboard /></TabsContent>
-        <TabsContent value="players" className="mt-4"><Players /></TabsContent>
-        <TabsContent value="items" className="mt-4">{adminUserId && <ItemManager adminUserId={adminUserId} />}</TabsContent>
-        <TabsContent value="skills" className="mt-4">{adminUserId && <SkillManager adminUserId={adminUserId} />}</TabsContent>
-        <TabsContent value="profs" className="mt-4"><ProficiencyManager /></TabsContent>
-        <TabsContent value="missions" className="mt-4"><MissionManager /></TabsContent>
-        <TabsContent value="clans" className="mt-4"><ClanTreeManager /></TabsContent>
-        <TabsContent value="locations" className="mt-4"><LocationManager /></TabsContent>
-        <TabsContent value="npcs" className="mt-4"><NpcManager /></TabsContent>
-        <TabsContent value="minigames" className="mt-4"><MinigameManager /></TabsContent>
-        <TabsContent value="library" className="mt-4"><LibraryManager /></TabsContent>
-        <TabsContent value="levels" className="mt-4"><LevelManager /></TabsContent>
-        <TabsContent value="parties" className="mt-4"><PartyManager /></TabsContent>
-        <TabsContent value="admins" className="mt-4"><AdminUsers /></TabsContent>
-        <TabsContent value="server" className="mt-4"><ServerControl /></TabsContent>
-        <TabsContent value="whatsapp" className="mt-4"><BotPanel /></TabsContent>
-      </Tabs>
+    <div className="admin-shell admin-scope">
+      {/* Mobile top bar */}
+      <div className="lg:hidden sticky top-0 z-30 flex items-center justify-between border-b border-border/60 bg-background/70 px-3 py-2 backdrop-blur">
+        <button
+          onClick={() => setMobileOpen(true)}
+          className="grid h-9 w-9 place-items-center rounded-md border border-border bg-secondary/40"
+          aria-label="Abrir menu"
+        ><Menu size={18} /></button>
+        <div className="flex items-center gap-2 font-display text-lg font-black">
+          <span className="text-gold">影</span>
+          <span className="admin-shimmer-text">{current.label}</span>
+        </div>
+        <div className="w-9" />
+      </div>
+
+      <div className="mx-auto grid max-w-[1400px] gap-4 p-3 sm:p-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+        {/* Sidebar */}
+        <aside
+          className={
+            "admin-card fixed inset-y-0 left-0 z-40 w-[280px] overflow-y-auto p-4 transition-transform lg:sticky lg:top-6 lg:z-0 lg:h-[calc(100dvh-3rem)] lg:translate-x-0" +
+            (mobileOpen ? " translate-x-0" : " -translate-x-full")
+          }
+        >
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-blood to-gold text-lg font-black text-background shadow-lg">影</div>
+              <div className="min-w-0">
+                <div className="font-display text-lg font-black leading-tight">Painel do Kage</div>
+                <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Controle Total</div>
+              </div>
+            </div>
+            <button
+              onClick={() => setMobileOpen(false)}
+              className="grid h-8 w-8 place-items-center rounded-md border border-border lg:hidden"
+              aria-label="Fechar"
+            ><X size={16} /></button>
+          </div>
+
+          <nav className="flex flex-col gap-4">
+            {groups.map((g) => (
+              <div key={g}>
+                <div className="mb-1 px-2 text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground/80">{g}</div>
+                <ul className="flex flex-col gap-0.5">
+                  {NAV.filter((n) => n.group === g).map((n) => {
+                    const IconC = n.icon;
+                    const isActive = n.id === active;
+                    return (
+                      <li key={n.id}>
+                        <button
+                          onClick={() => { setActive(n.id); setMobileOpen(false); }}
+                          className={
+                            "admin-nav-item admin-nav-item-hover w-full text-left" +
+                            (isActive ? " admin-nav-item-active" : "")
+                          }
+                        >
+                          <IconC size={16} className={isActive ? "text-gold" : ""} />
+                          <span className="truncate">{n.label}</span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </nav>
+        </aside>
+
+        {mobileOpen && (
+          <div
+            className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm lg:hidden"
+            onClick={() => setMobileOpen(false)}
+          />
+        )}
+
+        {/* Content */}
+        <main className="min-w-0">
+          <header className="mb-4 hidden items-center gap-3 lg:flex">
+            <div className="admin-card admin-tile-accent grid h-11 w-11 place-items-center rounded-xl">
+              <Icon size={20} className="text-gold" />
+            </div>
+            <div>
+              <h1 className="font-display text-2xl font-black leading-none admin-shimmer-text">{current.label}</h1>
+              <p className="mt-1 text-xs uppercase tracking-widest text-muted-foreground">{current.group}</p>
+            </div>
+          </header>
+
+          <div key={active} className="animate-admin-rise">
+            {active === "dashboard" && <Dashboard onNavigate={setActive} />}
+            {active === "players" && <Players />}
+            {active === "items" && adminUserId && <ItemManager adminUserId={adminUserId} />}
+            {active === "skills" && adminUserId && <SkillManager adminUserId={adminUserId} />}
+            {active === "profs" && <ProficiencyManager />}
+            {active === "missions" && <MissionManager />}
+            {active === "clans" && <ClanTreeManager />}
+            {active === "locations" && <LocationManager />}
+            {active === "npcs" && <NpcManager />}
+            {active === "minigames" && <MinigameManager />}
+            {active === "library" && <LibraryManager />}
+            {active === "levels" && <LevelManager />}
+            {active === "parties" && <PartyManager />}
+            {active === "admins" && <AdminUsers />}
+            {active === "server" && <ServerControl />}
+            {active === "whatsapp" && <BotPanel />}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
 
-function Dashboard() {
-  const [counts, setCounts] = useState({ players: 0, characters: 0, pending: 0 });
+function Dashboard({ onNavigate }: { onNavigate: (id: string) => void }) {
+  const [counts, setCounts] = useState({ players: 0, characters: 0, pending: 0, npcs: 0, items: 0, skills: 0, missions: 0, locations: 0 });
+  const [botStatus, setBotStatus] = useState<string>("—");
+  const [maintenance, setMaintenance] = useState<boolean>(false);
   useEffect(() => {
     (async () => {
-      const [{ count: players }, { count: characters }, { count: pending }] = await Promise.all([
+      const [
+        { count: players }, { count: characters }, { count: pending },
+        { count: npcs }, { count: items }, { count: skills }, { count: missions }, { count: locations },
+        { data: bot }, { data: srv },
+      ] = await Promise.all([
         supabase.from("profiles").select("*", { count: "exact", head: true }),
         supabase.from("characters").select("*", { count: "exact", head: true }),
         supabase.from("outbound_messages").select("*", { count: "exact", head: true }).eq("status", "pending"),
+        supabase.from("npcs").select("*", { count: "exact", head: true }),
+        supabase.from("items").select("*", { count: "exact", head: true }),
+        supabase.from("skills").select("*", { count: "exact", head: true }),
+        supabase.from("missions").select("*", { count: "exact", head: true }),
+        supabase.from("locations").select("*", { count: "exact", head: true }),
+        supabase.from("bot_sessions").select("status").eq("id", "default").maybeSingle(),
+        supabase.from("server_config").select("maintenance_mode").eq("id", "singleton").maybeSingle(),
       ]);
-      setCounts({ players: players ?? 0, characters: characters ?? 0, pending: pending ?? 0 });
+      setCounts({
+        players: players ?? 0, characters: characters ?? 0, pending: pending ?? 0,
+        npcs: npcs ?? 0, items: items ?? 0, skills: skills ?? 0, missions: missions ?? 0, locations: locations ?? 0,
+      });
+      setBotStatus(bot?.status ?? "disconnected");
+      setMaintenance(!!srv?.maintenance_mode);
     })();
   }, []);
+
+  const statusTone: Record<string, string> = {
+    connected: "from-emerald-500/30 to-emerald-500/5 text-emerald-300 border-emerald-500/40",
+    qr: "from-gold/30 to-gold/5 text-gold border-gold/40",
+    connecting: "from-sky-500/30 to-sky-500/5 text-sky-300 border-sky-500/40",
+    disconnected: "from-red-500/30 to-red-500/5 text-red-300 border-red-500/40",
+  };
+  const tone = statusTone[botStatus] ?? statusTone.disconnected;
+
   return (
-    <div className="grid gap-4 sm:grid-cols-3">
-      <Stat label="Jogadores" value={counts.players} />
-      <Stat label="Personagens" value={counts.characters} />
-      <Stat label="Mensagens pendentes" value={counts.pending} />
+    <div className="grid gap-4 md:grid-cols-6">
+      <BentoStat label="Jogadores" value={counts.players} icon={Users} tone="blood" span="md:col-span-2 md:row-span-2" onClick={() => onNavigate("players")} big />
+      <BentoStat label="Personagens" value={counts.characters} icon={UsersRound} span="md:col-span-2" onClick={() => onNavigate("players")} />
+      <BentoStat label="Mensagens pendentes" value={counts.pending} icon={MessageSquare} span="md:col-span-2" onClick={() => onNavigate("whatsapp")} />
+
+      <BentoStat label="NPCs" value={counts.npcs} icon={Ghost} span="md:col-span-2" onClick={() => onNavigate("npcs")} />
+      <BentoStat label="Locais" value={counts.locations} icon={MapPin} span="md:col-span-2" onClick={() => onNavigate("locations")} />
+
+      <div
+        onClick={() => onNavigate("server")}
+        className={`admin-card admin-card-hover md:col-span-3 cursor-pointer overflow-hidden bg-gradient-to-br ${maintenance ? "from-red-500/30 to-red-500/5 border-red-500/40" : "from-emerald-500/20 to-emerald-500/5 border-emerald-500/40"} p-5`}
+      >
+        <div className="flex items-center gap-3">
+          <Server size={20} className={maintenance ? "text-red-300" : "text-emerald-300"} />
+          <span className="text-xs uppercase tracking-widest text-muted-foreground">Servidor</span>
+        </div>
+        <div className={`mt-3 font-display text-2xl font-black ${maintenance ? "text-red-300" : "text-emerald-300"}`}>
+          {maintenance ? "MANUTENÇÃO ATIVA" : "ONLINE"}
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">{maintenance ? "Somente admins têm acesso agora." : "Jogadores podem jogar normalmente."}</p>
+      </div>
+
+      <div
+        onClick={() => onNavigate("whatsapp")}
+        className={`admin-card admin-card-hover md:col-span-3 cursor-pointer overflow-hidden bg-gradient-to-br ${tone} p-5`}
+      >
+        <div className="flex items-center gap-3">
+          <MessageSquare size={20} />
+          <span className="text-xs uppercase tracking-widest text-muted-foreground">WhatsApp Bot</span>
+        </div>
+        <div className="mt-3 font-display text-2xl font-black uppercase">{botStatus}</div>
+        <p className="mt-1 text-xs text-muted-foreground">Status atual da sessão do bot.</p>
+      </div>
+
+      <BentoStat label="Itens" value={counts.items} icon={Package} span="md:col-span-2" onClick={() => onNavigate("items")} />
+      <BentoStat label="Habilidades" value={counts.skills} icon={Sparkles} span="md:col-span-2" onClick={() => onNavigate("skills")} />
+      <BentoStat label="Missões" value={counts.missions} icon={ScrollText} span="md:col-span-2" onClick={() => onNavigate("missions")} />
     </div>
   );
 }
-function Stat({ label, value }: { label: string; value: number }) {
+
+function BentoStat({
+  label, value, icon: Icon, span = "", onClick, big = false, tone,
+}: {
+  label: string; value: number; icon: React.ComponentType<{ size?: number; className?: string }>;
+  span?: string; onClick?: () => void; big?: boolean; tone?: "blood" | "gold";
+}) {
+  const glow = tone === "blood"
+    ? "bg-gradient-to-br from-blood/25 via-blood/5 to-transparent border-blood/40"
+    : "bg-gradient-to-br from-gold/20 via-gold/5 to-transparent";
   return (
-    <div className="scroll-panel rounded-lg p-6">
-      <div className="text-xs uppercase tracking-widest text-muted-foreground">{label}</div>
-      <div className="mt-2 font-display text-4xl font-black text-gold">{value}</div>
-    </div>
+    <button
+      onClick={onClick}
+      className={`admin-card admin-card-hover admin-tile-accent group relative overflow-hidden p-5 text-left ${span} ${tone ? glow : ""}`}
+    >
+      <div className="flex items-start justify-between">
+        <div className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">{label}</div>
+        <div className="grid h-8 w-8 place-items-center rounded-lg bg-secondary/40 text-gold transition-transform group-hover:scale-110 group-hover:rotate-6">
+          <Icon size={16} />
+        </div>
+      </div>
+      <div className={`mt-3 font-display font-black leading-none ${big ? "text-6xl" : "text-4xl"} text-gold`}>{value}</div>
+      <div className="mt-1 text-[10px] uppercase tracking-widest text-muted-foreground opacity-60 group-hover:opacity-100 transition-opacity">Abrir →</div>
+    </button>
   );
 }
 
