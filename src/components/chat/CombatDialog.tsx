@@ -94,7 +94,30 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
 
   const state = (session?.state ?? {}) as any;
   const players: any[] = Array.isArray(state.players) ? state.players : [];
-  const npc = state.npc ?? { name: "?", image_url: null, hp: 0, hp_max: 1, energy: 0, energy_max: 1 };
+  const npcs: any[] = Array.isArray(state.npcs) && state.npcs.length
+    ? state.npcs
+    : (state.npc ? [state.npc] : []);
+  const npc = npcs[state.target ?? 0] ?? npcs[0] ?? { name: "?", image_url: null, hp: 0, hp_max: 1, energy: 0, energy_max: 1 };
+
+  // Alvo selecionado localmente (default: primeiro NPC vivo).
+  const [targetIdx, setTargetIdx] = useState<number>(0);
+  useEffect(() => {
+    // Se o alvo atual estiver morto/inexistente, aponta para o primeiro vivo.
+    const cur = npcs[targetIdx];
+    if (!cur || cur.alive === false) {
+      const nxt = npcs.findIndex((n: any) => n?.alive !== false);
+      if (nxt >= 0 && nxt !== targetIdx) setTargetIdx(nxt);
+    }
+  }, [npcs.map((n: any) => `${n?.id}:${n?.alive !== false}`).join("|")]);
+
+  // Números de dano flutuantes por combatente. Chave por índice (npc:i | player:cid).
+  const [bursts, setBursts] = useState<Record<string, DamageBurst[]>>({});
+  const pushBurst = (slotKey: string, burst: DamageBurst) => {
+    setBursts((prev) => ({ ...prev, [slotKey]: [...(prev[slotKey] ?? []), burst] }));
+  };
+  const expireBurst = (slotKey: string, id: string) => {
+    setBursts((prev) => ({ ...prev, [slotKey]: (prev[slotKey] ?? []).filter((b) => b.id !== id) }));
+  };
   const log: any[] = Array.isArray(session?.log) ? session.log : [];
   const me = players.find((p: any) => p.character_id === myCharId);
   const activePlayer = players[state.active ?? 0];
