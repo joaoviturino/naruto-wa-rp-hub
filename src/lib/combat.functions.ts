@@ -32,12 +32,48 @@ type NpcState = {
   music_url?: string | null;
   hp: number; hp_max: number;
   energy: number; energy_max: number;
+  alive?: boolean;
 };
 type CombatState = {
+  /** Alvo atual (referência ao mesmo objeto em `npcs`). Mantido por compat. */
   npc: NpcState;
+  /** Todos os inimigos do encontro. NPCs abatidos ficam com `alive=false`. */
+  npcs: NpcState[];
   players: Player[];
   active: number; // index do jogador cuja vez é
+  /** Índice do inimigo em `npcs` que o jogador atacará neste turno. */
+  target?: number;
 };
+
+/** Normaliza sessões antigas (`state.npc` sem `state.npcs`) migrando para array. */
+function normalizeState(state: any): CombatState {
+  if (!state) return state;
+  if (!Array.isArray(state.npcs) || state.npcs.length === 0) {
+    if (state.npc) {
+      state.npcs = [{ ...state.npc, alive: (state.npc.hp ?? 0) > 0 }];
+    } else {
+      state.npcs = [];
+    }
+  }
+  // Sincroniza flag `alive` a partir do hp
+  for (const n of state.npcs) if (n.alive === undefined) n.alive = (n.hp ?? 0) > 0;
+  // target inicial
+  if (typeof state.target !== "number") {
+    state.target = state.npcs.findIndex((n: NpcState) => n.alive);
+    if (state.target < 0) state.target = 0;
+  }
+  state.npc = state.npcs[state.target] ?? state.npcs[0];
+  return state;
+}
+
+/** Seleciona próximo NPC vivo. Retorna -1 se todos mortos. */
+function nextAliveNpcIdx(state: CombatState, from = 0): number {
+  for (let i = 0; i < state.npcs.length; i++) {
+    const idx = (from + i) % state.npcs.length;
+    if (state.npcs[idx].alive) return idx;
+  }
+  return -1;
+}
 type LogEntry = {
   seq: number;
   actor: "player" | "npc";
@@ -129,16 +165,34 @@ export const rollSpawn = createServerFn({ method: "POST" })
 
     if (Math.random() * 100 >= loc.spawn_chance) return { session_id: null };
 
-    // Escolhe um NPC do local
-    const { data: pool } = await context.supabase
-      .from("location_npcs").select("npc_id,weight,npc:npcs(id,name,image_url,battle_bg_url,music_url,hp_max,energy_max,xp,kind)").eq("location_id", loc.id);
-    const rows = ((pool as any[]) ?? []).filter((r) => (r.npc?.kind ?? "aggressive") === "aggressive");
-    if (!rows.length) return { session_id: null };
-    const total = rows.reduce((s, r) => s + (r.weight ?? 1), 0);
-    let r = Math.random() * total;
-    let picked = rows[rows.length - 1];
-    for (const row of rows) { r -= row.weight ?? 1; if (r <= 0) { picked = row; break; } }
-    const npc = picked.npc;
+    // Escolhe inimigos: preferimos grupos configurados no local; se não houver, cai para
+    // sorteio individual em `location_npcs`.
+    let chosenNpcs: any[] = [];
+    const { data: locFull } = await context.supabase
+      .from("locations").select("spawn_group_ids").eq("id", loc.id).maybeSingle();
+    const groupIds = ((locFull as any)?.spawn_group_ids ?? []) as string[];
+    if (groupIds.length) {
+      const groupId = groupIds[Math.floor(Math.random() * groupIds.length)];
+      const { data: mems } = await context.supabase
+        .from("npc_group_members")
+        .select("npc:npcs(id,name,image_url,battle_bg_url,music_url,hp_max,energy_max,xp,kind)")
+        .eq("group_id", groupId);
+      chosenNpcs = ((mems as any[]) ?? [])
+        .map((r) => r.npc)
+        .filter((n: any) => n && (n.kind ?? "aggressive") === "aggressive");
+    }
+    if (!chosenNpcs.length) {
+      const { data: pool } = await context.supabase
+        .from("location_npcs").select("npc_id,weight,npc:npcs(id,name,image_url,battle_bg_url,music_url,hp_max,energy_max,xp,kind)").eq("location_id", loc.id);
+      const rows = ((pool as any[]) ?? []).filter((r) => (r.npc?.kind ?? "aggressive") === "aggressive");
+      if (!rows.length) return { session_id: null };
+      const total = rows.reduce((s, r) => s + (r.weight ?? 1), 0);
+      let r = Math.random() * total;
+      let picked = rows[rows.length - 1];
+      for (const row of rows) { r -= row.weight ?? 1; if (r <= 0) { picked = row; break; } }
+      chosenNpcs = [picked.npc];
+    }
+    const npc = chosenNpcs[0];
 
     // Participantes
     const partyId: string | null = partyIdEarly;
@@ -168,9 +222,17 @@ export const rollSpawn = createServerFn({ method: "POST" })
         cooldowns: {},
       });
     }
+    const npcsState: NpcState[] = chosenNpcs.map((n) => ({
+      id: n.id, name: n.name, image_url: n.image_url,
+      battle_bg_url: n.battle_bg_url ?? null, music_url: (n as any).music_url ?? null,
+      hp: n.hp_max, hp_max: n.hp_max,
+      energy: n.energy_max, energy_max: n.energy_max,
+      alive: true,
+    }));
     const state: CombatState = {
-      npc: { id: npc.id, name: npc.name, image_url: npc.image_url, battle_bg_url: npc.battle_bg_url ?? null, music_url: (npc as any).music_url ?? null, hp: npc.hp_max, hp_max: npc.hp_max, energy: npc.energy_max, energy_max: npc.energy_max },
-      players, active: 0,
+      npc: npcsState[0],
+      npcs: npcsState,
+      players, active: 0, target: 0,
     };
 
     const { data: session, error: sErr } = await supabaseAdmin.from("combat_sessions").insert({
@@ -201,6 +263,7 @@ export const playerAttack = createServerFn({ method: "POST" })
     session_id: z.string().uuid(),
     skill_id: z.string().uuid(),
     energy_used: z.number().int().min(1).max(100000),
+    target_index: z.number().int().min(0).max(10).optional(),
   }).parse(i))
   .handler(async ({ data, context }) => {
     const me = await loadMyChar(context);
@@ -208,8 +271,17 @@ export const playerAttack = createServerFn({ method: "POST" })
 
     const { data: sess } = await supabaseAdmin.from("combat_sessions").select("*").eq("id", data.session_id).maybeSingle();
     if (!sess || sess.status !== "active") throw new Error("Combate encerrado.");
-    const state: CombatState = sess.state as any;
+    const state: CombatState = normalizeState(sess.state as any);
     const log: LogEntry[] = sess.log as any;
+
+    // Escolhe alvo: usa target_index enviado, ou o `state.target`, ou o primeiro vivo.
+    let targetIdx = typeof data.target_index === "number" ? data.target_index : (state.target ?? 0);
+    if (!state.npcs[targetIdx] || !state.npcs[targetIdx].alive) {
+      targetIdx = nextAliveNpcIdx(state, 0);
+      if (targetIdx < 0) throw new Error("Todos os inimigos já caíram.");
+    }
+    state.target = targetIdx;
+    state.npc = state.npcs[targetIdx];
 
     const activeIdx = state.active;
     const activePlayer = state.players[activeIdx];
@@ -392,13 +464,22 @@ export const playerAttack = createServerFn({ method: "POST" })
       } as any);
     }
     state.npc.hp = Math.max(0, state.npc.hp - damage);
+    if (state.npc.hp <= 0) state.npc.alive = false;
+    // Reflete mudança no array (state.npc é referência, mas garantimos)
+    state.npcs[targetIdx] = state.npc;
 
     let status = sess.status as string;
     let ended_at: string | null = null;
 
-    if (state.npc.hp <= 0) {
+    const allDead = state.npcs.every((n) => !n.alive);
+    if (allDead) {
       status = "won"; ended_at = new Date().toISOString();
     } else {
+      // Auto-pick próximo alvo vivo caso o atual tenha morrido
+      if (!state.npc.alive) {
+        const nxt = nextAliveNpcIdx(state, targetIdx);
+        if (nxt >= 0) { state.target = nxt; state.npc = state.npcs[nxt]; }
+      }
       // Turno do NPC
       const npcTurn = await runNpcTurn(supabaseAdmin, sess.npc_id, state, log, speed);
       state.npc.energy = npcTurn.energyRemaining;
@@ -484,23 +565,22 @@ async function applyRewards(supabaseAdmin: any, npcId: string, state: CombatStat
   return { xp: xpGain, ryo: ryoGain, drops: rolled };
 }
 
-async function runNpcTurn(supabaseAdmin: any, npcId: string, state: CombatState, log: LogEntry[], incomingSpeed: number) {
+async function runSingleNpcAttack(supabaseAdmin: any, npcState: NpcState, state: CombatState, log: LogEntry[], incomingSpeed: number) {
+  if (!npcState.alive) return;
   const { data: npcCfg } = await supabaseAdmin
-    .from("npcs").select("avg_damage,crit_chance,crit_multiplier").eq("id", npcId).maybeSingle();
+    .from("npcs").select("avg_damage,crit_chance,crit_multiplier").eq("id", npcState.id).maybeSingle();
   const avgDamage = Number(npcCfg?.avg_damage ?? 0);
   const critChance = Math.max(0, Math.min(100, Number(npcCfg?.crit_chance ?? 10)));
   const critMul = Math.max(1, Number(npcCfg?.crit_multiplier ?? 1.5));
   const { data: skills } = await supabaseAdmin
-    .from("npc_skills").select("skill:skills(id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic,animation_url,sound_url)").eq("npc_id", npcId);
+    .from("npc_skills").select("skill:skills(id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic,animation_url,sound_url)").eq("npc_id", npcState.id);
   const pool = ((skills as any[]) ?? []).map((r: any) => r.skill).filter(Boolean);
-  if (pool.length === 0) return { energyRemaining: state.npc.energy };
-
-  // NPC escolhe skill com maior speed×critical de energia disponível
-  const affordable = pool.filter((s: any) => state.npc.energy >= s.base_cost);
-  if (affordable.length === 0) return { energyRemaining: state.npc.energy };
+  if (pool.length === 0) return;
+  const affordable = pool.filter((s: any) => npcState.energy >= s.base_cost);
+  if (affordable.length === 0) return;
 
   const skill = affordable[Math.floor(Math.random() * affordable.length)];
-  const energy = Math.min(state.npc.energy, Math.max(skill.base_cost, Math.floor(state.npc.energy_max / 4)));
+  const energy = Math.min(npcState.energy, Math.max(skill.base_cost, Math.floor(npcState.energy_max / 4)));
   const effective = energy * Number(skill.bonus_energetic);
   const speed = effective * Number(skill.bonus_speed);
   // Base do dano: dano_medio configurado (variação ±20%) ou fórmula por energia.
@@ -522,19 +602,32 @@ async function runNpcTurn(supabaseAdmin: any, npcId: string, state: CombatState,
 
   // Escolhe um jogador vivo aleatório como alvo
   const alive = state.players.filter((p) => p.alive);
-  if (!alive.length) return { energyRemaining: state.npc.energy };
+  if (!alive.length) return;
   const target = alive[Math.floor(Math.random() * alive.length)];
   const taken = damageTargetPlayer(target, finalDamage);
 
   log.push({
-    seq: log.length + 1, actor: "npc", actor_name: state.npc.name, target_name: target.nickname,
+    seq: log.length + 1, actor: "npc", actor_name: npcState.name, target_name: target.nickname,
     skill_name: skill.name, energy_type: skill.energy_type as Pool, energy_used: energy,
     effective, damage: finalDamage, speed, crit_mul: isCrit ? critMul : Number(skill.bonus_critical),
     animation_url: (skill as any).animation_url ?? null,
     sound_url: (skill as any).sound_url ?? null,
-    msg: `${state.npc.name} usa ${skill.name}${isCrit ? " (CRÍTICO!)" : ""} → ${target.nickname} sofre ${taken.taken} de dano na vida${speedPenalty < 1 ? " (reação lenta)" : ""}.`,
+    msg: `${npcState.name} usa ${skill.name}${isCrit ? " (CRÍTICO!)" : ""} → ${target.nickname} sofre ${taken.taken} de dano na vida${speedPenalty < 1 ? " (reação lenta)" : ""}.`,
   });
-  return { energyRemaining: state.npc.energy - energy };
+  npcState.energy = Math.max(0, npcState.energy - energy);
+}
+
+async function runNpcTurn(supabaseAdmin: any, _npcId: string, state: CombatState, log: LogEntry[], incomingSpeed: number) {
+  for (const n of state.npcs) {
+    if (!n.alive) continue;
+    if (state.players.every((p) => !p.alive)) break;
+    await runSingleNpcAttack(supabaseAdmin, n, state, log, incomingSpeed);
+  }
+  if (!state.npc.alive) {
+    const nxt = nextAliveNpcIdx(state, state.target ?? 0);
+    if (nxt >= 0) { state.target = nxt; state.npc = state.npcs[nxt]; }
+  }
+  return { energyRemaining: state.npc.energy };
 }
 
 export const fleeCombat = createServerFn({ method: "POST" })
@@ -567,7 +660,7 @@ export const consumeInCombat = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: sess } = await supabaseAdmin.from("combat_sessions").select("*").eq("id", data.session_id).maybeSingle();
     if (!sess || sess.status !== "active") throw new Error("Combate encerrado.");
-    const state: CombatState = sess.state as any;
+    const state: CombatState = normalizeState(sess.state as any);
     const log: LogEntry[] = sess.log as any;
     const activeIdx = state.active;
     const activePlayer = state.players[activeIdx];
