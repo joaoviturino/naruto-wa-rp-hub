@@ -166,7 +166,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
     if (!fresh.length) return;
     lastLogSeq.current = fresh[fresh.length - 1].seq;
     for (const entry of fresh) {
-      if (entry.pose_url || entry.sound_url) animQueue.current.push(entry);
+      if (entry.pose_url || entry.sound_url || entry.animation_url) animQueue.current.push(entry);
       // Números de dano flutuantes
       if (Number(entry.damage) > 0) {
         const id = `${entry.seq}-${Math.random().toString(36).slice(2, 7)}`;
