@@ -199,6 +199,8 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
       const poseUrl: string | undefined = entry.pose_url;
       const actorCharId: string | undefined = entry.actor_char_id;
       const soundUrl: string | undefined = entry.sound_url;
+      const animUrl: string | undefined = entry.animation_url;
+      const animMode: "projectile" | "front" | "overlay" = entry.animation_mode ?? "overlay";
       const MAX_WAIT = 5000;
       const POSE_MS = 1400;
 
@@ -247,12 +249,55 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
         setPoses((p) => ({ ...p, [actorCharId]: poseUrl }));
       }
 
+      // Renderiza a animação (gif/vídeo) no palco, se houver
+      if (animUrl && stageRef.current) {
+        const stageRect = stageRef.current.getBoundingClientRect();
+        // origem = quem agiu
+        let fromEl: HTMLElement | null = null;
+        if (entry.actor === "player" && entry.actor_char_id) fromEl = playerRefs.current[entry.actor_char_id] ?? null;
+        else if (entry.actor === "npc") {
+          // achamos por nome como fallback
+          const idx = npcs.findIndex((n: any) => n.name === entry.actor_name);
+          if (idx >= 0) fromEl = npcRefs.current[idx] ?? null;
+        }
+        // alvo
+        let toEl: HTMLElement | null = null;
+        if (entry.actor === "player") {
+          const idx = typeof entry.target_npc_idx === "number"
+            ? entry.target_npc_idx
+            : npcs.findIndex((n: any) => n.name === entry.target_name);
+          if (idx >= 0) toEl = npcRefs.current[idx] ?? null;
+        } else if (entry.actor === "npc") {
+          const cid = entry.target_char_id
+            ?? players.find((p: any) => p.nickname === entry.target_name)?.character_id;
+          if (cid) toEl = playerRefs.current[cid] ?? null;
+        }
+        const rectCenter = (el: HTMLElement | null) => {
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          return { x: r.left + r.width / 2 - stageRect.left, y: r.top + r.height / 2 - stageRect.top };
+        };
+        const to = rectCenter(toEl);
+        const from = rectCenter(fromEl) ?? to;
+        if (to) {
+          setFx({
+            id: `${entry.seq}-fx`,
+            url: animUrl,
+            mode: animMode,
+            from: from!,
+            to,
+            isVideo: /\.(mp4|webm)$/i.test(animUrl),
+          });
+        }
+      }
+
       // Aguarda o maior entre duração do áudio e a pose (mínimo 1.2s, máximo 6s)
       const wait = Math.max(1200, Math.min(6000, Math.max(audioDuration || 0, poseUrl && imgOk ? POSE_MS : 0)));
       await new Promise((r) => setTimeout(r, wait));
       if (poseUrl && imgOk && actorCharId) {
         setPoses((p) => { const { [actorCharId]: _drop, ...rest } = p; return rest; });
       }
+      setFx(null);
     }
   }, [log.length]);
 
