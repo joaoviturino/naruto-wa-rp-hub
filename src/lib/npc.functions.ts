@@ -112,6 +112,23 @@ export const setLocationNpcs = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const setLocationSpawnGroups = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    location_id: z.string().uuid(),
+    group_ids: z.array(z.string().uuid()),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("locations")
+      .update({ spawn_group_ids: data.group_ids })
+      .eq("id", data.location_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 export const updateLocationDangerZone = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({

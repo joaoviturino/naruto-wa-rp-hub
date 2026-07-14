@@ -8,15 +8,18 @@ import { Trash2, Upload, Link2, Plus, Skull, Gamepad2, Store, Gift, BookOpen, Gr
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { updateLocationDangerZone, setLocationNpcs } from "@/lib/npc.functions";
+import { setLocationSpawnGroups } from "@/lib/npc.functions";
 import { setLocationMinigames } from "@/lib/minigame.functions";
 import { setLocationLibraries } from "@/lib/library.functions";
 import { LocationMapEditor } from "./LocationMapEditor";
 
 type Loc = { id: string; name: string; description: string | null; image_url: string | null;
   map_x?: number; map_y?: number;
-  is_danger_zone?: boolean; spawn_chance?: number; spawn_tick_seconds?: number };
+  is_danger_zone?: boolean; spawn_chance?: number; spawn_tick_seconds?: number;
+  spawn_group_ids?: string[] };
 type Conn = { id: string; a_id: string; b_id: string };
 type Npc = { id: string; name: string; kind: "aggressive" | "shop" | "reward" | "learning" };
+type NpcGroup = { id: string; name: string };
 type Minigame = { id: string; name: string; active: boolean };
 type LibSection = { id: string; name: string; active: boolean };
 
@@ -29,6 +32,8 @@ export function LocationManager() {
   const [locMinigames, setLocMinigames] = useState<Record<string, Set<string>>>({});
   const [libSections, setLibSections] = useState<LibSection[]>([]);
   const [locLibs, setLocLibs] = useState<Record<string, Set<string>>>({});
+  const [groups, setGroups] = useState<NpcGroup[]>([]);
+  const [dzTab, setDzTab] = useState<"solo" | "group">("solo");
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
@@ -36,12 +41,13 @@ export function LocationManager() {
   const fileRef = useRef<HTMLInputElement>(null);
   const updateDz = useServerFn(updateLocationDangerZone);
   const setLocNpcsFn = useServerFn(setLocationNpcs);
+  const setLocGroupsFn = useServerFn(setLocationSpawnGroups);
   const setLocMgFn = useServerFn(setLocationMinigames);
   const setLocLibFn = useServerFn(setLocationLibraries);
 
   async function load() {
-    const [l, c, n, ln, mg, lmg, ls, llb] = await Promise.all([
-      supabase.from("locations").select("id,name,description,image_url,map_x,map_y,is_danger_zone,spawn_chance,spawn_tick_seconds").order("name"),
+    const [l, c, n, ln, mg, lmg, ls, llb, gr] = await Promise.all([
+      supabase.from("locations").select("id,name,description,image_url,map_x,map_y,is_danger_zone,spawn_chance,spawn_tick_seconds,spawn_group_ids").order("name"),
       supabase.from("location_connections").select("id,a_id,b_id"),
       supabase.from("npcs").select("id,name,kind").order("name"),
       supabase.from("location_npcs").select("location_id,npc_id"),
@@ -49,12 +55,14 @@ export function LocationManager() {
       supabase.from("location_minigames").select("location_id,minigame_id"),
       supabase.from("library_sections").select("id,name,active").eq("active", true).order("name"),
       supabase.from("location_libraries").select("location_id,section_id"),
+      supabase.from("npc_groups").select("id,name").order("name"),
     ]);
     setLocs((l.data as Loc[]) ?? []);
     setConns((c.data as Conn[]) ?? []);
     setNpcs((n.data as Npc[]) ?? []);
     setMinigames((mg.data as Minigame[]) ?? []);
     setLibSections((ls.data as LibSection[]) ?? []);
+    setGroups((gr.data as NpcGroup[]) ?? []);
     const map: Record<string, Set<string>> = {};
     (ln.data ?? []).forEach((r: any) => {
       if (!map[r.location_id]) map[r.location_id] = new Set();
@@ -130,6 +138,14 @@ export function LocationManager() {
     const next = new Set(selNpcs);
     if (on) next.add(npcId); else next.delete(npcId);
     await setLocNpcsFn({ data: { location_id: sel.id, npc_ids: Array.from(next) } });
+    load();
+  }
+  const selGroups = new Set<string>((sel?.spawn_group_ids ?? []) as string[]);
+  async function toggleGroup(groupId: string, on: boolean) {
+    if (!sel) return;
+    const next = new Set(selGroups);
+    if (on) next.add(groupId); else next.delete(groupId);
+    await setLocGroupsFn({ data: { location_id: sel.id, group_ids: Array.from(next) } });
     load();
   }
   const avgSpawnSec = sel?.is_danger_zone && (sel.spawn_chance ?? 0) > 0
@@ -245,17 +261,43 @@ export function LocationManager() {
                   Tempo médio estimado até um encontro: <span className="text-gold">{avgSpawnSec ? `${avgSpawnSec}s (${(avgSpawnSec/60).toFixed(1)} min)` : "—"}</span>
                 </p>
                 <div>
-                  <Label>NPCs que podem aparecer aqui</Label>
-                  <div className="grid gap-1 max-h-[220px] overflow-y-auto pr-2 mt-1">
-                    {aggressiveNpcs.map((n) => (
-                      <label key={n.id} className="flex items-center gap-2 text-sm p-1 hover:bg-secondary/40 rounded">
-                        <input type="checkbox" checked={selNpcs.has(n.id)}
-                          onChange={(e) => toggleNpc(n.id, e.target.checked)} />
-                        <span>{n.name}</span>
-                      </label>
-                    ))}
-                    {aggressiveNpcs.length === 0 && <p className="text-xs text-muted-foreground">Cadastre NPCs agressivos primeiro.</p>}
+                  <Label>O que pode aparecer aqui</Label>
+                  <div className="flex gap-1 mt-1 mb-2">
+                    <button type="button" onClick={() => setDzTab("solo")}
+                      className={`px-3 py-1 rounded text-xs font-semibold border ${dzTab==="solo" ? "bg-gold text-background border-gold" : "border-border text-muted-foreground hover:bg-secondary/40"}`}>
+                      NPCs solos ({aggressiveNpcs.length})
+                    </button>
+                    <button type="button" onClick={() => setDzTab("group")}
+                      className={`px-3 py-1 rounded text-xs font-semibold border ${dzTab==="group" ? "bg-gold text-background border-gold" : "border-border text-muted-foreground hover:bg-secondary/40"}`}>
+                      Grupos ({groups.length})
+                    </button>
                   </div>
+                  {dzTab === "solo" ? (
+                    <div className="grid gap-1 max-h-[220px] overflow-y-auto pr-2">
+                      {aggressiveNpcs.map((n) => (
+                        <label key={n.id} className="flex items-center gap-2 text-sm p-1 hover:bg-secondary/40 rounded">
+                          <input type="checkbox" checked={selNpcs.has(n.id)}
+                            onChange={(e) => toggleNpc(n.id, e.target.checked)} />
+                          <span>{n.name}</span>
+                        </label>
+                      ))}
+                      {aggressiveNpcs.length === 0 && <p className="text-xs text-muted-foreground">Cadastre NPCs agressivos primeiro.</p>}
+                    </div>
+                  ) : (
+                    <div className="grid gap-1 max-h-[220px] overflow-y-auto pr-2">
+                      {groups.map((g) => (
+                        <label key={g.id} className="flex items-center gap-2 text-sm p-1 hover:bg-secondary/40 rounded">
+                          <input type="checkbox" checked={selGroups.has(g.id)}
+                            onChange={(e) => toggleGroup(g.id, e.target.checked)} />
+                          <span>{g.name}</span>
+                        </label>
+                      ))}
+                      {groups.length === 0 && <p className="text-xs text-muted-foreground">Nenhum grupo criado. Vá em NPCs → Grupos.</p>}
+                    </div>
+                  )}
+                  <p className="text-[11px] text-muted-foreground mt-2">
+                    Quando há grupos marcados, o spawn prioriza grupos. Se nenhum for marcado, cai no sorteio de NPCs solos.
+                  </p>
                 </div>
               </>
             )}
