@@ -1,48 +1,54 @@
-## Diagnóstico
+## Objetivo
 
-Investiguei uma sessão real (`Voadora`, EF 3699, dano 3699 → NPC com 3031 HP morto em 1 hit) e o código de `playerAttack` / `CombatDialog`.
+Trocar animações GIF por **troca de poses** durante o combate. Admins concedem poses (imagens PNG) aos jogadores; cada jogador escolhe qual pose será exibida ao usar cada habilidade. O áudio de sonoplastia continua funcionando normalmente.
 
-Causas encontradas:
+## Comportamento em combate
 
-1. **UI enche energia no máximo** — ao clicar na habilidade, `onClick` executa `setEnergy(maxES)` (linha 463 de `CombatDialog.tsx`). Ou seja, por default o jogador vai gastar 20 % do pool inteiro na primeira jogada.
-2. **Backend não valida `cost_percent`** — `playerAttack` aceita `energy_used` até 100000, sem checar o teto da habilidade. Se o front tiver bug/state velho, o servidor engole.
-3. **Não existe defesa/mitigação** — dano = `energy × bonus_energetic × bonus_critical × maestria × poder`. Sem redutor, NPC de 3031 HP cai com um único ataque de habilidade S ou de personagem alto-nível.
-4. **NPC não tem cap contra "one-shot"** — nenhuma regra impede que um golpe leve o HP direto a 0.
+- Cada personagem tem uma **pose padrão** (a imagem `inventory_png_url` atual continua sendo o default).
+- Ao usar uma habilidade que tenha pose vinculada, o sprite do personagem no palco troca para a pose configurada durante ~1.2s e volta ao default. Se não houver pose configurada, o sprite não muda (só toca o som e mostra o número de dano).
+- O som (`skills.sound_url`) continua tocando exatamente como hoje.
+- Vale para jogador e aliados; NPCs seguem usando o sprite atual (fora do escopo).
 
-## Plano
+## Mudanças no banco
 
-### 1. Servidor (`src/lib/combat.functions.ts`)
+1. Nova tabela `character_poses`
+   - `id`, `character_id` (FK), `name` (texto curto, ex.: "Selo de Tigre"), `image_url`, `sort_order`, timestamps.
+   - RLS: dono e admin leem; só admin insere/atualiza/deleta. Grants padrão.
+2. Nova tabela `character_skill_poses` (mapeamento pose ↔ habilidade por jogador)
+   - `character_id`, `skill_id`, `pose_id` (FK → character_poses), PK composta.
+   - RLS: dono lê/edita as próprias; admin lê/edita tudo.
+3. Deprecar `skills.animation_url`: manter a coluna por compat, mas remover da UI de skill (não é mais editada). Backend deixa de emitir `animation_url` no log de combate.
 
-- Recalcular `maxAllowed = floor(pool_max × cost_percent / 100)`. Se `energy_used > maxAllowed`, faz `clamp` (não erro) e registra `energy_used = maxAllowed`. Evita quebrar clientes antigos e garante o teto.
-- Ler `npcs.defense` (novo campo, ver §3) e aplicar: `damage = max(1, round(rawDamage × (1 − defense/100)))`.
-- Aplicar cap "anti one-shot": `damage = min(damage, ceil(npc.hp_max × maxHitPct))` — `maxHitPct` vem do NPC (novo campo `max_hit_percent`, default 50). Se o admin quiser permitir one-shot, sobe pra 100.
-- Log passa a mostrar `raw` e `damage` para transparência.
+## Mudanças no admin
 
-### 2. UI (`src/components/chat/CombatDialog.tsx`)
+- **PlayerEditor**: nova aba/seção "Poses" com CRUD (upload de imagem, nome, ordenação, remover). Reutiliza o bucket `skills` ou cria bucket `poses` (vou usar `skills` para não precisar de novo bucket).
+- **SkillManager**: remover os campos "Animação (GIF/PNG/MP4)" e a lógica associada (mantém `sound_url`).
 
-- Ao selecionar habilidade, default `energy = max(1, base_cost)` (não `maxES`).
-- Slider/Input já limita a `currentMaxEnergy`; mostrar hint "recomendado: base_cost".
-- Mostrar defesa e cap do alvo no popup de alvo (opcional, só se `defense>0`).
+## Mudanças no jogador
 
-### 3. Banco (`npcs`)
+- Nova tela **"Minhas Poses"** dentro da ficha (`CharacterSheet`): mostra poses concedidas pelo admin (somente leitura) e, para cada habilidade que ele conhece, um seletor "usar pose X".
+- Server fn `setSkillPose({ skill_id, pose_id | null })` valida que a pose pertence ao personagem.
 
-- `ALTER TABLE public.npcs ADD COLUMN defense int NOT NULL DEFAULT 0;` (0–90).
-- `ALTER TABLE public.npcs ADD COLUMN max_hit_percent int NOT NULL DEFAULT 50;` (10–100).
+## Mudanças no combate
 
-### 4. Admin (`NpcManager.tsx`)
+- `combat.functions.ts` `playerAttack`: no log, em vez de `animation_url` da skill, buscar `character_skill_poses` do jogador ativo e anexar `pose_url` (ou `null`) no evento. Mantém `sound_url`.
+- `CombatDialog.tsx`: quando um evento do jogador vem com `pose_url`, trocar o `src` do sprite daquele slot por ~1.2s (state com timeout), depois voltar para `inventory_png_url`. Remover o overlay atual de animação (o `<img className="animate-scale-in">` sobre o palco).
 
-- Dois inputs novos: **Defesa (%)** e **Dano máximo por golpe (% do HP)**, com sliders 0–100.
+## Arquivos afetados
 
-### 5. Teste
+- `supabase/migration` (nova): tabelas + policies + grants.
+- `src/lib/character.functions.ts`: `listMyPoses`, `setSkillPose`, `listMySkillPoses`.
+- `src/lib/admin.functions.ts`: `adminUpsertPose`, `adminDeletePose`, `adminListPoses`.
+- `src/components/admin/PlayerEditor.tsx`: seção Poses.
+- `src/components/admin/SkillManager.tsx`: remover campo de animação.
+- `src/components/CharacterSheet.tsx` (ou novo `PoseBinder.tsx`): UI do jogador para vincular poses a jutsus.
+- `src/lib/combat.functions.ts`: substituir `animation_url` por `pose_url` no log.
+- `src/components/chat/CombatDialog.tsx`: renderizar pose swap em vez de overlay de animação.
 
-- Rodar `bunx tsgo --noEmit`.
-- Simular combate com NPC de 3000 HP, defesa 20 %, cap 40 %:
-  - Voadora com energy=740 (20 % de 3699 EF) → raw=740, com defesa=592, com cap=1200 → 592 de dano (≈20 % da vida).
-  - Mesma skill com bonus_energetic=2.5 → raw=1850, defesa=1480, cap=1200 → 1200 (cap atua).
-- Confirmar que o servidor impede burla mesmo se o cliente enviar `energy_used` fora do teto.
+## Fora do escopo
 
-## Detalhes técnicos
+- Poses para NPCs.
+- Animação/transição elaborada entre poses (troca simples com fade curto CSS já existente).
+- Migração automática das `animation_url` antigas — ficam no banco mas não são mais usadas.
 
-- Todos os campos novos têm defaults, então NPCs existentes não quebram (defesa 0, cap 50 %).
-- `normalizeState` não precisa mudar (defesa é lida do NPC row a cada ataque, não persistida no state).
-- Balance secundário (mudar `bonus_energetic` das skills existentes) fica fora do escopo — o admin já pode editar por skill.
+Confirma que posso seguir?

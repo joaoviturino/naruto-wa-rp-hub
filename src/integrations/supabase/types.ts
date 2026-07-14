@@ -236,6 +236,87 @@ export type Database = {
           },
         ]
       }
+      character_poses: {
+        Row: {
+          character_id: string
+          created_at: string
+          id: string
+          image_url: string
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          character_id: string
+          created_at?: string
+          id?: string
+          image_url: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          character_id?: string
+          created_at?: string
+          id?: string
+          image_url?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "character_poses_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      character_skill_poses: {
+        Row: {
+          character_id: string
+          created_at: string
+          pose_id: string
+          skill_id: string
+        }
+        Insert: {
+          character_id: string
+          created_at?: string
+          pose_id: string
+          skill_id: string
+        }
+        Update: {
+          character_id?: string
+          created_at?: string
+          pose_id?: string
+          skill_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "character_skill_poses_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "character_skill_poses_pose_id_fkey"
+            columns: ["pose_id"]
+            isOneToOne: false
+            referencedRelation: "character_poses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "character_skill_poses_skill_id_fkey"
+            columns: ["skill_id"]
+            isOneToOne: false
+            referencedRelation: "skills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       character_skills: {
         Row: {
           character_id: string
