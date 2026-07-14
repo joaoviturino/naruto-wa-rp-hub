@@ -10,7 +10,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { playerAttack, fleeCombat, consumeInCombat } from "@/lib/combat.functions";
 import { NpcMusic } from "@/components/NpcMusic";
 import { toast } from "sonner";
-import { Sword, Flag, Zap, FlaskConical, Users } from "lucide-react";
+import { Sword, Flag, Zap, FlaskConical, Users, Target } from "lucide-react";
+import { FloatingDamageLayer, type DamageBurst } from "@/components/chat/FloatingDamage";
 
 type Skill = {
   id: string; name: string; energy_type: "ef" | "em" | "chakra"; base_cost: number;
@@ -93,7 +94,30 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
 
   const state = (session?.state ?? {}) as any;
   const players: any[] = Array.isArray(state.players) ? state.players : [];
-  const npc = state.npc ?? { name: "?", image_url: null, hp: 0, hp_max: 1, energy: 0, energy_max: 1 };
+  const npcs: any[] = Array.isArray(state.npcs) && state.npcs.length
+    ? state.npcs
+    : (state.npc ? [state.npc] : []);
+  const npc = npcs[state.target ?? 0] ?? npcs[0] ?? { name: "?", image_url: null, hp: 0, hp_max: 1, energy: 0, energy_max: 1 };
+
+  // Alvo selecionado localmente (default: primeiro NPC vivo).
+  const [targetIdx, setTargetIdx] = useState<number>(0);
+  useEffect(() => {
+    // Se o alvo atual estiver morto/inexistente, aponta para o primeiro vivo.
+    const cur = npcs[targetIdx];
+    if (!cur || cur.alive === false) {
+      const nxt = npcs.findIndex((n: any) => n?.alive !== false);
+      if (nxt >= 0 && nxt !== targetIdx) setTargetIdx(nxt);
+    }
+  }, [npcs.map((n: any) => `${n?.id}:${n?.alive !== false}`).join("|")]);
+
+  // Números de dano flutuantes por combatente. Chave por índice (npc:i | player:cid).
+  const [bursts, setBursts] = useState<Record<string, DamageBurst[]>>({});
+  const pushBurst = (slotKey: string, burst: DamageBurst) => {
+    setBursts((prev) => ({ ...prev, [slotKey]: [...(prev[slotKey] ?? []), burst] }));
+  };
+  const expireBurst = (slotKey: string, id: string) => {
+    setBursts((prev) => ({ ...prev, [slotKey]: (prev[slotKey] ?? []).filter((b) => b.id !== id) }));
+  };
   const log: any[] = Array.isArray(session?.log) ? session.log : [];
   const me = players.find((p: any) => p.character_id === myCharId);
   const activePlayer = players[state.active ?? 0];
@@ -128,6 +152,21 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
     lastLogSeq.current = fresh[fresh.length - 1].seq;
     for (const entry of fresh) {
       if (entry.animation_url || entry.sound_url) animQueue.current.push(entry);
+      // Números de dano flutuantes
+      if (Number(entry.damage) > 0) {
+        const id = `${entry.seq}-${Math.random().toString(36).slice(2, 7)}`;
+        const crit = Number(entry.crit_mul ?? 1) > 1 && entry.damage > 0;
+        if (entry.actor === "player") {
+          // dano no NPC alvo — usa o nome como fallback para achar o slot
+          const idx = npcs.findIndex((n: any) => n.name === entry.target_name);
+          const key = `npc:${idx >= 0 ? idx : 0}`;
+          pushBurst(key, { id, amount: Number(entry.damage), crit });
+        } else if (entry.actor === "npc") {
+          // dano no jogador target_name
+          const p = players.find((x: any) => x.nickname === entry.target_name);
+          if (p) pushBurst(`player:${p.character_id}`, { id, amount: Number(entry.damage), crit });
+        }
+      }
     }
     void runQueue();
 
@@ -206,7 +245,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
     if (energy > currentMaxEnergy) { toast.error(`Custo máximo: ${currentMaxEnergy} (${currentPct}% de ${currentPool?.toUpperCase()}).`); return; }
     setBusy(true);
     try {
-      await attack({ data: { session_id: sessionId, skill_id: currentSkill.id, energy_used: energy } });
+      await attack({ data: { session_id: sessionId, skill_id: currentSkill.id, energy_used: energy, target_index: targetIdx } });
     } catch (e: any) { toast.error(e.message); }
     finally { setBusy(false); }
   }
@@ -238,13 +277,14 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
         {/* Turn order strip */}
         <div className="flex items-center gap-1 px-2 py-1.5 border-b border-border bg-input/40 overflow-x-auto">
           <span className="text-[10px] uppercase text-muted-foreground mr-2 shrink-0">Turno</span>
-          {[npc, ...players].map((entity: any, i: number) => {
-            const isNpc = i === 0;
-            const activeP = !isNpc && players[state.active ?? 0]?.character_id === entity.character_id;
-            const activeN = isNpc && npcActive;
-            const img = isNpc ? entity.image_url : avatars[entity.character_id];
+          {[...npcs.map((n: any, i: number) => ({ kind: "npc" as const, e: n, i })),
+            ...players.map((p: any) => ({ kind: "player" as const, e: p, i: -1 }))].map((row, i) => {
+            const activeP = row.kind === "player" && players[state.active ?? 0]?.character_id === row.e.character_id;
+            const activeN = row.kind === "npc" && npcActive && row.i === (state.target ?? 0);
+            const img = row.kind === "npc" ? row.e.image_url : avatars[row.e.character_id];
+            const dead = row.kind === "npc" ? row.e.alive === false : !row.e.alive;
             return (
-              <div key={i} className={`w-9 h-9 sm:w-10 sm:h-10 rounded-md overflow-hidden shrink-0 border-2 ${activeP ? "border-emerald-400 ring-2 ring-emerald-400/40" : activeN ? "border-red-500 ring-2 ring-red-500/40" : isNpc ? "border-blood/60" : "border-border"} bg-secondary`}>
+              <div key={i} className={`w-9 h-9 sm:w-10 sm:h-10 rounded-md overflow-hidden shrink-0 border-2 ${activeP ? "border-emerald-400 ring-2 ring-emerald-400/40" : activeN ? "border-red-500 ring-2 ring-red-500/40" : row.kind === "npc" ? "border-blood/60" : "border-border"} bg-secondary ${dead ? "opacity-30 grayscale" : ""}`}>
                 {img && <img src={img} className="w-full h-full object-cover" alt="" />}
               </div>
             );
@@ -259,23 +299,46 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
         }}>
           {!bgUrl && <div className="absolute inset-0 bg-gradient-to-b from-background to-secondary/60" />}
           <div className="absolute inset-0 bg-black/25" />
-          <div className="relative h-[240px] sm:h-[320px] flex items-end justify-between px-3 sm:px-6 pb-3">
-            {/* NPC (left) */}
-            <div className="flex flex-col items-center gap-1 max-w-[45%]">
-              <div className={`relative transition-all ${npcActive ? "drop-shadow-[0_0_18px_rgba(239,68,68,0.9)] scale-105" : ""}`}>
-                {npc.image_url ? (
-                  <img src={npc.image_url} alt={npc.name} className="h-[150px] sm:h-[210px] w-auto object-contain" style={{ filter: npcActive ? "drop-shadow(0 0 10px rgb(239 68 68))" : undefined }} />
-                ) : <div className="h-[150px] w-[150px] bg-secondary rounded" />}
-              </div>
-              <div className="bg-black/70 rounded px-2 py-1 min-w-[140px] sm:min-w-[180px]">
-                <div className="font-display text-xs sm:text-sm text-white truncate">{npc.name}</div>
-                <div className="flex justify-between text-[10px] text-white/80"><span>HP</span><span>{npc.hp}/{npc.hp_max}</span></div>
-                <Progress value={npc.hp_max ? (npc.hp / npc.hp_max) * 100 : 0} className="h-1.5" />
-              </div>
+          <div className="relative h-[240px] sm:h-[320px] flex items-end justify-between px-3 sm:px-6 pb-3 gap-2">
+            {/* NPCs (left) */}
+            <div className="flex items-end gap-2 sm:gap-3 max-w-[55%] flex-wrap">
+              {npcs.map((n: any, i: number) => {
+                const dead = n.alive === false || n.hp <= 0;
+                const isTarget = i === targetIdx && !dead;
+                const isActing = npcActive && i === (state.target ?? 0);
+                const canPick = !dead && myTurn;
+                const size = npcs.length > 2 ? "h-[110px] sm:h-[160px]" : "h-[140px] sm:h-[200px]";
+                return (
+                  <button
+                    key={n.id ?? i}
+                    type="button"
+                    disabled={!canPick}
+                    onClick={() => canPick && setTargetIdx(i)}
+                    className={`relative flex flex-col items-center gap-1 group ${canPick ? "cursor-pointer" : "cursor-default"}`}
+                  >
+                    <div className={`relative transition-all ${isActing ? "drop-shadow-[0_0_18px_rgba(239,68,68,0.9)] scale-105" : ""} ${isTarget ? "ring-2 ring-red-400/80 rounded-md animate-target-pulse" : ""} ${dead ? "opacity-30 grayscale" : "group-hover:scale-105"}`}>
+                      {n.image_url ? (
+                        <img src={n.image_url} alt={n.name} className={`${size} w-auto object-contain`} style={{ filter: isActing ? "drop-shadow(0 0 10px rgb(239 68 68))" : undefined }} />
+                      ) : <div className={`${size} w-24 bg-secondary rounded`} />}
+                      <FloatingDamageLayer bursts={bursts[`npc:${i}`] ?? []} onExpire={(id) => expireBurst(`npc:${i}`, id)} />
+                      {isTarget && (
+                        <div className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-lg">
+                          <Target size={10} />
+                        </div>
+                      )}
+                    </div>
+                    <div className="bg-black/70 rounded px-2 py-1 min-w-[110px] sm:min-w-[140px]">
+                      <div className="font-display text-[11px] sm:text-xs text-white truncate">{n.name}</div>
+                      <div className="flex justify-between text-[9px] text-white/80"><span>HP</span><span>{n.hp}/{n.hp_max}</span></div>
+                      <Progress value={n.hp_max ? (n.hp / n.hp_max) * 100 : 0} className="h-1.5" />
+                    </div>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Allies (right) */}
-            <div className="flex items-end gap-1 sm:gap-3 max-w-[55%] justify-end flex-wrap">
+            <div className="flex items-end gap-1 sm:gap-3 max-w-[45%] justify-end flex-wrap">
               {players.map((p: any) => {
                 const isActive = session.status === "active" && !npcActive && p.character_id === activePlayer?.character_id && p.alive;
                 const sprite = p.sprite_url || sprites[p.character_id];
@@ -288,6 +351,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                       ) : (
                         <div className={`${size} w-24 bg-secondary rounded`} />
                       )}
+                      <FloatingDamageLayer bursts={bursts[`player:${p.character_id}`] ?? []} onExpire={(id) => expireBurst(`player:${p.character_id}`, id)} />
                     </div>
                   </div>
                 );
