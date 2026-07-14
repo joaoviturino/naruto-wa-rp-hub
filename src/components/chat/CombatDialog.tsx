@@ -37,6 +37,19 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const animQueue = useRef<any[]>([]);
   const animRunning = useRef<boolean>(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Refs para calcular posições no palco (projetéis, overlays, etc.)
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const npcRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const playerRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  // GIF/vídeo ativo no palco (por entrada de log)
+  const [fx, setFx] = useState<null | {
+    id: string;
+    url: string;
+    mode: "projectile" | "front" | "overlay";
+    from: { x: number; y: number };
+    to: { x: number; y: number };
+    isVideo: boolean;
+  }>(null);
   const attack = useServerFn(playerAttack);
   const flee = useServerFn(fleeCombat);
   const consume = useServerFn(consumeInCombat);
