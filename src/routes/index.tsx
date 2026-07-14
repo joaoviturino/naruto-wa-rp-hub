@@ -4,9 +4,9 @@ import { getTopPlayers, type TopPlayer } from "@/lib/public.functions";
 import { VILLAGES } from "@/lib/game";
 
 export const Route = createFileRoute("/")({
-  loader: async () => {
+  loader: async (): Promise<{ top: TopPlayer[] }> => {
     try {
-      const top = await getTopPlayers();
+      const top = (await getTopPlayers()) as TopPlayer[];
       return { top };
     } catch {
       return { top: [] as TopPlayer[] };
@@ -97,7 +97,7 @@ function Index() {
             </p>
           ) : (
             <ol className="mt-8 space-y-2">
-              {top.map((p, i) => {
+              {top.map((p: TopPlayer, i: number) => {
                 const pos = i + 1;
                 const medal = pos === 1 ? "🥇" : pos === 2 ? "🥈" : pos === 3 ? "🥉" : `#${pos}`;
                 const highlight = pos <= 3 ? "border-gold/60 bg-card/60" : "border-border bg-card/30";
