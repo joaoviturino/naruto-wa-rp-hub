@@ -300,6 +300,15 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
           {!bgUrl && <div className="absolute inset-0 bg-gradient-to-b from-background to-secondary/60" />}
           <div className="absolute inset-0 bg-black/25" />
           <div className="relative h-[240px] sm:h-[320px] flex items-end justify-between px-3 sm:px-6 pb-3 gap-2">
+            {/* Selected target badge */}
+            {myTurn && npcs[targetIdx] && (npcs[targetIdx].alive !== false) && (
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-black/75 backdrop-blur-sm border border-red-500/60 rounded-full px-3 py-1 shadow-lg animate-fade-in">
+                <Target size={12} className="text-red-400" />
+                <span className="font-display text-[11px] sm:text-xs text-white truncate max-w-[140px]">{npcs[targetIdx].name}</span>
+                <span className="text-[10px] sm:text-[11px] text-white/80 tabular-nums">{npcs[targetIdx].hp}/{npcs[targetIdx].hp_max}</span>
+                <div className="w-16 sm:w-20"><Progress value={npcs[targetIdx].hp_max ? (npcs[targetIdx].hp / npcs[targetIdx].hp_max) * 100 : 0} className="h-1" /></div>
+              </div>
+            )}
             {/* NPCs (left) */}
             <div className="flex items-end gap-2 sm:gap-3 max-w-[55%] flex-wrap">
               {npcs.map((n: any, i: number) => {
@@ -316,18 +325,13 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                     onClick={() => canPick && setTargetIdx(i)}
                     className={`relative flex flex-col items-center gap-1 group ${canPick ? "cursor-pointer" : "cursor-default"}`}
                   >
-                    <div className={`relative transition-all ${isActing ? "drop-shadow-[0_0_18px_rgba(239,68,68,0.9)] scale-105" : ""} ${isTarget ? "ring-2 ring-red-400/80 rounded-md animate-target-pulse" : ""} ${dead ? "opacity-30 grayscale" : "group-hover:scale-105"}`}>
+                    <div className={`relative transition-all ${isActing ? "drop-shadow-[0_0_18px_rgba(239,68,68,0.9)] scale-105" : ""} ${isTarget && !isActing ? "drop-shadow-[0_0_14px_rgba(239,68,68,0.75)] scale-[1.03]" : ""} ${dead ? "opacity-30 grayscale" : "group-hover:scale-105"}`}>
                       {n.image_url ? (
                         <img src={n.image_url} alt={n.name} className={`${size} w-auto object-contain`} style={{ filter: isActing ? "drop-shadow(0 0 10px rgb(239 68 68))" : undefined }} />
                       ) : <div className={`${size} w-24 bg-secondary rounded`} />}
                       <FloatingDamageLayer bursts={bursts[`npc:${i}`] ?? []} onExpire={(id) => expireBurst(`npc:${i}`, id)} />
-                      {isTarget && (
-                        <div className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-lg">
-                          <Target size={10} />
-                        </div>
-                      )}
                     </div>
-                    <div className="bg-black/70 rounded px-2 py-1 min-w-[110px] sm:min-w-[140px]">
+                    <div className={`rounded px-2 py-1 min-w-[110px] sm:min-w-[140px] transition-colors ${isTarget ? "bg-red-600/80 ring-1 ring-red-300" : "bg-black/70"}`}>
                       <div className="font-display text-[11px] sm:text-xs text-white truncate">{n.name}</div>
                       <div className="flex justify-between text-[9px] text-white/80"><span>HP</span><span>{n.hp}/{n.hp_max}</span></div>
                       <Progress value={n.hp_max ? (n.hp / n.hp_max) * 100 : 0} className="h-1.5" />
