@@ -32,11 +32,17 @@ type NpcState = {
   music_url?: string | null;
   hp: number; hp_max: number;
   energy: number; energy_max: number;
+  alive?: boolean;
 };
 type CombatState = {
-  npc: NpcState;
+  /** @deprecated compat com sessões antigas — sempre preferir `npcs[]` */
+  npc?: NpcState;
+  /** Array de inimigos. NPCs abatidos ficam com `alive=false`. */
+  npcs: NpcState[];
   players: Player[];
   active: number; // index do jogador cuja vez é
+  /** Índice do inimigo em `npcs` que o jogador atacará neste turno. */
+  target?: number;
 };
 type LogEntry = {
   seq: number;
