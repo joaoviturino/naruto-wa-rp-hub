@@ -500,14 +500,16 @@ function ForgeConfigEditor({ selected, setSelected, items }: { selected: any; se
       <h4 className="font-display text-lg text-gold">Configuração da forja</h4>
       <div className="grid gap-3 md:grid-cols-2">
         <div>
-          <Label>Item a ser forjado (precisa ter receita)</Label>
+          <Label>Item padrão (opcional — jogador pode escolher materiais livres)</Label>
           <select className="w-full bg-input border border-border rounded px-2 py-2 text-sm"
             value={cfg.recipe_item_id ?? ""}
             onChange={(e) => set({ recipe_item_id: e.target.value })}>
-            <option value="">— selecione —</option>
+            <option value="">— livre (qualquer receita cadastrada) —</option>
             {craftable.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
           </select>
-          {!craftable.length && <div className="text-xs text-muted-foreground mt-1">Nenhum item com receita. Adicione uma receita na aba Itens.</div>}
+          {!craftable.length
+            ? <div className="text-xs text-muted-foreground mt-1">Nenhum item com receita. Adicione uma receita na aba Itens.</div>
+            : <div className="text-xs text-muted-foreground mt-1">Deixe vazio para que o jogador escolha materiais na bolsa e o sistema descubra o item forjado.</div>}
         </div>
         <div>
           <Label>Origem dos materiais</Label>
