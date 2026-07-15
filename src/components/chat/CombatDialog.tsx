@@ -394,12 +394,14 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const poolColor: Record<string, string> = { ef: "oklch(0.55 0.22 25)", em: "oklch(0.6 0.15 220)", chakra: "oklch(0.78 0.15 80)" };
   const lastEntry = log[log.length - 1];
   const npcActive = session.status === "active" && lastEntry?.actor === "npc" && Object.keys(poses).length === 0;
-  const bgUrl = npc.battle_bg_url as string | null;
+  // Preferimos cenário/música do LOCAL; caímos para os do NPC/grupo por retrocompatibilidade.
+  const bgUrl = ((state as any).location_bg_url as string | null) ?? (npc.battle_bg_url as string | null);
+  const battleMusic = ((state as any).location_music_url as string | null) ?? ((npc as any).music_url as string | null);
 
   return (
     <Dialog open onOpenChange={(v) => !v && session.status !== "active" && onClose()}>
       <DialogContent className="max-w-4xl w-[calc(100vw-1rem)] p-0 overflow-hidden border-blood/30 max-h-[95vh] overflow-y-auto no-scrollbar">
-        <NpcMusic src={(npc as any).music_url} />
+        <NpcMusic src={battleMusic} />
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 px-3 pt-3 text-sm sm:text-base">
             <Sword size={16} /> Combate: {npc.name}
