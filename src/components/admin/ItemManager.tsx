@@ -39,7 +39,7 @@ export function ItemManager({ adminUserId }: { adminUserId: string }) {
       <div className="flex items-center justify-between">
         <h3 className="font-display text-xl text-gold">Itens ({items.length})</h3>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => { setEditing({ type: "material", rank: "E" }); setOpen(true); }}>
+          <Button size="sm" variant="outline" onClick={() => { setEditing({ type: "material", rank: "E", stackable: true, stack_limit: 99 }); setOpen(true); }}>
             <Plus size={14} /> Novo material
           </Button>
           <Button size="sm" onClick={() => { setEditing({}); setOpen(true); }}><Plus size={14} /> Novo item</Button>
