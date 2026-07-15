@@ -4,13 +4,14 @@
 export type RawSession = { id: string; state: any; log: any[]; status: string };
 
 function asUiFighter(p: any) {
-  const sprite = p?.sprite_url ?? p?.inventory_bg_url ?? null;
+  const sprite = p?.sprite_url ?? p?.inventory_bg_url ?? p?.image_url ?? null;
   return {
     ...p,
     id: p?.id ?? p?.character_id,
     name: p?.name ?? p?.nickname ?? "?",
+    inventory_bg_url: p?.inventory_bg_url ?? p?.sprite_url ?? null,
     image_url: p?.image_url ?? sprite ?? p?.avatar_url ?? null,
-    sprite_url: sprite ?? p?.image_url ?? null,
+    sprite_url: sprite ?? p?.avatar_url ?? null,
   };
 }
 
