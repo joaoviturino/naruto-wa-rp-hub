@@ -467,6 +467,11 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                 const isTarget = i === targetIdx && !dead;
                 const isActing = npcActive && i === (state.target ?? 0);
                 const canPick = !dead && myTurn;
+                // Em PvP, o "npc" na verdade é um jogador do lado adversário. Usa
+                // sprite_url do inventário e permite a troca de pose pelo character_id.
+                const enemyCid = nn.character_id as string | undefined;
+                const enemySprite =
+                  (enemyCid ? poses[enemyCid] : null) || nn.image_url || nn.sprite_url;
                 return (
                   <button
                     key={nn.id ?? i}
@@ -476,8 +481,8 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                     className={`relative flex flex-col items-center gap-1 group min-w-0 ${canPick ? "cursor-pointer" : "cursor-default"}`}
                   >
                     <div ref={(el) => { npcRefs.current[i] = el; }} className={`relative transition-all ${isActing ? "drop-shadow-[0_0_18px_rgba(239,68,68,0.9)] scale-105" : ""} ${isTarget && !isActing ? "drop-shadow-[0_0_14px_rgba(239,68,68,0.75)] scale-[1.03]" : ""} ${dead ? "opacity-30 grayscale" : "group-hover:scale-105"}`}>
-                      {nn.image_url ? (
-                        <img src={nn.image_url} alt={nn.name} className={`${sizeCls} w-auto object-contain`} style={{ filter: isActing ? "drop-shadow(0 0 10px rgb(239 68 68))" : undefined }} />
+                      {enemySprite ? (
+                        <img src={enemySprite} alt={nn.name} className={`${sizeCls} w-auto object-contain`} style={{ filter: isActing ? "drop-shadow(0 0 10px rgb(239 68 68))" : undefined }} />
                       ) : <div className={`${sizeCls} w-20 bg-secondary rounded`} />}
                       <FloatingDamageLayer bursts={bursts[`npc:${i}`] ?? []} onExpire={(id) => expireBurst(`npc:${i}`, id)} />
                     </div>
