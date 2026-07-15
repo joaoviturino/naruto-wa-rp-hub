@@ -87,8 +87,20 @@ function ItemDialog({ open, onOpenChange, initial, missions, skills, adminUserId
   const SKILL_CLASSES = useProficiencies();
   const save = useServerFn(upsertItem);
   const [f, setF] = useState<any>(initial ?? {});
+  const [allItems, setAllItems] = useState<any[]>([]);
   useEffect(() => { setF(initial ?? {}); }, [initial]);
+  useEffect(() => {
+    supabase.from("items").select("id,name,type").order("name").then(({ data }) => setAllItems(data ?? []));
+  }, [open]);
   function up(k: string, v: any) { setF((p: any) => ({ ...p, [k]: v })); }
+
+  const CRAFTABLE = ["weapon","weapon_primary","weapon_secondary","armor_helmet","armor_vest","armor_pants","armor_boots","tool","consumable"];
+  const isCraftable = CRAFTABLE.includes(f.type);
+  const recipe: { item_id: string; qty: number }[] = Array.isArray(f.meta?.recipe) ? f.meta.recipe : [];
+  function setRecipe(next: any[] | null) {
+    up("meta", { ...(f.meta ?? {}), recipe: next && next.length ? next : null });
+  }
+  const materials = allItems.filter((i) => i.type === "material");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -158,6 +170,45 @@ function ItemDialog({ open, onOpenChange, initial, missions, skills, adminUserId
               onChange={(r) => up("meta", { ...(f.meta ?? {}), restore: r })}
               title="Restauração de energia (consumível)"
             />
+          )}
+          {isCraftable && (
+            <div className="sm:col-span-2 border border-border rounded-lg p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-base">Receita de fabricação</Label>
+                  <p className="text-xs text-muted-foreground">Deixe vazio para item não fabricável. Materiais devem ser cadastrados como itens do tipo <b>material</b>.</p>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => setRecipe([...recipe, { item_id: materials[0]?.id ?? "", qty: 1 }])}>
+                  <Plus size={14} /> Ingrediente
+                </Button>
+              </div>
+              {materials.length === 0 && (
+                <p className="text-xs text-amber-500">Nenhum item do tipo <b>material</b> cadastrado ainda.</p>
+              )}
+              {recipe.map((r, idx) => (
+                <div key={idx} className="flex gap-2 items-center">
+                  <div className="flex-1">
+                    <SimpleSelect
+                      value={r.item_id || undefined}
+                      onChange={(v: string) => {
+                        const next = [...recipe]; next[idx] = { ...next[idx], item_id: v }; setRecipe(next);
+                      }}
+                      options={materials.map((m: any) => ({ value: m.id, label: m.name }))}
+                    />
+                  </div>
+                  <Input
+                    type="number" min={1} className="w-24"
+                    value={r.qty}
+                    onChange={(e) => {
+                      const next = [...recipe]; next[idx] = { ...next[idx], qty: Math.max(1, Number(e.target.value) || 1) }; setRecipe(next);
+                    }}
+                  />
+                  <Button size="icon" variant="ghost" onClick={() => {
+                    const next = recipe.filter((_, i) => i !== idx); setRecipe(next);
+                  }}><Trash2 size={14} /></Button>
+                </div>
+              ))}
+            </div>
           )}
           <Field label="Ferramenta de Shurikenjutsu">
             <SimpleSelect
