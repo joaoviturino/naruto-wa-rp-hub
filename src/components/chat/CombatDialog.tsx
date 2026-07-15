@@ -30,6 +30,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const [selectedSkill, setSelectedSkill] = useState<string>("");
   const [energy, setEnergy] = useState<number>(10);
   const [busy, setBusy] = useState(false);
+  const [fleeing, setFleeing] = useState(false);
   const [bag, setBag] = useState<BagEntry[]>([]);
   const [itemMap, setItemMap] = useState<Record<string, Item>>({});
   const [avatars, setAvatars] = useState<Record<string, string | null>>({});
@@ -59,18 +60,19 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const consume = useServerFn(consumeInCombat);
 
   async function doFlee() {
-    if (busy) return;
-    if (!confirm("Fugir do combate? Você perde a luta e o chat é destravado.")) return;
-    setBusy(true);
+    if (fleeing) return;
+    setFleeing(true);
     try {
       await flee({ data: { session_id: sessionId } });
       toast.success("Você fugiu do combate.");
       // Fecha imediatamente — o realtime também atualiza, mas queremos destravar o chat na hora.
       onClose();
     } catch (e: any) {
-      toast.error(e?.message ?? "Não foi possível fugir.");
+      const msg = e?.message ?? "Não foi possível fugir.";
+      toast.error(msg);
+      if (String(msg).toLowerCase().includes("encerrado")) onClose();
     } finally {
-      setBusy(false);
+      setFleeing(false);
     }
   }
 
@@ -114,9 +116,12 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   }, [sessionId]);
 
   useEffect(() => {
-    // Carrega avatares dos participantes
+    // Carrega avatares/sprites dos participantes dos dois lados (no PvP os inimigos ficam em `npcs`).
     if (!session) return;
-    const ids = (session.state?.players ?? []).map((p: any) => p.character_id);
+    const ids = Array.from(new Set([
+      ...(session.state?.players ?? []).map((p: any) => p.character_id),
+      ...(session.state?._pvp ? (session.state?.npcs ?? []).map((p: any) => p.character_id) : []),
+    ].filter(Boolean)));
     if (!ids.length) return;
     supabase.from("characters").select("id,avatar_url,inventory_bg_url").in("id", ids).then(({ data }) => {
       const av: Record<string, string | null> = {};
@@ -411,10 +416,10 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                 variant="destructive"
                 size="sm"
                 className="ml-auto mr-8 h-7 px-2 text-[11px]"
-                disabled={busy}
+                disabled={fleeing}
                 onClick={doFlee}
               >
-                <Flag size={12} className="mr-1" /> Fugir do duelo
+                <Flag size={12} className="mr-1" /> {fleeing ? "Fugindo..." : "Fugir do duelo"}
               </Button>
             )}
           </DialogTitle>
@@ -470,8 +475,10 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                 // Em PvP, o "npc" na verdade é um jogador do lado adversário. Usa
                 // sprite_url do inventário e permite a troca de pose pelo character_id.
                 const enemyCid = nn.character_id as string | undefined;
-                const enemySprite =
-                  (enemyCid ? poses[enemyCid] : null) || nn.image_url || nn.sprite_url;
+                const enemySprite = state._pvp
+                  ? ((enemyCid ? poses[enemyCid] : null) || nn.sprite_url || (enemyCid ? sprites[enemyCid] : null) || nn.inventory_bg_url || nn.image_url || (enemyCid ? avatars[enemyCid] : null))
+                  : ((enemyCid ? poses[enemyCid] : null) || nn.image_url || nn.sprite_url);
+                const enemyName = nn.name ?? nn.nickname ?? "?";
                 return (
                   <button
                     key={nn.id ?? i}
@@ -482,12 +489,12 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                   >
                     <div ref={(el) => { npcRefs.current[i] = el; }} className={`relative transition-all ${isActing ? "drop-shadow-[0_0_18px_rgba(239,68,68,0.9)] scale-105" : ""} ${isTarget && !isActing ? "drop-shadow-[0_0_14px_rgba(239,68,68,0.75)] scale-[1.03]" : ""} ${dead ? "opacity-30 grayscale" : "group-hover:scale-105"}`}>
                       {enemySprite ? (
-                        <img src={enemySprite} alt={nn.name} className={`${sizeCls} w-auto object-contain`} style={{ filter: isActing ? "drop-shadow(0 0 10px rgb(239 68 68))" : undefined }} />
+                        <img src={enemySprite} alt={enemyName} className={`${sizeCls} w-auto object-contain`} style={{ filter: isActing ? "drop-shadow(0 0 10px rgb(239 68 68))" : undefined }} />
                       ) : <div className={`${sizeCls} w-20 bg-secondary rounded`} />}
                       <FloatingDamageLayer bursts={bursts[`npc:${i}`] ?? []} onExpire={(id) => expireBurst(`npc:${i}`, id)} />
                     </div>
                     <div className={`rounded px-1.5 py-0.5 max-w-[130px] w-full transition-colors ${isTarget ? "bg-red-600/80 ring-1 ring-red-300" : "bg-black/70"}`}>
-                      <div className="font-display text-[10px] sm:text-xs text-white truncate">{nn.name}</div>
+                      <div className="font-display text-[10px] sm:text-xs text-white truncate">{enemyName}</div>
                       <div className="flex justify-between text-[9px] text-white/80"><span>HP</span><span>{nn.hp}/{nn.hp_max}</span></div>
                       <Progress value={nn.hp_max ? (nn.hp / nn.hp_max) * 100 : 0} className="h-1" />
                     </div>
@@ -705,8 +712,8 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
               </TabsContent>
               <TabsContent value="flee" className="mt-2">
                 <div className="text-sm text-muted-foreground mb-2">Fugir encerra o combate para você e o time sem recompensas.</div>
-              <Button variant="outline" onClick={doFlee} disabled={busy}>
-                  <Flag size={14} className="mr-1" /> Confirmar fuga
+                <Button variant="outline" onClick={doFlee} disabled={fleeing}>
+                  <Flag size={14} className="mr-1" /> {fleeing ? "Fugindo..." : "Confirmar fuga"}
                 </Button>
               </TabsContent>
             </Tabs>
@@ -722,8 +729,8 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
               {spectator ? (
                 <Button variant="outline" size="sm" onClick={onClose}>Fechar</Button>
               ) : (
-                <Button variant="outline" size="sm" onClick={doFlee} disabled={busy}>
-                  <Flag size={14} className="mr-1" /> Fugir
+                <Button variant="outline" size="sm" onClick={doFlee} disabled={fleeing}>
+                  <Flag size={14} className="mr-1" /> {fleeing ? "Fugindo..." : "Fugir"}
                 </Button>
               )}
             </div>

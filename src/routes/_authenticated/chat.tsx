@@ -204,7 +204,12 @@ function ChatPage() {
     async function refreshPvp() {
       const { data } = await supabase.from("combat_sessions")
         .select("id,state,status").eq("location_id", currentLoc!.id).eq("status", "active");
-      const pvp = ((data as any[]) ?? []).find((s) => s?.state?.mode === "pvp");
+      const candidates = ((data as any[]) ?? []).filter((s) => s?.state?.mode === "pvp");
+      let pvp = candidates[0] ?? null;
+      if (pvp?.state?.duel_id) {
+        const { data: duel } = await supabase.from("pvp_duels").select("status").eq("id", pvp.state.duel_id).maybeSingle();
+        if (duel && duel.status !== "active") pvp = null;
+      }
       setPvpAtLocation(pvp?.id ?? null);
       // Auto-abre para o participante e para o espectador.
       if (pvp?.id) setCombatId(pvp.id);
