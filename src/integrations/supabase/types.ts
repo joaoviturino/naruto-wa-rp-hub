@@ -1317,6 +1317,7 @@ export type Database = {
         Row: {
           character_id: string
           completed_at: string | null
+          context: Json
           id: string
           location_id: string | null
           minigame_id: string
@@ -1327,6 +1328,7 @@ export type Database = {
         Insert: {
           character_id: string
           completed_at?: string | null
+          context?: Json
           id?: string
           location_id?: string | null
           minigame_id: string
@@ -1337,6 +1339,7 @@ export type Database = {
         Update: {
           character_id?: string
           completed_at?: string | null
+          context?: Json
           id?: string
           location_id?: string | null
           minigame_id?: string
