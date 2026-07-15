@@ -436,8 +436,23 @@ export const upsertMission = createServerFn({ method: "POST" })
     id: z.string().uuid().optional(),
     name: z.string().min(1).max(120),
     rank: ninjaRank.default("genin"),
-    description: z.string().max(2000).nullable().optional(),
+    description: z.string().max(4000).nullable().optional(),
+    category: z.enum(["daily","common","special"]).default("daily"),
     reward_xp: z.number().int().min(0).default(0),
+    reward_ryo: z.number().int().min(0).default(0),
+    objectives: z.array(z.object({
+      id: z.string().min(1),
+      type: z.string(),
+      target_id: z.string().nullable().optional(),
+      target_ref: z.string().nullable().optional(),
+      count: z.number().int().min(1).max(9999).default(1),
+      description: z.string().max(400).nullable().optional(),
+    })).default([]),
+    rewards: z.any().optional(),
+    requirements: z.any().optional(),
+    cooldown_hours: z.number().int().min(0).max(24 * 365).default(24),
+    repeatable: z.boolean().default(true),
+    active: z.boolean().default(true),
   }).parse(i))
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
