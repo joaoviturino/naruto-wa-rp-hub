@@ -284,6 +284,13 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
           )}
         </DialogContent>
       </Dialog>
+      {objMinigame && (
+        <MinigameDialog
+          minigame={objMinigame}
+          open={objOpen}
+          onOpenChange={(v) => { setObjOpen(v); if (!v) { setObjMinigame(null); load(); } }}
+        />
+      )}
     </div>
   );
 }
