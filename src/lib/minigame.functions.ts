@@ -219,6 +219,23 @@ export const startMinigameRun = createServerFn({ method: "POST" })
       const next = new Date(last.completed_at).getTime() + (game.cooldown_hours * 3600 * 1000);
       if (next > Date.now()) throw new Error("Missão em recarga. Volte mais tarde.");
     }
+    // Forge: valida receita + materiais do jogador
+    if (game.kind === "forge") {
+      const cfg = (game.config ?? {}) as any;
+      if (!cfg.recipe_item_id) throw new Error("Forja sem item-alvo configurado.");
+      const { data: targetItem } = await context.supabase
+        .from("items").select("id,name,meta").eq("id", cfg.recipe_item_id).maybeSingle();
+      if (!targetItem) throw new Error("Item-alvo não existe.");
+      const recipe = Array.isArray((targetItem.meta as any)?.recipe) ? (targetItem.meta as any).recipe as Array<{ item_id: string; qty: number }> : [];
+      if (!recipe.length) throw new Error("Este item não possui receita.");
+      const { data: inv } = await context.supabase
+        .from("inventory").select("ninja_bag").eq("character_id", char.id).maybeSingle();
+      const bag = (((inv?.ninja_bag as any[]) ?? []).filter((e: any) => e && e.item_id));
+      for (const r of recipe) {
+        const have = bag.filter((b: any) => b.item_id === r.item_id).reduce((s: number, b: any) => s + (Number(b.qty) || 1), 0);
+        if (have < r.qty) throw new Error(`Materiais insuficientes para forjar ${targetItem.name}.`);
+      }
+    }
     const insertRow: any = {
       character_id: char.id,
       minigame_id: data.minigame_id,
