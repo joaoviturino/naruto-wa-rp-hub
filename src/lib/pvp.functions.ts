@@ -155,6 +155,12 @@ export const respondDuel = createServerFn({ method: "POST" })
     const sideA = await Promise.all(teamA.map(buildPlayer));
     const sideB = await Promise.all(teamB.map(buildPlayer));
 
+    // Cenário/música vêm do LOCAL (não mais do NPC/grupo).
+    const { data: locRow } = await supabaseAdmin
+      .from("locations").select("battle_bg_url,music_url").eq("id", locId).maybeSingle();
+    const location_bg_url = (locRow as any)?.battle_bg_url ?? null;
+    const location_music_url = (locRow as any)?.music_url ?? null;
+
     const state = {
       mode: "pvp" as const,
       side_a: sideA, side_b: sideB,
@@ -163,6 +169,8 @@ export const respondDuel = createServerFn({ method: "POST" })
       active_side: "a" as const,
       active_idx: 0,
       duel_id: duel.id as string,
+      location_bg_url,
+      location_music_url,
     };
 
     const { data: session, error: sErr } = await supabaseAdmin.from("combat_sessions").insert({
