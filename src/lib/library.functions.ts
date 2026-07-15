@@ -283,5 +283,10 @@ export const completeBookRead = createServerFn({ method: "POST" })
       character_id: char.id, book_id: data.book_id, rewards_applied: applied,
     });
 
+    try {
+      const { bumpMissionProgress } = await import("@/lib/missions.functions");
+      await bumpMissionProgress(supabaseAdmin, char.id, { type: "read_book", book_id: data.book_id });
+    } catch {}
+
     return { ok: true, rewards: applied };
   });
