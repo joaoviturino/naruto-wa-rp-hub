@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { Store, Gift, MessageSquare, Coins, Minus, Plus, Lock, GraduationCap } from "lucide-react";
+import { Store, Gift, MessageSquare, Coins, Minus, Plus, Lock, GraduationCap, Box } from "lucide-react";
 import { listLocationInteractNpcs, buyFromShop, claimNpcReward } from "@/lib/npc-interact.functions";
 import { listNpcLearningSteps } from "@/lib/minigame.functions";
 import { MinigameDialog } from "@/components/minigame/MinigameDialog";
@@ -15,7 +15,7 @@ import { NpcMusic } from "@/components/NpcMusic";
 
 type LearnBlock = { id: string; kind: "text" | "image"; text?: string | null; image_url?: string | null };
 type Npc = {
-  id: string; name: string; image_url: string | null; kind: "shop" | "reward" | "learning";
+  id: string; name: string; image_url: string | null; kind: "shop" | "reward" | "learning" | "object";
   dialog_intro: string | null; dialog_outro: string | null;
   music_url?: string | null;
   shop_items?: { item_id: string; price: number; stock: number }[];
@@ -38,6 +38,8 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
   const [busy, setBusy] = useState(false);
   const [ryo, setRyo] = useState<number>(0);
   const [qtys, setQtys] = useState<Record<string, number>>({});
+  const [objMinigame, setObjMinigame] = useState<any | null>(null);
+  const [objOpen, setObjOpen] = useState(false);
   const list = useServerFn(listLocationInteractNpcs);
   const buy = useServerFn(buyFromShop);
   const claim = useServerFn(claimNpcReward);
@@ -71,14 +73,47 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
   const shopNpcs = npcs.filter((n) => n.kind === "shop");
   const rewardNpcs = npcs.filter((n) => n.kind === "reward");
   const learningNpcs = npcs.filter((n) => n.kind === "learning");
+  const objectNpcs = npcs.filter((n) => n.kind === "object");
   const getQty = (k: string) => Math.max(1, qtys[k] ?? 1);
   const setQty = (k: string, v: number) => setQtys((s) => ({ ...s, [k]: Math.max(1, Math.min(50, v)) }));
+
+  async function openObject(n: Npc) {
+    if (!n.linked_minigame_id) { toast.error("Este objeto ainda não tem minigame vinculado."); return; }
+    const { data } = await supabase.from("minigames").select("*").eq("id", n.linked_minigame_id).maybeSingle();
+    if (!data) { toast.error("Minigame não encontrado."); return; }
+    setObjMinigame(data);
+    setObjOpen(true);
+  }
 
   return (
     <div className="border border-border rounded p-2 space-y-2">
       <div className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1">
         <MessageSquare size={11} /> NPCs no local
       </div>
+      {objectNpcs.length > 0 && (
+        <div className="space-y-1">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1"><Box size={11} /> Objetos</div>
+          <div className="flex flex-wrap justify-center sm:justify-start gap-2">
+            {objectNpcs.map((n) => (
+              <Button
+                key={n.id}
+                size="sm"
+                variant="outline"
+                className="gap-2 mx-auto sm:mx-0"
+                onClick={() => openObject(n)}
+              >
+                {n.image_url ? (
+                  <img src={n.image_url} className="w-5 h-5 rounded object-cover" alt="" />
+                ) : (
+                  <Box size={12} className="text-gold" />
+                )}
+                <span className="truncate">{n.name}</span>
+                <Badge variant="secondary" className="text-[10px]">Interagir</Badge>
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
       {shopNpcs.length > 0 && (
         <div className="space-y-1">
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1"><Store size={11} /> Lojas</div>
