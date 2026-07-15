@@ -324,14 +324,20 @@ export const completeMinigameRun = createServerFn({ method: "POST" })
 
       // Forge: consome materiais e entrega o item forjado
       if ((run.minigames.kind as string) === "forge") {
-        const cfg = (run.minigames.config ?? {}) as any;
-        if (cfg.recipe_item_id) {
+        const ctx = (run.context ?? {}) as any;
+        const selection: Array<{ item_id: string; qty: number }> =
+          Array.isArray(ctx.forge_selection) ? ctx.forge_selection : [];
+        const targetItemId: string | null = ctx.target_item_id ?? (run.minigames.config as any)?.recipe_item_id ?? null;
+        if (targetItemId) {
           const { data: targetItem } = await supabaseAdmin
-            .from("items").select("id,name,meta").eq("id", cfg.recipe_item_id).maybeSingle();
-          const recipe = Array.isArray((targetItem as any)?.meta?.recipe)
-            ? ((targetItem as any).meta.recipe as Array<{ item_id: string; qty: number }>)
-            : [];
-          if (targetItem && recipe.length) {
+            .from("items").select("id,name,meta").eq("id", targetItemId).maybeSingle();
+          // Fallback: se não houver seleção salva, usa a receita do próprio item (compat)
+          const consumeList: Array<{ item_id: string; qty: number }> = selection.length
+            ? selection
+            : (Array.isArray((targetItem as any)?.meta?.recipe)
+                ? ((targetItem as any).meta.recipe as Array<{ item_id: string; qty: number }>)
+                : []);
+          if (targetItem && consumeList.length) {
             const { data: inv } = await supabaseAdmin
               .from("inventory").select("ninja_bag").eq("character_id", run.character_id).maybeSingle();
             const bag: Array<{ item_id: string; qty: number }> = ((inv?.ninja_bag as any[]) ?? [])
@@ -339,7 +345,7 @@ export const completeMinigameRun = createServerFn({ method: "POST" })
               .map((e: any) => ({ item_id: e.item_id, qty: typeof e.qty === "number" && e.qty > 0 ? e.qty : 1 }));
             // debit materials
             let ok = true;
-            for (const r of recipe) {
+            for (const r of consumeList) {
               let need = r.qty;
               for (const b of bag) {
                 if (b.item_id !== r.item_id || need <= 0) continue;
@@ -356,7 +362,7 @@ export const completeMinigameRun = createServerFn({ method: "POST" })
               else cleaned[idx].qty += 1;
               await supabaseAdmin.from("inventory").update({ ninja_bag: cleaned }).eq("character_id", run.character_id);
               applied.forged = { item_id: targetItem.id, name: targetItem.name };
-              applied.consumed = recipe;
+              applied.consumed = consumeList;
             }
           }
         }
