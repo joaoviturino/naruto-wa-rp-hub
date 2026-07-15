@@ -691,7 +691,8 @@ export type Database = {
           id: string
           location_id: string
           log: Json
-          npc_id: string
+          mode: string
+          npc_id: string | null
           party_id: string | null
           state: Json
           status: string
@@ -703,7 +704,8 @@ export type Database = {
           id?: string
           location_id: string
           log?: Json
-          npc_id: string
+          mode?: string
+          npc_id?: string | null
           party_id?: string | null
           state?: Json
           status?: string
@@ -715,7 +717,8 @@ export type Database = {
           id?: string
           location_id?: string
           log?: Json
-          npc_id?: string
+          mode?: string
+          npc_id?: string | null
           party_id?: string | null
           state?: Json
           status?: string
@@ -1955,6 +1958,7 @@ export type Database = {
       pvp_duels: {
         Row: {
           challenger_id: string
+          combat_session_id: string | null
           created_at: string
           current_turn_character_id: string | null
           ended_at: string | null
@@ -1971,6 +1975,7 @@ export type Database = {
         }
         Insert: {
           challenger_id: string
+          combat_session_id?: string | null
           created_at?: string
           current_turn_character_id?: string | null
           ended_at?: string | null
@@ -1987,6 +1992,7 @@ export type Database = {
         }
         Update: {
           challenger_id?: string
+          combat_session_id?: string | null
           created_at?: string
           current_turn_character_id?: string | null
           ended_at?: string | null
@@ -2007,6 +2013,13 @@ export type Database = {
             columns: ["challenger_id"]
             isOneToOne: false
             referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pvp_duels_combat_session_id_fkey"
+            columns: ["combat_session_id"]
+            isOneToOne: false
+            referencedRelation: "combat_sessions"
             referencedColumns: ["id"]
           },
           {

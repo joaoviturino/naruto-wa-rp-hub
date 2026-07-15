@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { Sword, Flag, Zap, FlaskConical, Users, Target } from "lucide-react";
 import { FloatingDamageLayer, type DamageBurst } from "@/components/chat/FloatingDamage";
 import { HealParticles } from "@/components/chat/HealParticles";
+import { remapPvpForViewer } from "@/components/chat/pvpRemap";
 
 type Skill = {
   id: string; name: string; energy_type: "ef" | "em" | "chakra"; base_cost: number;
@@ -59,7 +60,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
 
   async function load() {
     const { data } = await supabase.from("combat_sessions").select("*").eq("id", sessionId).maybeSingle();
-    setSession(data);
+    setSession(remapPvpForViewer(data as any, myCharId));
   }
   async function loadSkills() {
     const { data } = await supabase
@@ -90,7 +91,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
     load(); loadSkills(); loadBag();
     const ch = supabase.channel(`combat-${sessionId}`)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "combat_sessions", filter: `id=eq.${sessionId}` },
-        (payload) => setSession(payload.new))
+        (payload) => setSession(remapPvpForViewer(payload.new as any, myCharId)))
       .subscribe();
     return () => { supabase.removeChannel(ch); };
      
@@ -152,7 +153,11 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const aliveMe = !!me?.alive;
   const solo = players.length <= 1;
   const onlyAlivePlayer = players.filter((p: any) => p.alive).length === 1 && aliveMe;
-  const myTurn = session?.status === "active" && aliveMe && (solo || onlyAlivePlayer || activePlayer?.character_id === myCharId);
+  const spectator = !!state._spectator;
+  const myTurn = !spectator && session?.status === "active" && aliveMe &&
+    (state._pvp
+      ? (state.turn === "player" && activePlayer?.character_id === myCharId)
+      : (solo || onlyAlivePlayer || activePlayer?.character_id === myCharId));
   const currentSkill = skills.find((s) => s.id === selectedSkill);
   const healTarget: "single" | "team" | null = currentSkill?.meta?.heal?.target ?? null;
   const isHealSkill = !!healTarget;
@@ -674,11 +679,19 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
           ) : (
             <div className="flex items-center justify-between border border-border rounded p-3 bg-input/30">
               <div className="text-sm text-muted-foreground">
-                <Users size={12} className="inline mr-1"/> Aguardando <span className="text-gold font-display">{activePlayer?.nickname ?? "…"}</span> agir…
+                <Users size={12} className="inline mr-1"/>
+                {spectator
+                  ? <>Você está assistindo ao duelo. Vez de <span className="text-gold font-display">{activePlayer?.nickname ?? "…"}</span>.</>
+                  : <>Aguardando <span className="text-gold font-display">{activePlayer?.nickname ?? "…"}</span> agir…</>
+                }
               </div>
-              <Button variant="outline" size="sm" onClick={() => flee({ data: { session_id: sessionId } })}>
-                <Flag size={14} className="mr-1" /> Fugir
-              </Button>
+              {spectator ? (
+                <Button variant="outline" size="sm" onClick={onClose}>Fechar</Button>
+              ) : (
+                <Button variant="outline" size="sm" onClick={() => flee({ data: { session_id: sessionId } })}>
+                  <Flag size={14} className="mr-1" /> Fugir
+                </Button>
+              )}
             </div>
           )
         ) : (

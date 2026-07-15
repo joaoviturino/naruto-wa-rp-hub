@@ -62,6 +62,7 @@ function ChatPage() {
   const [activeMinigame, setActiveMinigame] = useState<any | null>(null);
   const listMg = useServerFn(listMinigamesForMyLocation);
   const [hasLibraryHere, setHasLibraryHere] = useState(false);
+  const [pvpAtLocation, setPvpAtLocation] = useState<string | null>(null);
 
   async function loadCore() {
     const [{ data: c }, { data: l }, { data: cn }] = await Promise.all([
@@ -196,6 +197,25 @@ function ChatPage() {
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [currentLoc?.id]);
+
+  // Detecta duelo PvP ativo neste local (para travar chat e abrir espectador).
+  useEffect(() => {
+    if (!currentLoc || !character) { setPvpAtLocation(null); return; }
+    async function refreshPvp() {
+      const { data } = await supabase.from("combat_sessions")
+        .select("id,state,status").eq("location_id", currentLoc!.id).eq("status", "active");
+      const pvp = ((data as any[]) ?? []).find((s) => s?.state?.mode === "pvp");
+      setPvpAtLocation(pvp?.id ?? null);
+      // Auto-abre para o participante e para o espectador.
+      if (pvp?.id) setCombatId(pvp.id);
+    }
+    refreshPvp();
+    const ch = supabase.channel(`pvp-loc-${currentLoc.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "combat_sessions", filter: `location_id=eq.${currentLoc.id}` },
+        () => refreshPvp())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [currentLoc?.id, character?.id]);
 
   // Presença em tempo real via Realtime Presence — instantâneo, sem depender de publication
   useEffect(() => {
@@ -444,9 +464,14 @@ function ChatPage() {
             )}
 
             <div className="border-t border-border p-3 flex gap-2 items-end">
+              {pvpAtLocation && (
+                <div className="absolute left-0 right-0 -translate-y-full text-center text-xs bg-blood/20 border-t border-blood text-blood py-1">
+                  ⚔ Duelo em andamento — chat travado neste local.
+                </div>
+              )}
               <Dialog open={sceneOpen} onOpenChange={setSceneOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" size="icon" title="Anexar cena"><ImagePlus size={16} /></Button>
+                  <Button variant="outline" size="icon" title="Anexar cena" disabled={!!pvpAtLocation}><ImagePlus size={16} /></Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-2xl">
                   <DialogHeader><DialogTitle>Escolha uma cena ({scenes.length}/10)</DialogTitle></DialogHeader>
@@ -466,9 +491,11 @@ function ChatPage() {
                 </DialogContent>
               </Dialog>
               <Textarea rows={2} value={content} onChange={(e) => setContent(e.target.value)}
-                placeholder="Descreva sua ação, fale…" className="resize-none"
+                placeholder={pvpAtLocation ? "Chat travado durante o duelo." : "Descreva sua ação, fale…"}
+                disabled={!!pvpAtLocation}
+                className="resize-none"
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); doSend(); } }} />
-              <Button onClick={doSend} disabled={sending || (!content.trim() && !scene)}><Send size={16} /></Button>
+              <Button onClick={doSend} disabled={sending || !!pvpAtLocation || (!content.trim() && !scene)}><Send size={16} /></Button>
             </div>
           </>
         )}
