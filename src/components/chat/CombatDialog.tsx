@@ -153,7 +153,11 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const aliveMe = !!me?.alive;
   const solo = players.length <= 1;
   const onlyAlivePlayer = players.filter((p: any) => p.alive).length === 1 && aliveMe;
-  const myTurn = session?.status === "active" && aliveMe && (solo || onlyAlivePlayer || activePlayer?.character_id === myCharId);
+  const spectator = !!state._spectator;
+  const myTurn = !spectator && session?.status === "active" && aliveMe &&
+    (state._pvp
+      ? (state.turn === "player" && activePlayer?.character_id === myCharId)
+      : (solo || onlyAlivePlayer || activePlayer?.character_id === myCharId));
   const currentSkill = skills.find((s) => s.id === selectedSkill);
   const healTarget: "single" | "team" | null = currentSkill?.meta?.heal?.target ?? null;
   const isHealSkill = !!healTarget;
