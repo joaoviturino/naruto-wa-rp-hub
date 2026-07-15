@@ -146,10 +146,14 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
           {rewardNpcs.map((n) => {
             const locked = n.mission_unlocked === false;
             const cooldown = (n.cooldown_remaining_ms ?? 0) > 0;
+            const offer = n.offer_status;
             return (
               <Button key={n.id} size="sm" variant="outline" className="w-full justify-start gap-2" onClick={() => setOpen(n)}>
                 {locked ? <Lock size={12} className="text-muted-foreground" /> : <Gift size={12} className="text-gold" />}
                 <span className="flex-1 truncate text-left">{n.name}</span>
+                {offer === "available" && <Badge className="text-[10px]">Nova missão</Badge>}
+                {offer === "in_progress" && <Badge variant="secondary" className="text-[10px]">Em andamento</Badge>}
+                {offer === "ready" && <Badge className="text-[10px] bg-emerald-600 hover:bg-emerald-600">Entregar</Badge>}
                 {locked && <span className="text-[10px] text-muted-foreground">bloqueado</span>}
                 {!locked && cooldown && <span className="text-[10px] text-muted-foreground">{remH(n.cooldown_remaining_ms)}h</span>}
               </Button>
