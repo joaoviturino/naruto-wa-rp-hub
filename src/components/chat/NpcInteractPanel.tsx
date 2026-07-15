@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { Store, Gift, MessageSquare, Coins, Minus, Plus, Lock, GraduationCap, Box } from "lucide-react";
+import { Store, Gift, MessageSquare, Coins, Minus, Plus, Lock, GraduationCap, Box, CheckCircle2, Target, Sparkles } from "lucide-react";
 import { listLocationInteractNpcs, buyFromShop, claimNpcReward } from "@/lib/npc-interact.functions";
 import { acceptMissionFromNpc } from "@/lib/npc-interact.functions";
 import { claimMission } from "@/lib/missions.functions";
@@ -501,8 +501,53 @@ function MissionOfferBlock({ npc, busy, onAccept, onTurnIn }: {
     o.type === "collect_item" ? "Coletar item" :
     o.type === "pvp_win" ? "Vencer duelo PvP" :
     o.type === "talk_npc" ? "Falar com NPC" :
+    o.type === "reach_rank" ? "Atingir patente" :
+    o.type === "reach_level" ? "Atingir nível" :
+    o.type === "reach_proficiency" ? "Atingir proficiência" :
     "Objetivo"
   );
+  const countsHint = (o: any): string => {
+    switch (o.type) {
+      case "kill_npc":         return `Cada derrota do NPC "${o.target_ref ?? "alvo"}" conta +1.`;
+      case "kill_npc_kind":    return `Cada derrota de um NPC do tipo "${o.target_ref ?? "?"}" conta +1.`;
+      case "kill_npc_group":   return `Cada NPC derrotado do grupo "${o.target_ref ?? "?"}" conta +1.`;
+      case "complete_minigame":return `Concluir o minigame "${o.target_ref ?? "?"}" conta +1.`;
+      case "read_book":        return `Terminar a leitura do livro "${o.target_ref ?? "?"}" conta +1.`;
+      case "reach_location":   return `Chegar ao local "${o.target_ref ?? "?"}" marca o objetivo.`;
+      case "learn_skill":      return `Aprender a habilidade "${o.target_ref ?? "?"}" marca o objetivo.`;
+      case "craft_item":       return `Cada "${o.target_ref ?? "item"}" fabricado conta +1.`;
+      case "collect_item":     return `Ter "${o.target_ref ?? "item"}" na bolsa conta a quantidade atual.`;
+      case "reach_rank":       return `Ao alcançar a patente "${o.target_ref ?? "?"}" o objetivo é marcado.`;
+      case "reach_level":      return `Ao alcançar o nível ${o.target_ref ?? "?"} o objetivo é marcado.`;
+      case "reach_proficiency":return `Atingir "${o.target_ref ?? "?"}" marca o objetivo.`;
+      case "pvp_win":          return "Cada vitória em duelo PvP conta +1.";
+      case "talk_npc":         return `Falar com "${o.target_ref ?? "?"}" marca o objetivo.`;
+      case "custom":           return "Marcação manual por um administrador.";
+      default:                 return "Progresso registrado automaticamente.";
+    }
+  };
+
+  // Detect objective completion transitions to give feedback.
+  const prev = useRef<Record<string, number>>({});
+  const [flash, setFlash] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    if (status !== "in_progress" && status !== "ready") { prev.current = { ...progress }; return; }
+    for (const o of m.objectives) {
+      const before = Math.min(Number(prev.current[o.id] ?? 0), o.count);
+      const now = Math.min(Number(progress[o.id] ?? 0), o.count);
+      if (before < o.count && now >= o.count) {
+        toast.success(`Objetivo concluído: ${describe(o)}`);
+        setFlash((s) => ({ ...s, [o.id]: true }));
+        setTimeout(() => setFlash((s) => ({ ...s, [o.id]: false })), 1600);
+      }
+    }
+    prev.current = { ...progress };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(progress), status]);
+
+  const totalObjs = m.objectives.length;
+  const doneObjs = m.objectives.filter((o) => Math.min(Number(progress[o.id] ?? 0), o.count) >= o.count).length;
+  const showList = totalObjs > 0;
   return (
     <div className="rounded-lg border border-gold/40 bg-gold/5 p-3 space-y-2">
       <div className="flex items-center justify-between gap-2">
@@ -516,19 +561,64 @@ function MissionOfferBlock({ npc, busy, onAccept, onTurnIn }: {
            status === "cooldown" ? "Cooldown" : "Concluída"}
         </Badge>
       </div>
-      {m.objectives.length > 0 && (status === "in_progress" || status === "ready") && (
-        <ul className="text-xs space-y-1">
-          {m.objectives.map((o) => {
-            const cur = Math.min(Number(progress[o.id] ?? 0), o.count);
-            const done = cur >= o.count;
-            return (
-              <li key={o.id} className="flex items-center justify-between gap-2">
-                <span className={done ? "line-through text-muted-foreground" : ""}>{describe(o)}</span>
-                <span className={`font-mono ${done ? "text-emerald-400" : "text-muted-foreground"}`}>{cur}/{o.count}</span>
-              </li>
-            );
-          })}
-        </ul>
+      {showList && (
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">
+            <Target size={11} /> Objetivos
+            {(status === "in_progress" || status === "ready") && (
+              <span className="ml-auto font-mono normal-case tracking-normal">
+                {doneObjs}/{totalObjs} concluídos
+              </span>
+            )}
+          </div>
+          <ul className="space-y-1.5">
+            {m.objectives.map((o) => {
+              const cur = Math.min(Number(progress[o.id] ?? 0), o.count);
+              const done = cur >= o.count;
+              const pct = Math.round((cur / Math.max(1, o.count)) * 100);
+              const isFlashing = !!flash[o.id];
+              const showProgress = status === "in_progress" || status === "ready";
+              return (
+                <li
+                  key={o.id}
+                  className={`rounded-md border p-2 text-xs transition-colors ${
+                    isFlashing ? "border-emerald-400 bg-emerald-500/15 animate-pulse" :
+                    done ? "border-emerald-700/40 bg-emerald-950/30" :
+                    "border-border/60 bg-background/40"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    {done
+                      ? <CheckCircle2 size={13} className="text-emerald-400 shrink-0" />
+                      : <span className="h-3 w-3 rounded-full border border-muted-foreground/60 shrink-0" />}
+                    <span className={`flex-1 truncate ${done ? "line-through text-muted-foreground" : ""}`}>{describe(o)}</span>
+                    {showProgress && (
+                      <span className={`font-mono text-[11px] ${done ? "text-emerald-400" : "text-muted-foreground"}`}>
+                        {cur}/{o.count}
+                      </span>
+                    )}
+                  </div>
+                  {showProgress && o.count > 1 && (
+                    <div className="mt-1 h-1 rounded-full bg-muted/40 overflow-hidden">
+                      <div
+                        className={`h-full transition-all ${done ? "bg-emerald-500" : "bg-gold"}`}
+                        style={{ width: `${Math.min(100, Math.max(done ? 100 : pct, 0))}%` }}
+                      />
+                    </div>
+                  )}
+                  <div className="mt-1 text-[10px] text-muted-foreground/90 leading-snug">
+                    {countsHint(o)}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          {status === "ready" && (
+            <div className="flex items-center gap-1.5 text-[11px] text-emerald-400">
+              <Sparkles size={12} /> Todos os objetivos concluídos — volte ao NPC para entregar!
+            </div>
+          )}
+        </div>
       )}
       <div className="text-[11px] text-muted-foreground">
         Recompensa: +{m.reward_xp} XP · +{m.reward_ryo} Ryo
