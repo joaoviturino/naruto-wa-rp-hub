@@ -183,8 +183,10 @@ export const rollSpawn = createServerFn({ method: "POST" })
     let groupBattleBg: string | null = null;
     let groupMusic: string | null = null;
     const { data: locFull } = await context.supabase
-      .from("locations").select("spawn_group_ids").eq("id", loc.id).maybeSingle();
+      .from("locations").select("spawn_group_ids,battle_bg_url,music_url").eq("id", loc.id).maybeSingle();
     const groupIds = ((locFull as any)?.spawn_group_ids ?? []) as string[];
+    const locBg = (locFull as any)?.battle_bg_url ?? null;
+    const locMusic = (locFull as any)?.music_url ?? null;
     if (groupIds.length) {
       const groupId = groupIds[Math.floor(Math.random() * groupIds.length)];
       const { data: gRow } = await context.supabase
@@ -252,7 +254,10 @@ export const rollSpawn = createServerFn({ method: "POST" })
       npc: npcsState[0],
       npcs: npcsState,
       players, active: 0, target: 0,
-    };
+      // Cenário/música do LOCAL têm prioridade no cliente.
+      location_bg_url: locBg,
+      location_music_url: locMusic,
+    } as any;
 
     const { data: session, error: sErr } = await supabaseAdmin.from("combat_sessions").insert({
       location_id: loc.id, party_id: partyId, npc_id: npc.id, status: "active", state, log: [], turn: "player",

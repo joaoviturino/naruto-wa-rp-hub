@@ -17,7 +17,8 @@ type Loc = { id: string; name: string; description: string | null; image_url: st
   map_x?: number; map_y?: number;
   parent_id?: string | null;
   is_danger_zone?: boolean; spawn_chance?: number; spawn_tick_seconds?: number;
-  spawn_group_ids?: string[] };
+  spawn_group_ids?: string[];
+  battle_bg_url?: string | null; music_url?: string | null };
 type Conn = { id: string; a_id: string; b_id: string };
 type Npc = { id: string; name: string; kind: "aggressive" | "shop" | "reward" | "learning" | "object" };
 type NpcGroup = { id: string; name: string };
@@ -48,7 +49,7 @@ export function LocationManager() {
 
   async function load() {
     const [l, c, n, ln, mg, lmg, ls, llb, gr] = await Promise.all([
-      supabase.from("locations").select("id,name,description,image_url,map_x,map_y,parent_id,is_danger_zone,spawn_chance,spawn_tick_seconds,spawn_group_ids").order("name"),
+      supabase.from("locations").select("id,name,description,image_url,map_x,map_y,parent_id,is_danger_zone,spawn_chance,spawn_tick_seconds,spawn_group_ids,battle_bg_url,music_url").order("name"),
       supabase.from("location_connections").select("id,a_id,b_id"),
       supabase.from("npcs").select("id,name,kind").order("name"),
       supabase.from("location_npcs").select("location_id,npc_id"),
@@ -216,6 +217,30 @@ export function LocationManager() {
                   </p>
                 )}
               </div>
+            </div>
+          </div>
+
+          <div className="scroll-panel rounded-lg p-4 space-y-3">
+            <h4 className="font-display text-lg text-gold">Cenário e som de combate</h4>
+            <p className="text-xs text-muted-foreground">Usado por todas as batalhas iniciadas neste local (PvE e duelos PvP). Substitui as antigas configurações por NPC/grupo.</p>
+            <div>
+              <Label className="text-xs">URL da imagem de fundo do combate</Label>
+              <Input key={`bg-${sel.id}`} defaultValue={sel.battle_bg_url ?? ""} placeholder="https://…"
+                onBlur={async (e) => {
+                  const v = e.target.value.trim() || null;
+                  const { error } = await supabase.from("locations").update({ battle_bg_url: v }).eq("id", sel.id);
+                  if (error) toast.error(error.message); else { toast.success("Cenário atualizado."); load(); }
+                }} />
+              {sel.battle_bg_url && <img src={sel.battle_bg_url} alt="" className="mt-2 h-24 rounded object-cover" />}
+            </div>
+            <div>
+              <Label className="text-xs">URL da música de combate (loop)</Label>
+              <Input key={`music-${sel.id}`} defaultValue={sel.music_url ?? ""} placeholder="https://… .mp3/.ogg"
+                onBlur={async (e) => {
+                  const v = e.target.value.trim() || null;
+                  const { error } = await supabase.from("locations").update({ music_url: v }).eq("id", sel.id);
+                  if (error) toast.error(error.message); else { toast.success("Música atualizada."); load(); }
+                }} />
             </div>
           </div>
 

@@ -394,12 +394,14 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const poolColor: Record<string, string> = { ef: "oklch(0.55 0.22 25)", em: "oklch(0.6 0.15 220)", chakra: "oklch(0.78 0.15 80)" };
   const lastEntry = log[log.length - 1];
   const npcActive = session.status === "active" && lastEntry?.actor === "npc" && Object.keys(poses).length === 0;
-  const bgUrl = npc.battle_bg_url as string | null;
+  // Preferimos cenário/música do LOCAL; caímos para os do NPC/grupo por retrocompatibilidade.
+  const bgUrl = ((state as any).location_bg_url as string | null) ?? (npc.battle_bg_url as string | null);
+  const battleMusic = ((state as any).location_music_url as string | null) ?? ((npc as any).music_url as string | null);
 
   return (
     <Dialog open onOpenChange={(v) => !v && session.status !== "active" && onClose()}>
       <DialogContent className="max-w-4xl w-[calc(100vw-1rem)] p-0 overflow-hidden border-blood/30 max-h-[95vh] overflow-y-auto no-scrollbar">
-        <NpcMusic src={(npc as any).music_url} />
+        <NpcMusic src={battleMusic} />
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 px-3 pt-3 text-sm sm:text-base">
             <Sword size={16} /> Combate: {npc.name}
@@ -465,6 +467,11 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                 const isTarget = i === targetIdx && !dead;
                 const isActing = npcActive && i === (state.target ?? 0);
                 const canPick = !dead && myTurn;
+                // Em PvP, o "npc" na verdade é um jogador do lado adversário. Usa
+                // sprite_url do inventário e permite a troca de pose pelo character_id.
+                const enemyCid = nn.character_id as string | undefined;
+                const enemySprite =
+                  (enemyCid ? poses[enemyCid] : null) || nn.image_url || nn.sprite_url;
                 return (
                   <button
                     key={nn.id ?? i}
@@ -474,8 +481,8 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                     className={`relative flex flex-col items-center gap-1 group min-w-0 ${canPick ? "cursor-pointer" : "cursor-default"}`}
                   >
                     <div ref={(el) => { npcRefs.current[i] = el; }} className={`relative transition-all ${isActing ? "drop-shadow-[0_0_18px_rgba(239,68,68,0.9)] scale-105" : ""} ${isTarget && !isActing ? "drop-shadow-[0_0_14px_rgba(239,68,68,0.75)] scale-[1.03]" : ""} ${dead ? "opacity-30 grayscale" : "group-hover:scale-105"}`}>
-                      {nn.image_url ? (
-                        <img src={nn.image_url} alt={nn.name} className={`${sizeCls} w-auto object-contain`} style={{ filter: isActing ? "drop-shadow(0 0 10px rgb(239 68 68))" : undefined }} />
+                      {enemySprite ? (
+                        <img src={enemySprite} alt={nn.name} className={`${sizeCls} w-auto object-contain`} style={{ filter: isActing ? "drop-shadow(0 0 10px rgb(239 68 68))" : undefined }} />
                       ) : <div className={`${sizeCls} w-20 bg-secondary rounded`} />}
                       <FloatingDamageLayer bursts={bursts[`npc:${i}`] ?? []} onExpire={(id) => expireBurst(`npc:${i}`, id)} />
                     </div>
