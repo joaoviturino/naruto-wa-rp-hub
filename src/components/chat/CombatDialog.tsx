@@ -41,6 +41,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const animQueue = useRef<any[]>([]);
   const animRunning = useRef<boolean>(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const pvpDuelIdRef = useRef<string | null>(null);
   // Refs para calcular posições no palco (projetéis, overlays, etc.)
   const stageRef = useRef<HTMLDivElement | null>(null);
   const npcRefs = useRef<Record<number, HTMLDivElement | null>>({});
@@ -80,6 +81,11 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   async function load() {
     const { data } = await supabase.from("combat_sessions").select("*").eq("id", sessionId).maybeSingle();
     if (!data) { onClose(); return; }
+    pvpDuelIdRef.current = (data.state as any)?.duel_id ?? null;
+    if ((data.state as any)?.mode === "pvp" && (data.state as any)?.duel_id) {
+      const { data: duel } = await supabase.from("pvp_duels").select("status").eq("id", (data.state as any).duel_id).maybeSingle();
+      if (duel && duel.status !== "active") { onClose(); return; }
+    }
     setSession(remapPvpForViewer(data as any, myCharId));
   }
   async function loadSkills() {
@@ -116,6 +122,13 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
           const next = remapPvpForViewer(payload.new as any, myCharId);
           setSession(next);
           if (next?.state?._pvp && next?.status !== "active") onClose();
+        })
+      .on("postgres_changes", { event: "*", schema: "public", table: "pvp_duels" },
+        (payload) => {
+          const currentDuelId = pvpDuelIdRef.current;
+          const row = payload.new as any;
+          if (currentDuelId && row?.id === currentDuelId && row?.status !== "active") onClose();
+          else void load();
         })
       .subscribe((status) => { if (status === "SUBSCRIBED") void load(); });
     return () => { supabase.removeChannel(ch); };
@@ -491,7 +504,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                 // sprite_url do inventário e permite a troca de pose pelo character_id.
                 const enemyCid = nn.character_id as string | undefined;
                 const enemySources = state._pvp
-                  ? [enemyCid ? poses[enemyCid] : null, nn.sprite_url, enemyCid ? sprites[enemyCid] : null, nn.inventory_bg_url, nn.image_url, nn.avatar_url, enemyCid ? avatars[enemyCid] : null]
+                  ? [enemyCid ? poses[enemyCid] : null, enemyCid ? sprites[enemyCid] : null, nn.sprite_url, nn.inventory_bg_url, nn.image_url, nn.avatar_url, enemyCid ? avatars[enemyCid] : null]
                   : [enemyCid ? poses[enemyCid] : null, nn.image_url, nn.sprite_url];
                 const enemyName = nn.name ?? nn.nickname ?? "?";
                 return (
@@ -543,7 +556,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
               const sizeCls = n > 2 ? "max-h-[95px] sm:max-h-[130px]" : "max-h-[150px] sm:max-h-[200px]";
               const renderPlayer = (p: any) => {
                 const isActive = session.status === "active" && !npcActive && p.character_id === activePlayer?.character_id && p.alive;
-                const spriteSources = [poses[p.character_id], p.sprite_url, sprites[p.character_id], p.inventory_bg_url, avatars[p.character_id], p.avatar_url].filter(Boolean) as string[];
+                const spriteSources = [poses[p.character_id], sprites[p.character_id], p.sprite_url, p.inventory_bg_url, p.image_url, avatars[p.character_id], p.avatar_url].filter(Boolean) as string[];
                 const isHealPick = isHealSkill && healTarget === "single" && myTurn && p.alive;
                 const chosenHeal = isHealPick && healTargetId === p.character_id;
                 return (
