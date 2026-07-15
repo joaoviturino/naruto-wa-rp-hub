@@ -48,6 +48,7 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
   const [open, setOpen] = useState<Npc | null>(null);
   const [items, setItems] = useState<Record<string, Item>>({});
   const [busy, setBusy] = useState(false);
+  const [outro, setOutro] = useState<string | null>(null);
   const [ryo, setRyo] = useState<number>(0);
   const [qtys, setQtys] = useState<Record<string, number>>({});
   const [objMinigame, setObjMinigame] = useState<any | null>(null);
@@ -195,12 +196,20 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
                   </div>
                 </DialogTitle>
               </DialogHeader>
-              {open.dialog_intro && (
+              {outro ? (
+                <div className="text-sm italic text-foreground border-l-2 border-gold pl-3 bg-gold/5 py-2 rounded-r">
+                  {outro}
+                </div>
+              ) : open.dialog_intro && (
                 <div className="text-sm italic text-muted-foreground border-l-2 border-gold pl-3">
                   {open.dialog_intro}
                 </div>
               )}
-              {open.kind === "learning" ? (
+              {outro ? (
+                <div className="flex justify-end">
+                  <Button onClick={() => { setOutro(null); setOpen(null); load(); }}>Fechar</Button>
+                </div>
+              ) : open.kind === "learning" ? (
                 <LearningNpcView npc={open} onClose={() => { setOpen(null); load(); }} />
               ) : open.kind === "shop" ? (
                 <div className="grid gap-2 sm:grid-cols-2 max-h-[55vh] overflow-y-auto pr-1">
@@ -273,7 +282,7 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
                         try {
                           const r: any = await turnIn({ data: { mission_id: open.offer_mission!.id } });
                           toast.success(`Missão entregue! +${r?.applied?.xp ?? 0} XP · +${r?.applied?.ryo ?? 0} Ryo`);
-                          if (open.dialog_outro) toast.message(open.dialog_outro);
+                          if (open.dialog_outro) setOutro(open.dialog_outro);
                           await load();
                         }
                         catch (e: any) { toast.error(e.message); }
@@ -308,9 +317,9 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
                       try {
                         await claim({ data: { npc_id: open.id } });
                         toast.success("Recompensa recebida.");
-                        if (open.dialog_outro) toast.message(open.dialog_outro);
                         await load();
-                        setOpen(null);
+                        if (open.dialog_outro) setOutro(open.dialog_outro);
+                        else setOpen(null);
                       } catch (e: any) { toast.error(e.message); }
                       finally { setBusy(false); }
                     }}>
