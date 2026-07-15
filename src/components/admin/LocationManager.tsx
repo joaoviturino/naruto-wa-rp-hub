@@ -17,7 +17,8 @@ type Loc = { id: string; name: string; description: string | null; image_url: st
   map_x?: number; map_y?: number;
   parent_id?: string | null;
   is_danger_zone?: boolean; spawn_chance?: number; spawn_tick_seconds?: number;
-  spawn_group_ids?: string[] };
+  spawn_group_ids?: string[];
+  battle_bg_url?: string | null; music_url?: string | null };
 type Conn = { id: string; a_id: string; b_id: string };
 type Npc = { id: string; name: string; kind: "aggressive" | "shop" | "reward" | "learning" | "object" };
 type NpcGroup = { id: string; name: string };
@@ -48,7 +49,7 @@ export function LocationManager() {
 
   async function load() {
     const [l, c, n, ln, mg, lmg, ls, llb, gr] = await Promise.all([
-      supabase.from("locations").select("id,name,description,image_url,map_x,map_y,parent_id,is_danger_zone,spawn_chance,spawn_tick_seconds,spawn_group_ids").order("name"),
+      supabase.from("locations").select("id,name,description,image_url,map_x,map_y,parent_id,is_danger_zone,spawn_chance,spawn_tick_seconds,spawn_group_ids,battle_bg_url,music_url").order("name"),
       supabase.from("location_connections").select("id,a_id,b_id"),
       supabase.from("npcs").select("id,name,kind").order("name"),
       supabase.from("location_npcs").select("location_id,npc_id"),
