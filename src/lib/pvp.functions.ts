@@ -3,7 +3,9 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 // ============================================================
-//  PvP — Duelo turno a turno com narrativa RP
+//  PvP — Duelo turno-a-turno visual (compartilha o motor do combate
+//  contra NPC). Ao aceitar o convite, criamos uma combat_sessions com
+//  mode='pvp' contendo os dois times (desafiante + party × desafiado + party).
 // ============================================================
 
 const POWER_BY_RANK: Record<string, number> = { E: 20, D: 35, C: 55, B: 80, A: 110, S: 150 };
@@ -51,12 +53,6 @@ async function myChar(context: { supabase: any; userId: string }) {
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Sem personagem.");
   return data;
-}
-
-function decCooldowns(side: Side) {
-  const next: Record<string, number> = {};
-  for (const [k, v] of Object.entries(side.cooldowns)) if (v > 1) next[k] = v - 1;
-  side.cooldowns = next;
 }
 
 // ------------------------ Desafiar ------------------------
