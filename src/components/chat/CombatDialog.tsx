@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { Sword, Flag, Zap, FlaskConical, Users, Target } from "lucide-react";
 import { FloatingDamageLayer, type DamageBurst } from "@/components/chat/FloatingDamage";
 import { HealParticles } from "@/components/chat/HealParticles";
+import { remapPvpForViewer } from "@/components/chat/pvpRemap";
 
 type Skill = {
   id: string; name: string; energy_type: "ef" | "em" | "chakra"; base_cost: number;
@@ -59,7 +60,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
 
   async function load() {
     const { data } = await supabase.from("combat_sessions").select("*").eq("id", sessionId).maybeSingle();
-    setSession(data);
+    setSession(remapPvpForViewer(data as any, myCharId));
   }
   async function loadSkills() {
     const { data } = await supabase
@@ -90,7 +91,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
     load(); loadSkills(); loadBag();
     const ch = supabase.channel(`combat-${sessionId}`)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "combat_sessions", filter: `id=eq.${sessionId}` },
-        (payload) => setSession(payload.new))
+        (payload) => setSession(remapPvpForViewer(payload.new as any, myCharId)))
       .subscribe();
     return () => { supabase.removeChannel(ch); };
      
