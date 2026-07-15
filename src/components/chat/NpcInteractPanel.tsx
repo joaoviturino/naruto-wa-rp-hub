@@ -254,6 +254,29 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
                 </div>
               ) : (
                 <div className="space-y-2">
+                  {open.offer_mission && (
+                    <MissionOfferBlock
+                      npc={open}
+                      busy={busy}
+                      onAccept={async () => {
+                        setBusy(true);
+                        try { await accept({ data: { npc_id: open.id } }); toast.success("Missão aceita!"); await load(); }
+                        catch (e: any) { toast.error(e.message); }
+                        finally { setBusy(false); }
+                      }}
+                      onTurnIn={async () => {
+                        setBusy(true);
+                        try {
+                          const r: any = await turnIn({ data: { mission_id: open.offer_mission!.id } });
+                          toast.success(`Missão entregue! +${r?.applied?.xp ?? 0} XP · +${r?.applied?.ryo ?? 0} Ryo`);
+                          if (open.dialog_outro) toast.message(open.dialog_outro);
+                          await load();
+                        }
+                        catch (e: any) { toast.error(e.message); }
+                        finally { setBusy(false); }
+                      }}
+                    />
+                  )}
                   <div className="text-sm">Recompensa: {open.reward_xp ? `${open.reward_xp} XP` : ""} {open.reward_ryo ? `+ ${open.reward_ryo} Ryo` : ""}</div>
                   {(open.reward_items ?? []).length > 0 && (
                     <div className="flex flex-wrap gap-2">
