@@ -1,7 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { computeLevel } from "@/lib/level";
+import { levelFromXp, DEFAULT_LEVEL_CONFIG } from "@/lib/level";
+function computeLevel(xp: number, cfg?: { base_xp: number; growth_factor: number; max_level: number }) {
+  return levelFromXp(xp ?? 0, cfg ?? DEFAULT_LEVEL_CONFIG);
+}
 
 // ------- Types shared with UI -------
 export type ObjectiveType =
