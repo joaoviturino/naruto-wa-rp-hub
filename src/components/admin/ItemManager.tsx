@@ -38,7 +38,12 @@ export function ItemManager({ adminUserId }: { adminUserId: string }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="font-display text-xl text-gold">Itens ({items.length})</h3>
-        <Button size="sm" onClick={() => { setEditing({}); setOpen(true); }}><Plus size={14} /> Novo item</Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => { setEditing({ type: "material", rank: "E" }); setOpen(true); }}>
+            <Plus size={14} /> Novo material
+          </Button>
+          <Button size="sm" onClick={() => { setEditing({}); setOpen(true); }}><Plus size={14} /> Novo item</Button>
+        </div>
       </div>
       <div className="scroll-panel rounded-lg overflow-x-auto">
         <table className="w-full text-sm min-w-[640px]">
