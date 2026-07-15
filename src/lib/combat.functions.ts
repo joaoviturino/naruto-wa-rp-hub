@@ -827,11 +827,20 @@ export const fleeCombat = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const me = await loadMyChar(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: sess } = await supabaseAdmin.from("combat_sessions").select("*").eq("id", data.session_id).maybeSingle();
+    if (!sess) return { ok: true };
+    const stateAny = (sess.state as any) ?? {};
     const { data: cp } = await supabaseAdmin
       .from("combat_participants").select("session_id").eq("session_id", data.session_id).eq("character_id", me.id).maybeSingle();
-    if (!cp) throw new Error("Você não está neste combate.");
-    const { data: sess } = await supabaseAdmin.from("combat_sessions").select("*").eq("id", data.session_id).maybeSingle();
-    if ((sess?.state as any)?.mode === "pvp") {
+    const pvpSide = stateAny?.mode === "pvp" ? pvpFindMySide(stateAny as PvpState, me.id) : null;
+    if (!cp && !pvpSide) throw new Error("Você não está neste combate.");
+    if (sess.status !== "active") {
+      if (stateAny?.mode === "pvp" && stateAny?.duel_id) {
+        await supabaseAdmin.from("pvp_duels").update({ status: "finished", ended_at: new Date().toISOString() }).eq("id", stateAny.duel_id).in("status", ["pending", "active"]);
+      }
+      return { ok: true };
+    }
+    if (stateAny?.mode === "pvp") {
       return await pvpFlee(supabaseAdmin, sess, me.id);
     }
     if (sess?.state) await persistPools(supabaseAdmin, sess.state as any);
@@ -1245,7 +1254,13 @@ async function handlePvpConsume(supabaseAdmin: any, sess: any, myId: string, ite
 async function pvpFlee(supabaseAdmin: any, sess: any, myId: string) {
   const state = sess.state as PvpState;
   const mySide = pvpFindMySide(state, myId);
-  if (!mySide) throw new Error("Você não é participante deste duelo.");
+  if (!mySide) {
+    await supabaseAdmin.from("combat_sessions").update({ status: "fled", ended_at: new Date().toISOString() }).eq("id", sess.id);
+    if (state?.duel_id) {
+      await supabaseAdmin.from("pvp_duels").update({ status: "finished", ended_at: new Date().toISOString() }).eq("id", state.duel_id).in("status", ["pending", "active"]);
+    }
+    return { ok: true };
+  }
   // Marca todos do lado que fugiu como derrotados; o outro lado vence.
   for (const p of pvpSide(state, mySide)) p.alive = false;
   const winnerSide = otherSide(mySide);
