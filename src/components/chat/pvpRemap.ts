@@ -18,6 +18,10 @@ export function remapPvpForViewer(raw: RawSession | null, myCharId: string): any
   const active = myTurn ? Math.max(0, Number(st.active_idx ?? 0)) : 0;
   const target = 0;
   const turn = myTurn ? "player" : "npc";
+  // Nickname de quem realmente está agindo (para textos "Aguardando X agir").
+  const actingList = st.active_side === "a" ? st.side_a : st.side_b;
+  const actingIdx = Math.max(0, Number(st.active_idx ?? 0));
+  const activeActorNickname = actingList?.[actingIdx]?.nickname ?? null;
 
   const remappedLog = (Array.isArray(raw.log) ? raw.log : []).map((e: any) => {
     if (!e) return e;
@@ -45,6 +49,7 @@ export function remapPvpForViewer(raw: RawSession | null, myCharId: string): any
       _pvp: true,
       _pvp_my_side: mySide,
       _spectator: spectator,
+      _acting_nickname: activeActorNickname,
     },
     log: remappedLog,
   };
