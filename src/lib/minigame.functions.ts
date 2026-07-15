@@ -36,6 +36,16 @@ const sequenceConfigSchema = z.object({
   })).default([]),
 }).default({ duration_seconds: 60, max_mistakes: 2, tiles: [] });
 
+const forgeConfigSchema = z.object({
+  duration_seconds: z.number().int().min(20).max(300).default(90),
+  difficulty: z.number().int().min(1).max(5).default(2),
+  hammer_hits: z.number().int().min(3).max(20).default(8),
+  heat_target: z.number().int().min(20).max(95).default(70),
+  temper_target: z.number().int().min(5).max(95).default(40),
+  recipe_item_id: z.string().uuid(),
+  source: z.enum(["inventory","inventory_or_equipped"]).default("inventory"),
+}).default({ duration_seconds: 90, difficulty: 2, hammer_hits: 8, heat_target: 70, temper_target: 40, recipe_item_id: "00000000-0000-0000-0000-000000000000", source: "inventory" });
+
 const configSchema = z.any();
 
 const ninjaRank = z.enum(["estudante","genin","chunin","tokubetsu_jonin","jonin","anbu","sannin","kage"]);
@@ -50,7 +60,7 @@ const rewardSkillsSchema = z.array(z.object({ skill_id: z.string().uuid() })).de
 const upsertSchema = z.object({
   id: z.string().uuid().optional(),
   slug: z.string().trim().min(2).max(40).regex(/^[a-z0-9_-]+$/, "slug inválido"),
-  kind: z.enum(["cleanup", "sequence"]).default("cleanup"),
+  kind: z.enum(["cleanup", "sequence", "forge"]).default("cleanup"),
   name: z.string().min(2).max(80),
   description: z.string().max(2000).nullish(),
   background_url: z.string().nullish(),
@@ -68,7 +78,10 @@ const upsertSchema = z.object({
   required_profs: requiredProfsSchema,
   reward_skills: rewardSkillsSchema,
 }).superRefine((data, ctx) => {
-  const parser = data.kind === "sequence" ? sequenceConfigSchema : cleanupConfigSchema;
+  const parser =
+    data.kind === "sequence" ? sequenceConfigSchema :
+    data.kind === "forge" ? forgeConfigSchema :
+    cleanupConfigSchema;
   const r = parser.safeParse(data.config);
   if (!r.success) {
     r.error.issues.forEach((i) => ctx.addIssue({ ...i, path: ["config", ...(i.path ?? [])] }));
