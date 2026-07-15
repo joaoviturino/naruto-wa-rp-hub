@@ -675,7 +675,8 @@ async function persistPools(supabaseAdmin: any, state: CombatState) {
   }
 }
 
-async function applyRewards(supabaseAdmin: any, npcId: string, state: CombatState, log: LogEntry[]) {
+async function applyRewards(supabaseAdmin: any, npcId: string | null, state: CombatState, log: LogEntry[]) {
+  if (!npcId) return null;
   const { data: npc } = await supabaseAdmin.from("npcs").select("reward_xp,reward_ryo,drop_table").eq("id", npcId).maybeSingle();
   if (!npc) return null;
   const xpGain = Number(npc.reward_xp ?? 0);
@@ -788,7 +789,7 @@ async function runSingleNpcAttack(supabaseAdmin: any, npcState: NpcState, state:
   npcState.energy = Math.max(0, npcState.energy - energy);
 }
 
-async function runNpcTurn(supabaseAdmin: any, _npcId: string, state: CombatState, log: LogEntry[], incomingSpeed: number) {
+async function runNpcTurn(supabaseAdmin: any, _npcId: string | null, state: CombatState, log: LogEntry[], incomingSpeed: number) {
   for (const n of state.npcs) {
     if (!n.alive) continue;
     if (state.players.every((p) => !p.alive)) break;
