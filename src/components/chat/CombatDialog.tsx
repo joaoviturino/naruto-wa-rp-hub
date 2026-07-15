@@ -425,6 +425,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
             {session.status !== "active" && <span className="ml-2 text-xs uppercase text-gold">{session.status}</span>}
             {state._pvp && !spectator && session.status === "active" && (
               <Button
+                type="button"
                 variant="destructive"
                 size="sm"
                 className="ml-auto mr-8 h-7 px-2 text-[11px]"
@@ -732,7 +733,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
               </TabsContent>
               <TabsContent value="flee" className="mt-2">
                 <div className="text-sm text-muted-foreground mb-2">Fugir encerra o combate para você e o time sem recompensas.</div>
-                <Button variant="outline" onClick={doFlee} disabled={fleeing}>
+                <Button type="button" variant="outline" onClick={doFlee} disabled={fleeing}>
                   <Flag size={14} className="mr-1" /> {fleeing ? "Fugindo..." : "Confirmar fuga"}
                 </Button>
               </TabsContent>
@@ -749,7 +750,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
               {spectator ? (
                 <Button variant="outline" size="sm" onClick={onClose}>Fechar</Button>
               ) : (
-                <Button variant="outline" size="sm" onClick={doFlee} disabled={fleeing}>
+                <Button type="button" variant="outline" size="sm" onClick={doFlee} disabled={fleeing}>
                   <Flag size={14} className="mr-1" /> {fleeing ? "Fugindo..." : "Fugir"}
                 </Button>
               )}
