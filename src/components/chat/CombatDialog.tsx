@@ -772,6 +772,22 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   );
 }
 
+function SmartCombatImage({ sources, alt, className, style, fallbackClassName }: {
+  sources: Array<string | null | undefined>;
+  alt: string;
+  className?: string;
+  style?: React.CSSProperties;
+  fallbackClassName?: string;
+}) {
+  const key = sources.join("|");
+  const clean = useMemo(() => Array.from(new Set(sources.filter((s): s is string => !!s && /^https?:\/\//i.test(s)))), [key]);
+  const [idx, setIdx] = useState(0);
+  useEffect(() => { setIdx(0); }, [clean.join("|")]);
+  const src = clean[idx];
+  if (!src) return <div className={fallbackClassName ?? "w-full h-full bg-secondary rounded"} />;
+  return <img src={src} alt={alt} className={className} style={style} onError={() => setIdx((i) => i + 1)} />;
+}
+
 function SkillFxLayer({ fx }: {
   fx: {
     id: string;
