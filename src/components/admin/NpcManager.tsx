@@ -27,6 +27,7 @@ type Npc = {
   kind: NpcKind; dialog_intro: string | null; dialog_outro: string | null;
   shop_items: ShopRow[]; reward_items: RewardRow[]; reward_cooldown_hours: number;
   required_mission_id: string | null;
+  offer_mission_id: string | null;
   tutorial_blocks?: LearnBlock[];
   learning_min_read_seconds?: number;
   linked_minigame_id?: string | null;
@@ -86,6 +87,7 @@ export function NpcManager() {
       reward_items: Array.isArray(r.reward_items) ? r.reward_items : [],
       reward_cooldown_hours: Number(r.reward_cooldown_hours ?? 24),
       required_mission_id: r.required_mission_id ?? null,
+      offer_mission_id: r.offer_mission_id ?? null,
       tutorial_blocks: Array.isArray(r.tutorial_blocks) ? r.tutorial_blocks : [],
       learning_min_read_seconds: Number(r.learning_min_read_seconds ?? 30),
       linked_minigame_id: r.linked_minigame_id ?? null,
@@ -309,6 +311,22 @@ export function NpcManager() {
                 <Label>Diálogo de despedida</Label>
                 <Textarea rows={2} defaultValue={sel.dialog_outro ?? ""}
                   onBlur={async (e) => { await save({ data: { ...sel, dialog_outro: e.target.value } } as any); load(); }} />
+                <div>
+                  <Label>Missão oferecida ao jogador (opcional)</Label>
+                  <select
+                    value={sel.offer_mission_id ?? ""}
+                    onChange={async (e) => {
+                      const v = e.target.value || null;
+                      await save({ data: { ...sel, offer_mission_id: v } } as any); load();
+                    }}
+                    className="w-full bg-input border border-border rounded px-2 py-1 text-sm mt-1">
+                    <option value="">— Não oferece missão —</option>
+                    {missions.map((m) => <option key={m.id} value={m.id}>[{m.rank}] {m.name}</option>)}
+                  </select>
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    O jogador aceita a missão com este NPC, faz os objetivos e retorna aqui para entregar. Recompensa da missão é definida na aba <b>Missões</b> — evite duplicar em "Recompensa do NPC" para não pagar duas vezes.
+                  </p>
+                </div>
               </div>
             ) : (
               <p className="text-xs text-muted-foreground">Disponível para NPCs de Loja e Recompensa.</p>

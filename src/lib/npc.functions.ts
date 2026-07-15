@@ -34,6 +34,7 @@ const npcPayload = z.object({
   dialog_intro: z.string().max(4000).nullish(),
   dialog_outro: z.string().max(4000).nullish(),
   required_mission_id: z.string().uuid().nullish(),
+  offer_mission_id: z.string().uuid().nullish(),
   shop_items: z.array(z.object({
     item_id: z.string().uuid(),
     price: z.number().int().min(0).max(10_000_000),
