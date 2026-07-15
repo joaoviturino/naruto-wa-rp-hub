@@ -13,7 +13,7 @@ const skillRank = z.enum(["E","D","C","B","A","S"]);
 const profKind = z.enum(["kenjutsu","shurikenjutsu","taijutsu","ninjutsu","genjutsu","fuinjutsu","iryo"]);
 const skillClassification = z.enum(["ofensivo","defensivo","suplementar"]);
 const skillRange = z.enum(["curto","medio","longo"]);
-const itemType = z.enum(["consumable","tool","armor_helmet","armor_vest","armor_pants","armor_boots","weapon","weapon_primary","weapon_secondary"]);
+const itemType = z.enum(["consumable","tool","material","armor_helmet","armor_vest","armor_pants","armor_boots","weapon","weapon_primary","weapon_secondary"]);
 const villageEnum = z.enum(["konoha","suna","kiri","kumo","iwa","ame","kusa","taki","oto","yuki","hoshi","nomad"]);
 const elementEnum = z.enum(["katon","suiton","fuuton","doton","raiton"]);
 const skillClassEnum = z.enum([
@@ -40,6 +40,10 @@ const restoreEffect = z.object({
 }).nullable().optional();
 const metaSchema = z.object({
   restore: restoreEffect,
+  recipe: z.array(z.object({
+    item_id: z.string().uuid(),
+    qty: z.number().int().min(1).max(999),
+  })).nullable().optional(),
 }).partial().passthrough().nullable().optional();
 
 /** Send a test message via the bot queue. */
