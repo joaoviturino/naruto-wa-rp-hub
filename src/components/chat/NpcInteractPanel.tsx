@@ -626,6 +626,22 @@ function MissionOfferBlock({ npc, busy, onAccept, onTurnIn }: {
         {(m.rewards?.items?.length ?? 0) > 0 && ` · ${m.rewards.items.length} item(ns)`}
         {(m.rewards?.skill_ids?.length ?? 0) > 0 && ` · ${m.rewards.skill_ids.length} habilidade(s)`}
       </div>
+      {(status === "available" || status === "in_progress") && (npc.offer_conflicts?.length ?? 0) > 0 && (
+        <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-2 text-[11px] text-amber-200 space-y-1">
+          <div className="font-semibold flex items-center gap-1"><Sparkles size={11}/> Objetivos compartilhados</div>
+          <div className="text-amber-100/90">
+            Esta missão tem objetivos em comum com outra(s) missão(ões) suas em andamento. O progresso conta para todas simultaneamente:
+          </div>
+          <ul className="list-disc pl-4 space-y-0.5">
+            {npc.offer_conflicts!.map((c) => (
+              <li key={c.mission_id}>
+                <span className="font-medium">{c.mission_name}</span>
+                {c.shared.length > 0 && <span className="text-amber-100/70"> — {c.shared.join(", ")}</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div className="flex justify-end">
         {status === "available" && (
           <Button size="sm" disabled={busy} onClick={onAccept}>Aceitar missão</Button>
