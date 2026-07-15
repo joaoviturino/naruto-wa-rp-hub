@@ -58,6 +58,22 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const flee = useServerFn(fleeCombat);
   const consume = useServerFn(consumeInCombat);
 
+  async function doFlee() {
+    if (busy) return;
+    if (!confirm("Fugir do combate? Você perde a luta e o chat é destravado.")) return;
+    setBusy(true);
+    try {
+      await flee({ data: { session_id: sessionId } });
+      toast.success("Você fugiu do combate.");
+      // Fecha imediatamente — o realtime também atualiza, mas queremos destravar o chat na hora.
+      onClose();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Não foi possível fugir.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function load() {
     const { data } = await supabase.from("combat_sessions").select("*").eq("id", sessionId).maybeSingle();
     setSession(remapPvpForViewer(data as any, myCharId));
