@@ -286,7 +286,7 @@ export const getMyActiveCombat = createServerFn({ method: "POST" })
       if (!duel || duel.status === "active") return { session, character_id: me.id as string };
       // Autorrecuperação: se o duelo já terminou mas a sessão ficou ativa, encerra a sessão para destravar o chat.
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      await supabaseAdmin.from("combat_sessions").update({ status: "finished", ended_at: new Date().toISOString() }).eq("id", session.id);
+      await supabaseAdmin.from("combat_sessions").update({ status: "fled", ended_at: new Date().toISOString() }).eq("id", session.id);
     }
     return { session: null, character_id: me.id as string };
   });
@@ -1000,11 +1000,11 @@ async function persistPvpPools(supabaseAdmin: any, state: PvpState) {
   }
 }
 
-async function finalizePvp(supabaseAdmin: any, sessId: string, state: PvpState, winnerSide: "a" | "b") {
+async function finalizePvp(supabaseAdmin: any, sessId: string, state: PvpState, winnerSide: "a" | "b", sessionStatus: "won" | "fled" = "won") {
   state.winner_side = winnerSide;
   await persistPvpPools(supabaseAdmin, state);
   await supabaseAdmin.from("combat_sessions").update({
-    state, status: "finished", ended_at: new Date().toISOString(),
+    state, status: sessionStatus, ended_at: new Date().toISOString(),
   }).eq("id", sessId);
   if (state.duel_id) {
     const winnerArr = pvpSide(state, winnerSide);
@@ -1249,7 +1249,7 @@ async function pvpFlee(supabaseAdmin: any, sess: any, myId: string) {
   // Marca todos do lado que fugiu como derrotados; o outro lado vence.
   for (const p of pvpSide(state, mySide)) p.alive = false;
   const winnerSide = otherSide(mySide);
-  await finalizePvp(supabaseAdmin, sess.id, state, winnerSide);
+  await finalizePvp(supabaseAdmin, sess.id, state, winnerSide, "fled");
   return { ok: true };
 }
 
