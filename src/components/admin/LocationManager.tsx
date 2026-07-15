@@ -15,6 +15,7 @@ import { LocationMapEditor } from "./LocationMapEditor";
 
 type Loc = { id: string; name: string; description: string | null; image_url: string | null;
   map_x?: number; map_y?: number;
+  parent_id?: string | null;
   is_danger_zone?: boolean; spawn_chance?: number; spawn_tick_seconds?: number;
   spawn_group_ids?: string[] };
 type Conn = { id: string; a_id: string; b_id: string };
