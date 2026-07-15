@@ -9,6 +9,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { toast } from "sonner";
 import { Store, Gift, MessageSquare, Coins, Minus, Plus, Lock, GraduationCap, Box } from "lucide-react";
 import { listLocationInteractNpcs, buyFromShop, claimNpcReward } from "@/lib/npc-interact.functions";
+import { acceptMissionFromNpc } from "@/lib/npc-interact.functions";
+import { claimMission } from "@/lib/missions.functions";
 import { listNpcLearningSteps } from "@/lib/minigame.functions";
 import { MinigameDialog } from "@/components/minigame/MinigameDialog";
 import { NpcMusic } from "@/components/NpcMusic";
@@ -25,6 +27,16 @@ type Npc = {
   required_mission_id?: string | null;
   mission_required_name?: string | null;
   mission_unlocked?: boolean;
+  offer_mission_id?: string | null;
+  offer_mission?: {
+    id: string; name: string;
+    objectives: Array<{ id: string; type: string; count: number; description: string | null; target_ref?: string | null }>;
+    reward_xp: number; reward_ryo: number; rewards: any;
+    cooldown_hours: number; repeatable: boolean;
+  } | null;
+  offer_status?: "available" | "in_progress" | "ready" | "claimed" | "cooldown";
+  offer_progress?: Record<string, number>;
+  offer_cooldown_until?: string | null;
   tutorial_blocks?: LearnBlock[];
   learning_min_read_seconds?: number;
   linked_minigame_id?: string | null;
@@ -43,6 +55,8 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
   const list = useServerFn(listLocationInteractNpcs);
   const buy = useServerFn(buyFromShop);
   const claim = useServerFn(claimNpcReward);
+  const accept = useServerFn(acceptMissionFromNpc);
+  const turnIn = useServerFn(claimMission);
 
   async function load() {
     try {
