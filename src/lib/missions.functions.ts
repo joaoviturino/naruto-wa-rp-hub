@@ -1,0 +1,353 @@
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { levelFromXp, DEFAULT_LEVEL_CONFIG } from "@/lib/level";
+function computeLevel(xp: number, cfg?: { base_xp: number; growth_factor: number; max_level: number }) {
+  return levelFromXp(xp ?? 0, cfg ?? DEFAULT_LEVEL_CONFIG);
+}
+
+// ------- Types shared with UI -------
+export type ObjectiveType =
+  | "kill_npc" | "kill_npc_kind" | "kill_npc_group"
+  | "complete_minigame" | "read_book"
+  | "reach_location" | "learn_skill"
+  | "craft_item" | "collect_item"
+  | "reach_rank" | "reach_level" | "reach_proficiency"
+  | "pvp_win" | "talk_npc" | "custom";
+
+export const OBJECTIVE_TYPES: { value: ObjectiveType; label: string; needs: "npc"|"npc_group"|"npc_kind"|"minigame"|"book"|"location"|"skill"|"item"|"rank"|"level"|"proficiency"|"none" }[] = [
+  { value: "kill_npc",           label: "Derrotar NPC específico",          needs: "npc" },
+  { value: "kill_npc_kind",      label: "Derrotar NPC por tipo",             needs: "npc_kind" },
+  { value: "kill_npc_group",     label: "Derrotar grupo de NPCs",            needs: "npc_group" },
+  { value: "complete_minigame",  label: "Completar minigame",                needs: "minigame" },
+  { value: "read_book",          label: "Ler livro",                          needs: "book" },
+  { value: "reach_location",     label: "Chegar a um local",                 needs: "location" },
+  { value: "learn_skill",        label: "Aprender habilidade",               needs: "skill" },
+  { value: "craft_item",         label: "Fabricar item",                     needs: "item" },
+  { value: "collect_item",       label: "Coletar item",                      needs: "item" },
+  { value: "reach_rank",         label: "Atingir patente",                   needs: "rank" },
+  { value: "reach_level",        label: "Atingir nível",                     needs: "level" },
+  { value: "reach_proficiency",  label: "Atingir proficiência",              needs: "proficiency" },
+  { value: "pvp_win",            label: "Vencer duelo PvP",                  needs: "none" },
+  { value: "talk_npc",           label: "Falar com NPC",                     needs: "npc" },
+  { value: "custom",             label: "Personalizado (marcação manual)",   needs: "none" },
+];
+
+const objective = z.object({
+  id: z.string().min(1),
+  type: z.enum([
+    "kill_npc","kill_npc_kind","kill_npc_group",
+    "complete_minigame","read_book",
+    "reach_location","learn_skill",
+    "craft_item","collect_item",
+    "reach_rank","reach_level","reach_proficiency",
+    "pvp_win","talk_npc","custom",
+  ]),
+  target_id: z.string().nullable().optional(),
+  target_ref: z.string().nullable().optional(),
+  count: z.number().int().min(1).max(9999).default(1),
+  description: z.string().max(400).nullable().optional(),
+});
+
+const rewardsSchema = z.object({
+  xp: z.number().int().min(0).default(0),
+  ryo: z.number().int().min(0).default(0),
+  items: z.array(z.object({ item_id: z.string().uuid(), qty: z.number().int().min(1).max(999) })).default([]),
+  skill_ids: z.array(z.string().uuid()).default([]),
+  proficiency_grants: z.array(z.object({
+    skill_class: z.string(),
+    nivel: z.enum(["E","D","C","B","A","S"]).nullable().optional(),
+    maestria: z.enum(["E","D","C","B","A","S"]).nullable().optional(),
+  })).default([]),
+}).partial();
+
+const requirementsSchema = z.object({
+  min_rank: z.string().nullable().optional(),
+  min_level: z.number().int().min(0).nullable().optional(),
+  previous_mission_id: z.string().uuid().nullable().optional(),
+}).partial();
+
+export const missionInputSchema = z.object({
+  id: z.string().uuid().optional(),
+  name: z.string().min(1).max(120),
+  rank: z.enum(["estudante","genin","chunin","tokubetsu_jonin","jonin","anbu","sannin","kage"]).default("genin"),
+  description: z.string().max(4000).nullable().optional(),
+  category: z.enum(["daily","common","special"]).default("daily"),
+  reward_xp: z.number().int().min(0).default(0),
+  reward_ryo: z.number().int().min(0).default(0),
+  objectives: z.array(objective).default([]),
+  rewards: rewardsSchema.default({}),
+  requirements: requirementsSchema.default({}),
+  cooldown_hours: z.number().int().min(0).max(24 * 365).default(24),
+  repeatable: z.boolean().default(true),
+  active: z.boolean().default(true),
+});
+
+async function assertAdmin(context: { supabase: any; userId: string }) {
+  const { data, error } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Forbidden");
+}
+
+const RANK_ORDER = ["estudante","genin","chunin","tokubetsu_jonin","jonin","anbu","sannin","kage"];
+function rankIdx(r?: string | null) { return r ? RANK_ORDER.indexOf(r) : -1; }
+const SKILL_RANKS = ["E","D","C","B","A","S"];
+function skillRankIdx(r?: string | null) { return r ? SKILL_RANKS.indexOf(r) : -1; }
+
+/** Recompute derived progress values (rank/level/prof/collect) from live character state. */
+function computeDerivedProgress(mission: any, char: any, inventory: any[], level: number, persisted: Record<string, number>): Record<string, number> {
+  const out: Record<string, number> = { ...persisted };
+  const objs: any[] = Array.isArray(mission.objectives) ? mission.objectives : [];
+  for (const o of objs) {
+    if (o.type === "reach_rank") {
+      out[o.id] = rankIdx(char?.rank) >= rankIdx(o.target_ref) ? o.count : 0;
+    } else if (o.type === "reach_level") {
+      const target = Number(o.target_ref ?? 0);
+      out[o.id] = level >= target ? o.count : 0;
+    } else if (o.type === "reach_proficiency") {
+      const [cls, rank] = String(o.target_ref ?? "").split("|");
+      const p = ((char?.proficiencies ?? {}) as any)[cls] ?? {};
+      const best = Math.max(skillRankIdx(p.nivel), skillRankIdx(p.maestria));
+      out[o.id] = best >= skillRankIdx(rank) ? o.count : 0;
+    } else if (o.type === "collect_item") {
+      const target = o.target_id;
+      const totalInBag = inventory.filter((e) => e?.item_id === target).reduce((n, e) => n + Number(e.qty ?? 1), 0);
+      out[o.id] = Math.min(totalInBag, o.count);
+    }
+  }
+  return out;
+}
+
+function isComplete(mission: any, progress: Record<string, number>) {
+  const objs: any[] = Array.isArray(mission.objectives) ? mission.objectives : [];
+  if (!objs.length) return false;
+  return objs.every((o) => Number(progress[o.id] ?? 0) >= Number(o.count ?? 1));
+}
+
+async function meetsRequirements(supa: any, char: any, level: number, req: any): Promise<{ ok: boolean; reason?: string }> {
+  const r = req ?? {};
+  if (r.min_rank && rankIdx(char?.rank) < rankIdx(r.min_rank)) return { ok: false, reason: `Requer patente ${r.min_rank}` };
+  if (r.min_level && level < Number(r.min_level)) return { ok: false, reason: `Requer nível ${r.min_level}` };
+  if (r.previous_mission_id) {
+    const { data } = await supa.from("character_missions").select("status").eq("character_id", char.id).eq("mission_id", r.previous_mission_id).maybeSingle();
+    if (!data || data.status !== "claimed") return { ok: false, reason: "Missão anterior não concluída" };
+  }
+  return { ok: true };
+}
+
+/* -------- LIST -------- */
+export const listMyMissions = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data: char } = await context.supabase
+      .from("characters").select("id,xp,rank,proficiencies").eq("user_id", context.userId).maybeSingle();
+    if (!char) return { missions: [] };
+    const { data: lvlCfg } = await context.supabase.from("level_config").select("*").limit(1).maybeSingle();
+    const level = computeLevel(char.xp ?? 0, lvlCfg ? { base_xp: lvlCfg.base_xp, growth_factor: lvlCfg.growth_factor, max_level: lvlCfg.max_level } : undefined);
+    const [{ data: missions }, { data: cms }, { data: inv }] = await Promise.all([
+      context.supabase.from("missions").select("*").eq("active", true).order("category").order("rank"),
+      context.supabase.from("character_missions").select("*").eq("character_id", char.id),
+      context.supabase.from("inventory").select("ninja_bag").eq("character_id", char.id).maybeSingle(),
+    ]);
+    const bag = (Array.isArray(inv?.ninja_bag) ? inv!.ninja_bag : []) as any[];
+    const byId = new Map(((cms as any[]) ?? []).map((r) => [r.mission_id, r]));
+    const out = [];
+    for (const m of (missions ?? []) as any[]) {
+      const req = await meetsRequirements(context.supabase, char, level, m.requirements);
+      const cm = byId.get(m.id);
+      const persisted = (cm?.progress ?? {}) as Record<string, number>;
+      const progress = computeDerivedProgress(m, char, bag, level, persisted);
+      const complete = isComplete(m, progress);
+      let effectiveStatus: "locked" | "active" | "completed" | "claimed" | "cooldown" = "active";
+      if (!req.ok) effectiveStatus = "locked";
+      else if (cm?.status === "claimed") {
+        if (!m.repeatable) effectiveStatus = "claimed";
+        else {
+          const nextAt = new Date(cm.claimed_at ?? cm.completed_at ?? cm.started_at).getTime() + Number(m.cooldown_hours ?? 24) * 3600_000;
+          effectiveStatus = Date.now() < nextAt ? "cooldown" : "active";
+        }
+      } else if (complete || cm?.status === "completed") effectiveStatus = "completed";
+      out.push({
+        ...m, progress, status: effectiveStatus,
+        cooldown_until: cm?.claimed_at ? new Date(new Date(cm.claimed_at).getTime() + Number(m.cooldown_hours ?? 24) * 3600_000).toISOString() : null,
+        requirement_reason: req.ok ? null : req.reason,
+      });
+    }
+    return { missions: out, character_id: char.id };
+  });
+
+/* -------- CLAIM -------- */
+export const claimMission = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ mission_id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: char } = await context.supabase
+      .from("characters").select("id,xp,ryo,rank,proficiencies").eq("user_id", context.userId).maybeSingle();
+    if (!char) throw new Error("Sem personagem.");
+    const { data: m } = await supabaseAdmin.from("missions").select("*").eq("id", data.mission_id).maybeSingle();
+    if (!m || !m.active) throw new Error("Missão indisponível.");
+    const { data: cmRow } = await supabaseAdmin.from("character_missions").select("*").eq("character_id", char.id).eq("mission_id", m.id).maybeSingle();
+    const { data: lvlCfg } = await context.supabase.from("level_config").select("*").limit(1).maybeSingle();
+    const level = computeLevel(char.xp ?? 0, lvlCfg ? { base_xp: lvlCfg.base_xp, growth_factor: lvlCfg.growth_factor, max_level: lvlCfg.max_level } : undefined);
+    const { data: inv } = await context.supabase.from("inventory").select("ninja_bag").eq("character_id", char.id).maybeSingle();
+    const bag = (Array.isArray(inv?.ninja_bag) ? inv!.ninja_bag : []) as any[];
+    const persisted = (cmRow?.progress ?? {}) as Record<string, number>;
+    const progress = computeDerivedProgress(m, char, bag, level, persisted);
+    if (!isComplete(m, progress)) throw new Error("Objetivos incompletos.");
+    // Cooldown
+    if (cmRow?.status === "claimed") {
+      if (!m.repeatable) throw new Error("Missão já concluída.");
+      const nextAt = new Date(cmRow.claimed_at ?? cmRow.started_at).getTime() + Number(m.cooldown_hours ?? 24) * 3600_000;
+      if (Date.now() < nextAt) throw new Error("Ainda em cooldown.");
+    }
+    // Apply rewards
+    const r = (m.rewards ?? {}) as any;
+    const patch: any = {};
+    const totalXp = Number(m.reward_xp ?? 0) + Number(r.xp ?? 0);
+    const totalRyo = Number(m.reward_ryo ?? 0) + Number(r.ryo ?? 0);
+    if (totalXp) patch.xp = Number(char.xp ?? 0) + totalXp;
+    if (totalRyo) patch.ryo = Number(char.ryo ?? 0) + totalRyo;
+    if (Array.isArray(r.proficiency_grants) && r.proficiency_grants.length) {
+      const profs = { ...((char.proficiencies as any) ?? {}) } as Record<string, any>;
+      for (const g of r.proficiency_grants) {
+        const cur = profs[g.skill_class] ?? {};
+        const nivel = skillRankIdx(g.nivel) > skillRankIdx(cur.nivel) ? g.nivel : cur.nivel;
+        const maestria = skillRankIdx(g.maestria) > skillRankIdx(cur.maestria) ? g.maestria : cur.maestria;
+        profs[g.skill_class] = { nivel: nivel ?? null, maestria: maestria ?? null };
+      }
+      patch.proficiencies = profs;
+    }
+    if (Object.keys(patch).length) await supabaseAdmin.from("characters").update(patch).eq("id", char.id);
+    if (Array.isArray(r.skill_ids) && r.skill_ids.length) {
+      const rows = r.skill_ids.map((sid: string) => ({ character_id: char.id, skill_id: sid }));
+      await supabaseAdmin.from("character_skills").upsert(rows, { onConflict: "character_id,skill_id" });
+    }
+    if (Array.isArray(r.items) && r.items.length) {
+      const nb = bag.map((e: any) => ({ item_id: e.item_id, qty: Number(e.qty ?? 1) }));
+      for (const it of r.items) {
+        const idx = nb.findIndex((b: any) => b.item_id === it.item_id);
+        if (idx >= 0) nb[idx].qty += Number(it.qty ?? 1); else nb.push({ item_id: it.item_id, qty: Number(it.qty ?? 1) });
+      }
+      await supabaseAdmin.from("inventory").update({ ninja_bag: nb }).eq("character_id", char.id);
+    }
+    // Persist claim
+    const now = new Date().toISOString();
+    const row = {
+      character_id: char.id, mission_id: m.id,
+      progress, status: "claimed" as const,
+      started_at: cmRow?.started_at ?? now, completed_at: now, claimed_at: now,
+    };
+    if (cmRow) {
+      await supabaseAdmin.from("character_missions").update(row).eq("character_id", char.id).eq("mission_id", m.id);
+    } else {
+      await supabaseAdmin.from("character_missions").insert(row);
+    }
+    return { ok: true, applied: { xp: totalXp, ryo: totalRyo, items: r.items ?? [], skill_ids: r.skill_ids ?? [], proficiency_grants: r.proficiency_grants ?? [] } };
+  });
+
+/* -------- ADMIN: manual mark objective (for 'custom') -------- */
+export const adminMarkObjective = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    character_id: z.string().uuid(),
+    mission_id: z.string().uuid(),
+    objective_id: z.string().min(1),
+    value: z.number().int().min(0).max(9999),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: existing } = await supabaseAdmin.from("character_missions").select("*").eq("character_id", data.character_id).eq("mission_id", data.mission_id).maybeSingle();
+    const progress = { ...(existing?.progress ?? {}) as any, [data.objective_id]: data.value };
+    if (existing) await supabaseAdmin.from("character_missions").update({ progress }).eq("character_id", data.character_id).eq("mission_id", data.mission_id);
+    else await supabaseAdmin.from("character_missions").insert({ character_id: data.character_id, mission_id: data.mission_id, progress, status: "active" });
+    return { ok: true };
+  });
+
+/* -------- INTERNAL: increment progress based on an event.
+   Exported as a server-only helper (no `createServerFn`), called from other .functions modules. -------- */
+export type MissionEvent =
+  | { type: "kill_npc"; npc_id: string; npc_kind?: string | null; group_id?: string | null }
+  | { type: "complete_minigame"; minigame_id: string; kind?: string | null }
+  | { type: "read_book"; book_id: string }
+  | { type: "reach_location"; location_id: string }
+  | { type: "learn_skill"; skill_id: string }
+  | { type: "craft_item"; item_id: string }
+  | { type: "pvp_win" }
+  | { type: "talk_npc"; npc_id: string };
+
+export async function bumpMissionProgress(supabaseAdmin: any, characterId: string, event: MissionEvent) {
+  const { data: missions } = await supabaseAdmin.from("missions").select("id,objectives,active").eq("active", true);
+  if (!missions?.length) return;
+  const missionIds = missions.map((m: any) => m.id);
+  const { data: rows } = await supabaseAdmin.from("character_missions").select("*").eq("character_id", characterId).in("mission_id", missionIds);
+  const byMission = new Map<string, any>(((rows as any[]) ?? []).map((r) => [r.mission_id, r]));
+  for (const m of missions as any[]) {
+    const objs: any[] = Array.isArray(m.objectives) ? m.objectives : [];
+    let touched = false;
+    const cm = byMission.get(m.id);
+    // Skip if claimed and not in cooldown-reset window (we let claim handle repeats)
+    if (cm?.status === "claimed") continue;
+    const progress: Record<string, number> = { ...((cm?.progress ?? {}) as any) };
+    for (const o of objs) {
+      const cap = Number(o.count ?? 1);
+      const cur = Number(progress[o.id] ?? 0);
+      if (cur >= cap) continue;
+      let match = false;
+      switch (event.type) {
+        case "kill_npc":
+          if (o.type === "kill_npc" && o.target_id === event.npc_id) match = true;
+          if (o.type === "kill_npc_kind" && o.target_ref === event.npc_kind) match = true;
+          if (o.type === "kill_npc_group" && event.group_id && o.target_id === event.group_id) match = true;
+          break;
+        case "complete_minigame":
+          if (o.type === "complete_minigame" && (o.target_id === event.minigame_id || o.target_ref === event.kind)) match = true;
+          break;
+        case "read_book":
+          if (o.type === "read_book" && o.target_id === event.book_id) match = true;
+          break;
+        case "reach_location":
+          if (o.type === "reach_location" && o.target_id === event.location_id) match = true;
+          break;
+        case "learn_skill":
+          if (o.type === "learn_skill" && o.target_id === event.skill_id) match = true;
+          break;
+        case "craft_item":
+          if (o.type === "craft_item" && o.target_id === event.item_id) match = true;
+          break;
+        case "pvp_win":
+          if (o.type === "pvp_win") match = true;
+          break;
+        case "talk_npc":
+          if (o.type === "talk_npc" && o.target_id === event.npc_id) match = true;
+          break;
+      }
+      if (match) {
+        progress[o.id] = Math.min(cap, cur + 1);
+        touched = true;
+      }
+    }
+    if (touched) {
+      if (cm) {
+        await supabaseAdmin.from("character_missions").update({ progress }).eq("character_id", characterId).eq("mission_id", m.id);
+      } else {
+        await supabaseAdmin.from("character_missions").insert({ character_id: characterId, mission_id: m.id, progress, status: "active" });
+      }
+    }
+  }
+}
+
+/** Server-fn wrapper so client code (rare) can trigger from a safe place. */
+export const bumpMyProgress = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    event: z.any(),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { data: char } = await context.supabase.from("characters").select("id").eq("user_id", context.userId).maybeSingle();
+    if (!char) return { ok: false };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await bumpMissionProgress(supabaseAdmin, char.id, data.event as MissionEvent);
+    return { ok: true };
+  });

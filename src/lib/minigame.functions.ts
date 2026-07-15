@@ -378,6 +378,21 @@ export const completeMinigameRun = createServerFn({ method: "POST" })
       score: data.score, success: data.success, rewards_applied: applied, completed_at: new Date().toISOString(),
     }).eq("id", data.run_id);
 
+    // Missões — registrar conclusão de minigame e (se houver) fabricação.
+    if (data.success) {
+      try {
+        const { bumpMissionProgress } = await import("@/lib/missions.functions");
+        await bumpMissionProgress(supabaseAdmin, run.character_id, {
+          type: "complete_minigame", minigame_id: run.minigame_id, kind: run.minigames.kind ?? null,
+        });
+        if (applied.forged?.item_id) {
+          await bumpMissionProgress(supabaseAdmin, run.character_id, {
+            type: "craft_item", item_id: applied.forged.item_id,
+          });
+        }
+      } catch (e) { /* non-fatal */ }
+    }
+
     return { ok: true, rewards: applied };
   });
 

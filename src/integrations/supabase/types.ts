@@ -170,18 +170,30 @@ export type Database = {
       character_missions: {
         Row: {
           character_id: string
+          claimed_at: string | null
           completed_at: string
           mission_id: string
+          progress: Json
+          started_at: string
+          status: string
         }
         Insert: {
           character_id: string
+          claimed_at?: string | null
           completed_at?: string
           mission_id: string
+          progress?: Json
+          started_at?: string
+          status?: string
         }
         Update: {
           character_id?: string
+          claimed_at?: string | null
           completed_at?: string
           mission_id?: string
+          progress?: Json
+          started_at?: string
+          status?: string
         }
         Relationships: [
           {
@@ -1445,28 +1457,52 @@ export type Database = {
       }
       missions: {
         Row: {
+          active: boolean
+          category: string
+          cooldown_hours: number
           created_at: string
           description: string | null
           id: string
           name: string
+          objectives: Json
           rank: Database["public"]["Enums"]["ninja_rank"]
+          repeatable: boolean
+          requirements: Json
+          reward_ryo: number
           reward_xp: number
+          rewards: Json
         }
         Insert: {
+          active?: boolean
+          category?: string
+          cooldown_hours?: number
           created_at?: string
           description?: string | null
           id?: string
           name: string
+          objectives?: Json
           rank?: Database["public"]["Enums"]["ninja_rank"]
+          repeatable?: boolean
+          requirements?: Json
+          reward_ryo?: number
           reward_xp?: number
+          rewards?: Json
         }
         Update: {
+          active?: boolean
+          category?: string
+          cooldown_hours?: number
           created_at?: string
           description?: string | null
           id?: string
           name?: string
+          objectives?: Json
           rank?: Database["public"]["Enums"]["ninja_rank"]
+          repeatable?: boolean
+          requirements?: Json
+          reward_ryo?: number
           reward_xp?: number
+          rewards?: Json
         }
         Relationships: []
       }

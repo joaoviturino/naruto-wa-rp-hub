@@ -27,6 +27,11 @@ export const moveCharacter = createServerFn({ method: "POST" })
         last_spawn_roll_at: null,
       }).eq("id", char.id);
     if (error) throw new Error(error.message);
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { bumpMissionProgress } = await import("@/lib/missions.functions");
+      await bumpMissionProgress(supabaseAdmin, char.id, { type: "reach_location", location_id: data.locationId });
+    } catch {}
     return { ok: true };
   });
 

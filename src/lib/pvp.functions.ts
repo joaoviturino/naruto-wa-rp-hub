@@ -322,6 +322,11 @@ export const submitTurn = createServerFn({ method: "POST" })
         status: "finished", winner_id: me.id, ended_at: new Date().toISOString(),
         state: isChallenger ? { challenger: actor, opponent: target } : { challenger: target, opponent: actor },
       }).eq("id", duel.id);
+      try {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { bumpMissionProgress } = await import("@/lib/missions.functions");
+        await bumpMissionProgress(supabaseAdmin, me.id, { type: "pvp_win" });
+      } catch {}
       return { ok: true, finished: true, winner_id: me.id, damage, crit };
     }
 
