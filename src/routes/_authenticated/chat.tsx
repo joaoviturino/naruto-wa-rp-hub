@@ -214,7 +214,10 @@ function ChatPage() {
       .on("postgres_changes", { event: "*", schema: "public", table: "combat_sessions", filter: `location_id=eq.${currentLoc.id}` },
         () => refreshPvp())
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    // Fallback: alguns celulares/webviews perdem realtime; isso garante que
+    // o chat destrave assim que o duelo mudar para finished/fled.
+    const poll = window.setInterval(refreshPvp, 2000);
+    return () => { supabase.removeChannel(ch); window.clearInterval(poll); };
   }, [currentLoc?.id, character?.id]);
 
   // Presença em tempo real via Realtime Presence — instantâneo, sem depender de publication
@@ -257,6 +260,12 @@ function ChatPage() {
       setContent(""); setScene(null);
     } catch (e: any) { toast.error(e.message); }
     finally { setSending(false); }
+  }
+
+  function closeCombatDialog() {
+    const closingId = combatId;
+    setCombatId(null);
+    if (closingId && closingId === pvpAtLocation) setPvpAtLocation(null);
   }
 
   async function doTogglePin(id: string) {
@@ -503,7 +512,7 @@ function ChatPage() {
 
       <PlayerActionMenu target={target} open={targetOpen} onOpenChange={setTargetOpen} />
       {combatId && character && (
-        <CombatDialog sessionId={combatId} myCharId={character.id} onClose={() => setCombatId(null)} />
+        <CombatDialog sessionId={combatId} myCharId={character.id} onClose={closeCombatDialog} />
       )}
       {activeMinigame && (
         <MinigameDialog minigame={activeMinigame} open onOpenChange={(v) => { if (!v) setActiveMinigame(null); }}
