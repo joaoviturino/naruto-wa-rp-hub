@@ -2347,7 +2347,7 @@ export type Database = {
         | "anbu"
         | "sannin"
         | "kage"
-      npc_kind: "aggressive" | "shop" | "reward" | "learning"
+      npc_kind: "aggressive" | "shop" | "reward" | "learning" | "object"
       proficiency_kind:
         | "kenjutsu"
         | "shurikenjutsu"
@@ -2581,7 +2581,7 @@ export const Constants = {
         "sannin",
         "kage",
       ],
-      npc_kind: ["aggressive", "shop", "reward", "learning"],
+      npc_kind: ["aggressive", "shop", "reward", "learning", "object"],
       proficiency_kind: [
         "kenjutsu",
         "shurikenjutsu",
