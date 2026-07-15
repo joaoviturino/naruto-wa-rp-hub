@@ -53,6 +53,7 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
   const [qtys, setQtys] = useState<Record<string, number>>({});
   const [objMinigame, setObjMinigame] = useState<any | null>(null);
   const [objOpen, setObjOpen] = useState(false);
+  const [charId, setCharId] = useState<string | null>(null);
   const list = useServerFn(listLocationInteractNpcs);
   const buy = useServerFn(buyFromShop);
   const claim = useServerFn(claimNpcReward);
@@ -76,12 +77,27 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
       }
       const { data: me } = await supabase.auth.getUser();
       if (me.user) {
-        const { data: ch } = await supabase.from("characters").select("ryo").eq("user_id", me.user.id).maybeSingle();
+        const { data: ch } = await supabase.from("characters").select("id,ryo").eq("user_id", me.user.id).maybeSingle();
         setRyo(Number((ch as any)?.ryo ?? 0));
+        setCharId((ch as any)?.id ?? null);
       }
     } catch {/* ignore */}
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [locationId, refreshTick]);
+
+  // Realtime: refresh NPC offer progress when this character's mission rows change.
+  useEffect(() => {
+    if (!charId) return;
+    const ch = supabase
+      .channel(`npc-panel-missions:${charId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "character_missions", filter: `character_id=eq.${charId}` },
+        () => { load(); },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [charId]);
 
   if (!npcs.length) return null;
   const remH = (ms?: number) => ms && ms > 0 ? Math.ceil(ms / 3600000) : 0;
