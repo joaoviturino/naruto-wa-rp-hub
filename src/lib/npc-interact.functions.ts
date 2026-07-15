@@ -94,6 +94,34 @@ export const listLocationInteractNpcs = createServerFn({ method: "POST" })
         n.offer_progress = progress;
       }
     }
+    // Conflitos / sobreposição de objetivos: para cada offer_mission disponível,
+    // procura outras missões ATIVAS do jogador com objetivos equivalentes.
+    const availableOffers = list.filter(
+      (n: any) => n.offer_mission && (n.offer_status === "available" || n.offer_status === "in_progress"),
+    );
+    if (availableOffers.length) {
+      const activeRows = ((doneRows as any[]) ?? []).filter((r) => r.status === "active" || r.status === "completed");
+      const activeIds = activeRows.map((r) => r.mission_id);
+      let activeMissions: any[] = [];
+      if (activeIds.length) {
+        const { data: ams } = await supabaseAdmin.from("missions").select("id,name,objectives").in("id", activeIds);
+        activeMissions = (ams as any[]) ?? [];
+      }
+      const objKey = (o: any) => `${o.type}::${o.target_id ?? ""}::${o.target_ref ?? ""}`;
+      for (const n of availableOffers) {
+        const mine = new Set((n.offer_mission!.objectives ?? []).map(objKey));
+        const conflicts: { mission_id: string; mission_name: string; shared: string[] }[] = [];
+        for (const am of activeMissions) {
+          if (am.id === n.offer_mission!.id) continue;
+          const other = Array.isArray(am.objectives) ? am.objectives : [];
+          const shared = other
+            .filter((o: any) => mine.has(objKey(o)))
+            .map((o: any) => o.description || o.type);
+          if (shared.length) conflicts.push({ mission_id: am.id, mission_name: am.name, shared });
+        }
+        if (conflicts.length) (n as any).offer_conflicts = conflicts;
+      }
+    }
     // Aprendizagem: computa quantos passos ainda estão pendentes (não concluídos com sucesso).
     const learningNpcs = list.filter((n: any) => n.kind === "learning");
     if (learningNpcs.length) {
