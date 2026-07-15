@@ -360,3 +360,51 @@ export const bumpMyProgress = createServerFn({ method: "POST" })
     await bumpMissionProgress(supabaseAdmin, char.id, data.event as MissionEvent);
     return { ok: true };
   });
+
+/* -------- HISTORY -------- */
+export const listMissionHistory = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ character_id: z.string().uuid().optional() }).parse(i))
+  .handler(async ({ data, context }) => {
+    let charId = data.character_id;
+    if (!charId) {
+      const { data: c } = await context.supabase.from("characters").select("id").eq("user_id", context.userId).maybeSingle();
+      charId = c?.id;
+    }
+    if (!charId) return { history: [] };
+    const { data: rows } = await context.supabase
+      .from("character_missions")
+      .select("mission_id,status,started_at,completed_at,claimed_at,progress")
+      .eq("character_id", charId)
+      .order("started_at", { ascending: false });
+    const list = (rows ?? []) as any[];
+    if (list.length === 0) return { history: [] };
+    const missionIds = list.map((r) => r.mission_id);
+    const [{ data: missions }, { data: npcs }] = await Promise.all([
+      context.supabase.from("missions").select("id,name,category,rank,cooldown_hours,repeatable").in("id", missionIds),
+      context.supabase.from("npcs").select("id,name,offer_mission_id").in("offer_mission_id", missionIds),
+    ]);
+    const mById = new Map(((missions as any[]) ?? []).map((m) => [m.id, m]));
+    const npcByMission = new Map(((npcs as any[]) ?? []).map((n) => [n.offer_mission_id, n]));
+    const history = list.map((r) => {
+      const m = mById.get(r.mission_id);
+      const npc = npcByMission.get(r.mission_id);
+      let displayStatus: "active" | "completed" | "claimed" | "cooldown" = r.status;
+      if (r.status === "claimed" && m?.repeatable) {
+        const nextAt = new Date(r.claimed_at ?? r.completed_at ?? r.started_at).getTime() + Number(m?.cooldown_hours ?? 24) * 3600_000;
+        if (Date.now() < nextAt) displayStatus = "cooldown";
+      }
+      return {
+        mission_id: r.mission_id,
+        mission_name: m?.name ?? "Missão removida",
+        category: m?.category ?? null,
+        rank: m?.rank ?? null,
+        npc_name: npc?.name ?? null,
+        status: displayStatus,
+        started_at: r.started_at,
+        completed_at: r.status === "active" ? null : r.completed_at,
+        claimed_at: r.claimed_at,
+      };
+    });
+    return { history };
+  });
