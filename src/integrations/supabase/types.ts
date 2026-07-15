@@ -1683,6 +1683,7 @@ export type Database = {
           max_hit_percent: number
           music_url: string | null
           name: string
+          offer_mission_id: string | null
           required_mission_id: string | null
           reward_cooldown_hours: number
           reward_items: Json
@@ -1714,6 +1715,7 @@ export type Database = {
           max_hit_percent?: number
           music_url?: string | null
           name: string
+          offer_mission_id?: string | null
           required_mission_id?: string | null
           reward_cooldown_hours?: number
           reward_items?: Json
@@ -1745,6 +1747,7 @@ export type Database = {
           max_hit_percent?: number
           music_url?: string | null
           name?: string
+          offer_mission_id?: string | null
           required_mission_id?: string | null
           reward_cooldown_hours?: number
           reward_items?: Json
@@ -1761,6 +1764,13 @@ export type Database = {
             columns: ["linked_minigame_id"]
             isOneToOne: false
             referencedRelation: "minigames"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "npcs_offer_mission_id_fkey"
+            columns: ["offer_mission_id"]
+            isOneToOne: false
+            referencedRelation: "missions"
             referencedColumns: ["id"]
           },
           {

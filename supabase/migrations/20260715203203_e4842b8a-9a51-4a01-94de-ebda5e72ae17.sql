@@ -1,0 +1,2 @@
+ALTER TABLE public.npcs ADD COLUMN IF NOT EXISTS offer_mission_id uuid REFERENCES public.missions(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS npcs_offer_mission_idx ON public.npcs(offer_mission_id);
