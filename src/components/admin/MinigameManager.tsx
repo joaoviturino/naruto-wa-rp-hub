@@ -12,8 +12,9 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CleanupGame } from "@/components/minigame/CleanupGame";
 import { SequenceGame } from "@/components/minigame/SequenceGame";
+import { ForgeGame } from "@/components/minigame/ForgeGame";
 
-type Item = { id: string; name: string };
+type Item = { id: string; name: string; meta?: any; image_url?: string | null };
 type SkillLite = { id: string; name: string; rank: string };
 type RewardItem = { item_id: string; qty: number };
 type Minigame = {
@@ -55,7 +56,7 @@ export function MinigameManager() {
   async function load() {
     const [{ data: mg }, { data: it }, { data: sk }] = await Promise.all([
       supabase.from("minigames").select("*").order("name"),
-      supabase.from("items").select("id,name").order("name"),
+      supabase.from("items").select("id,name,meta,image_url").order("name"),
       supabase.from("skills").select("id,name,rank").order("name"),
     ]);
     setList(((mg as any[]) ?? []) as Minigame[]);
@@ -130,11 +131,14 @@ export function MinigameManager() {
                     const kind = e.target.value;
                     const config = kind === "sequence"
                       ? { duration_seconds: 60, max_mistakes: 2, tiles: [] }
+                      : kind === "forge"
+                      ? { duration_seconds: 90, difficulty: 2, hammer_hits: 8, heat_target: 70, temper_target: 40, recipe_item_id: "", source: "inventory" }
                       : { duration_seconds: 60, spots: 12, target_score: 8 };
                     setSelected({ ...selected, kind, config });
                   }}>
                   <option value="cleanup">Limpeza (clique)</option>
                   <option value="sequence">Sequência (acerto)</option>
+                  <option value="forge">Forja (fabricação)</option>
                 </select>
               </div>
               <div><Label>Nome</Label><Input value={selected.name} onChange={(e) => setSelected({ ...selected, name: e.target.value })} /></div>
@@ -222,6 +226,8 @@ export function MinigameManager() {
 
           {selected.kind === "sequence" ? (
             <SequenceConfigEditor selected={selected} setSelected={setSelected} />
+          ) : selected.kind === "forge" ? (
+            <ForgeConfigEditor selected={selected} setSelected={setSelected} items={items} />
           ) : (
             <div className="scroll-panel rounded-lg p-4 space-y-3">
               <h4 className="font-display text-lg text-gold">Configuração da limpeza</h4>
