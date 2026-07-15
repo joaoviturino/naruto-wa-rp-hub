@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Move, Trash2 } from "lucide-react";
+import { Move, Trash2, Group, Ungroup } from "lucide-react";
 
-type Loc = { id: string; name: string; image_url: string | null; map_x: number; map_y: number };
+type Loc = { id: string; name: string; image_url: string | null; map_x: number; map_y: number; parent_id?: string | null };
 type Conn = { id: string; a_id: string; b_id: string };
 
 type Props = {
@@ -33,6 +33,8 @@ export function LocationMapEditor({ locations, connections, selectedId, onSelect
   const dragRef = useRef<{ id: string; offX: number; offY: number; moved: boolean } | null>(null);
   const [wire, setWire] = useState<{ from: string; x: number; y: number } | null>(null);
   const panRef = useRef<{ startX: number; startY: number; scrollLeft: number; scrollTop: number } | null>(null);
+  const [groupMode, setGroupMode] = useState(false);
+  const [multiSel, setMultiSel] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     setPositions((prev) => {
@@ -65,6 +67,15 @@ export function LocationMapEditor({ locations, connections, selectedId, onSelect
 
   function onNodePointerDown(e: React.PointerEvent, id: string) {
     e.stopPropagation();
+    if (groupMode) {
+      // In group mode, tapping toggles multi-selection; no drag/wire.
+      setMultiSel((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        return next;
+      });
+      return;
+    }
     const { x, y } = relCoords(e);
     const pos = positions[id] ?? { x: 0, y: 0 };
     dragRef.current = { id, offX: x - pos.x, offY: y - pos.y, moved: false };
@@ -89,7 +100,7 @@ export function LocationMapEditor({ locations, connections, selectedId, onSelect
   }
 
   function onBgPointerDown(e: React.PointerEvent) {
-    if (dragRef.current || wire) return;
+    if (dragRef.current || wire || groupMode) return;
     const el = wrapRef.current;
     if (!el) return;
     panRef.current = { startX: e.clientX, startY: e.clientY, scrollLeft: el.scrollLeft, scrollTop: el.scrollTop };
@@ -106,6 +117,7 @@ export function LocationMapEditor({ locations, connections, selectedId, onSelect
 
   function onHandlePointerDown(e: React.PointerEvent, id: string) {
     e.stopPropagation();
+    if (groupMode) return;
     const { x, y } = relCoords(e);
     setWire({ from: id, x, y });
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -136,6 +148,48 @@ export function LocationMapEditor({ locations, connections, selectedId, onSelect
     onChange();
   }
 
+  async function groupSelected() {
+    const ids = Array.from(multiSel);
+    if (ids.length < 2) { toast.error("Selecione ao menos 2 locais."); return; }
+    const name = window.prompt("Nome do grupo (ex: Casa dos Uzumaki):", "Novo grupo");
+    if (!name || !name.trim()) return;
+    // Compute average position for the parent node.
+    const pts = ids.map((id) => positions[id]).filter(Boolean) as { x: number; y: number }[];
+    const avgX = Math.round(pts.reduce((s, p) => s + p.x, 0) / Math.max(1, pts.length));
+    const avgY = Math.round(pts.reduce((s, p) => s + p.y, 0) / Math.max(1, pts.length)) - 120;
+    const { data: created, error } = await supabase.from("locations")
+      .insert({ name: name.trim(), description: "Grupo", map_x: Math.max(0, avgX), map_y: Math.max(0, avgY) })
+      .select("id").single();
+    if (error || !created) { toast.error(error?.message ?? "Falha ao criar grupo."); return; }
+    const upd = await supabase.from("locations").update({ parent_id: created.id }).in("id", ids);
+    if (upd.error) { toast.error(upd.error.message); return; }
+    toast.success(`Grupo "${name}" criado com ${ids.length} locais.`);
+    setMultiSel(new Set());
+    setGroupMode(false);
+    onChange();
+  }
+
+  async function ungroupSelected() {
+    const ids = Array.from(multiSel);
+    if (ids.length === 0) return;
+    if (!confirm("Remover estes locais do grupo atual?")) return;
+    const { error } = await supabase.from("locations").update({ parent_id: null }).in("id", ids);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Locais desagrupados.");
+    setMultiSel(new Set());
+    onChange();
+  }
+
+  // Group parents = locations that are referenced as parent_id by others.
+  const parentIds = new Set(locations.map((l) => l.parent_id).filter(Boolean) as string[]);
+  const groups: { parent: Loc; children: Loc[] }[] = [];
+  parentIds.forEach((pid) => {
+    const parent = locations.find((l) => l.id === pid);
+    if (!parent) return;
+    const children = locations.filter((l) => l.parent_id === pid);
+    groups.push({ parent, children });
+  });
+
   const maxX = Math.max(600, ...Object.values(positions).map((p) => p.x + NODE_W + 60));
   const maxY = Math.max(400, ...Object.values(positions).map((p) => p.y + NODE_H + 80));
 
@@ -145,9 +199,29 @@ export function LocationMapEditor({ locations, connections, selectedId, onSelect
         <h4 className="font-display text-lg text-gold flex items-center gap-2">
           <Move size={16} /> Mapa de locais
         </h4>
-        <span className="text-[11px] text-muted-foreground">
-          Arraste o corpo para mover · arraste um ponto azul até outro local para conectar
-        </span>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button type="button"
+            onClick={() => { setGroupMode((v) => !v); setMultiSel(new Set()); }}
+            className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold border ${groupMode ? "bg-gold text-background border-gold" : "border-border text-muted-foreground hover:bg-secondary/40"}`}>
+            <Group size={12} /> {groupMode ? "Sair do modo agrupar" : "Modo agrupar"}
+          </button>
+          {groupMode && (
+            <>
+              <span className="text-[11px] text-muted-foreground">{multiSel.size} selecionado(s)</span>
+              <button type="button" onClick={groupSelected} disabled={multiSel.size < 2}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold border border-gold text-gold hover:bg-gold/10 disabled:opacity-40 disabled:cursor-not-allowed">
+                <Group size={12} /> Agrupar
+              </button>
+              <button type="button" onClick={ungroupSelected} disabled={multiSel.size === 0}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold border border-border text-muted-foreground hover:bg-secondary/40 disabled:opacity-40 disabled:cursor-not-allowed">
+                <Ungroup size={12} /> Desagrupar
+              </button>
+            </>
+          )}
+          <span className="text-[11px] text-muted-foreground w-full sm:w-auto">
+            {groupMode ? "Toque nos locais para selecioná-los e depois em Agrupar." : "Arraste para mover · arraste o ponto azul para conectar."}
+          </span>
+        </div>
       </div>
       <div ref={wrapRef}
         className="relative w-full overflow-auto rounded border border-border bg-black/30 cursor-grab active:cursor-grabbing"
@@ -157,6 +231,23 @@ export function LocationMapEditor({ locations, connections, selectedId, onSelect
         onPointerUp={(e) => { onNodePointerUp(); onHandlePointerUp(e); onBgPointerUp(); }}
         onPointerCancel={onBgPointerUp}>
         <div className="relative" style={{ width: maxX, height: maxY }}>
+          {/* Group bounding boxes */}
+          {groups.map(({ parent, children }) => {
+            const pts = children.map((c) => positions[c.id]).filter(Boolean) as { x: number; y: number }[];
+            if (pts.length === 0) return null;
+            const minX = Math.min(...pts.map((p) => p.x)) - 12;
+            const minY = Math.min(...pts.map((p) => p.y)) - 22;
+            const maxRX = Math.max(...pts.map((p) => p.x + NODE_W)) + 12;
+            const maxRY = Math.max(...pts.map((p) => p.y + NODE_H)) + 12;
+            return (
+              <div key={`grp-${parent.id}`} className="absolute pointer-events-none rounded-lg border-2 border-dashed border-gold/50 bg-gold/[0.03]"
+                style={{ left: minX, top: minY, width: maxRX - minX, height: maxRY - minY }}>
+                <div className="absolute -top-3 left-2 px-1.5 bg-background text-[10px] font-semibold text-gold uppercase tracking-wide rounded">
+                  {parent.name}
+                </div>
+              </div>
+            );
+          })}
           <svg className="absolute inset-0 pointer-events-none" width={maxX} height={maxY}>
             {connections.map((c) => {
               const a = positions[c.a_id], b = positions[c.b_id];
@@ -185,19 +276,27 @@ export function LocationMapEditor({ locations, connections, selectedId, onSelect
           {locations.map((l) => {
             const p = positions[l.id] ?? { x: 0, y: 0 };
             const isSel = selectedId === l.id;
+            const isMulti = multiSel.has(l.id);
+            const isGroupParent = parentIds.has(l.id);
             return (
               <div key={l.id}
                 data-node-id={l.id}
                 onPointerDown={(e) => onNodePointerDown(e, l.id)}
-                className={`absolute select-none rounded border-2 shadow-md flex items-center gap-2 px-2 group cursor-grab active:cursor-grabbing ${
-                  isSel ? "border-gold bg-secondary" : "border-border bg-card hover:border-gold/60"
+                className={`absolute select-none rounded border-2 shadow-md flex items-center gap-2 px-2 group ${groupMode ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"} ${
+                  isMulti ? "border-sky-400 bg-sky-400/10 ring-2 ring-sky-300/50" :
+                  isSel ? "border-gold bg-secondary" :
+                  isGroupParent ? "border-gold/70 bg-card" :
+                  "border-border bg-card hover:border-gold/60"
                 }`}
                 style={{ left: p.x, top: p.y, width: NODE_W, height: NODE_H }}>
                 <div className="w-10 h-10 rounded bg-secondary overflow-hidden shrink-0 pointer-events-none">
                   {l.image_url && <img src={l.image_url} className="w-full h-full object-cover" alt="" />}
                 </div>
-                <div className="text-xs font-semibold flex-1 truncate pointer-events-none">{l.name}</div>
-                {(["t","r","b","l"] as Handle[]).map((h) => {
+                <div className="text-xs font-semibold flex-1 truncate pointer-events-none">
+                  {isGroupParent && <span className="text-gold mr-1">▣</span>}
+                  {l.name}
+                </div>
+                {!groupMode && (["t","r","b","l"] as Handle[]).map((h) => {
                   const style: React.CSSProperties =
                     h === "t" ? { top: -6, left: "50%", transform: "translateX(-50%)" } :
                     h === "b" ? { bottom: -6, left: "50%", transform: "translateX(-50%)" } :

@@ -1290,6 +1290,7 @@ export type Database = {
           map_x: number
           map_y: number
           name: string
+          parent_id: string | null
           spawn_chance: number
           spawn_group_ids: string[]
           spawn_tick_seconds: number
@@ -1304,6 +1305,7 @@ export type Database = {
           map_x?: number
           map_y?: number
           name: string
+          parent_id?: string | null
           spawn_chance?: number
           spawn_group_ids?: string[]
           spawn_tick_seconds?: number
@@ -1318,12 +1320,21 @@ export type Database = {
           map_x?: number
           map_y?: number
           name?: string
+          parent_id?: string | null
           spawn_chance?: number
           spawn_group_ids?: string[]
           spawn_tick_seconds?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "locations_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       minigame_runs: {
         Row: {

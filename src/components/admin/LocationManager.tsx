@@ -15,6 +15,7 @@ import { LocationMapEditor } from "./LocationMapEditor";
 
 type Loc = { id: string; name: string; description: string | null; image_url: string | null;
   map_x?: number; map_y?: number;
+  parent_id?: string | null;
   is_danger_zone?: boolean; spawn_chance?: number; spawn_tick_seconds?: number;
   spawn_group_ids?: string[] };
 type Conn = { id: string; a_id: string; b_id: string };
@@ -47,7 +48,7 @@ export function LocationManager() {
 
   async function load() {
     const [l, c, n, ln, mg, lmg, ls, llb, gr] = await Promise.all([
-      supabase.from("locations").select("id,name,description,image_url,map_x,map_y,is_danger_zone,spawn_chance,spawn_tick_seconds,spawn_group_ids").order("name"),
+      supabase.from("locations").select("id,name,description,image_url,map_x,map_y,parent_id,is_danger_zone,spawn_chance,spawn_tick_seconds,spawn_group_ids").order("name"),
       supabase.from("location_connections").select("id,a_id,b_id"),
       supabase.from("npcs").select("id,name,kind").order("name"),
       supabase.from("location_npcs").select("location_id,npc_id"),
@@ -156,7 +157,7 @@ export function LocationManager() {
   return (
     <div className="space-y-4">
       <LocationMapEditor
-        locations={locs.map((l) => ({ id: l.id, name: l.name, image_url: l.image_url, map_x: l.map_x ?? 0, map_y: l.map_y ?? 0 }))}
+        locations={locs.map((l) => ({ id: l.id, name: l.name, image_url: l.image_url, map_x: l.map_x ?? 0, map_y: l.map_y ?? 0, parent_id: l.parent_id ?? null }))}
         connections={conns}
         selectedId={selected}
         onSelect={setSelected}
@@ -192,13 +193,28 @@ export function LocationManager() {
                 {sel.image_url && <img src={sel.image_url} className="w-full h-full object-cover" alt="" />}
               </div>
               <div className="flex-1 space-y-2">
-                <h3 className="font-display text-2xl">{sel.name}</h3>
-                <Textarea defaultValue={sel.description ?? ""} rows={3}
+                <div>
+                  <Label className="text-xs">Nome</Label>
+                  <Input key={`name-${sel.id}`} defaultValue={sel.name}
+                    onBlur={async (e) => {
+                      const v = e.target.value.trim();
+                      if (!v || v === sel.name) return;
+                      const { error } = await supabase.from("locations").update({ name: v }).eq("id", sel.id);
+                      if (error) toast.error(error.message); else { toast.success("Nome atualizado."); load(); }
+                    }} />
+                </div>
+                <Label className="text-xs">Descrição</Label>
+                <Textarea key={`desc-${sel.id}`} defaultValue={sel.description ?? ""} rows={3}
                   onBlur={async (e) => { await supabase.from("locations").update({ description: e.target.value }).eq("id", sel.id); load(); }} />
                 <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
                   <Upload size={14} className="mr-1" /> Imagem do local
                 </Button>
                 <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={uploadImage} />
+                {sel.parent_id && (
+                  <p className="text-xs text-muted-foreground">
+                    Este local pertence ao grupo <span className="text-gold">{locs.find((l) => l.id === sel.parent_id)?.name ?? "—"}</span>.
+                  </p>
+                )}
               </div>
             </div>
           </div>
