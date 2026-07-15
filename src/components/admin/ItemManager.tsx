@@ -255,22 +255,29 @@ function ItemDialog({ open, onOpenChange, initial, missions, skills, adminUserId
 function Field({ label, children }: any) {
   return <div><Label>{label}</Label>{children}</div>;
 }
+const NATIVE_SELECT_CLASS =
+  "flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 function SimpleSelect({ value, onChange, options }: any) {
   return (
-    <Select value={value ?? undefined} onValueChange={onChange}>
-      <SelectTrigger><SelectValue placeholder="Selecionar" /></SelectTrigger>
-      <SelectContent>{options.map((o: any) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
-    </Select>
+    <select
+      className={NATIVE_SELECT_CLASS}
+      value={value ?? ""}
+      onChange={(e) => onChange(e.target.value)}
+    >
+      {value == null && <option value="" disabled>Selecionar</option>}
+      {options.map((o: any) => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
   );
 }
 function NullableSelect({ value, onChange, options }: any) {
   return (
-    <Select value={value ?? "__none__"} onValueChange={(v: string) => onChange(v === "__none__" ? null : v)}>
-      <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
-      <SelectContent>
-        <SelectItem value="__none__">— Nenhum —</SelectItem>
-        {options.map((o: any) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-      </SelectContent>
-    </Select>
+    <select
+      className={NATIVE_SELECT_CLASS}
+      value={value ?? "__none__"}
+      onChange={(e) => onChange(e.target.value === "__none__" ? null : e.target.value)}
+    >
+      <option value="__none__">— Nenhum —</option>
+      {options.map((o: any) => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
   );
 }
