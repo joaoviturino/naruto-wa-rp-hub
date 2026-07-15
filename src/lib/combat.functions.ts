@@ -291,6 +291,10 @@ export const playerAttack = createServerFn({ method: "POST" })
 
     const { data: sess } = await supabaseAdmin.from("combat_sessions").select("*").eq("id", data.session_id).maybeSingle();
     if (!sess || sess.status !== "active") throw new Error("Combate encerrado.");
+    // PvP: dispatch para o motor específico
+    if ((sess.state as any)?.mode === "pvp") {
+      return await handlePvpAttack(supabaseAdmin, context.supabase, sess, me.id, data);
+    }
     const state: CombatState = normalizeState(sess.state as any);
     const log: LogEntry[] = sess.log as any;
 
