@@ -222,34 +222,6 @@ export function LocationManager() {
 
           <div className="scroll-panel rounded-lg p-4 space-y-3">
             <h4 className="font-display text-lg text-gold flex items-center gap-2"><Link2 size={16} /> Conexões</h4>
-          </div>
-
-          <div className="scroll-panel rounded-lg p-4 space-y-3">
-            <h4 className="font-display text-lg text-gold">Cenário e som de combate</h4>
-            <p className="text-xs text-muted-foreground">Usado por todas as batalhas iniciadas neste local (PvE e duelos PvP). Substitui as antigas configurações por NPC/grupo.</p>
-            <div>
-              <Label className="text-xs">URL da imagem de fundo do combate</Label>
-              <Input key={`bg-${sel.id}`} defaultValue={sel.battle_bg_url ?? ""} placeholder="https://…"
-                onBlur={async (e) => {
-                  const v = e.target.value.trim() || null;
-                  const { error } = await supabase.from("locations").update({ battle_bg_url: v }).eq("id", sel.id);
-                  if (error) toast.error(error.message); else { toast.success("Cenário atualizado."); load(); }
-                }} />
-              {sel.battle_bg_url && <img src={sel.battle_bg_url} alt="" className="mt-2 h-24 rounded object-cover" />}
-            </div>
-            <div>
-              <Label className="text-xs">URL da música de combate (loop)</Label>
-              <Input key={`music-${sel.id}`} defaultValue={sel.music_url ?? ""} placeholder="https://…mp3 / ogg"
-                onBlur={async (e) => {
-                  const v = e.target.value.trim() || null;
-                  const { error } = await supabase.from("locations").update({ music_url: v }).eq("id", sel.id);
-                  if (error) toast.error(error.message); else { toast.success("Música atualizada."); load(); }
-                }} />
-            </div>
-          </div>
-
-          <div className="scroll-panel rounded-lg p-4 space-y-3">
-            <h4 className="font-display text-lg text-gold flex items-center gap-2"><Link2 size={16} /> Conexões (continuação)</h4>
             <div className="flex flex-wrap gap-2">
               {conns.filter((c) => c.a_id === sel.id || c.b_id === sel.id).map((c) => {
                 const other = locs.find((l) => l.id === (c.a_id === sel.id ? c.b_id : c.a_id));
