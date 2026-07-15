@@ -58,6 +58,22 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const flee = useServerFn(fleeCombat);
   const consume = useServerFn(consumeInCombat);
 
+  async function doFlee() {
+    if (busy) return;
+    if (!confirm("Fugir do combate? Você perde a luta e o chat é destravado.")) return;
+    setBusy(true);
+    try {
+      await flee({ data: { session_id: sessionId } });
+      toast.success("Você fugiu do combate.");
+      // Fecha imediatamente — o realtime também atualiza, mas queremos destravar o chat na hora.
+      onClose();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Não foi possível fugir.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function load() {
     const { data } = await supabase.from("combat_sessions").select("*").eq("id", sessionId).maybeSingle();
     setSession(remapPvpForViewer(data as any, myCharId));
@@ -388,6 +404,17 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
           <DialogTitle className="flex items-center gap-2 px-3 pt-3 text-sm sm:text-base">
             <Sword size={16} /> Combate: {npc.name}
             {session.status !== "active" && <span className="ml-2 text-xs uppercase text-gold">{session.status}</span>}
+            {state._pvp && !spectator && session.status === "active" && (
+              <Button
+                variant="destructive"
+                size="sm"
+                className="ml-auto mr-8 h-7 px-2 text-[11px]"
+                disabled={busy}
+                onClick={doFlee}
+              >
+                <Flag size={12} className="mr-1" /> Fugir do duelo
+              </Button>
+            )}
           </DialogTitle>
         </DialogHeader>
 
@@ -671,7 +698,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
               </TabsContent>
               <TabsContent value="flee" className="mt-2">
                 <div className="text-sm text-muted-foreground mb-2">Fugir encerra o combate para você e o time sem recompensas.</div>
-                <Button variant="outline" onClick={() => flee({ data: { session_id: sessionId } })}>
+              <Button variant="outline" onClick={doFlee} disabled={busy}>
                   <Flag size={14} className="mr-1" /> Confirmar fuga
                 </Button>
               </TabsContent>
@@ -681,14 +708,14 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
               <div className="text-sm text-muted-foreground">
                 <Users size={12} className="inline mr-1"/>
                 {spectator
-                  ? <>Você está assistindo ao duelo. Vez de <span className="text-gold font-display">{activePlayer?.nickname ?? "…"}</span>.</>
-                  : <>Aguardando <span className="text-gold font-display">{activePlayer?.nickname ?? "…"}</span> agir…</>
+                  ? <>Você está assistindo ao duelo. Vez de <span className="text-gold font-display">{state._acting_nickname ?? activePlayer?.nickname ?? "…"}</span>.</>
+                  : <>Aguardando <span className="text-gold font-display">{state._acting_nickname ?? "adversário"}</span> agir…</>
                 }
               </div>
               {spectator ? (
                 <Button variant="outline" size="sm" onClick={onClose}>Fechar</Button>
               ) : (
-                <Button variant="outline" size="sm" onClick={() => flee({ data: { session_id: sessionId } })}>
+                <Button variant="outline" size="sm" onClick={doFlee} disabled={busy}>
                   <Flag size={14} className="mr-1" /> Fugir
                 </Button>
               )}
