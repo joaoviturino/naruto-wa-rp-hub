@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Trash2, Upload, Link2, Plus, Skull, Gamepad2, Store, Gift, BookOpen, GraduationCap } from "lucide-react";
+import { Trash2, Upload, Link2, Plus, Skull, Gamepad2, Store, Gift, BookOpen, GraduationCap, Box } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { updateLocationDangerZone, setLocationNpcs } from "@/lib/npc.functions";
@@ -18,7 +18,7 @@ type Loc = { id: string; name: string; description: string | null; image_url: st
   is_danger_zone?: boolean; spawn_chance?: number; spawn_tick_seconds?: number;
   spawn_group_ids?: string[] };
 type Conn = { id: string; a_id: string; b_id: string };
-type Npc = { id: string; name: string; kind: "aggressive" | "shop" | "reward" | "learning" };
+type Npc = { id: string; name: string; kind: "aggressive" | "shop" | "reward" | "learning" | "object" };
 type NpcGroup = { id: string; name: string };
 type Minigame = { id: string; name: string; active: boolean };
 type LibSection = { id: string; name: string; active: boolean };
@@ -133,6 +133,7 @@ export function LocationManager() {
   const shopNpcs = npcs.filter((n) => n.kind === "shop");
   const rewardNpcs = npcs.filter((n) => n.kind === "reward");
   const learningNpcs = npcs.filter((n) => n.kind === "learning");
+  const objectNpcs = npcs.filter((n) => n.kind === "object");
   async function toggleNpc(npcId: string, on: boolean) {
     if (!sel) return;
     const next = new Set(selNpcs);
@@ -339,6 +340,20 @@ export function LocationManager() {
                 </label>
               ))}
               {learningNpcs.length === 0 && <p className="text-xs text-muted-foreground">Nenhum NPC do tipo Aprendizagem cadastrado.</p>}
+            </div>
+          </div>
+
+          <div className="scroll-panel rounded-lg p-4 space-y-3">
+            <h4 className="font-display text-lg text-gold flex items-center gap-2"><Box size={16} /> Objetos neste local</h4>
+            <p className="text-xs text-muted-foreground">Objetos interativos (vinculados a minigames) que aparecerão para os jogadores neste local.</p>
+            <div className="grid gap-1 max-h-[220px] overflow-y-auto pr-2">
+              {objectNpcs.map((n) => (
+                <label key={n.id} className="flex items-center gap-2 text-sm p-1 hover:bg-secondary/40 rounded">
+                  <input type="checkbox" checked={selNpcs.has(n.id)} onChange={(e) => toggleNpc(n.id, e.target.checked)} />
+                  <span>{n.name}</span>
+                </label>
+              ))}
+              {objectNpcs.length === 0 && <p className="text-xs text-muted-foreground">Nenhum NPC do tipo Objeto cadastrado.</p>}
             </div>
           </div>
 
