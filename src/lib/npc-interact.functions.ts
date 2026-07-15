@@ -30,20 +30,25 @@ export const listLocationInteractNpcs = createServerFn({ method: "POST" })
     if (!me.current_location_id) return { npcs: [] as any[] };
     const { data } = await context.supabase
       .from("location_npcs")
-      .select("npc:npcs(id,name,image_url,kind,dialog_intro,dialog_outro,shop_items,reward_items,reward_xp,reward_ryo,reward_cooldown_hours,required_mission_id,tutorial_blocks,learning_min_read_seconds,linked_minigame_id,music_url)")
+      .select("npc:npcs(id,name,image_url,kind,dialog_intro,dialog_outro,shop_items,reward_items,reward_xp,reward_ryo,reward_cooldown_hours,required_mission_id,offer_mission_id,tutorial_blocks,learning_min_read_seconds,linked_minigame_id,music_url)")
       .eq("location_id", me.current_location_id);
     const list = ((data as any[]) ?? []).map((r) => r.npc).filter((n: any) => n && n.kind !== "aggressive");
     // Enriquece reward com cooldown remaining
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // Missões concluídas do personagem (para gate de recompensa)
     const { data: doneRows } = await supabaseAdmin
-      .from("character_missions").select("mission_id").eq("character_id", me.id);
-    const done = new Set(((doneRows as any[]) ?? []).map((r) => r.mission_id));
-    const missionIds = list.map((n: any) => n.required_mission_id).filter(Boolean);
+      .from("character_missions").select("mission_id,status,progress,claimed_at").eq("character_id", me.id);
+    const doneMap = new Map<string, any>(((doneRows as any[]) ?? []).map((r) => [r.mission_id, r]));
+    const done = new Set(((doneRows as any[]) ?? []).filter((r) => r.status === "claimed").map((r) => r.mission_id));
+    const missionIds = [
+      ...list.map((n: any) => n.required_mission_id),
+      ...list.map((n: any) => n.offer_mission_id),
+    ].filter(Boolean);
     let missionNames: Record<string, string> = {};
+    let missionsById: Record<string, any> = {};
     if (missionIds.length) {
-      const { data: ms } = await supabaseAdmin.from("missions").select("id,name").in("id", missionIds);
-      for (const m of (ms as any[]) ?? []) missionNames[m.id] = m.name;
+      const { data: ms } = await supabaseAdmin.from("missions").select("id,name,objectives,reward_xp,reward_ryo,rewards,cooldown_hours,repeatable").in("id", missionIds);
+      for (const m of (ms as any[]) ?? []) { missionNames[m.id] = m.name; missionsById[m.id] = m; }
     }
     for (const n of list) {
       if (n.kind === "reward") {
@@ -60,6 +65,33 @@ export const listLocationInteractNpcs = createServerFn({ method: "POST" })
         } else {
           n.mission_unlocked = true;
         }
+      }
+      // Missão oferecida pelo NPC (aceitar / progresso / entregar)
+      if (n.offer_mission_id) {
+        const m = missionsById[n.offer_mission_id];
+        const cm = doneMap.get(n.offer_mission_id);
+        n.offer_mission = m ? {
+          id: m.id, name: m.name,
+          objectives: Array.isArray(m.objectives) ? m.objectives : [],
+          reward_xp: Number(m.reward_xp ?? 0), reward_ryo: Number(m.reward_ryo ?? 0),
+          rewards: m.rewards ?? {},
+          cooldown_hours: Number(m.cooldown_hours ?? 24),
+          repeatable: !!m.repeatable,
+        } : null;
+        const objs = n.offer_mission?.objectives ?? [];
+        const progress = (cm?.progress ?? {}) as Record<string, number>;
+        const allComplete = objs.length > 0 && objs.every((o: any) => Number(progress[o.id] ?? 0) >= Number(o.count ?? 1));
+        if (!cm) n.offer_status = "available";
+        else if (cm.status === "claimed") {
+          if (!m?.repeatable) n.offer_status = "claimed";
+          else {
+            const nextAt = new Date(cm.claimed_at ?? cm.completed_at).getTime() + Number(m?.cooldown_hours ?? 24) * 3600_000;
+            n.offer_status = Date.now() < nextAt ? "cooldown" : "available";
+            n.offer_cooldown_until = new Date(nextAt).toISOString();
+          }
+        } else if (allComplete) n.offer_status = "ready";
+        else n.offer_status = "in_progress";
+        n.offer_progress = progress;
       }
     }
     // Aprendizagem: computa quantos passos ainda estão pendentes (não concluídos com sucesso).
@@ -89,6 +121,37 @@ export const listLocationInteractNpcs = createServerFn({ method: "POST" })
       // e o estado ("tudo concluído" / "bloqueado") são mostrados dentro do diálogo.
     }
     return { npcs: list };
+  });
+
+/** Aceita a missão oferecida por um NPC — cria um character_missions row status='active'. */
+export const acceptMissionFromNpc = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ npc_id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const me = await assertNpcHere(context, data.npc_id);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: npc } = await supabaseAdmin.from("npcs").select("offer_mission_id").eq("id", data.npc_id).maybeSingle();
+    if (!npc?.offer_mission_id) throw new Error("Este NPC não oferece missão.");
+    const { data: existing } = await supabaseAdmin.from("character_missions")
+      .select("status,claimed_at").eq("character_id", me.id).eq("mission_id", npc.offer_mission_id).maybeSingle();
+    if (existing) {
+      if (existing.status === "active") return { ok: true, already: true };
+      if (existing.status === "claimed") {
+        const { data: m } = await supabaseAdmin.from("missions").select("repeatable,cooldown_hours").eq("id", npc.offer_mission_id).maybeSingle();
+        if (!m?.repeatable) throw new Error("Missão já concluída.");
+        const nextAt = new Date(existing.claimed_at ?? Date.now()).getTime() + Number(m.cooldown_hours ?? 24) * 3600_000;
+        if (Date.now() < nextAt) throw new Error("Ainda em cooldown.");
+        // Reinicia
+        await supabaseAdmin.from("character_missions").update({
+          status: "active", progress: {}, started_at: new Date().toISOString(), claimed_at: null,
+        }).eq("character_id", me.id).eq("mission_id", npc.offer_mission_id);
+        return { ok: true, restarted: true };
+      }
+    }
+    await supabaseAdmin.from("character_missions").insert({
+      character_id: me.id, mission_id: npc.offer_mission_id, status: "active", progress: {},
+    });
+    return { ok: true };
   });
 
 /** Compra 1 unidade de um item do NPC de loja. */
