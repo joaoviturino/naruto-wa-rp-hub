@@ -453,3 +453,76 @@ function LearningNpcView({ npc, onClose }: { npc: Npc; onClose: () => void }) {
     </div>
   );
 }
+
+function MissionOfferBlock({ npc, busy, onAccept, onTurnIn }: {
+  npc: Npc; busy: boolean; onAccept: () => void; onTurnIn: () => void;
+}) {
+  const m = npc.offer_mission!;
+  const status = npc.offer_status ?? "available";
+  const progress = npc.offer_progress ?? {};
+  const describe = (o: any) => o.description || (
+    o.type === "kill_npc" ? "Derrotar alvo" :
+    o.type === "kill_npc_kind" ? `Derrotar (${o.target_ref ?? "tipo"})` :
+    o.type === "kill_npc_group" ? "Derrotar grupo" :
+    o.type === "complete_minigame" ? "Completar minigame" :
+    o.type === "read_book" ? "Ler livro" :
+    o.type === "reach_location" ? "Chegar a local" :
+    o.type === "learn_skill" ? "Aprender habilidade" :
+    o.type === "craft_item" ? "Fabricar item" :
+    o.type === "collect_item" ? "Coletar item" :
+    o.type === "pvp_win" ? "Vencer duelo PvP" :
+    o.type === "talk_npc" ? "Falar com NPC" :
+    "Objetivo"
+  );
+  return (
+    <div className="rounded-lg border border-gold/40 bg-gold/5 p-3 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-sm font-display text-gold flex items-center gap-2">
+          <Gift size={14} /> Missão: {m.name}
+        </div>
+        <Badge variant="outline" className="text-[10px]">
+          {status === "available" ? "Disponível" :
+           status === "in_progress" ? "Em andamento" :
+           status === "ready" ? "Pronto para entregar" :
+           status === "cooldown" ? "Cooldown" : "Concluída"}
+        </Badge>
+      </div>
+      {m.objectives.length > 0 && (status === "in_progress" || status === "ready") && (
+        <ul className="text-xs space-y-1">
+          {m.objectives.map((o) => {
+            const cur = Math.min(Number(progress[o.id] ?? 0), o.count);
+            const done = cur >= o.count;
+            return (
+              <li key={o.id} className="flex items-center justify-between gap-2">
+                <span className={done ? "line-through text-muted-foreground" : ""}>{describe(o)}</span>
+                <span className={`font-mono ${done ? "text-emerald-400" : "text-muted-foreground"}`}>{cur}/{o.count}</span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <div className="text-[11px] text-muted-foreground">
+        Recompensa: +{m.reward_xp} XP · +{m.reward_ryo} Ryo
+        {(m.rewards?.items?.length ?? 0) > 0 && ` · ${m.rewards.items.length} item(ns)`}
+        {(m.rewards?.skill_ids?.length ?? 0) > 0 && ` · ${m.rewards.skill_ids.length} habilidade(s)`}
+      </div>
+      <div className="flex justify-end">
+        {status === "available" && (
+          <Button size="sm" disabled={busy} onClick={onAccept}>Aceitar missão</Button>
+        )}
+        {status === "in_progress" && (
+          <span className="text-xs text-muted-foreground">Complete os objetivos e volte aqui.</span>
+        )}
+        {status === "ready" && (
+          <Button size="sm" disabled={busy} onClick={onTurnIn}>Entregar & receber recompensa</Button>
+        )}
+        {status === "cooldown" && npc.offer_cooldown_until && (
+          <span className="text-xs text-muted-foreground">Disponível em {new Date(npc.offer_cooldown_until).toLocaleString()}</span>
+        )}
+        {status === "claimed" && (
+          <span className="text-xs text-muted-foreground">Missão já concluída.</span>
+        )}
+      </div>
+    </div>
+  );
+}
