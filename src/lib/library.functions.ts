@@ -127,7 +127,13 @@ export const upsertLibraryBook = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: row, error } = await supabaseAdmin.from("library_books").upsert(data as any).select("id").single();
+    const { id, ...rest } = data as any;
+    if (id) {
+      const { data: row, error } = await supabaseAdmin.from("library_books").update(rest).eq("id", id).select("id").single();
+      if (error) throw new Error(error.message);
+      return { id: row.id };
+    }
+    const { data: row, error } = await supabaseAdmin.from("library_books").insert(rest).select("id").single();
     if (error) throw new Error(error.message);
     return { id: row.id };
   });
