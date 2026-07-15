@@ -437,6 +437,28 @@ export function NpcManager() {
             </div>
           )}
 
+          {sel.kind === "object" && (
+            <div className="scroll-panel rounded-lg p-4 space-y-3">
+              <h4 className="font-display text-lg text-gold">Objeto interativo</h4>
+              <p className="text-xs text-muted-foreground">
+                Objetos aparecem no chat com um botão central em dispositivos móveis. Ao clicar, o jogador inicia o minigame vinculado.
+              </p>
+              <div>
+                <Label>Minigame vinculado</Label>
+                <select
+                  value={sel.linked_minigame_id ?? ""}
+                  onChange={async (e) => {
+                    const v = e.target.value || null;
+                    await save({ data: { ...sel, linked_minigame_id: v } } as any); load();
+                  }}
+                  className="w-full bg-input border border-border rounded px-2 py-1 text-sm mt-1">
+                  <option value="">— Nenhum —</option>
+                  {minigames.map((m) => <option key={m.id} value={m.id}>[{m.kind}] {m.name}</option>)}
+                </select>
+              </div>
+            </div>
+          )}
+
           {sel.kind === "aggressive" && (
           <div className="scroll-panel rounded-lg p-4 space-y-2">
             <h4 className="font-display text-lg text-gold">Tabela de drop</h4>
