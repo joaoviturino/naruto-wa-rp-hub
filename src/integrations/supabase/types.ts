@@ -1285,6 +1285,7 @@ export type Database = {
       }
       locations: {
         Row: {
+          battle_bg_url: string | null
           created_at: string
           description: string | null
           id: string
@@ -1292,6 +1293,7 @@ export type Database = {
           is_danger_zone: boolean
           map_x: number
           map_y: number
+          music_url: string | null
           name: string
           parent_id: string | null
           spawn_chance: number
@@ -1300,6 +1302,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          battle_bg_url?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -1307,6 +1310,7 @@ export type Database = {
           is_danger_zone?: boolean
           map_x?: number
           map_y?: number
+          music_url?: string | null
           name: string
           parent_id?: string | null
           spawn_chance?: number
@@ -1315,6 +1319,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          battle_bg_url?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -1322,6 +1327,7 @@ export type Database = {
           is_danger_zone?: boolean
           map_x?: number
           map_y?: number
+          music_url?: string | null
           name?: string
           parent_id?: string | null
           spawn_chance?: number
