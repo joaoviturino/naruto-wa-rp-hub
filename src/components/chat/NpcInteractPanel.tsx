@@ -37,6 +37,7 @@ type Npc = {
   offer_status?: "available" | "in_progress" | "ready" | "claimed" | "cooldown";
   offer_progress?: Record<string, number>;
   offer_cooldown_until?: string | null;
+  offer_conflicts?: { mission_id: string; mission_name: string; shared: string[] }[];
   tutorial_blocks?: LearnBlock[];
   learning_min_read_seconds?: number;
   linked_minigame_id?: string | null;
