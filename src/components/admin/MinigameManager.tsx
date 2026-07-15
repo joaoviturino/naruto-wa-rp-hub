@@ -9,6 +9,9 @@ import { useServerFn } from "@tanstack/react-start";
 import { upsertMinigame, deleteMinigame } from "@/lib/minigame.functions";
 import { useProficiencies } from "@/hooks/useProficiencies";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { CleanupGame } from "@/components/minigame/CleanupGame";
+import { SequenceGame } from "@/components/minigame/SequenceGame";
 
 type Item = { id: string; name: string };
 type SkillLite = { id: string; name: string; rank: string };
@@ -44,6 +47,8 @@ export function MinigameManager() {
   const [items, setItems] = useState<Item[]>([]);
   const [skills, setSkills] = useState<SkillLite[]>([]);
   const [selected, setSelected] = useState<Minigame | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ score: number; success: boolean } | null>(null);
   const upsert = useServerFn(upsertMinigame);
   const remove = useServerFn(deleteMinigame);
 
@@ -298,12 +303,41 @@ export function MinigameManager() {
 
           <div className="flex gap-2">
             <Button onClick={save}><Save size={14} className="mr-1" /> Salvar</Button>
+            <Button variant="secondary" onClick={() => { setTestResult(null); setTesting(true); }}>▶ Testar</Button>
             {selected.id && <Button variant="destructive" onClick={() => del(selected.id)}><Trash2 size={14} className="mr-1" /> Apagar</Button>}
             <Button variant="outline" onClick={() => setSelected(null)}>Fechar</Button>
           </div>
         </div>
       ) : (
         <div className="text-muted-foreground text-sm p-6">Selecione ou crie um minigame à esquerda.</div>
+      )}
+
+      {selected && (
+        <Dialog open={testing} onOpenChange={(v) => { if (!v) { setTesting(false); setTestResult(null); } }}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Teste — {selected.name || "sem nome"}</DialogTitle>
+            </DialogHeader>
+            <p className="text-xs text-muted-foreground">
+              Modo de teste: sem cooldown, sem recompensas, sem gravar histórico.
+            </p>
+            {testResult ? (
+              <div className="space-y-3">
+                <div className={`rounded p-3 text-sm ${testResult.success ? "bg-emerald-950/50 text-emerald-200" : "bg-red-950/50 text-red-200"}`}>
+                  {testResult.success ? "✔ Sucesso" : "✘ Falhou"} · Pontuação: <b>{testResult.score}</b>
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={() => setTestResult(null)}>Jogar de novo</Button>
+                  <Button variant="outline" onClick={() => { setTesting(false); setTestResult(null); }}>Fechar</Button>
+                </div>
+              </div>
+            ) : selected.kind === "sequence" ? (
+              <SequenceGame background={selected.background_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
+            ) : (
+              <CleanupGame background={selected.background_url} tileset={selected.tileset_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
+            )}
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
