@@ -266,6 +266,18 @@ function BookEditor({ book, setBook, sections, items, adminUserId, onSave, onCan
   const grants: any[] = Array.isArray(book.proficiency_grants) ? book.proficiency_grants : [];
   const rewards: any = book.rewards ?? {};
   const rewardItems: any[] = Array.isArray(rewards.items) ? rewards.items : [];
+  const title = (book.title ?? "").trim();
+  const blocks: Block[] = Array.isArray(book.blocks) ? (book.blocks as Block[]) : [];
+  const invalidRewardItem = rewardItems.some((it: any) => !it || !it.item_id);
+  const invalidGrant = grants.some((g: any) => !g || !g.skill_class);
+  const invalidReqProf = (Array.isArray(book.required_profs) ? book.required_profs : []).some((p: any) => !p || !p.skill_class);
+  const errors: string[] = [];
+  if (title.length < 2) errors.push("Título com pelo menos 2 caracteres.");
+  if (blocks.length === 0) errors.push("Adicione ao menos um bloco de conteúdo.");
+  if (invalidRewardItem) errors.push("Selecione o item em todas as recompensas (ou remova as vazias).");
+  if (invalidGrant) errors.push("Escolha a classe em todas as concessões (ou remova as vazias).");
+  if (invalidReqProf) errors.push("Escolha a classe em todos os requisitos de proficiência (ou remova os vazios).");
+  const canSave = errors.length === 0;
   return (
     <div className="space-y-3">
       <h3 className="font-display text-lg text-gold">{book.id ? "Editar livro" : "Novo livro"}</h3>
@@ -372,7 +384,15 @@ function BookEditor({ book, setBook, sections, items, adminUserId, onSave, onCan
         </Button>
       </div>
 
-      <div className="flex gap-2"><Button onClick={onSave}>Salvar</Button><Button variant="outline" onClick={onCancel}>Cancelar</Button></div>
+      {!canSave && (
+        <ul className="text-xs text-destructive list-disc pl-5 space-y-0.5">
+          {errors.map((e, i) => <li key={i}>{e}</li>)}
+        </ul>
+      )}
+      <div className="flex gap-2">
+        <Button onClick={onSave} disabled={!canSave}>Salvar</Button>
+        <Button variant="outline" onClick={onCancel}>Cancelar</Button>
+      </div>
     </div>
   );
 }
