@@ -4,6 +4,7 @@ import { listMyMissions, claimMission } from "@/lib/missions.functions";
 import { Scroll, CheckCircle2, Lock, Clock, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 type MissionRow = {
   id: string; name: string; rank: string; category: string; description: string | null;
@@ -32,6 +33,20 @@ export function DailyMissionsPanel({ characterId }: { characterId: string }) {
   }, [list]);
 
   useEffect(() => { load(); }, [load, characterId]);
+
+  // Realtime: refresh whenever this character's mission progress changes.
+  useEffect(() => {
+    if (!characterId) return;
+    const ch = supabase
+      .channel(`char-missions:${characterId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "character_missions", filter: `character_id=eq.${characterId}` },
+        () => { load(); },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [characterId, load]);
 
   const filtered = rows.filter((r) => filter === "all" || r.category === filter);
 
