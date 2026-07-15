@@ -151,8 +151,12 @@ export const listMyMissions = createServerFn({ method: "POST" })
     ]);
     const bag = (Array.isArray(inv?.ninja_bag) ? inv!.ninja_bag : []) as any[];
     const byId = new Map(((cms as any[]) ?? []).map((r) => [r.mission_id, r]));
+    // Missões oferecidas por NPC só aparecem depois que o jogador aceita.
+    const { data: giverRows } = await context.supabase.from("npcs").select("offer_mission_id").not("offer_mission_id", "is", null);
+    const npcOffered = new Set(((giverRows as any[]) ?? []).map((r) => r.offer_mission_id));
     const out = [];
     for (const m of (missions ?? []) as any[]) {
+      if (npcOffered.has(m.id) && !byId.has(m.id)) continue;
       const req = await meetsRequirements(context.supabase, char, level, m.requirements);
       const cm = byId.get(m.id);
       const persisted = (cm?.progress ?? {}) as Record<string, number>;
@@ -283,12 +287,17 @@ export async function bumpMissionProgress(supabaseAdmin: any, characterId: strin
   const missionIds = missions.map((m: any) => m.id);
   const { data: rows } = await supabaseAdmin.from("character_missions").select("*").eq("character_id", characterId).in("mission_id", missionIds);
   const byMission = new Map<string, any>(((rows as any[]) ?? []).map((r) => [r.mission_id, r]));
+  // NPCs oferecem quais missões — usadas para não auto-criar linhas antes do aceite.
+  const { data: giverRows } = await supabaseAdmin.from("npcs").select("offer_mission_id").not("offer_mission_id", "is", null);
+  const npcOffered = new Set(((giverRows as any[]) ?? []).map((r: any) => r.offer_mission_id));
   for (const m of missions as any[]) {
     const objs: any[] = Array.isArray(m.objectives) ? m.objectives : [];
     let touched = false;
     const cm = byMission.get(m.id);
     // Skip if claimed and not in cooldown-reset window (we let claim handle repeats)
     if (cm?.status === "claimed") continue;
+    // Missões oferecidas por NPC não avançam sem aceite.
+    if (!cm && npcOffered.has(m.id)) continue;
     const progress: Record<string, number> = { ...((cm?.progress ?? {}) as any) };
     for (const o of objs) {
       const cap = Number(o.count ?? 1);
