@@ -1,0 +1,1 @@
+ALTER TYPE public.npc_kind ADD VALUE IF NOT EXISTS 'object';

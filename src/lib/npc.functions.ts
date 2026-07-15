@@ -30,7 +30,7 @@ const npcPayload = z.object({
     qty: z.number().int().min(1).max(99).default(1),
     chance: z.number().min(0).max(100), // percentual
   })).optional(),
-  kind: z.enum(["aggressive","shop","reward","learning"]).optional(),
+  kind: z.enum(["aggressive","shop","reward","learning","object"]).optional(),
   dialog_intro: z.string().max(4000).nullish(),
   dialog_outro: z.string().max(4000).nullish(),
   required_mission_id: z.string().uuid().nullish(),
