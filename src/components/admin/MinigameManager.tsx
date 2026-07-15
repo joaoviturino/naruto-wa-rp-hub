@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { CleanupGame } from "@/components/minigame/CleanupGame";
 import { SequenceGame } from "@/components/minigame/SequenceGame";
 import { ForgeGame } from "@/components/minigame/ForgeGame";
+import { TailoringGame } from "@/components/minigame/TailoringGame";
 
 type Item = { id: string; name: string; meta?: any; image_url?: string | null };
 type SkillLite = { id: string; name: string; rank: string };
@@ -131,7 +132,7 @@ export function MinigameManager() {
                     const kind = e.target.value;
                     const config = kind === "sequence"
                       ? { duration_seconds: 60, max_mistakes: 2, tiles: [] }
-                      : kind === "forge"
+                      : (kind === "forge" || kind === "tailoring")
                       ? { duration_seconds: 90, difficulty: 2, hammer_hits: 8, heat_target: 70, temper_target: 40, recipe_item_id: "", source: "inventory" }
                       : { duration_seconds: 60, spots: 12, target_score: 8 };
                     setSelected({ ...selected, kind, config });
@@ -139,6 +140,7 @@ export function MinigameManager() {
                   <option value="cleanup">Limpeza (clique)</option>
                   <option value="sequence">Sequência (acerto)</option>
                   <option value="forge">Forja (fabricação)</option>
+                  <option value="tailoring">Confecção (costura)</option>
                 </select>
               </div>
               <div><Label>Nome</Label><Input value={selected.name} onChange={(e) => setSelected({ ...selected, name: e.target.value })} /></div>
@@ -226,8 +228,8 @@ export function MinigameManager() {
 
           {selected.kind === "sequence" ? (
             <SequenceConfigEditor selected={selected} setSelected={setSelected} />
-          ) : selected.kind === "forge" ? (
-            <ForgeConfigEditor selected={selected} setSelected={setSelected} items={items} />
+          ) : (selected.kind === "forge" || selected.kind === "tailoring") ? (
+            <ForgeConfigEditor selected={selected} setSelected={setSelected} items={items} kind={selected.kind} />
           ) : (
             <div className="scroll-panel rounded-lg p-4 space-y-3">
               <h4 className="font-display text-lg text-gold">Configuração da limpeza</h4>
@@ -341,6 +343,16 @@ export function MinigameManager() {
               <SequenceGame background={selected.background_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
             ) : selected.kind === "forge" ? (
               <ForgeGame
+                background={selected.background_url}
+                config={selected.config ?? {}}
+                preview={(() => {
+                  const it = items.find((i) => i.id === selected.config?.recipe_item_id);
+                  return it ? { name: it.name, icon: (it as any).image_url ?? null } : undefined;
+                })()}
+                onFinish={(r) => setTestResult(r)}
+              />
+            ) : selected.kind === "tailoring" ? (
+              <TailoringGame
                 background={selected.background_url}
                 config={selected.config ?? {}}
                 preview={(() => {
@@ -487,17 +499,18 @@ function nextOrder(tiles: Tile[]) {
   return orders.length ? Math.max(...orders) + 1 : 0;
 }
 
-function ForgeConfigEditor({ selected, setSelected, items }: { selected: any; setSelected: (s: any) => void; items: Item[] }) {
+function ForgeConfigEditor({ selected, setSelected, items, kind }: { selected: any; setSelected: (s: any) => void; items: Item[]; kind?: string }) {
   const cfg = selected.config ?? {};
   const craftable = items.filter((it) => Array.isArray((it as any)?.meta?.recipe) && (it as any).meta.recipe.length > 0);
   const target = items.find((it) => it.id === cfg.recipe_item_id);
   const recipe: Array<{ item_id: string; qty: number }> = Array.isArray((target as any)?.meta?.recipe) ? (target as any).meta.recipe : [];
   const nameById = new Map(items.map((it) => [it.id, it.name]));
   const imgById = new Map(items.map((it) => [it.id, (it as any).image_url ?? null]));
+  const isTailoring = kind === "tailoring";
   function set(patch: any) { setSelected({ ...selected, config: { ...cfg, ...patch } }); }
   return (
     <div className="scroll-panel rounded-lg p-4 space-y-3">
-      <h4 className="font-display text-lg text-gold">Configuração da forja</h4>
+      <h4 className="font-display text-lg text-gold">{isTailoring ? "Configuração da confecção" : "Configuração da forja"}</h4>
       <div className="grid gap-3 md:grid-cols-2">
         <div>
           <Label>Item padrão (opcional — jogador pode escolher materiais livres)</Label>
@@ -554,15 +567,15 @@ function ForgeConfigEditor({ selected, setSelected, items }: { selected: any; se
           <Input type="number" min={20} max={300} value={cfg.duration_seconds ?? 90}
             onChange={(e) => set({ duration_seconds: Number(e.target.value) })} />
         </div>
-        <div><Label>Marteladas</Label>
+        <div><Label>{isTailoring ? "Pontos de costura" : "Marteladas"}</Label>
           <Input type="number" min={3} max={20} value={cfg.hammer_hits ?? 8}
             onChange={(e) => set({ hammer_hits: Number(e.target.value) })} />
         </div>
-        <div><Label>Alvo de calor (%)</Label>
+        <div><Label>{isTailoring ? "Alvo de corte (%)" : "Alvo de calor (%)"}</Label>
           <Input type="number" min={20} max={95} value={cfg.heat_target ?? 70}
             onChange={(e) => set({ heat_target: Number(e.target.value) })} />
         </div>
-        <div><Label>Alvo de têmpera (%)</Label>
+        <div><Label>{isTailoring ? "Alvo de acabamento (%)" : "Alvo de têmpera (%)"}</Label>
           <Input type="number" min={5} max={95} value={cfg.temper_target ?? 40}
             onChange={(e) => set({ temper_target: Number(e.target.value) })} />
         </div>

@@ -6,6 +6,7 @@ import { startMinigameRun, completeMinigameRun } from "@/lib/minigame.functions"
 import { CleanupGame } from "./CleanupGame";
 import { SequenceGame } from "./SequenceGame";
 import { ForgeGame } from "./ForgeGame";
+import { TailoringGame } from "./TailoringGame";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -38,9 +39,11 @@ export function MinigameDialog({
   const [craftables, setCraftables] = useState<Array<{ id: string; name: string; image_url: string | null; recipe: Array<{ item_id: string; qty: number }> }>>([]);
   const [selection, setSelection] = useState<Record<string, number>>({});
   const isForge = minigame.kind === "forge";
+  const isTailoring = minigame.kind === "tailoring";
+  const isCrafting = isForge || isTailoring;
 
   const forgeMatch = (() => {
-    if (!isForge) return null;
+    if (!isCrafting) return null;
     const selEntries = Object.entries(selection).filter(([, q]) => q > 0);
     if (!selEntries.length) return null;
     const selMap = new Map(selEntries.map(([k, v]) => [k, v]));
@@ -57,7 +60,7 @@ export function MinigameDialog({
   useEffect(() => {
     let cancel = false;
     async function loadForgeData() {
-      if (!isForge || !open) return;
+      if (!isCrafting || !open) return;
       setSelection({});
       const { data: userRes } = await supabase.auth.getUser();
       const uid = userRes.user?.id;
@@ -94,7 +97,7 @@ export function MinigameDialog({
     }
     loadForgeData();
     return () => { cancel = true; };
-  }, [minigame.id, isForge, open]);
+  }, [minigame.id, isCrafting, open]);
 
   function bump(item_id: string, delta: number) {
     setSelection((prev) => {
@@ -111,7 +114,7 @@ export function MinigameDialog({
     setBusy(true);
     try {
       const payload: any = { minigame_id: minigame.id };
-      if (isForge) {
+      if (isCrafting) {
         payload.forge_selection = Object.entries(selection)
           .filter(([, q]) => q > 0)
           .map(([item_id, qty]) => ({ item_id, qty }));
@@ -151,7 +154,7 @@ export function MinigameDialog({
             <div className="flex-1 space-y-3">
               <div className="font-display text-lg text-gold">{minigame.npc_name ?? "NPC"}</div>
               <p className="whitespace-pre-wrap text-sm">{minigame.dialog_intro || "Bora começar?"}</p>
-              {isForge && (
+              {isCrafting && (
                 <div className="rounded border border-border p-3 bg-secondary/30 space-y-3">
                   <div className="text-xs uppercase tracking-widest text-muted-foreground">Bolsa Ninja — escolha os materiais</div>
                   {bag.length === 0 ? (
@@ -183,22 +186,22 @@ export function MinigameDialog({
                     <div className="rounded border border-gold/60 bg-gold/10 p-2 flex items-center gap-3">
                       {forgeMatch.image_url && <img src={forgeMatch.image_url} className="w-10 h-10 object-contain" alt="" />}
                       <div>
-                        <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Sugestão de forja</div>
+                        <div className="text-[10px] uppercase tracking-widest text-muted-foreground">{isTailoring ? "Sugestão de confecção" : "Sugestão de forja"}</div>
                         <div className="font-display text-gold">{forgeMatch.name}</div>
                       </div>
                     </div>
                   ) : (
                     <div className="text-xs text-muted-foreground italic">
                       {Object.keys(selection).length === 0
-                        ? "Selecione materiais para ver o que pode ser forjado."
+                        ? "Selecione materiais para ver o que pode ser fabricado."
                         : "Nenhuma receita conhecida bate com essa combinação."}
                     </div>
                   )}
                 </div>
               )}
               <div className="flex gap-2">
-                <Button onClick={begin} disabled={busy || (isForge && !forgeMatch)}>
-                  {busy ? "…" : (isForge ? "Iniciar Forja" : "Aceitar missão")}
+                <Button onClick={begin} disabled={busy || (isCrafting && !forgeMatch)}>
+                  {busy ? "…" : (isForge ? "Iniciar Forja" : isTailoring ? "Iniciar Confecção" : "Aceitar missão")}
                 </Button>
                 <Button variant="outline" onClick={close}>Sair</Button>
               </div>
@@ -209,6 +212,8 @@ export function MinigameDialog({
         {stage === "play" && (
           (minigame.kind === "forge"
             ? <ForgeGame background={minigame.background_url} config={minigame.config ?? {}} preview={forgeMatch ? { name: forgeMatch.name, icon: forgeMatch.image_url } : undefined} onFinish={onFinish} />
+            : minigame.kind === "tailoring"
+            ? <TailoringGame background={minigame.background_url} config={minigame.config ?? {}} preview={forgeMatch ? { name: forgeMatch.name, icon: forgeMatch.image_url } : undefined} onFinish={onFinish} />
             : minigame.kind === "sequence"
             ? <SequenceGame background={minigame.background_url} config={minigame.config ?? {}} onFinish={onFinish} />
             : <CleanupGame background={minigame.background_url} tileset={minigame.tileset_url} config={minigame.config ?? {}} onFinish={onFinish} />
