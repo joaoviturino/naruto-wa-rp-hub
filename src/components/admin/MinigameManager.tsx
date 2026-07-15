@@ -339,6 +339,16 @@ export function MinigameManager() {
               </div>
             ) : selected.kind === "sequence" ? (
               <SequenceGame background={selected.background_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
+            ) : selected.kind === "forge" ? (
+              <ForgeGame
+                background={selected.background_url}
+                config={selected.config ?? {}}
+                preview={(() => {
+                  const it = items.find((i) => i.id === selected.config?.recipe_item_id);
+                  return it ? { name: it.name, icon: (it as any).image_url ?? null } : undefined;
+                })()}
+                onFinish={(r) => setTestResult(r)}
+              />
             ) : (
               <CleanupGame background={selected.background_url} tileset={selected.tileset_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
             )}
