@@ -220,7 +220,7 @@ export const startMinigameRun = createServerFn({ method: "POST" })
       if (next > Date.now()) throw new Error("Missão em recarga. Volte mais tarde.");
     }
     // Forge: valida receita + materiais do jogador
-    if (game.kind === "forge") {
+    if ((game.kind as string) === "forge") {
       const cfg = (game.config ?? {}) as any;
       if (!cfg.recipe_item_id) throw new Error("Forja sem item-alvo configurado.");
       const { data: targetItem } = await context.supabase
