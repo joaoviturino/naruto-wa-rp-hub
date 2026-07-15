@@ -20,6 +20,23 @@ export const moveCharacter = createServerFn({ method: "POST" })
         .from("location_connections").select("id").eq("a_id", a).eq("b_id", b).maybeSingle();
       if (!conn) throw new Error("Este local não é acessível a partir da sua posição atual.");
     }
+    // Se este personagem está em um duelo PvP ativo, sair do local implica desistência.
+    try {
+      const { data: parts } = await context.supabase
+        .from("combat_participants").select("session_id").eq("character_id", char.id);
+      const sessIds = (parts ?? []).map((p: any) => p.session_id);
+      if (sessIds.length > 0) {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { data: sessions } = await supabaseAdmin
+          .from("combat_sessions").select("id,status,state").in("id", sessIds).eq("status", "active");
+        for (const s of sessions ?? []) {
+          if ((s as any).state?.mode === "pvp") {
+            const { pvpForfeitOnLeave } = await import("@/lib/combat.functions");
+            await pvpForfeitOnLeave(supabaseAdmin, s.id, char.id);
+          }
+        }
+      }
+    } catch {}
     const { error } = await context.supabase
       .from("characters").update({
         current_location_id: data.locationId,
@@ -48,6 +65,16 @@ export const sendLocationMessage = createServerFn({ method: "POST" })
       .from("characters").select("id,current_location_id").eq("user_id", context.userId).maybeSingle();
     if (!char) throw new Error("Sem personagem.");
     if (char.current_location_id !== data.locationId) throw new Error("Você não está neste local.");
+    // Chat travado quando há duelo PvP ativo no local (mesmo para espectadores).
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: active } = await supabaseAdmin
+        .from("combat_sessions").select("id,state,location_id,status").eq("location_id", data.locationId).eq("status", "active");
+      const pvpHere = (active ?? []).find((s: any) => s.state?.mode === "pvp");
+      if (pvpHere) throw new Error("Um duelo está em andamento neste local. O chat está temporariamente travado.");
+    } catch (e: any) {
+      if (e?.message?.startsWith("Um duelo")) throw e;
+    }
     const { data: msg, error } = await context.supabase
       .from("location_messages")
       .insert({ location_id: data.locationId, character_id: char.id, content: data.content.trim(), image_url: data.imageUrl ?? null })
