@@ -277,8 +277,18 @@ export const getMyActiveCombat = createServerFn({ method: "POST" })
       .from("combat_participants")
       .select("session:combat_sessions!inner(id,status,state,log,turn,npc_id)")
       .eq("character_id", me.id);
-    const found = ((data as any[]) ?? []).find((r) => r.session?.status === "active");
-    return { session: found?.session ?? null, character_id: me.id as string };
+    const activeRows = ((data as any[]) ?? []).filter((r) => r.session?.status === "active");
+    for (const row of activeRows) {
+      const session = row.session;
+      const duelId = (session?.state as any)?.mode === "pvp" ? (session.state as any).duel_id : null;
+      if (!duelId) return { session, character_id: me.id as string };
+      const { data: duel } = await context.supabase.from("pvp_duels").select("status").eq("id", duelId).maybeSingle();
+      if (!duel || duel.status === "active") return { session, character_id: me.id as string };
+      // Autorrecuperação: se o duelo já terminou mas a sessão ficou ativa, encerra a sessão para destravar o chat.
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await supabaseAdmin.from("combat_sessions").update({ status: "finished", ended_at: new Date().toISOString() }).eq("id", session.id);
+    }
+    return { session: null, character_id: me.id as string };
   });
 
 export const playerAttack = createServerFn({ method: "POST" })
