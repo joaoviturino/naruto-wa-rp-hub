@@ -444,11 +444,13 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
             ...players.map((p: any) => ({ kind: "player" as const, e: p, i: -1 }))].map((row, i) => {
             const activeP = row.kind === "player" && players[state.active ?? 0]?.character_id === row.e.character_id;
             const activeN = row.kind === "npc" && npcActive && row.i === (state.target ?? 0);
-            const img = row.kind === "npc" ? row.e.image_url : avatars[row.e.character_id];
+            const imgSources = row.kind === "npc"
+              ? [row.e.sprite_url, row.e.inventory_bg_url, row.e.image_url, row.e.avatar_url, avatars[row.e.character_id]].filter(Boolean)
+              : [sprites[row.e.character_id], row.e.sprite_url, row.e.inventory_bg_url, avatars[row.e.character_id], row.e.avatar_url].filter(Boolean);
             const dead = row.kind === "npc" ? row.e.alive === false : !row.e.alive;
             return (
               <div key={i} className={`w-9 h-9 sm:w-10 sm:h-10 rounded-md overflow-hidden shrink-0 border-2 ${activeP ? "border-emerald-400 ring-2 ring-emerald-400/40" : activeN ? "border-red-500 ring-2 ring-red-500/40" : row.kind === "npc" ? "border-blood/60" : "border-border"} bg-secondary ${dead ? "opacity-30 grayscale" : ""}`}>
-                {img && <img src={img} className="w-full h-full object-cover" alt="" />}
+                <SmartCombatImage sources={imgSources as string[]} className="w-full h-full object-cover" alt="" />
               </div>
             );
           })}
@@ -487,9 +489,9 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                 // Em PvP, o "npc" na verdade é um jogador do lado adversário. Usa
                 // sprite_url do inventário e permite a troca de pose pelo character_id.
                 const enemyCid = nn.character_id as string | undefined;
-                const enemySprite = state._pvp
-                  ? ((enemyCid ? poses[enemyCid] : null) || nn.sprite_url || (enemyCid ? sprites[enemyCid] : null) || nn.inventory_bg_url || nn.image_url || (enemyCid ? avatars[enemyCid] : null))
-                  : ((enemyCid ? poses[enemyCid] : null) || nn.image_url || nn.sprite_url);
+                const enemySources = state._pvp
+                  ? [enemyCid ? poses[enemyCid] : null, nn.sprite_url, enemyCid ? sprites[enemyCid] : null, nn.inventory_bg_url, nn.image_url, nn.avatar_url, enemyCid ? avatars[enemyCid] : null]
+                  : [enemyCid ? poses[enemyCid] : null, nn.image_url, nn.sprite_url];
                 const enemyName = nn.name ?? nn.nickname ?? "?";
                 return (
                   <button
@@ -500,9 +502,13 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                     className={`relative flex flex-col items-center gap-1 group min-w-0 ${canPick ? "cursor-pointer" : "cursor-default"}`}
                   >
                     <div ref={(el) => { npcRefs.current[i] = el; }} className={`relative transition-all ${isActing ? "drop-shadow-[0_0_18px_rgba(239,68,68,0.9)] scale-105" : ""} ${isTarget && !isActing ? "drop-shadow-[0_0_14px_rgba(239,68,68,0.75)] scale-[1.03]" : ""} ${dead ? "opacity-30 grayscale" : "group-hover:scale-105"}`}>
-                      {enemySprite ? (
-                        <img src={enemySprite} alt={enemyName} className={`${sizeCls} w-auto object-contain`} style={{ filter: isActing ? "drop-shadow(0 0 10px rgb(239 68 68))" : undefined }} />
-                      ) : <div className={`${sizeCls} w-20 bg-secondary rounded`} />}
+                      <SmartCombatImage
+                        sources={enemySources.filter(Boolean) as string[]}
+                        alt={enemyName}
+                        className={`${sizeCls} w-auto object-contain`}
+                        style={{ filter: isActing ? "drop-shadow(0 0 10px rgb(239 68 68))" : undefined }}
+                        fallbackClassName={`${sizeCls} w-20 bg-secondary rounded`}
+                      />
                       <FloatingDamageLayer bursts={bursts[`npc:${i}`] ?? []} onExpire={(id) => expireBurst(`npc:${i}`, id)} />
                     </div>
                     <div className={`rounded px-1.5 py-0.5 max-w-[130px] w-full transition-colors ${isTarget ? "bg-red-600/80 ring-1 ring-red-300" : "bg-black/70"}`}>
@@ -536,7 +542,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
               const sizeCls = n > 2 ? "max-h-[95px] sm:max-h-[130px]" : "max-h-[150px] sm:max-h-[200px]";
               const renderPlayer = (p: any) => {
                 const isActive = session.status === "active" && !npcActive && p.character_id === activePlayer?.character_id && p.alive;
-                const sprite = poses[p.character_id] || p.sprite_url || sprites[p.character_id];
+                const spriteSources = [poses[p.character_id], p.sprite_url, sprites[p.character_id], p.inventory_bg_url, avatars[p.character_id], p.avatar_url].filter(Boolean) as string[];
                 const isHealPick = isHealSkill && healTarget === "single" && myTurn && p.alive;
                 const chosenHeal = isHealPick && healTargetId === p.character_id;
                 return (
@@ -548,11 +554,13 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                     className={`flex flex-col items-center gap-1 min-w-0 ${isHealPick ? "cursor-pointer" : "cursor-default"}`}
                   >
                     <div ref={(el) => { playerRefs.current[p.character_id] = el; }} className={`relative transition-all ${isActive ? "drop-shadow-[0_0_18px_rgba(52,211,153,0.9)] scale-105" : ""} ${chosenHeal ? "drop-shadow-[0_0_18px_rgba(52,211,153,0.9)] scale-[1.04] ring-2 ring-emerald-400/70 rounded-md" : ""} ${!p.alive ? "opacity-30 grayscale" : ""}`}>
-                      {sprite ? (
-                        <img src={sprite} alt={p.nickname} className={`${sizeCls} w-auto object-contain`} style={{ transform: "scaleX(-1)", filter: isActive ? "drop-shadow(0 0 10px rgb(52 211 153))" : undefined }} />
-                      ) : (
-                        <div className={`${sizeCls} w-20 bg-secondary rounded`} />
-                      )}
+                      <SmartCombatImage
+                        sources={spriteSources}
+                        alt={p.nickname}
+                        className={`${sizeCls} w-auto object-contain`}
+                        style={{ transform: "scaleX(-1)", filter: isActive ? "drop-shadow(0 0 10px rgb(52 211 153))" : undefined }}
+                        fallbackClassName={`${sizeCls} w-20 bg-secondary rounded`}
+                      />
                       <FloatingDamageLayer bursts={bursts[`player:${p.character_id}`] ?? []} onExpire={(id) => expireBurst(`player:${p.character_id}`, id)} />
                       {healOverlays[p.character_id] && (
                         <HealParticles key={healOverlays[p.character_id]} />
