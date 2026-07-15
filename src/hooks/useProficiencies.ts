@@ -35,7 +35,8 @@ export function useProficiencies(opts: { includeInactive?: boolean } = {}) {
     listeners.add(cb);
     if (!cache) fetchAll();
     else setRows(cache);
-    const ch = supabase.channel("proficiencies_live")
+    const chName = `proficiencies_live_${Math.random().toString(36).slice(2)}_${Date.now()}`;
+    const ch = supabase.channel(chName)
       .on("postgres_changes", { event: "*", schema: "public", table: "proficiencies" }, () => { refreshProficiencies(); })
       .subscribe();
     return () => { alive = false; listeners.delete(cb); supabase.removeChannel(ch); };
