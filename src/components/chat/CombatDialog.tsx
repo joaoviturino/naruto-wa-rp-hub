@@ -679,11 +679,19 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
           ) : (
             <div className="flex items-center justify-between border border-border rounded p-3 bg-input/30">
               <div className="text-sm text-muted-foreground">
-                <Users size={12} className="inline mr-1"/> Aguardando <span className="text-gold font-display">{activePlayer?.nickname ?? "…"}</span> agir…
+                <Users size={12} className="inline mr-1"/>
+                {spectator
+                  ? <>Você está assistindo ao duelo. Vez de <span className="text-gold font-display">{activePlayer?.nickname ?? "…"}</span>.</>
+                  : <>Aguardando <span className="text-gold font-display">{activePlayer?.nickname ?? "…"}</span> agir…</>
+                }
               </div>
-              <Button variant="outline" size="sm" onClick={() => flee({ data: { session_id: sessionId } })}>
-                <Flag size={14} className="mr-1" /> Fugir
-              </Button>
+              {spectator ? (
+                <Button variant="outline" size="sm" onClick={onClose}>Fechar</Button>
+              ) : (
+                <Button variant="outline" size="sm" onClick={() => flee({ data: { session_id: sessionId } })}>
+                  <Flag size={14} className="mr-1" /> Fugir
+                </Button>
+              )}
             </div>
           )
         ) : (
