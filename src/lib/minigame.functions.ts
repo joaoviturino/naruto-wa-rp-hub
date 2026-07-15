@@ -295,6 +295,46 @@ export const completeMinigameRun = createServerFn({ method: "POST" })
           applied.skills = skillIds;
         }
       }
+
+      // Forge: consome materiais e entrega o item forjado
+      if ((run.minigames.kind as string) === "forge") {
+        const cfg = (run.minigames.config ?? {}) as any;
+        if (cfg.recipe_item_id) {
+          const { data: targetItem } = await supabaseAdmin
+            .from("items").select("id,name,meta").eq("id", cfg.recipe_item_id).maybeSingle();
+          const recipe = Array.isArray((targetItem as any)?.meta?.recipe)
+            ? ((targetItem as any).meta.recipe as Array<{ item_id: string; qty: number }>)
+            : [];
+          if (targetItem && recipe.length) {
+            const { data: inv } = await supabaseAdmin
+              .from("inventory").select("ninja_bag").eq("character_id", run.character_id).maybeSingle();
+            const bag: Array<{ item_id: string; qty: number }> = ((inv?.ninja_bag as any[]) ?? [])
+              .filter((e: any) => e && e.item_id)
+              .map((e: any) => ({ item_id: e.item_id, qty: typeof e.qty === "number" && e.qty > 0 ? e.qty : 1 }));
+            // debit materials
+            let ok = true;
+            for (const r of recipe) {
+              let need = r.qty;
+              for (const b of bag) {
+                if (b.item_id !== r.item_id || need <= 0) continue;
+                const take = Math.min(b.qty, need);
+                b.qty -= take; need -= take;
+              }
+              if (need > 0) { ok = false; break; }
+            }
+            if (ok) {
+              const cleaned = bag.filter((b) => b.qty > 0);
+              // credit forged item (1x)
+              const idx = cleaned.findIndex((b) => b.item_id === targetItem.id);
+              if (idx === -1) cleaned.push({ item_id: targetItem.id, qty: 1 });
+              else cleaned[idx].qty += 1;
+              await supabaseAdmin.from("inventory").update({ ninja_bag: cleaned }).eq("character_id", run.character_id);
+              applied.forged = { item_id: targetItem.id, name: targetItem.name };
+              applied.consumed = recipe;
+            }
+          }
+        }
+      }
     }
 
     await supabaseAdmin.from("minigame_runs").update({
