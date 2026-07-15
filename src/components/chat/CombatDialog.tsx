@@ -41,6 +41,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const animQueue = useRef<any[]>([]);
   const animRunning = useRef<boolean>(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const pvpDuelIdRef = useRef<string | null>(null);
   // Refs para calcular posições no palco (projetéis, overlays, etc.)
   const stageRef = useRef<HTMLDivElement | null>(null);
   const npcRefs = useRef<Record<number, HTMLDivElement | null>>({});
@@ -80,6 +81,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   async function load() {
     const { data } = await supabase.from("combat_sessions").select("*").eq("id", sessionId).maybeSingle();
     if (!data) { onClose(); return; }
+    pvpDuelIdRef.current = (data.state as any)?.duel_id ?? null;
     if ((data.state as any)?.mode === "pvp" && (data.state as any)?.duel_id) {
       const { data: duel } = await supabase.from("pvp_duels").select("status").eq("id", (data.state as any).duel_id).maybeSingle();
       if (duel && duel.status !== "active") { onClose(); return; }
@@ -123,7 +125,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
         })
       .on("postgres_changes", { event: "*", schema: "public", table: "pvp_duels" },
         (payload) => {
-          const currentDuelId = (session?.state as any)?.duel_id;
+          const currentDuelId = pvpDuelIdRef.current;
           const row = payload.new as any;
           if (currentDuelId && row?.id === currentDuelId && row?.status !== "active") onClose();
           else void load();
@@ -131,7 +133,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
       .subscribe((status) => { if (status === "SUBSCRIBED") void load(); });
     return () => { supabase.removeChannel(ch); };
      
-  }, [sessionId, myCharId, session?.state?.duel_id]);
+  }, [sessionId, myCharId]);
 
   const participantIdsKey = useMemo(() => [
     ...(session?.state?.players ?? []).map((p: any) => p.character_id),
