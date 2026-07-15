@@ -2339,7 +2339,7 @@ export type Database = {
         | "weapon_primary"
         | "weapon_secondary"
         | "weapon"
-      minigame_kind: "cleanup" | "sequence"
+      minigame_kind: "cleanup" | "sequence" | "forge"
       msg_status: "pending" | "sent" | "failed"
       ninja_rank:
         | "estudante"
@@ -2572,7 +2572,7 @@ export const Constants = {
         "weapon_secondary",
         "weapon",
       ],
-      minigame_kind: ["cleanup", "sequence"],
+      minigame_kind: ["cleanup", "sequence", "forge"],
       msg_status: ["pending", "sent", "failed"],
       ninja_rank: [
         "estudante",
