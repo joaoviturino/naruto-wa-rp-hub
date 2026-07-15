@@ -39,7 +39,7 @@ export function ItemManager({ adminUserId }: { adminUserId: string }) {
       <div className="flex items-center justify-between">
         <h3 className="font-display text-xl text-gold">Itens ({items.length})</h3>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => { setEditing({ type: "material", rank: "E" }); setOpen(true); }}>
+          <Button size="sm" variant="outline" onClick={() => { setEditing({ type: "material", rank: "E", stackable: true, stack_limit: 99 }); setOpen(true); }}>
             <Plus size={14} /> Novo material
           </Button>
           <Button size="sm" onClick={() => { setEditing({}); setOpen(true); }}><Plus size={14} /> Novo item</Button>
@@ -121,7 +121,7 @@ function ItemDialog({ open, onOpenChange, initial, missions, skills, adminUserId
           </Field>
           <Field label="Tamanho de slot"><Input type="number" min={1} max={20} value={f.slot_size ?? 1} onChange={(e) => up("slot_size", Number(e.target.value))} /></Field>
           <Field label="Durabilidade (vazio = infinita)"><Input type="number" min={0} value={f.durability ?? ""} onChange={(e) => up("durability", e.target.value === "" ? null : Number(e.target.value))} /></Field>
-          {(f.type === "consumable" || f.meta?.is_tool) && (
+          {(f.type === "consumable" || f.type === "material" || f.meta?.is_tool) && (
             <>
               <Field label="Empilhável">
                 <SimpleSelect
