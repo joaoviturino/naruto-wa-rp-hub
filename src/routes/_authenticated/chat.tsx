@@ -122,7 +122,10 @@ function ChatPage() {
   useEffect(() => {
     if (!character) return;
     async function checkCombat() {
-      try { const r = await getCombat({}); if (r.session) setCombatId(r.session.id); }
+      try {
+        const r = await getCombat({});
+        setCombatId((cur) => r.session ? (cur ?? r.session.id) : null);
+      }
       catch { /* noop */ }
     }
     loadInvites(); loadPartyMembers(); checkCombat();
@@ -132,7 +135,7 @@ function ChatPage() {
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "characters" }, loadPartyMembers)
       .subscribe();
     // Fallback de polling (caso realtime falhe por rede/RLS)
-    const poll = setInterval(() => { loadInvites(); loadPartyMembers(); }, 3000);
+    const poll = setInterval(() => { loadInvites(); loadPartyMembers(); checkCombat(); }, 3000);
     return () => { supabase.removeChannel(ch); clearInterval(poll); };
   }, [character?.id]);
 

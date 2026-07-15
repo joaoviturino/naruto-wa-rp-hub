@@ -1012,15 +1012,17 @@ async function persistPvpPools(supabaseAdmin: any, state: PvpState) {
 async function finalizePvp(supabaseAdmin: any, sessId: string, state: PvpState, winnerSide: "a" | "b", sessionStatus: "won" | "fled" = "won") {
   state.winner_side = winnerSide;
   await persistPvpPools(supabaseAdmin, state);
-  await supabaseAdmin.from("combat_sessions").update({
+  const { error: sessionError } = await supabaseAdmin.from("combat_sessions").update({
     state, status: sessionStatus, ended_at: new Date().toISOString(),
   }).eq("id", sessId);
+  if (sessionError) throw new Error(sessionError.message);
   if (state.duel_id) {
     const winnerArr = pvpSide(state, winnerSide);
     const winnerId = winnerArr.find((p) => p.alive)?.character_id ?? winnerArr[0]?.character_id ?? null;
-    await supabaseAdmin.from("pvp_duels").update({
+    const { error: duelError } = await supabaseAdmin.from("pvp_duels").update({
       status: "finished", winner_id: winnerId, ended_at: new Date().toISOString(),
     }).eq("id", state.duel_id);
+    if (duelError) throw new Error(duelError.message);
     try {
       const { bumpMissionProgress } = await import("@/lib/missions.functions");
       for (const p of winnerArr.filter((x) => x.alive)) {
@@ -1255,9 +1257,11 @@ async function pvpFlee(supabaseAdmin: any, sess: any, myId: string) {
   const state = sess.state as PvpState;
   const mySide = pvpFindMySide(state, myId);
   if (!mySide) {
-    await supabaseAdmin.from("combat_sessions").update({ status: "fled", ended_at: new Date().toISOString() }).eq("id", sess.id);
+    const { error: sessionError } = await supabaseAdmin.from("combat_sessions").update({ status: "fled", ended_at: new Date().toISOString() }).eq("id", sess.id);
+    if (sessionError) throw new Error(sessionError.message);
     if (state?.duel_id) {
-      await supabaseAdmin.from("pvp_duels").update({ status: "finished", ended_at: new Date().toISOString() }).eq("id", state.duel_id).in("status", ["pending", "active"]);
+      const { error: duelError } = await supabaseAdmin.from("pvp_duels").update({ status: "finished", ended_at: new Date().toISOString() }).eq("id", state.duel_id).in("status", ["pending", "active"]);
+      if (duelError) throw new Error(duelError.message);
     }
     return { ok: true };
   }
