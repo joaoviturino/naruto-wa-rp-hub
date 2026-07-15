@@ -210,18 +210,24 @@ function ChatPage() {
         const { data: duel } = await supabase.from("pvp_duels").select("status").eq("id", pvp.state.duel_id).maybeSingle();
         if (duel && duel.status !== "active") pvp = null;
       }
-      setPvpAtLocation(pvp?.id ?? null);
+      const nextPvpId = pvp?.id ?? null;
+      setPvpAtLocation((prev) => {
+        if (!nextPvpId && prev) setCombatId((cur) => cur === prev ? null : cur);
+        return nextPvpId;
+      });
       // Auto-abre para o participante e para o espectador.
-      if (pvp?.id) setCombatId(pvp.id);
+      if (nextPvpId) setCombatId(nextPvpId);
     }
     refreshPvp();
     const ch = supabase.channel(`pvp-loc-${currentLoc.id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "combat_sessions", filter: `location_id=eq.${currentLoc.id}` },
         () => refreshPvp())
+      .on("postgres_changes", { event: "*", schema: "public", table: "pvp_duels" },
+        () => refreshPvp())
       .subscribe();
     // Fallback: alguns celulares/webviews perdem realtime; isso garante que
     // o chat destrave assim que o duelo mudar para finished/fled.
-    const poll = window.setInterval(refreshPvp, 2000);
+    const poll = window.setInterval(refreshPvp, 1500);
     return () => { supabase.removeChannel(ch); window.clearInterval(poll); };
   }, [currentLoc?.id, character?.id]);
 

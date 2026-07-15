@@ -141,6 +141,7 @@ export const respondDuel = createServerFn({ method: "POST" })
       const hp = c.hp_current == null ? hpMax : Math.max(0, Math.min(hpMax, Number(c.hp_current)));
       return {
         character_id: c.id, nickname: c.nickname, avatar_url: c.avatar_url,
+        inventory_bg_url: c.inventory_bg_url ?? null,
         sprite_url: c.inventory_bg_url ?? null,
         hp, hp_max: hpMax,
         ef: c.ef_current == null ? efMax : Math.min(efMax, Number(c.ef_current)),

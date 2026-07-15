@@ -59,18 +59,19 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const flee = useServerFn(fleeCombat);
   const consume = useServerFn(consumeInCombat);
 
-  async function doFlee() {
+  async function doFlee(e?: React.MouseEvent) {
+    e?.preventDefault();
+    e?.stopPropagation();
     if (fleeing) return;
     setFleeing(true);
     try {
       await flee({ data: { session_id: sessionId } });
       toast.success("Você fugiu do combate.");
-      // Fecha imediatamente — o realtime também atualiza, mas queremos destravar o chat na hora.
       onClose();
     } catch (e: any) {
       const msg = e?.message ?? "Não foi possível fugir.";
       toast.error(msg);
-      if (String(msg).toLowerCase().includes("encerrado")) onClose();
+      if (/encerrado|não encontrado|nao encontrado/i.test(String(msg))) onClose();
     } finally {
       setFleeing(false);
     }
@@ -78,6 +79,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
 
   async function load() {
     const { data } = await supabase.from("combat_sessions").select("*").eq("id", sessionId).maybeSingle();
+    if (!data) { onClose(); return; }
     setSession(remapPvpForViewer(data as any, myCharId));
   }
   async function loadSkills() {
@@ -107,13 +109,23 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
 
   useEffect(() => {
     load(); loadSkills(); loadBag();
-    const ch = supabase.channel(`combat-${sessionId}`)
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "combat_sessions", filter: `id=eq.${sessionId}` },
-        (payload) => setSession(remapPvpForViewer(payload.new as any, myCharId)))
-      .subscribe();
+    const ch = supabase.channel(`combat-${sessionId}-${myCharId}-${Date.now()}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "combat_sessions", filter: `id=eq.${sessionId}` },
+        (payload) => {
+          if (payload.eventType === "DELETE") { onClose(); return; }
+          const next = remapPvpForViewer(payload.new as any, myCharId);
+          setSession(next);
+          if (next?.state?._pvp && next?.status !== "active") onClose();
+        })
+      .subscribe((status) => { if (status === "SUBSCRIBED") void load(); });
     return () => { supabase.removeChannel(ch); };
      
-  }, [sessionId]);
+  }, [sessionId, myCharId]);
+
+  const participantIdsKey = useMemo(() => [
+    ...(session?.state?.players ?? []).map((p: any) => p.character_id),
+    ...(session?.state?._pvp ? (session?.state?.npcs ?? []).map((p: any) => p.character_id) : []),
+  ].filter(Boolean).sort().join("|"), [session?.state?.players, session?.state?.npcs, session?.state?._pvp]);
 
   useEffect(() => {
     // Carrega avatares/sprites dos participantes dos dois lados (no PvP os inimigos ficam em `npcs`).
@@ -129,7 +141,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
       for (const c of (data as any[]) ?? []) { av[c.id] = c.avatar_url; sp[c.id] = c.inventory_bg_url; }
       setAvatars(av); setSprites(sp);
     });
-  }, [session?.id]);
+  }, [participantIdsKey]);
 
   const state = (session?.state ?? {}) as any;
   const players: any[] = Array.isArray(state.players) ? state.players : [];
@@ -413,6 +425,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
             {session.status !== "active" && <span className="ml-2 text-xs uppercase text-gold">{session.status}</span>}
             {state._pvp && !spectator && session.status === "active" && (
               <Button
+                type="button"
                 variant="destructive"
                 size="sm"
                 className="ml-auto mr-8 h-7 px-2 text-[11px]"
@@ -432,11 +445,13 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
             ...players.map((p: any) => ({ kind: "player" as const, e: p, i: -1 }))].map((row, i) => {
             const activeP = row.kind === "player" && players[state.active ?? 0]?.character_id === row.e.character_id;
             const activeN = row.kind === "npc" && npcActive && row.i === (state.target ?? 0);
-            const img = row.kind === "npc" ? row.e.image_url : avatars[row.e.character_id];
+            const imgSources = row.kind === "npc"
+              ? [row.e.sprite_url, row.e.inventory_bg_url, row.e.image_url, row.e.avatar_url, avatars[row.e.character_id]].filter(Boolean)
+              : [sprites[row.e.character_id], row.e.sprite_url, row.e.inventory_bg_url, avatars[row.e.character_id], row.e.avatar_url].filter(Boolean);
             const dead = row.kind === "npc" ? row.e.alive === false : !row.e.alive;
             return (
               <div key={i} className={`w-9 h-9 sm:w-10 sm:h-10 rounded-md overflow-hidden shrink-0 border-2 ${activeP ? "border-emerald-400 ring-2 ring-emerald-400/40" : activeN ? "border-red-500 ring-2 ring-red-500/40" : row.kind === "npc" ? "border-blood/60" : "border-border"} bg-secondary ${dead ? "opacity-30 grayscale" : ""}`}>
-                {img && <img src={img} className="w-full h-full object-cover" alt="" />}
+                <SmartCombatImage sources={imgSources as string[]} className="w-full h-full object-cover" alt="" />
               </div>
             );
           })}
@@ -475,9 +490,9 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                 // Em PvP, o "npc" na verdade é um jogador do lado adversário. Usa
                 // sprite_url do inventário e permite a troca de pose pelo character_id.
                 const enemyCid = nn.character_id as string | undefined;
-                const enemySprite = state._pvp
-                  ? ((enemyCid ? poses[enemyCid] : null) || nn.sprite_url || (enemyCid ? sprites[enemyCid] : null) || nn.inventory_bg_url || nn.image_url || (enemyCid ? avatars[enemyCid] : null))
-                  : ((enemyCid ? poses[enemyCid] : null) || nn.image_url || nn.sprite_url);
+                const enemySources = state._pvp
+                  ? [enemyCid ? poses[enemyCid] : null, nn.sprite_url, enemyCid ? sprites[enemyCid] : null, nn.inventory_bg_url, nn.image_url, nn.avatar_url, enemyCid ? avatars[enemyCid] : null]
+                  : [enemyCid ? poses[enemyCid] : null, nn.image_url, nn.sprite_url];
                 const enemyName = nn.name ?? nn.nickname ?? "?";
                 return (
                   <button
@@ -488,9 +503,13 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                     className={`relative flex flex-col items-center gap-1 group min-w-0 ${canPick ? "cursor-pointer" : "cursor-default"}`}
                   >
                     <div ref={(el) => { npcRefs.current[i] = el; }} className={`relative transition-all ${isActing ? "drop-shadow-[0_0_18px_rgba(239,68,68,0.9)] scale-105" : ""} ${isTarget && !isActing ? "drop-shadow-[0_0_14px_rgba(239,68,68,0.75)] scale-[1.03]" : ""} ${dead ? "opacity-30 grayscale" : "group-hover:scale-105"}`}>
-                      {enemySprite ? (
-                        <img src={enemySprite} alt={enemyName} className={`${sizeCls} w-auto object-contain`} style={{ filter: isActing ? "drop-shadow(0 0 10px rgb(239 68 68))" : undefined }} />
-                      ) : <div className={`${sizeCls} w-20 bg-secondary rounded`} />}
+                      <SmartCombatImage
+                        sources={enemySources.filter(Boolean) as string[]}
+                        alt={enemyName}
+                        className={`${sizeCls} w-auto object-contain`}
+                        style={{ filter: isActing ? "drop-shadow(0 0 10px rgb(239 68 68))" : undefined }}
+                        fallbackClassName={`${sizeCls} w-20 bg-secondary rounded`}
+                      />
                       <FloatingDamageLayer bursts={bursts[`npc:${i}`] ?? []} onExpire={(id) => expireBurst(`npc:${i}`, id)} />
                     </div>
                     <div className={`rounded px-1.5 py-0.5 max-w-[130px] w-full transition-colors ${isTarget ? "bg-red-600/80 ring-1 ring-red-300" : "bg-black/70"}`}>
@@ -524,7 +543,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
               const sizeCls = n > 2 ? "max-h-[95px] sm:max-h-[130px]" : "max-h-[150px] sm:max-h-[200px]";
               const renderPlayer = (p: any) => {
                 const isActive = session.status === "active" && !npcActive && p.character_id === activePlayer?.character_id && p.alive;
-                const sprite = poses[p.character_id] || p.sprite_url || sprites[p.character_id];
+                const spriteSources = [poses[p.character_id], p.sprite_url, sprites[p.character_id], p.inventory_bg_url, avatars[p.character_id], p.avatar_url].filter(Boolean) as string[];
                 const isHealPick = isHealSkill && healTarget === "single" && myTurn && p.alive;
                 const chosenHeal = isHealPick && healTargetId === p.character_id;
                 return (
@@ -536,11 +555,13 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                     className={`flex flex-col items-center gap-1 min-w-0 ${isHealPick ? "cursor-pointer" : "cursor-default"}`}
                   >
                     <div ref={(el) => { playerRefs.current[p.character_id] = el; }} className={`relative transition-all ${isActive ? "drop-shadow-[0_0_18px_rgba(52,211,153,0.9)] scale-105" : ""} ${chosenHeal ? "drop-shadow-[0_0_18px_rgba(52,211,153,0.9)] scale-[1.04] ring-2 ring-emerald-400/70 rounded-md" : ""} ${!p.alive ? "opacity-30 grayscale" : ""}`}>
-                      {sprite ? (
-                        <img src={sprite} alt={p.nickname} className={`${sizeCls} w-auto object-contain`} style={{ transform: "scaleX(-1)", filter: isActive ? "drop-shadow(0 0 10px rgb(52 211 153))" : undefined }} />
-                      ) : (
-                        <div className={`${sizeCls} w-20 bg-secondary rounded`} />
-                      )}
+                      <SmartCombatImage
+                        sources={spriteSources}
+                        alt={p.nickname}
+                        className={`${sizeCls} w-auto object-contain`}
+                        style={{ transform: "scaleX(-1)", filter: isActive ? "drop-shadow(0 0 10px rgb(52 211 153))" : undefined }}
+                        fallbackClassName={`${sizeCls} w-20 bg-secondary rounded`}
+                      />
                       <FloatingDamageLayer bursts={bursts[`player:${p.character_id}`] ?? []} onExpire={(id) => expireBurst(`player:${p.character_id}`, id)} />
                       {healOverlays[p.character_id] && (
                         <HealParticles key={healOverlays[p.character_id]} />
@@ -712,7 +733,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
               </TabsContent>
               <TabsContent value="flee" className="mt-2">
                 <div className="text-sm text-muted-foreground mb-2">Fugir encerra o combate para você e o time sem recompensas.</div>
-                <Button variant="outline" onClick={doFlee} disabled={fleeing}>
+                <Button type="button" variant="outline" onClick={doFlee} disabled={fleeing}>
                   <Flag size={14} className="mr-1" /> {fleeing ? "Fugindo..." : "Confirmar fuga"}
                 </Button>
               </TabsContent>
@@ -729,7 +750,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
               {spectator ? (
                 <Button variant="outline" size="sm" onClick={onClose}>Fechar</Button>
               ) : (
-                <Button variant="outline" size="sm" onClick={doFlee} disabled={fleeing}>
+                <Button type="button" variant="outline" size="sm" onClick={doFlee} disabled={fleeing}>
                   <Flag size={14} className="mr-1" /> {fleeing ? "Fugindo..." : "Fugir"}
                 </Button>
               )}
@@ -749,6 +770,22 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
       </DialogContent>
     </Dialog>
   );
+}
+
+function SmartCombatImage({ sources, alt, className, style, fallbackClassName }: {
+  sources: Array<string | null | undefined>;
+  alt: string;
+  className?: string;
+  style?: React.CSSProperties;
+  fallbackClassName?: string;
+}) {
+  const key = sources.join("|");
+  const clean = useMemo(() => Array.from(new Set(sources.filter((s): s is string => !!s && /^https?:\/\//i.test(s)))), [key]);
+  const [idx, setIdx] = useState(0);
+  useEffect(() => { setIdx(0); }, [clean.join("|")]);
+  const src = clean[idx];
+  if (!src) return <div className={fallbackClassName ?? "w-full h-full bg-secondary rounded"} />;
+  return <img src={src} alt={alt} className={className} style={style} onError={() => setIdx((i) => i + 1)} />;
 }
 
 function SkillFxLayer({ fx }: {
