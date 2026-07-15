@@ -6,6 +6,23 @@ import { Check, ChevronDown, ChevronUp } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
+// Polyfill pointer-capture APIs em navegadores/webviews (Android antigos, iOS Safari
+// em alguns modos) que não implementam essas funções nos elementos. Sem isso, o
+// Radix Select v2 quebra na primeira interação em mobile com
+// "target.hasPointerCapture is not a function", derrubando toda a página admin.
+if (typeof window !== "undefined" && typeof Element !== "undefined") {
+  const proto = Element.prototype as any;
+  if (typeof proto.hasPointerCapture !== "function") {
+    proto.hasPointerCapture = function () { return false; };
+  }
+  if (typeof proto.setPointerCapture !== "function") {
+    proto.setPointerCapture = function () { /* noop */ };
+  }
+  if (typeof proto.releasePointerCapture !== "function") {
+    proto.releasePointerCapture = function () { /* noop */ };
+  }
+}
+
 const Select = SelectPrimitive.Root;
 
 const SelectGroup = SelectPrimitive.Group;
