@@ -42,7 +42,7 @@ const forgeConfigSchema = z.object({
   hammer_hits: z.number().int().min(3).max(20).default(8),
   heat_target: z.number().int().min(20).max(95).default(70),
   temper_target: z.number().int().min(5).max(95).default(40),
-  recipe_item_id: z.string().uuid().nullish(),
+  recipe_item_id: z.preprocess((v) => (v === "" || v === null ? undefined : v), z.string().uuid().optional()),
   source: z.enum(["inventory","inventory_or_equipped"]).default("inventory"),
 }).default({ duration_seconds: 90, difficulty: 2, hammer_hits: 8, heat_target: 70, temper_target: 40, source: "inventory" });
 
