@@ -839,6 +839,9 @@ export const consumeInCombat = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: sess } = await supabaseAdmin.from("combat_sessions").select("*").eq("id", data.session_id).maybeSingle();
     if (!sess || sess.status !== "active") throw new Error("Combate encerrado.");
+    if ((sess.state as any)?.mode === "pvp") {
+      return await handlePvpConsume(supabaseAdmin, sess, me.id, data.item_id);
+    }
     const state: CombatState = normalizeState(sess.state as any);
     const log: LogEntry[] = sess.log as any;
     const activeIdx = state.active;
