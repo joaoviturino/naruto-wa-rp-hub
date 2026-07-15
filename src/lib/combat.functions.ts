@@ -922,3 +922,328 @@ export const consumeInCombat = createServerFn({ method: "POST" })
     await supabaseAdmin.from("combat_sessions").update({ state, log, status, ended_at }).eq("id", sess.id);
     return { ok: true };
   });
+// ============================================================
+//  PvP — motor de combate jogador × jogador.
+//  Compartilha o mesmo shape visual (state.mode='pvp'), mas com dois
+//  lados de players ao invés de NPCs. Reusa fórmulas de dano/pool.
+// ============================================================
+
+type PvpState = {
+  mode: "pvp";
+  side_a: Player[];
+  side_b: Player[];
+  side_a_ids: string[];
+  side_b_ids: string[];
+  active_side: "a" | "b";
+  active_idx: number;
+  last_a?: number;
+  last_b?: number;
+  duel_id?: string;
+  winner_side?: "a" | "b";
+};
+
+const PVP_MAX_HIT_PCT = 50; // teto por golpe (% da vida máxima)
+
+function pvpSide(state: PvpState, side: "a" | "b") { return side === "a" ? state.side_a : state.side_b; }
+function otherSide(s: "a" | "b"): "a" | "b" { return s === "a" ? "b" : "a"; }
+
+function pvpFindMySide(state: PvpState, charId: string): "a" | "b" | null {
+  if (state.side_a_ids.includes(charId)) return "a";
+  if (state.side_b_ids.includes(charId)) return "b";
+  return null;
+}
+
+function pvpAdvanceTurn(state: PvpState): { finished: boolean; winnerSide?: "a" | "b" } {
+  // Registra último idx da side que acabou de agir
+  if (state.active_side === "a") state.last_a = state.active_idx;
+  else state.last_b = state.active_idx;
+  const nextSide = otherSide(state.active_side);
+  const arr = pvpSide(state, nextSide);
+  const last = nextSide === "a" ? (state.last_a ?? -1) : (state.last_b ?? -1);
+  let next = -1;
+  for (let i = 1; i <= arr.length; i++) {
+    const cand = (last + i) % arr.length;
+    if (arr[cand].alive) { next = cand; break; }
+  }
+  // Verifica finalização (algum lado sem vivos)
+  const aAlive = state.side_a.some((p) => p.alive);
+  const bAlive = state.side_b.some((p) => p.alive);
+  if (!aAlive || !bAlive) return { finished: true, winnerSide: aAlive ? "a" : (bAlive ? "b" : state.active_side) };
+  if (next < 0) return { finished: true, winnerSide: state.active_side };
+  state.active_side = nextSide;
+  state.active_idx = next;
+  const np = arr[next];
+  if (np.cooldowns) for (const k of Object.keys(np.cooldowns)) np.cooldowns[k] = Math.max(0, (np.cooldowns[k] ?? 0) - 1);
+  return { finished: false };
+}
+
+async function persistPvpPools(supabaseAdmin: any, state: PvpState) {
+  for (const p of [...state.side_a, ...state.side_b]) {
+    await supabaseAdmin.from("characters").update({
+      ef_current: p.ef, em_current: p.em, chakra_current: p.chakra, hp_current: p.hp,
+    }).eq("id", p.character_id);
+  }
+}
+
+async function finalizePvp(supabaseAdmin: any, sessId: string, state: PvpState, winnerSide: "a" | "b") {
+  state.winner_side = winnerSide;
+  await persistPvpPools(supabaseAdmin, state);
+  await supabaseAdmin.from("combat_sessions").update({
+    state, status: "finished", ended_at: new Date().toISOString(),
+  }).eq("id", sessId);
+  if (state.duel_id) {
+    const winnerArr = pvpSide(state, winnerSide);
+    const winnerId = winnerArr.find((p) => p.alive)?.character_id ?? winnerArr[0]?.character_id ?? null;
+    await supabaseAdmin.from("pvp_duels").update({
+      status: "finished", winner_id: winnerId, ended_at: new Date().toISOString(),
+    }).eq("id", state.duel_id);
+    try {
+      const { bumpMissionProgress } = await import("@/lib/missions.functions");
+      for (const p of winnerArr.filter((x) => x.alive)) {
+        await bumpMissionProgress(supabaseAdmin, p.character_id, { type: "pvp_win" });
+      }
+    } catch {}
+  }
+}
+
+async function handlePvpAttack(
+  supabaseAdmin: any, supabaseUser: any, sess: any, myId: string,
+  data: { session_id: string; skill_id: string; energy_used: number; target_index?: number; heal_target_char_id?: string },
+) {
+  const state = sess.state as PvpState;
+  const log: LogEntry[] = Array.isArray(sess.log) ? (sess.log as any) : [];
+  const mySide = pvpFindMySide(state, myId);
+  if (!mySide) throw new Error("Você não é participante deste duelo.");
+  if (state.active_side !== mySide) throw new Error("Não é sua vez.");
+  const activePlayer = pvpSide(state, mySide)[state.active_idx];
+  if (!activePlayer || activePlayer.character_id !== myId) throw new Error("Não é sua vez.");
+  if (!activePlayer.alive) throw new Error("Você está fora de combate.");
+
+  activePlayer.cooldowns = activePlayer.cooldowns ?? {};
+  const cd = activePlayer.cooldowns[data.skill_id] ?? 0;
+  if (cd > 0) throw new Error(`Habilidade em cooldown por mais ${cd} turno(s).`);
+
+  const { data: owned } = await supabaseUser
+    .from("character_skills").select("skill_id").eq("character_id", myId).eq("skill_id", data.skill_id).maybeSingle();
+  if (!owned) throw new Error("Você não conhece essa habilidade.");
+  const { data: skill } = await supabaseUser.from("skills")
+    .select("id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class,skill_class,meta,animation_url,animation_mode,sound_url")
+    .eq("id", data.skill_id).maybeSingle();
+  if (!skill) throw new Error("Habilidade inexistente.");
+
+  const enemySide = otherSide(mySide);
+  const enemies = pvpSide(state, enemySide);
+
+  const { getCharBuffs } = await import("./clan-tree.functions");
+  const buffs = await getCharBuffs(supabaseUser, myId);
+  const costReduction = Math.max(0, Math.min(90, Number((buffs as any).skill_cost_reduction ?? 0)));
+  const powerBonus = Math.max(0, Number((buffs as any).skill_power_bonus ?? 0));
+  const powerMul = 1 + powerBonus / 100;
+
+  const pool = (skill.energy_type as Pool);
+  const poolMax = pool === "ef" ? activePlayer.ef_max : pool === "em" ? activePlayer.em_max : activePlayer.chakra_max;
+  const costPct = Math.max(1, Math.min(100, Number((skill as any).cost_percent ?? 20)));
+  const maxEnergyBase = Math.max(1, Math.floor((poolMax * costPct) / 100));
+  const maxEnergy = Math.max(1, Math.floor(maxEnergyBase * (1 - costReduction / 100)));
+  if (data.energy_used < 1) throw new Error("Energia mínima: 1.");
+  if (data.energy_used > maxEnergy) throw new Error(`Custo máximo desta habilidade: ${maxEnergy} (${costPct}% da pool ${pool.toUpperCase()}).`);
+  if ((activePlayer as any)[pool] < data.energy_used) throw new Error(`Energia insuficiente (${pool.toUpperCase()}).`);
+  (activePlayer as any)[pool] -= data.energy_used;
+
+  // Maestria
+  let masteryMul = 1;
+  const skClass = (skill as any).skill_class ?? skill.req_class;
+  if (skClass) {
+    const { data: c } = await supabaseUser.from("characters").select("proficiencies").eq("id", myId).maybeSingle();
+    const m = ((c as any)?.proficiencies)?.[skClass]?.maestria as string | undefined;
+    const idx = ["E","D","C","B","A","S"].indexOf(m ?? "");
+    if (idx >= 0) masteryMul = 1 + idx * 0.1;
+  }
+
+  // Pose configurada
+  let poseUrl: string | null = null;
+  {
+    const { data: csp } = await supabaseAdmin
+      .from("character_skill_poses")
+      .select("pose:character_poses(image_url)")
+      .eq("character_id", activePlayer.character_id)
+      .eq("skill_id", data.skill_id).maybeSingle();
+    poseUrl = ((csp as any)?.pose?.image_url as string | undefined) ?? null;
+  }
+
+  const healCfg = (skill as any).meta?.heal as { target?: "single" | "team" } | undefined;
+  const isHeal = !!healCfg?.target;
+
+  if (isHeal) {
+    const healAmount = Math.max(1, Math.round(data.energy_used * powerMul * masteryMul));
+    if (Number(skill.cooldown_turns ?? 0) > 0) activePlayer.cooldowns[data.skill_id] = Number(skill.cooldown_turns);
+    let targets: Player[] = [];
+    if (healCfg!.target === "team") {
+      targets = pvpSide(state, mySide).filter((p) => p.alive);
+    } else {
+      const tid = data.heal_target_char_id ?? activePlayer.character_id;
+      const t = pvpSide(state, mySide).find((p) => p.character_id === tid && p.alive);
+      if (!t) throw new Error("Alvo inválido para cura.");
+      targets = [t];
+    }
+    const healedIds: string[] = [];
+    const names: string[] = [];
+    for (const t of targets) {
+      const before = t.hp;
+      t.hp = Math.min(t.hp_max, t.hp + healAmount);
+      if (t.hp > before) healedIds.push(t.character_id);
+      names.push(t.nickname);
+    }
+    log.push({
+      seq: log.length + 1, actor: "player", actor_name: activePlayer.nickname,
+      target_name: healCfg!.target === "team" ? "Time" : (names[0] ?? activePlayer.nickname),
+      skill_name: skill.name, energy_type: pool, energy_used: data.energy_used,
+      effective: healAmount, damage: healAmount, speed: 0, crit_mul: 1,
+      heal: true, heal_mode: healCfg!.target, heal_target_ids: healedIds,
+      pose_url: poseUrl,
+      actor_char_id: activePlayer.character_id,
+      target_char_id: healCfg!.target === "team" ? null : (targets[0]?.character_id ?? null),
+      animation_url: (skill as any).animation_url ?? null,
+      animation_mode: ((skill as any).animation_mode ?? "overlay") as any,
+      sound_url: (skill as any).sound_url ?? null,
+      msg: `${activePlayer.nickname} usa ${skill.name} → ${healCfg!.target === "team" ? "time" : names[0]} +${healAmount} HP.`,
+      // marcadores PvP p/ o CombatDialog
+      pvp_actor_side: mySide, pvp_actor_idx: state.active_idx,
+      pvp_target_side: mySide, pvp_target_idx: healCfg!.target === "team" ? -1 : pvpSide(state, mySide).findIndex((p) => p.character_id === targets[0]?.character_id),
+    } as any);
+  } else {
+    // Alvo inimigo
+    let tIdx = typeof data.target_index === "number" ? data.target_index : enemies.findIndex((p) => p.alive);
+    if (!enemies[tIdx] || !enemies[tIdx].alive) tIdx = enemies.findIndex((p) => p.alive);
+    if (tIdx < 0) throw new Error("Sem alvos vivos.");
+    const target = enemies[tIdx];
+
+    const effective = data.energy_used * Number(skill.bonus_energetic);
+    const speed = effective * Number(skill.bonus_speed);
+    const rawDamage = Math.max(1, Math.round(effective * Number(skill.bonus_critical) * masteryMul * powerMul));
+    const hitCap = Math.max(1, Math.ceil((target.hp_max ?? 0) * PVP_MAX_HIT_PCT / 100));
+    const damage = Math.min(rawDamage, hitCap);
+
+    if (Number(skill.cooldown_turns ?? 0) > 0) activePlayer.cooldowns[data.skill_id] = Number(skill.cooldown_turns);
+
+    target.hp = Math.max(0, target.hp - damage);
+    if (target.hp <= 0) target.alive = false;
+
+    log.push({
+      seq: log.length + 1, actor: "player", actor_name: activePlayer.nickname, target_name: target.nickname,
+      skill_name: skill.name, energy_type: pool, energy_used: data.energy_used,
+      effective, damage, raw_damage: rawDamage, defense: 0, hit_cap: hitCap, speed,
+      crit_mul: Number(skill.bonus_critical),
+      pose_url: poseUrl,
+      actor_char_id: activePlayer.character_id,
+      target_char_id: target.character_id,
+      animation_url: (skill as any).animation_url ?? null,
+      animation_mode: ((skill as any).animation_mode ?? "overlay") as any,
+      sound_url: (skill as any).sound_url ?? null,
+      msg: `${activePlayer.nickname} usa ${skill.name} (${pool.toUpperCase()} ${data.energy_used})${masteryMul > 1 ? ` [Maestria ×${masteryMul.toFixed(1)}]` : ""} → ${damage} de dano${damage < rawDamage ? ` [cap ${PVP_MAX_HIT_PCT}%]` : ""}.`,
+      pvp_actor_side: mySide, pvp_actor_idx: state.active_idx,
+      pvp_target_side: enemySide, pvp_target_idx: tIdx,
+    } as any);
+  }
+
+  const step = pvpAdvanceTurn(state);
+  if (step.finished) {
+    await finalizePvp(supabaseAdmin, sess.id, state, step.winnerSide ?? mySide);
+    return { ok: true, status: "finished" };
+  }
+  await persistPvpPools(supabaseAdmin, state);
+  await supabaseAdmin.from("combat_sessions").update({ state, log }).eq("id", sess.id);
+  return { ok: true, status: "active" };
+}
+
+async function handlePvpConsume(supabaseAdmin: any, sess: any, myId: string, itemId: string) {
+  const state = sess.state as PvpState;
+  const log: LogEntry[] = Array.isArray(sess.log) ? (sess.log as any) : [];
+  const mySide = pvpFindMySide(state, myId);
+  if (!mySide) throw new Error("Você não é participante deste duelo.");
+  if (state.active_side !== mySide) throw new Error("Não é sua vez.");
+  const activePlayer = pvpSide(state, mySide)[state.active_idx];
+  if (!activePlayer || activePlayer.character_id !== myId) throw new Error("Não é sua vez.");
+
+  const { data: inv } = await supabaseAdmin.from("inventory").select("ninja_bag,secondary_slots").eq("character_id", myId).maybeSingle();
+  if (!inv) throw new Error("Sem inventário.");
+  const removeOne = (arr: any) => {
+    const b = Array.isArray(arr) ? arr.map((e: any) => ({ item_id: e.item_id, qty: Number(e.qty ?? 1) })) : [];
+    const idx = b.findIndex((e: any) => e.item_id === itemId);
+    if (idx < 0) return null;
+    b[idx].qty -= 1;
+    if (b[idx].qty <= 0) b.splice(idx, 1);
+    return b;
+  };
+  let patch: any = null;
+  const nb = removeOne(inv.ninja_bag);
+  if (nb) patch = { ninja_bag: nb };
+  else {
+    const sb = removeOne(inv.secondary_slots);
+    if (sb) patch = { secondary_slots: sb };
+  }
+  if (!patch) throw new Error("Você não tem este item.");
+
+  const { data: item } = await supabaseAdmin.from("items").select("name,type,meta").eq("id", itemId).maybeSingle();
+  if (!item) throw new Error("Item inexistente.");
+  if (item.type !== "consumable") throw new Error("Só consumíveis podem ser usados em combate.");
+
+  await supabaseAdmin.from("inventory").update(patch).eq("character_id", myId);
+
+  const restore = (item as any).meta?.restore as
+    | { pool: "ef" | "em" | "chakra" | "hp" | "all"; mode: "flat" | "percent"; amount: number } | null | undefined;
+  let restoredMsg = "";
+  if (restore && restore.amount > 0) {
+    const targets: Array<"ef"|"em"|"chakra"|"hp"> = restore.pool === "all" ? ["hp","ef","em","chakra"] : [restore.pool];
+    const maxOf = { ef: activePlayer.ef_max, em: activePlayer.em_max, chakra: activePlayer.chakra_max, hp: activePlayer.hp_max } as const;
+    const gains: string[] = [];
+    for (const p of targets) {
+      const gain = restore.mode === "percent" ? Math.round((maxOf[p] * restore.amount) / 100) : Math.round(restore.amount);
+      const before = (activePlayer as any)[p] as number;
+      (activePlayer as any)[p] = Math.min(maxOf[p], before + gain);
+      gains.push(`${p.toUpperCase()} +${(activePlayer as any)[p] - before}`);
+    }
+    restoredMsg = ` (${gains.join(", ")})`;
+    activePlayer.alive = activePlayer.hp > 0;
+  }
+
+  log.push({
+    seq: log.length + 1, actor: "player", actor_name: activePlayer.nickname, target_name: activePlayer.nickname,
+    skill_name: `Item: ${item.name}`, energy_type: "chakra", energy_used: 0,
+    effective: 0, damage: 0, speed: 0, crit_mul: 0,
+    actor_char_id: activePlayer.character_id, target_char_id: activePlayer.character_id,
+    msg: `${activePlayer.nickname} usa ${item.name}${restoredMsg}.`,
+    pvp_actor_side: mySide, pvp_actor_idx: state.active_idx,
+    pvp_target_side: mySide, pvp_target_idx: state.active_idx,
+  } as any);
+
+  const step = pvpAdvanceTurn(state);
+  if (step.finished) {
+    await finalizePvp(supabaseAdmin, sess.id, state, step.winnerSide ?? mySide);
+    return { ok: true };
+  }
+  await persistPvpPools(supabaseAdmin, state);
+  await supabaseAdmin.from("combat_sessions").update({ state, log }).eq("id", sess.id);
+  return { ok: true };
+}
+
+async function pvpFlee(supabaseAdmin: any, sess: any, myId: string) {
+  const state = sess.state as PvpState;
+  const mySide = pvpFindMySide(state, myId);
+  if (!mySide) throw new Error("Você não é participante deste duelo.");
+  // Marca todos do lado que fugiu como derrotados; o outro lado vence.
+  for (const p of pvpSide(state, mySide)) p.alive = false;
+  const winnerSide = otherSide(mySide);
+  await finalizePvp(supabaseAdmin, sess.id, state, winnerSide);
+  return { ok: true };
+}
+
+/**
+ * Chamado por moveCharacter quando um duelista sai do local durante um PvP.
+ * Efetiva a desistência do lado do jogador.
+ */
+export async function pvpForfeitOnLeave(supabaseAdmin: any, sessionId: string, charId: string) {
+  const { data: sess } = await supabaseAdmin.from("combat_sessions").select("*").eq("id", sessionId).maybeSingle();
+  if (!sess || sess.status !== "active" || (sess.state as any)?.mode !== "pvp") return;
+  await pvpFlee(supabaseAdmin, sess, charId);
+}
