@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { bumpMissionProgress } from "@/lib/missions.functions";
 
 // Modelo de combate simplificado:
 // - Cada participante tem 3 pools: ef, em, chakra (derivados de xp/2 e xp).
@@ -712,6 +713,23 @@ async function applyRewards(supabaseAdmin: any, npcId: string, state: CombatStat
     skill_name: "recompensa", energy_type: "chakra", energy_used: 0, effective: 0, damage: 0, speed: 0, crit_mul: 0,
     msg: `Recompensa: +${xpGain} XP, +${ryoGain} Ryo${dropNames} (por jogador).`,
   });
+  // Missões — registrar derrotas por NPC/tipo para cada jogador do time.
+  try {
+    const deadNpcs = (state.npcs ?? []).filter((n) => !n.alive);
+    const npcIds = deadNpcs.map((n) => n.id).filter(Boolean);
+    let kindMap = new Map<string, string | null>();
+    if (npcIds.length) {
+      const { data: kinds } = await supabaseAdmin.from("npcs").select("id,kind").in("id", npcIds);
+      kindMap = new Map(((kinds as any[]) ?? []).map((r) => [r.id, r.kind ?? null]));
+    }
+    for (const p of receivers) {
+      for (const n of deadNpcs) {
+        await bumpMissionProgress(supabaseAdmin, p.character_id, {
+          type: "kill_npc", npc_id: n.id, npc_kind: kindMap.get(n.id) ?? null, group_id: null,
+        });
+      }
+    }
+  } catch (e) { /* mission bump non-fatal */ }
   return { xp: xpGain, ryo: ryoGain, drops: rolled };
 }
 
