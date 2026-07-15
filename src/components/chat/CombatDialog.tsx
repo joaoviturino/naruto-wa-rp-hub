@@ -59,18 +59,19 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const flee = useServerFn(fleeCombat);
   const consume = useServerFn(consumeInCombat);
 
-  async function doFlee() {
+  async function doFlee(e?: React.MouseEvent) {
+    e?.preventDefault();
+    e?.stopPropagation();
     if (fleeing) return;
     setFleeing(true);
     try {
       await flee({ data: { session_id: sessionId } });
       toast.success("Você fugiu do combate.");
-      // Fecha imediatamente — o realtime também atualiza, mas queremos destravar o chat na hora.
       onClose();
     } catch (e: any) {
       const msg = e?.message ?? "Não foi possível fugir.";
       toast.error(msg);
-      if (String(msg).toLowerCase().includes("encerrado")) onClose();
+      if (/encerrado|não encontrado|nao encontrado/i.test(String(msg))) onClose();
     } finally {
       setFleeing(false);
     }
@@ -78,6 +79,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
 
   async function load() {
     const { data } = await supabase.from("combat_sessions").select("*").eq("id", sessionId).maybeSingle();
+    if (!data) { onClose(); return; }
     setSession(remapPvpForViewer(data as any, myCharId));
   }
   async function loadSkills() {
@@ -107,13 +109,23 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
 
   useEffect(() => {
     load(); loadSkills(); loadBag();
-    const ch = supabase.channel(`combat-${sessionId}`)
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "combat_sessions", filter: `id=eq.${sessionId}` },
-        (payload) => setSession(remapPvpForViewer(payload.new as any, myCharId)))
-      .subscribe();
+    const ch = supabase.channel(`combat-${sessionId}-${myCharId}-${Date.now()}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "combat_sessions", filter: `id=eq.${sessionId}` },
+        (payload) => {
+          if (payload.eventType === "DELETE") { onClose(); return; }
+          const next = remapPvpForViewer(payload.new as any, myCharId);
+          setSession(next);
+          if (next?.state?._pvp && next?.status !== "active") onClose();
+        })
+      .subscribe((status) => { if (status === "SUBSCRIBED") void load(); });
     return () => { supabase.removeChannel(ch); };
      
-  }, [sessionId]);
+  }, [sessionId, myCharId]);
+
+  const participantIdsKey = useMemo(() => [
+    ...(session?.state?.players ?? []).map((p: any) => p.character_id),
+    ...(session?.state?._pvp ? (session?.state?.npcs ?? []).map((p: any) => p.character_id) : []),
+  ].filter(Boolean).sort().join("|"), [session?.state?.players, session?.state?.npcs, session?.state?._pvp]);
 
   useEffect(() => {
     // Carrega avatares/sprites dos participantes dos dois lados (no PvP os inimigos ficam em `npcs`).
@@ -129,7 +141,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
       for (const c of (data as any[]) ?? []) { av[c.id] = c.avatar_url; sp[c.id] = c.inventory_bg_url; }
       setAvatars(av); setSprites(sp);
     });
-  }, [session?.id]);
+  }, [participantIdsKey]);
 
   const state = (session?.state ?? {}) as any;
   const players: any[] = Array.isArray(state.players) ? state.players : [];
