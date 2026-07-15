@@ -14,7 +14,7 @@ import { NpcGroupManager } from "./NpcGroupManager";
 type DropRow = { item_id: string; qty: number; chance: number };
 type ShopRow = { item_id: string; price: number; stock: number };
 type RewardRow = { item_id: string; qty: number };
-type NpcKind = "aggressive" | "shop" | "reward" | "learning";
+type NpcKind = "aggressive" | "shop" | "reward" | "learning" | "object";
 type LearnBlock = { id: string; kind: "text" | "image"; text?: string | null; image_url?: string | null };
 type Npc = {
   id: string; name: string; image_url: string | null; description: string | null;
@@ -204,10 +204,10 @@ export function NpcManager() {
         <div className="space-y-4">
           <div className="scroll-panel rounded-lg p-4 space-y-3">
             <div className="flex flex-wrap gap-2">
-              {(["aggressive","shop","reward","learning"] as NpcKind[]).map((k) => (
+              {(["aggressive","shop","reward","learning","object"] as NpcKind[]).map((k) => (
                 <Button key={k} size="sm" variant={sel.kind === k ? "default" : "outline"}
                   onClick={async () => { await save({ data: { ...sel, kind: k } } as any); load(); }}>
-                  {k === "aggressive" ? "Agressivo" : k === "shop" ? "Loja" : k === "reward" ? "Recompensa" : "Aprendizagem"}
+                  {k === "aggressive" ? "Agressivo" : k === "shop" ? "Loja" : k === "reward" ? "Recompensa" : k === "learning" ? "Aprendizagem" : "Objeto"}
                 </Button>
               ))}
             </div>
