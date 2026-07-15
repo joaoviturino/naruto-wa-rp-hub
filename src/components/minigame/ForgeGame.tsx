@@ -357,13 +357,10 @@ function ForgeScene({
               left: `${s.x}%`, top: `${s.y}%`,
               background: s.good ? "#ffe58a" : "#c96a30",
               boxShadow: s.good ? "0 0 6px 2px rgba(255,229,138,.9)" : "0 0 4px 1px rgba(201,106,48,.7)",
-              // random direction
-              // @ts-expect-error CSS var
-              "--dx": `${(Math.random() * 40 - 20).toFixed(0)}px`,
-              // @ts-expect-error CSS var
-              "--dy": `${(-20 - Math.random() * 30).toFixed(0)}px`,
+              ["--dx" as any]: `${(Math.random() * 40 - 20).toFixed(0)}px`,
+              ["--dy" as any]: `${(-20 - Math.random() * 30).toFixed(0)}px`,
               animation: "forge-spark 500ms ease-out forwards",
-            }}
+            } as React.CSSProperties}
           />
         ))}
 
