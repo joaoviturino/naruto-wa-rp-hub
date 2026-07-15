@@ -5,6 +5,9 @@ import { useServerFn } from "@tanstack/react-start";
 import { startMinigameRun, completeMinigameRun } from "@/lib/minigame.functions";
 import { CleanupGame } from "./CleanupGame";
 import { SequenceGame } from "./SequenceGame";
+import { ForgeGame } from "./ForgeGame";
+import { useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 type Minigame = {
@@ -29,6 +32,36 @@ export function MinigameDialog({
   const [runId, setRunId] = useState<string | null>(null);
   const [result, setResult] = useState<{ score: number; success: boolean; rewards: any } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [forgePreview, setForgePreview] = useState<{ name: string; icon: string | null; recipe: Array<{ item_id: string; qty: number; name: string; icon: string | null }> } | null>(null);
+
+  useEffect(() => {
+    let cancel = false;
+    async function loadPreview() {
+      if (minigame.kind !== "forge") { setForgePreview(null); return; }
+      const targetId = minigame.config?.recipe_item_id;
+      if (!targetId) return;
+      const { data: target } = await supabase.from("items").select("id,name,image_url,meta").eq("id", targetId).maybeSingle();
+      if (!target) return;
+      const recipe = Array.isArray((target as any).meta?.recipe) ? (target as any).meta.recipe : [];
+      const ids = recipe.map((r: any) => r.item_id);
+      const { data: mats } = ids.length
+        ? await supabase.from("items").select("id,name,image_url").in("id", ids)
+        : { data: [] as any[] };
+      const byId = new Map((mats ?? []).map((m: any) => [m.id, m]));
+      if (cancel) return;
+      setForgePreview({
+        name: target.name,
+        icon: (target as any).image_url ?? null,
+        recipe: recipe.map((r: any) => ({
+          item_id: r.item_id, qty: r.qty,
+          name: byId.get(r.item_id)?.name ?? r.item_id,
+          icon: byId.get(r.item_id)?.image_url ?? null,
+        })),
+      });
+    }
+    loadPreview();
+    return () => { cancel = true; };
+  }, [minigame.id]);
 
   async function begin() {
     setBusy(true);
@@ -68,6 +101,27 @@ export function MinigameDialog({
             <div className="flex-1 space-y-3">
               <div className="font-display text-lg text-gold">{minigame.npc_name ?? "NPC"}</div>
               <p className="whitespace-pre-wrap text-sm">{minigame.dialog_intro || "Bora começar?"}</p>
+              {forgePreview && (
+                <div className="rounded border border-border p-3 bg-secondary/30">
+                  <div className="flex items-center gap-3 mb-2">
+                    {forgePreview.icon && <img src={forgePreview.icon} className="w-12 h-12 object-contain" alt="" />}
+                    <div>
+                      <div className="text-xs uppercase tracking-widest text-muted-foreground">Você irá forjar</div>
+                      <div className="font-display text-gold">{forgePreview.name}</div>
+                    </div>
+                  </div>
+                  <div className="text-xs text-muted-foreground mb-1">Materiais consumidos:</div>
+                  <ul className="text-sm space-y-1">
+                    {forgePreview.recipe.map((r, i) => (
+                      <li key={i} className="flex items-center gap-2">
+                        {r.icon && <img src={r.icon} className="w-5 h-5 object-contain" alt="" />}
+                        <span>{r.name}</span>
+                        <span className="text-muted-foreground">× {r.qty}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <div className="flex gap-2">
                 <Button onClick={begin} disabled={busy}>{busy ? "…" : "Aceitar missão"}</Button>
                 <Button variant="outline" onClick={close}>Sair</Button>
@@ -77,7 +131,9 @@ export function MinigameDialog({
         )}
 
         {stage === "play" && (
-          (minigame.kind === "sequence"
+          (minigame.kind === "forge"
+            ? <ForgeGame background={minigame.background_url} config={minigame.config ?? {}} preview={forgePreview ? { name: forgePreview.name, icon: forgePreview.icon } : undefined} onFinish={onFinish} />
+            : minigame.kind === "sequence"
             ? <SequenceGame background={minigame.background_url} config={minigame.config ?? {}} onFinish={onFinish} />
             : <CleanupGame background={minigame.background_url} tileset={minigame.tileset_url} config={minigame.config ?? {}} onFinish={onFinish} />
           )
@@ -103,6 +159,7 @@ export function MinigameDialog({
                     {result.rewards.em ? <span>+{result.rewards.em} EM</span> : null}
                     {result.rewards.chakra ? <span>+{result.rewards.chakra} Chakra</span> : null}
                     {result.rewards.items?.length ? <span>+{result.rewards.items.length} item(ns)</span> : null}
+                    {result.rewards.forged ? <span>⚒ {result.rewards.forged.name}</span> : null}
                   </div>
                 </div>
               )}

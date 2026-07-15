@@ -36,6 +36,16 @@ const sequenceConfigSchema = z.object({
   })).default([]),
 }).default({ duration_seconds: 60, max_mistakes: 2, tiles: [] });
 
+const forgeConfigSchema = z.object({
+  duration_seconds: z.number().int().min(20).max(300).default(90),
+  difficulty: z.number().int().min(1).max(5).default(2),
+  hammer_hits: z.number().int().min(3).max(20).default(8),
+  heat_target: z.number().int().min(20).max(95).default(70),
+  temper_target: z.number().int().min(5).max(95).default(40),
+  recipe_item_id: z.string().uuid(),
+  source: z.enum(["inventory","inventory_or_equipped"]).default("inventory"),
+}).default({ duration_seconds: 90, difficulty: 2, hammer_hits: 8, heat_target: 70, temper_target: 40, recipe_item_id: "00000000-0000-0000-0000-000000000000", source: "inventory" });
+
 const configSchema = z.any();
 
 const ninjaRank = z.enum(["estudante","genin","chunin","tokubetsu_jonin","jonin","anbu","sannin","kage"]);
@@ -50,7 +60,7 @@ const rewardSkillsSchema = z.array(z.object({ skill_id: z.string().uuid() })).de
 const upsertSchema = z.object({
   id: z.string().uuid().optional(),
   slug: z.string().trim().min(2).max(40).regex(/^[a-z0-9_-]+$/, "slug inválido"),
-  kind: z.enum(["cleanup", "sequence"]).default("cleanup"),
+  kind: z.enum(["cleanup", "sequence", "forge"]).default("cleanup"),
   name: z.string().min(2).max(80),
   description: z.string().max(2000).nullish(),
   background_url: z.string().nullish(),
@@ -68,7 +78,10 @@ const upsertSchema = z.object({
   required_profs: requiredProfsSchema,
   reward_skills: rewardSkillsSchema,
 }).superRefine((data, ctx) => {
-  const parser = data.kind === "sequence" ? sequenceConfigSchema : cleanupConfigSchema;
+  const parser =
+    data.kind === "sequence" ? sequenceConfigSchema :
+    data.kind === "forge" ? forgeConfigSchema :
+    cleanupConfigSchema;
   const r = parser.safeParse(data.config);
   if (!r.success) {
     r.error.issues.forEach((i) => ctx.addIssue({ ...i, path: ["config", ...(i.path ?? [])] }));
@@ -206,6 +219,23 @@ export const startMinigameRun = createServerFn({ method: "POST" })
       const next = new Date(last.completed_at).getTime() + (game.cooldown_hours * 3600 * 1000);
       if (next > Date.now()) throw new Error("Missão em recarga. Volte mais tarde.");
     }
+    // Forge: valida receita + materiais do jogador
+    if ((game.kind as string) === "forge") {
+      const cfg = (game.config ?? {}) as any;
+      if (!cfg.recipe_item_id) throw new Error("Forja sem item-alvo configurado.");
+      const { data: targetItem } = await context.supabase
+        .from("items").select("id,name,meta").eq("id", cfg.recipe_item_id).maybeSingle();
+      if (!targetItem) throw new Error("Item-alvo não existe.");
+      const recipe = Array.isArray((targetItem.meta as any)?.recipe) ? (targetItem.meta as any).recipe as Array<{ item_id: string; qty: number }> : [];
+      if (!recipe.length) throw new Error("Este item não possui receita.");
+      const { data: inv } = await context.supabase
+        .from("inventory").select("ninja_bag").eq("character_id", char.id).maybeSingle();
+      const bag = (((inv?.ninja_bag as any[]) ?? []).filter((e: any) => e && e.item_id));
+      for (const r of recipe) {
+        const have = bag.filter((b: any) => b.item_id === r.item_id).reduce((s: number, b: any) => s + (Number(b.qty) || 1), 0);
+        if (have < r.qty) throw new Error(`Materiais insuficientes para forjar ${targetItem.name}.`);
+      }
+    }
     const insertRow: any = {
       character_id: char.id,
       minigame_id: data.minigame_id,
@@ -263,6 +293,46 @@ export const completeMinigameRun = createServerFn({ method: "POST" })
           const rows = skillIds.map((sid: string) => ({ character_id: run.character_id, skill_id: sid }));
           await supabaseAdmin.from("character_skills").upsert(rows, { onConflict: "character_id,skill_id" });
           applied.skills = skillIds;
+        }
+      }
+
+      // Forge: consome materiais e entrega o item forjado
+      if ((run.minigames.kind as string) === "forge") {
+        const cfg = (run.minigames.config ?? {}) as any;
+        if (cfg.recipe_item_id) {
+          const { data: targetItem } = await supabaseAdmin
+            .from("items").select("id,name,meta").eq("id", cfg.recipe_item_id).maybeSingle();
+          const recipe = Array.isArray((targetItem as any)?.meta?.recipe)
+            ? ((targetItem as any).meta.recipe as Array<{ item_id: string; qty: number }>)
+            : [];
+          if (targetItem && recipe.length) {
+            const { data: inv } = await supabaseAdmin
+              .from("inventory").select("ninja_bag").eq("character_id", run.character_id).maybeSingle();
+            const bag: Array<{ item_id: string; qty: number }> = ((inv?.ninja_bag as any[]) ?? [])
+              .filter((e: any) => e && e.item_id)
+              .map((e: any) => ({ item_id: e.item_id, qty: typeof e.qty === "number" && e.qty > 0 ? e.qty : 1 }));
+            // debit materials
+            let ok = true;
+            for (const r of recipe) {
+              let need = r.qty;
+              for (const b of bag) {
+                if (b.item_id !== r.item_id || need <= 0) continue;
+                const take = Math.min(b.qty, need);
+                b.qty -= take; need -= take;
+              }
+              if (need > 0) { ok = false; break; }
+            }
+            if (ok) {
+              const cleaned = bag.filter((b) => b.qty > 0);
+              // credit forged item (1x)
+              const idx = cleaned.findIndex((b) => b.item_id === targetItem.id);
+              if (idx === -1) cleaned.push({ item_id: targetItem.id, qty: 1 });
+              else cleaned[idx].qty += 1;
+              await supabaseAdmin.from("inventory").update({ ninja_bag: cleaned }).eq("character_id", run.character_id);
+              applied.forged = { item_id: targetItem.id, name: targetItem.name };
+              applied.consumed = recipe;
+            }
+          }
         }
       }
     }

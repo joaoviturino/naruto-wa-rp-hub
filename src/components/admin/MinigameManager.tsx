@@ -12,8 +12,9 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CleanupGame } from "@/components/minigame/CleanupGame";
 import { SequenceGame } from "@/components/minigame/SequenceGame";
+import { ForgeGame } from "@/components/minigame/ForgeGame";
 
-type Item = { id: string; name: string };
+type Item = { id: string; name: string; meta?: any; image_url?: string | null };
 type SkillLite = { id: string; name: string; rank: string };
 type RewardItem = { item_id: string; qty: number };
 type Minigame = {
@@ -55,7 +56,7 @@ export function MinigameManager() {
   async function load() {
     const [{ data: mg }, { data: it }, { data: sk }] = await Promise.all([
       supabase.from("minigames").select("*").order("name"),
-      supabase.from("items").select("id,name").order("name"),
+      supabase.from("items").select("id,name,meta,image_url").order("name"),
       supabase.from("skills").select("id,name,rank").order("name"),
     ]);
     setList(((mg as any[]) ?? []) as Minigame[]);
@@ -130,11 +131,14 @@ export function MinigameManager() {
                     const kind = e.target.value;
                     const config = kind === "sequence"
                       ? { duration_seconds: 60, max_mistakes: 2, tiles: [] }
+                      : kind === "forge"
+                      ? { duration_seconds: 90, difficulty: 2, hammer_hits: 8, heat_target: 70, temper_target: 40, recipe_item_id: "", source: "inventory" }
                       : { duration_seconds: 60, spots: 12, target_score: 8 };
                     setSelected({ ...selected, kind, config });
                   }}>
                   <option value="cleanup">Limpeza (clique)</option>
                   <option value="sequence">Sequência (acerto)</option>
+                  <option value="forge">Forja (fabricação)</option>
                 </select>
               </div>
               <div><Label>Nome</Label><Input value={selected.name} onChange={(e) => setSelected({ ...selected, name: e.target.value })} /></div>
@@ -222,6 +226,8 @@ export function MinigameManager() {
 
           {selected.kind === "sequence" ? (
             <SequenceConfigEditor selected={selected} setSelected={setSelected} />
+          ) : selected.kind === "forge" ? (
+            <ForgeConfigEditor selected={selected} setSelected={setSelected} items={items} />
           ) : (
             <div className="scroll-panel rounded-lg p-4 space-y-3">
               <h4 className="font-display text-lg text-gold">Configuração da limpeza</h4>
@@ -333,6 +339,16 @@ export function MinigameManager() {
               </div>
             ) : selected.kind === "sequence" ? (
               <SequenceGame background={selected.background_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
+            ) : selected.kind === "forge" ? (
+              <ForgeGame
+                background={selected.background_url}
+                config={selected.config ?? {}}
+                preview={(() => {
+                  const it = items.find((i) => i.id === selected.config?.recipe_item_id);
+                  return it ? { name: it.name, icon: (it as any).image_url ?? null } : undefined;
+                })()}
+                onFinish={(r) => setTestResult(r)}
+              />
             ) : (
               <CleanupGame background={selected.background_url} tileset={selected.tileset_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
             )}
@@ -469,4 +485,86 @@ function SequenceConfigEditor({ selected, setSelected }: { selected: any; setSel
 function nextOrder(tiles: Tile[]) {
   const orders = tiles.filter((t) => t.correct && t.order != null).map((t) => t.order as number);
   return orders.length ? Math.max(...orders) + 1 : 0;
+}
+
+function ForgeConfigEditor({ selected, setSelected, items }: { selected: any; setSelected: (s: any) => void; items: Item[] }) {
+  const cfg = selected.config ?? {};
+  const craftable = items.filter((it) => Array.isArray((it as any)?.meta?.recipe) && (it as any).meta.recipe.length > 0);
+  const target = items.find((it) => it.id === cfg.recipe_item_id);
+  const recipe: Array<{ item_id: string; qty: number }> = Array.isArray((target as any)?.meta?.recipe) ? (target as any).meta.recipe : [];
+  const nameById = new Map(items.map((it) => [it.id, it.name]));
+  const imgById = new Map(items.map((it) => [it.id, (it as any).image_url ?? null]));
+  function set(patch: any) { setSelected({ ...selected, config: { ...cfg, ...patch } }); }
+  return (
+    <div className="scroll-panel rounded-lg p-4 space-y-3">
+      <h4 className="font-display text-lg text-gold">Configuração da forja</h4>
+      <div className="grid gap-3 md:grid-cols-2">
+        <div>
+          <Label>Item a ser forjado (precisa ter receita)</Label>
+          <select className="w-full bg-input border border-border rounded px-2 py-2 text-sm"
+            value={cfg.recipe_item_id ?? ""}
+            onChange={(e) => set({ recipe_item_id: e.target.value })}>
+            <option value="">— selecione —</option>
+            {craftable.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
+          </select>
+          {!craftable.length && <div className="text-xs text-muted-foreground mt-1">Nenhum item com receita. Adicione uma receita na aba Itens.</div>}
+        </div>
+        <div>
+          <Label>Origem dos materiais</Label>
+          <select className="w-full bg-input border border-border rounded px-2 py-2 text-sm"
+            value={cfg.source ?? "inventory"}
+            onChange={(e) => set({ source: e.target.value })}>
+            <option value="inventory">Apenas mochila</option>
+            <option value="inventory_or_equipped">Mochila ou equipados</option>
+          </select>
+        </div>
+      </div>
+
+      {target && (
+        <div className="rounded border border-border p-3 bg-secondary/30">
+          <div className="flex items-center gap-3 mb-2">
+            {imgById.get(target.id) && <img src={imgById.get(target.id) as string} className="w-12 h-12 object-contain" alt="" />}
+            <div>
+              <div className="text-xs uppercase tracking-widest text-muted-foreground">Prévia</div>
+              <div className="font-display text-gold">{target.name}</div>
+            </div>
+          </div>
+          <div className="text-xs text-muted-foreground mb-1">Materiais consumidos:</div>
+          <ul className="text-sm space-y-1">
+            {recipe.map((r, i) => (
+              <li key={i} className="flex items-center gap-2">
+                {imgById.get(r.item_id) && <img src={imgById.get(r.item_id) as string} className="w-5 h-5 object-contain" alt="" />}
+                <span>{nameById.get(r.item_id) ?? r.item_id}</span>
+                <span className="text-muted-foreground">× {r.qty}</span>
+              </li>
+            ))}
+            {!recipe.length && <li className="text-muted-foreground">Sem receita definida.</li>}
+          </ul>
+        </div>
+      )}
+
+      <div className="grid gap-3 md:grid-cols-4">
+        <div><Label>Dificuldade (1–5)</Label>
+          <Input type="number" min={1} max={5} value={cfg.difficulty ?? 2}
+            onChange={(e) => set({ difficulty: Math.max(1, Math.min(5, Number(e.target.value) || 2)) })} />
+        </div>
+        <div><Label>Duração (s)</Label>
+          <Input type="number" min={20} max={300} value={cfg.duration_seconds ?? 90}
+            onChange={(e) => set({ duration_seconds: Number(e.target.value) })} />
+        </div>
+        <div><Label>Marteladas</Label>
+          <Input type="number" min={3} max={20} value={cfg.hammer_hits ?? 8}
+            onChange={(e) => set({ hammer_hits: Number(e.target.value) })} />
+        </div>
+        <div><Label>Alvo de calor (%)</Label>
+          <Input type="number" min={20} max={95} value={cfg.heat_target ?? 70}
+            onChange={(e) => set({ heat_target: Number(e.target.value) })} />
+        </div>
+        <div><Label>Alvo de têmpera (%)</Label>
+          <Input type="number" min={5} max={95} value={cfg.temper_target ?? 40}
+            onChange={(e) => set({ temper_target: Number(e.target.value) })} />
+        </div>
+      </div>
+    </div>
+  );
 }
