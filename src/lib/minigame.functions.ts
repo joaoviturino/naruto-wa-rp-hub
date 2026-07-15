@@ -197,7 +197,13 @@ function checkRequirements(character: any, req_rank: string | null, req_profs: a
 /** Cria um run pendente (para telemetria). Verifica cooldown. */
 export const startMinigameRun = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ minigame_id: z.string().uuid() }).parse(i))
+  .inputValidator((i: unknown) => z.object({
+    minigame_id: z.string().uuid(),
+    forge_selection: z.array(z.object({
+      item_id: z.string().uuid(),
+      qty: z.number().int().min(1).max(999),
+    })).optional(),
+  }).parse(i))
   .handler(async ({ data, context }) => {
     const { data: char } = await context.supabase
       .from("characters").select("id,current_location_id,rank,proficiencies").eq("user_id", context.userId).maybeSingle();
@@ -219,31 +225,51 @@ export const startMinigameRun = createServerFn({ method: "POST" })
       const next = new Date(last.completed_at).getTime() + (game.cooldown_hours * 3600 * 1000);
       if (next > Date.now()) throw new Error("Missão em recarga. Volte mais tarde.");
     }
-    // Forge: valida receita + materiais do jogador
+    // Forge: valida seleção do jogador + descobre item forjado
+    let runContext: any = {};
     if ((game.kind as string) === "forge") {
       const cfg = (game.config ?? {}) as any;
-      if (!cfg.recipe_item_id) throw new Error("Forja sem item-alvo configurado.");
-      const { data: targetItem } = await context.supabase
-        .from("items").select("id,name,meta").eq("id", cfg.recipe_item_id).maybeSingle();
-      if (!targetItem) throw new Error("Item-alvo não existe.");
-      const recipe = Array.isArray((targetItem.meta as any)?.recipe) ? (targetItem.meta as any).recipe as Array<{ item_id: string; qty: number }> : [];
-      if (!recipe.length) throw new Error("Este item não possui receita.");
+      const selection = (data.forge_selection ?? []).filter((s) => s.qty > 0);
+      if (!selection.length) throw new Error("Selecione os materiais que deseja usar na forja.");
+      // Normaliza seleção (agrega mesmo item_id)
+      const selMap = new Map<string, number>();
+      for (const s of selection) selMap.set(s.item_id, (selMap.get(s.item_id) ?? 0) + s.qty);
+      // Verifica materiais no inventário
       const { data: inv } = await context.supabase
         .from("inventory").select("ninja_bag").eq("character_id", char.id).maybeSingle();
       const bag = (((inv?.ninja_bag as any[]) ?? []).filter((e: any) => e && e.item_id));
-      for (const r of recipe) {
-        const have = bag.filter((b: any) => b.item_id === r.item_id).reduce((s: number, b: any) => s + (Number(b.qty) || 1), 0);
-        if (have < r.qty) throw new Error(`Materiais insuficientes para forjar ${targetItem.name}.`);
+      for (const [itemId, qty] of selMap.entries()) {
+        const have = bag.filter((b: any) => b.item_id === itemId).reduce((s: number, b: any) => s + (Number(b.qty) || 1), 0);
+        if (have < qty) throw new Error("Materiais insuficientes na bolsa ninja.");
       }
+      // Procura item cujo meta.recipe bate exatamente com a seleção
+      const { data: candidates } = await context.supabase
+        .from("items").select("id,name,meta");
+      const target = (candidates ?? []).find((it: any) => {
+        const recipe = Array.isArray(it?.meta?.recipe) ? it.meta.recipe : [];
+        if (!recipe.length) return false;
+        const rMap = new Map<string, number>();
+        for (const r of recipe) rMap.set(r.item_id, (rMap.get(r.item_id) ?? 0) + Number(r.qty || 0));
+        if (rMap.size !== selMap.size) return false;
+        for (const [k, v] of rMap.entries()) if (selMap.get(k) !== v) return false;
+        return true;
+      });
+      if (!target) throw new Error("Nenhuma receita conhecida combina com esses materiais.");
+      runContext = {
+        forge_selection: Array.from(selMap.entries()).map(([item_id, qty]) => ({ item_id, qty })),
+        target_item_id: target.id,
+        target_item_name: target.name,
+      };
     }
     const insertRow: any = {
       character_id: char.id,
       minigame_id: data.minigame_id,
       location_id: char.current_location_id,
+      context: runContext,
     };
     const { data: row, error } = await context.supabase.from("minigame_runs").insert(insertRow).select("id").single();
     if (error) throw new Error(error.message);
-    return { run_id: row.id, game };
+    return { run_id: row.id, game, forge_target: runContext.target_item_id ? { id: runContext.target_item_id, name: runContext.target_item_name } : null };
   });
 
 /** Finaliza um run e aplica recompensas. */
