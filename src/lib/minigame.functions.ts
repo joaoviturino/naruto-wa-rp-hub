@@ -46,6 +46,9 @@ const forgeConfigSchema = z.object({
   source: z.enum(["inventory","inventory_or_equipped"]).default("inventory"),
 }).default({ duration_seconds: 90, difficulty: 2, hammer_hits: 8, heat_target: 70, temper_target: 40, source: "inventory" });
 
+// Confecção reutiliza a estrutura da forja (mesmas fases mecânicas).
+const tailoringConfigSchema = forgeConfigSchema;
+
 const configSchema = z.any();
 
 const ninjaRank = z.enum(["estudante","genin","chunin","tokubetsu_jonin","jonin","anbu","sannin","kage"]);
@@ -60,7 +63,7 @@ const rewardSkillsSchema = z.array(z.object({ skill_id: z.string().uuid() })).de
 const upsertSchema = z.object({
   id: z.string().uuid().optional(),
   slug: z.string().trim().min(2).max(40).regex(/^[a-z0-9_-]+$/, "slug inválido"),
-  kind: z.enum(["cleanup", "sequence", "forge"]).default("cleanup"),
+  kind: z.enum(["cleanup", "sequence", "forge", "tailoring"]).default("cleanup"),
   name: z.string().min(2).max(80),
   description: z.string().max(2000).nullish(),
   background_url: z.string().nullish(),
@@ -81,6 +84,7 @@ const upsertSchema = z.object({
   const parser =
     data.kind === "sequence" ? sequenceConfigSchema :
     data.kind === "forge" ? forgeConfigSchema :
+    data.kind === "tailoring" ? tailoringConfigSchema :
     cleanupConfigSchema;
   const r = parser.safeParse(data.config);
   if (!r.success) {
@@ -225,12 +229,12 @@ export const startMinigameRun = createServerFn({ method: "POST" })
       const next = new Date(last.completed_at).getTime() + (game.cooldown_hours * 3600 * 1000);
       if (next > Date.now()) throw new Error("Missão em recarga. Volte mais tarde.");
     }
-    // Forge: valida seleção do jogador + descobre item forjado
+    // Crafting (forge / tailoring): valida seleção do jogador + descobre item resultante
     let runContext: any = {};
-    if ((game.kind as string) === "forge") {
+    if ((game.kind as string) === "forge" || (game.kind as string) === "tailoring") {
       const cfg = (game.config ?? {}) as any;
       const selection = (data.forge_selection ?? []).filter((s) => s.qty > 0);
-      if (!selection.length) throw new Error("Selecione os materiais que deseja usar na forja.");
+      if (!selection.length) throw new Error("Selecione os materiais para a fabricação.");
       // Normaliza seleção (agrega mesmo item_id)
       const selMap = new Map<string, number>();
       for (const s of selection) selMap.set(s.item_id, (selMap.get(s.item_id) ?? 0) + s.qty);
@@ -322,8 +326,9 @@ export const completeMinigameRun = createServerFn({ method: "POST" })
         }
       }
 
-      // Forge: consome materiais e entrega o item forjado
-      if ((run.minigames.kind as string) === "forge") {
+      // Crafting: consome materiais e entrega o item resultante
+      const crafKind = run.minigames.kind as string;
+      if (crafKind === "forge" || crafKind === "tailoring") {
         const ctx = (run.context ?? {}) as any;
         const selection: Array<{ item_id: string; qty: number }> =
           Array.isArray(ctx.forge_selection) ? ctx.forge_selection : [];
