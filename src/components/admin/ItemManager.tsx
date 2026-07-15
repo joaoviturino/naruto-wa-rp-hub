@@ -232,7 +232,12 @@ function ItemDialog({ open, onOpenChange, initial, missions, skills, adminUserId
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button onClick={async () => {
             try {
-              await save({ data: { ...f, description: f.description || null, image_url: f.image_url || null, meta: f.meta ?? {} } } as any);
+              const cleanMeta = { ...(f.meta ?? {}) };
+              if (Array.isArray(cleanMeta.recipe)) {
+                const cleaned = cleanMeta.recipe.filter((r: any) => r && r.item_id && r.qty > 0);
+                cleanMeta.recipe = cleaned.length ? cleaned : null;
+              }
+              await save({ data: { ...f, description: f.description || null, image_url: f.image_url || null, meta: cleanMeta } } as any);
               toast.success("Item salvo."); onSaved();
             } catch (e: any) { toast.error(e.message); }
           }}>Salvar</Button>
