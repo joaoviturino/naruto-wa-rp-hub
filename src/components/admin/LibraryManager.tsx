@@ -74,26 +74,53 @@ export function LibraryManager() {
         sort_order: Number(sec.sort_order ?? 0), active: sec.active ?? true,
       } as any });
       toast.success("Seção salva."); setEditing(null); load();
-    } catch (e: any) { toast.error(e.message); }
+    } catch (e: any) {
+      console.error("[LibraryManager] submitSection failed", e);
+      toast.error(e?.message ?? "Falha ao salvar seção.");
+    }
   }
   async function submitBook() {
     try {
       const blocks: Block[] = Array.isArray(book.blocks) ? book.blocks : [];
       const plainContent = blocks.filter((b) => b.kind === "text").map((b) => b.text ?? "").join("\n\n");
+      if (!book.title || book.title.trim().length < 2) {
+        toast.error("Dá um título com pelo menos 2 caracteres.");
+        return;
+      }
+      // Sanitiza recompensas: remove itens sem item_id (Zod exige UUID).
+      const rawRewards: any = book.rewards ?? {};
+      const cleanItems = Array.isArray(rawRewards.items)
+        ? rawRewards.items.filter((it: any) => it && typeof it.item_id === "string" && it.item_id.length > 0)
+        : undefined;
+      const rewards: any = { ...rawRewards };
+      if (cleanItems && cleanItems.length) rewards.items = cleanItems;
+      else delete rewards.items;
+
+      // Concessões: só as que têm skill_class.
+      const grants = (Array.isArray(book.proficiency_grants) ? book.proficiency_grants : [])
+        .filter((g: any) => g && typeof g.skill_class === "string" && g.skill_class.length >= 2);
+      // Requisitos: só os que têm skill_class.
+      const reqProfs = (Array.isArray(book.required_profs) ? book.required_profs : [])
+        .filter((p: any) => p && typeof p.skill_class === "string" && p.skill_class.length >= 2);
+
       await saveBook({ data: {
-        id: book.id, section_id: book.section_id ?? null, title: book.title!,
+        id: book.id, section_id: book.section_id ?? null, title: book.title.trim(),
         author: book.author ?? null, cover_url: book.cover_url ?? null,
         summary: book.summary ?? null, content: plainContent || (book.content ?? ""),
         blocks,
         min_read_seconds: Number(book.min_read_seconds ?? 30),
-        rewards: book.rewards ?? {}, proficiency_grants: book.proficiency_grants ?? [],
+        rewards, proficiency_grants: grants,
         sort_order: Number(book.sort_order ?? 0), active: book.active ?? true,
         required_level: Math.max(1, Number(book.required_level ?? 1)),
         required_rank: book.required_rank ?? null,
-        required_profs: Array.isArray(book.required_profs) ? book.required_profs : [],
+        required_profs: reqProfs,
       } as any });
       toast.success("Livro salvo."); setEditing(null); load();
-    } catch (e: any) { toast.error(e.message); }
+    } catch (e: any) {
+      console.error("[LibraryManager] submitBook failed", e);
+      const msg = e?.message || e?.error?.message || (typeof e === "string" ? e : "Falha ao salvar livro.");
+      toast.error(msg);
+    }
   }
 
   return (
