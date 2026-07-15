@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { Store, Gift, MessageSquare, Coins, Minus, Plus, Lock, GraduationCap, Box } from "lucide-react";
+import { Store, Gift, MessageSquare, Coins, Minus, Plus, Lock, GraduationCap, Box, CheckCircle2, Target, Sparkles } from "lucide-react";
 import { listLocationInteractNpcs, buyFromShop, claimNpcReward } from "@/lib/npc-interact.functions";
 import { acceptMissionFromNpc } from "@/lib/npc-interact.functions";
 import { claimMission } from "@/lib/missions.functions";
