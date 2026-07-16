@@ -97,25 +97,57 @@ function skillRankIdx(r?: string | null) { return r ? SKILL_RANKS.indexOf(r) : -
 /** Recompute derived progress values (rank/level/prof/collect) from live character state. */
 function computeDerivedProgress(mission: any, char: any, inventory: any[], level: number, persisted: Record<string, number>): Record<string, number> {
   const out: Record<string, number> = { ...persisted };
+  const baseline: Record<string, number> = ((persisted as any)?.__baseline ?? {}) as any;
   const objs: any[] = Array.isArray(mission.objectives) ? mission.objectives : [];
   for (const o of objs) {
     if (o.type === "reach_rank") {
-      out[o.id] = rankIdx(char?.rank) >= rankIdx(o.target_ref) ? o.count : 0;
+      const target = rankIdx(o.target_ref);
+      const now = rankIdx(char?.rank);
+      const b = Number(baseline[o.id] ?? -1);
+      out[o.id] = (now >= target && b < target) ? o.count : 0;
     } else if (o.type === "reach_level") {
       const target = Number(o.target_ref ?? 0);
-      out[o.id] = level >= target ? o.count : 0;
+      const b = Number(baseline[o.id] ?? -1);
+      out[o.id] = (level >= target && b < target) ? o.count : 0;
     } else if (o.type === "reach_proficiency") {
       const [cls, rank] = String(o.target_ref ?? "").split("|");
       const p = ((char?.proficiencies ?? {}) as any)[cls] ?? {};
       const best = Math.max(skillRankIdx(p.nivel), skillRankIdx(p.maestria));
-      out[o.id] = best >= skillRankIdx(rank) ? o.count : 0;
+      const target = skillRankIdx(rank);
+      const b = Number(baseline[o.id] ?? -1);
+      out[o.id] = (best >= target && b < target) ? o.count : 0;
     } else if (o.type === "collect_item") {
       const target = o.target_id;
       const totalInBag = inventory.filter((e) => e?.item_id === target).reduce((n, e) => n + Number(e.qty ?? 1), 0);
-      out[o.id] = Math.min(totalInBag, o.count);
+      const b = Number(baseline[o.id] ?? 0);
+      const gained = Math.max(0, totalInBag - b);
+      out[o.id] = Math.min(gained, o.count);
     }
   }
   return out;
+}
+
+/** Snapshot do estado do personagem no momento do aceite — usado como linha de base
+ *  para objetivos "state-based" (collect_item, reach_rank/level/prof) para impedir
+ *  que a missão conte progresso já existente antes do aceite. */
+export function snapshotMissionBaseline(mission: any, char: any, inventory: any[], level: number): Record<string, number> {
+  const base: Record<string, number> = {};
+  const objs: any[] = Array.isArray(mission.objectives) ? mission.objectives : [];
+  for (const o of objs) {
+    if (o.type === "collect_item") {
+      const target = o.target_id;
+      base[o.id] = inventory.filter((e: any) => e?.item_id === target).reduce((n: number, e: any) => n + Number(e.qty ?? 1), 0);
+    } else if (o.type === "reach_rank") {
+      base[o.id] = rankIdx(char?.rank);
+    } else if (o.type === "reach_level") {
+      base[o.id] = Number(level ?? 0);
+    } else if (o.type === "reach_proficiency") {
+      const [cls] = String(o.target_ref ?? "").split("|");
+      const p = ((char?.proficiencies ?? {}) as any)[cls] ?? {};
+      base[o.id] = Math.max(skillRankIdx(p.nivel), skillRankIdx(p.maestria));
+    }
+  }
+  return base;
 }
 
 function isComplete(mission: any, progress: Record<string, number>) {
