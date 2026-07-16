@@ -312,12 +312,30 @@ export const claimMission = createServerFn({ method: "POST" })
     const progress = computeDerivedProgress(m, char, bag, level, persisted);
     if (!isComplete(m, progress)) throw new Error("Objetivos incompletos.");
     // Cooldown
+    const expectedStatus = cmRow.status; // "active" | "completed" | "claimed"
     if (cmRow?.status === "claimed") {
       if (!m.repeatable) throw new Error("Missão já concluída.");
       const nextAt = new Date(cmRow.claimed_at ?? cmRow.started_at).getTime() + Number(m.cooldown_hours ?? 24) * 3600_000;
       if (Date.now() < nextAt) throw new Error("Ainda em cooldown.");
     }
-    // Apply rewards
+    // 🔒 Anti-race: tenta "travar" a linha antes de conceder recompensas.
+    // A UPDATE condicional exige status inalterado desde a leitura E __accepted=true no JSONB.
+    // Se outra requisição concorrente já mudou o status (ex.: duplo-clique / requests paralelos),
+    // esta atualização não retorna linha e abortamos sem creditar nada.
+    const nowIso = new Date().toISOString();
+    const { data: locked, error: lockErr } = await supabaseAdmin
+      .from("character_missions")
+      .update({ status: "claimed", completed_at: nowIso, claimed_at: nowIso, progress })
+      .eq("character_id", char.id)
+      .eq("mission_id", m.id)
+      .eq("status", expectedStatus)
+      .filter("progress->>__accepted", "eq", "true")
+      .select("mission_id")
+      .maybeSingle();
+    if (lockErr) throw new Error(lockErr.message);
+    if (!locked) throw new Error("Recompensa já reivindicada ou missão em conflito. Recarregue e tente novamente.");
+
+    // Apply rewards (a partir daqui, temos posse exclusiva do claim)
     const r = (m.rewards ?? {}) as any;
     const patch: any = {};
     const totalXp = Number(m.reward_xp ?? 0) + Number(r.xp ?? 0);
@@ -347,18 +365,7 @@ export const claimMission = createServerFn({ method: "POST" })
       }
       await supabaseAdmin.from("inventory").update({ ninja_bag: nb }).eq("character_id", char.id);
     }
-    // Persist claim
-    const now = new Date().toISOString();
-    const row = {
-      character_id: char.id, mission_id: m.id,
-      progress, status: "claimed" as const,
-      started_at: cmRow?.started_at ?? now, completed_at: now, claimed_at: now,
-    };
-    if (cmRow) {
-      await supabaseAdmin.from("character_missions").update(row).eq("character_id", char.id).eq("mission_id", m.id);
-    } else {
-      await supabaseAdmin.from("character_missions").insert(row);
-    }
+    // status/claimed_at já persistidos pelo lock atômico acima.
     return { ok: true, applied: { xp: totalXp, ryo: totalRyo, items: r.items ?? [], skill_ids: r.skill_ids ?? [], proficiency_grants: r.proficiency_grants ?? [] } };
   });
 
