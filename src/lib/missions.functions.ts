@@ -397,6 +397,14 @@ export async function bumpMissionProgress(supabaseAdmin: any, characterId: strin
       if (cm) {
         await supabaseAdmin.from("character_missions").update({ progress }).eq("character_id", characterId).eq("mission_id", m.id);
       } else {
+        // Ao criar a linha por causa de um evento, também grava um baseline zerado
+        // para os objetivos state-based (o personagem já pode ter itens/rank suficiente).
+        const { data: charRow } = await supabaseAdmin.from("characters").select("id,xp,rank,proficiencies").eq("id", characterId).maybeSingle();
+        const { data: invRow } = await supabaseAdmin.from("inventory").select("ninja_bag").eq("character_id", characterId).maybeSingle();
+        const { data: lvlCfg } = await supabaseAdmin.from("level_config").select("*").limit(1).maybeSingle();
+        const level = computeLevel(charRow?.xp ?? 0, lvlCfg ? { base_xp: lvlCfg.base_xp, growth_factor: lvlCfg.growth_factor, max_level: lvlCfg.max_level } : undefined);
+        const bag = (Array.isArray(invRow?.ninja_bag) ? invRow!.ninja_bag : []) as any[];
+        (progress as any).__baseline = snapshotMissionBaseline(m, charRow, bag, level);
         await supabaseAdmin.from("character_missions").insert({ character_id: characterId, mission_id: m.id, progress, status: "active" });
       }
     }
