@@ -1,9 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { listMyMissions, claimMission, acceptMissionFn } from "@/lib/missions.functions";
+import { listMyMissions, claimMission } from "@/lib/missions.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Scroll, ChevronDown, ChevronUp, Trophy, CheckCircle2, X, Loader2, Handshake, Sparkles } from "lucide-react";
+import { Scroll, ChevronDown, ChevronUp, Trophy, CheckCircle2, X, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -45,10 +45,9 @@ export function MissionTracker({ characterId }: { characterId: string }) {
   const [hidden, setHidden] = useState(false);
   const [lastMissionId, setLastMissionId] = useState<string | null>(null);
   const hydratedRef = useRef(false);
-  const [busy, setBusy] = useState<Record<string, "accept" | "claim" | null>>({});
+  const [busy, setBusy] = useState<Record<string, "claim" | null>>({});
   const list = useServerFn(listMyMissions);
   const claim = useServerFn(claimMission);
-  const accept = useServerFn(acceptMissionFn);
 
   // Hidrata do localStorage por personagem — só no cliente.
   useEffect(() => {
@@ -85,20 +84,19 @@ export function MissionTracker({ characterId }: { characterId: string }) {
     return () => { supabase.removeChannel(ch); };
   }, [characterId, load]);
 
-  // Estados exibidos: Não aceito (available), Em progresso, Pronto para reivindicar, Reivindicado.
-  // Ignoramos apenas as travadas por requisito e as em cooldown puro (sem interesse imediato).
+  // Exibe apenas missões já aceitas pelo jogador: em progresso, prontas ou reivindicadas.
+  // Aceitar missões só acontece no local (NPC), nunca por este popup.
   const visible = rows.filter((m) => {
-    if (m.status === "locked" || m.status === "cooldown") return false;
-    // "available" = existe/ativa no catálogo mas ainda não foi aceita pelo jogador.
+    if (m.status === "locked" || m.status === "cooldown" || !m.accepted) return false;
     return true;
   });
-  const readyCount = visible.filter((m) => m.status === "completed" && m.accepted).length;
+  const readyCount = visible.filter((m) => m.status === "completed").length;
 
   // Atualiza "última missão focada" — prioriza a que está pronta; senão, a mais recente em progresso.
   useEffect(() => {
     if (!hydratedRef.current || !visible.length) return;
-    const ready = visible.find((m) => m.status === "completed" && m.accepted);
-    const inProg = visible.find((m) => m.accepted && m.status === "active");
+    const ready = visible.find((m) => m.status === "completed");
+    const inProg = visible.find((m) => m.status === "active");
     const pick = ready ?? inProg ?? visible[0];
     if (pick && pick.id !== lastMissionId) setLastMissionId(pick.id);
   }, [visible, lastMissionId]);
@@ -153,7 +151,7 @@ export function MissionTracker({ characterId }: { characterId: string }) {
               const total = m.objectives.length;
               const done = m.objectives.filter((o) => Math.min(Number(m.progress[o.id] ?? 0), o.count) >= o.count).length;
               const phase = derivePhase(m);
-              const b = busy[m.id] ?? null;
+              const isBusy = busy[m.id] === "claim";
               return (
                 <div key={m.id} className="rounded-md border border-border/60 bg-secondary/20 p-2">
                   <div className="flex items-center justify-between gap-2">
@@ -185,21 +183,6 @@ export function MissionTracker({ characterId }: { characterId: string }) {
                     })}
                   </ul>
                   <div className="mt-2 flex justify-end">
-                    {phase === "not_accepted" && (
-                      <Button
-                        size="sm" variant="secondary"
-                        className="h-6 text-[11px] px-2"
-                        disabled={b !== null}
-                        onClick={async () => {
-                          setBusy((s) => ({ ...s, [m.id]: "accept" }));
-                          try { await accept({ data: { mission_id: m.id } } as any); toast.success("Missão aceita!"); await load(); }
-                          catch (e: any) { toast.error(e.message ?? "Não foi possível aceitar."); }
-                          finally { setBusy((s) => ({ ...s, [m.id]: null })); }
-                        }}
-                      >
-                        {b === "accept" ? <Loader2 size={10} className="animate-spin" /> : "Aceitar"}
-                      </Button>
-                    )}
                     {phase === "in_progress" && (
                       <Button size="sm" className="h-6 text-[11px] px-2" disabled variant="outline">
                         Em progresso
@@ -209,7 +192,7 @@ export function MissionTracker({ characterId }: { characterId: string }) {
                       <Button
                         size="sm"
                         className="h-6 text-[11px] px-2"
-                        disabled={b !== null}
+                        disabled={isBusy}
                         onClick={async () => {
                           setBusy((s) => ({ ...s, [m.id]: "claim" }));
                           try { await claim({ data: { mission_id: m.id } } as any); toast.success("Recompensa recebida!"); await load(); }
@@ -217,7 +200,7 @@ export function MissionTracker({ characterId }: { characterId: string }) {
                           finally { setBusy((s) => ({ ...s, [m.id]: null })); }
                         }}
                       >
-                        {b === "claim" ? <Loader2 size={10} className="animate-spin" /> : "Reivindicar"}
+                        {isBusy ? <Loader2 size={10} className="animate-spin" /> : "Reivindicar"}
                       </Button>
                     )}
                     {phase === "claimed" && (
@@ -236,18 +219,16 @@ export function MissionTracker({ characterId }: { characterId: string }) {
   );
 }
 
-type Phase = "not_accepted" | "in_progress" | "ready" | "claimed";
+type Phase = "in_progress" | "ready" | "claimed";
 
 function derivePhase(m: Mission): Phase {
   if (m.status === "claimed") return "claimed";
-  if (!m.accepted) return "not_accepted";
   if (m.status === "completed") return "ready";
   return "in_progress";
 }
 
 function StateBadge({ phase }: { phase: Phase }) {
   const map: Record<Phase, { label: string; cls: string; icon: React.ReactNode }> = {
-    not_accepted: { label: "Não aceito", cls: "bg-amber-500/15 text-amber-300 border-amber-500/30", icon: <Handshake size={10} /> },
     in_progress: { label: "Em progresso", cls: "bg-blue-500/15 text-blue-300 border-blue-500/30", icon: <Loader2 size={10} /> },
     ready: { label: "Pronto", cls: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", icon: <Trophy size={10} /> },
     claimed: { label: "Reivindicado", cls: "bg-muted/30 text-muted-foreground border-border", icon: <Sparkles size={10} /> },
