@@ -95,7 +95,7 @@ const SKILL_RANKS = ["E","D","C","B","A","S"];
 function skillRankIdx(r?: string | null) { return r ? SKILL_RANKS.indexOf(r) : -1; }
 
 /** Recompute derived progress values (rank/level/prof/collect) from live character state. */
-function computeDerivedProgress(mission: any, char: any, inventory: any[], level: number, persisted: Record<string, number>): Record<string, number> {
+export function computeDerivedProgress(mission: any, char: any, inventory: any[], level: number, persisted: Record<string, number>): Record<string, number> {
   const out: Record<string, number> = { ...persisted };
   const baseline: Record<string, number> = ((persisted as any)?.__baseline ?? {}) as any;
   const objs: any[] = Array.isArray(mission.objectives) ? mission.objectives : [];
@@ -150,13 +150,13 @@ export function snapshotMissionBaseline(mission: any, char: any, inventory: any[
   return base;
 }
 
-function isComplete(mission: any, progress: Record<string, number>) {
+export function isComplete(mission: any, progress: Record<string, number>) {
   const objs: any[] = Array.isArray(mission.objectives) ? mission.objectives : [];
   if (!objs.length) return false;
   return objs.every((o) => Number(progress[o.id] ?? 0) >= Number(o.count ?? 1));
 }
 
-function isAccepted(progress: any): boolean {
+export function isAccepted(progress: any): boolean {
   return !!(progress && progress.__accepted === true);
 }
 
