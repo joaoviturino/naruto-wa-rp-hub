@@ -382,6 +382,43 @@ export function NpcManager() {
             </div>
           )}
 
+          {sel.kind === "buyer" && (
+            <div className="scroll-panel rounded-lg p-4 space-y-2">
+              <h4 className="font-display text-lg text-gold">Itens que este NPC compra</h4>
+              <p className="text-xs text-muted-foreground">Configure quais itens o comprador aceita e o preço pago por unidade.</p>
+              {(sel.buy_items ?? []).map((s, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <ComboSelect
+                      value={s.item_id}
+                      onChange={async (v) => {
+                        const next = [...(sel.buy_items ?? [])]; next[i] = { ...s, item_id: v };
+                        await save({ data: { ...sel, buy_items: next } } as any); load();
+                      }}
+                      triggerClassName="h-9 text-sm"
+                      options={items.map((it) => ({ value: it.id, label: it.name }))}
+                    />
+                  </div>
+                  <Input type="number" min={0} className="w-24" defaultValue={s.price}
+                    onBlur={async (e) => {
+                      const next = [...(sel.buy_items ?? [])]; next[i] = { ...s, price: Math.max(0, Number(e.target.value)) };
+                      await save({ data: { ...sel, buy_items: next } } as any); load();
+                    }} />
+                  <span className="text-xs text-muted-foreground">Ryo/un.</span>
+                  <Button variant="ghost" size="icon" onClick={async () => {
+                    const next = (sel.buy_items ?? []).filter((_, j) => j !== i);
+                    await save({ data: { ...sel, buy_items: next } } as any); load();
+                  }}><Trash2 size={14} /></Button>
+                </div>
+              ))}
+              <Button size="sm" variant="outline" onClick={async () => {
+                if (!items.length) return toast.error("Cadastre um item primeiro.");
+                const next = [...(sel.buy_items ?? []), { item_id: items[0].id, price: 10, max_per_day: -1 }];
+                await save({ data: { ...sel, buy_items: next } } as any); load();
+              }}><Plus size={14} className="mr-1" /> Adicionar item</Button>
+            </div>
+          )}
+
           {sel.kind === "reward" && (
             <div className="scroll-panel rounded-lg p-4 space-y-2">
               <h4 className="font-display text-lg text-gold">Recompensas</h4>
