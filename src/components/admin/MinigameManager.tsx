@@ -17,6 +17,7 @@ import { TailoringGame } from "@/components/minigame/TailoringGame";
 import { MiningGame } from "@/components/minigame/MiningGame";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ComboSelect } from "@/components/ui/combo-select";
 
 type Item = { id: string; name: string; type?: string | null; meta?: any; image_url?: string | null };
 type SkillLite = { id: string; name: string; rank: string };
@@ -129,10 +130,9 @@ export function MinigameManager() {
             <div className="grid gap-3 md:grid-cols-3">
               <div>
                 <Label>Tipo</Label>
-                <select className="w-full bg-input border border-border rounded px-2 py-2 text-sm"
+                <ComboSelect
                   value={selected.kind || "cleanup"}
-                  onChange={(e) => {
-                    const kind = e.target.value;
+                  onChange={(kind) => {
                     const config = kind === "sequence"
                       ? { duration_seconds: 60, max_mistakes: 2, tiles: [] }
                       : (kind === "forge" || kind === "tailoring")
@@ -141,13 +141,15 @@ export function MinigameManager() {
                       ? { node_hp: 4, swing_cooldown_ms: 500, min_break_interval_ms: 800, xp_per_break: 1, required_items: [], drops: [] }
                       : { duration_seconds: 60, spots: 12, target_score: 8 };
                     setSelected({ ...selected, kind, config });
-                  }}>
-                  <option value="cleanup">Limpeza (clique)</option>
-                  <option value="sequence">Sequência (acerto)</option>
-                  <option value="forge">Forja (fabricação)</option>
-                  <option value="tailoring">Confecção (costura)</option>
-                  <option value="mining">Mineração (idle)</option>
-                </select>
+                  }}
+                  options={[
+                    { value: "cleanup", label: "Limpeza (clique)" },
+                    { value: "sequence", label: "Sequência (acerto)" },
+                    { value: "forge", label: "Forja (fabricação)" },
+                    { value: "tailoring", label: "Confecção (costura)" },
+                    { value: "mining", label: "Mineração (idle)" },
+                  ]}
+                />
               </div>
               <div><Label>Nome</Label><Input value={selected.name} onChange={(e) => setSelected({ ...selected, name: e.target.value })} /></div>
               <div><Label>Slug (único, a-z, 0-9, _, -)</Label><Input value={selected.slug} onChange={(e) => setSelected({ ...selected, slug: e.target.value })} /></div>
@@ -169,12 +171,15 @@ export function MinigameManager() {
             <div className="grid gap-3 md:grid-cols-2">
               <div>
                 <Label>Patente mínima</Label>
-                <select className="w-full bg-input border border-border rounded px-2 py-2 text-sm"
+                <ComboSelect
                   value={selected.required_rank ?? ""}
-                  onChange={(e) => setSelected({ ...selected, required_rank: e.target.value || null })}>
-                  <option value="">— Nenhuma —</option>
-                  {NINJA_RANKS.map((r) => <option key={r} value={r}>{r}</option>)}
-                </select>
+                  onChange={(v) => setSelected({ ...selected, required_rank: v || null })}
+                  placeholder="— Nenhuma —"
+                  options={[
+                    { value: "", label: "— Nenhuma —" },
+                    ...NINJA_RANKS.map((r) => ({ value: r, label: r })),
+                  ]}
+                />
               </div>
             </div>
             <div>
@@ -182,24 +187,42 @@ export function MinigameManager() {
               <div className="space-y-1">
                 {(selected.required_profs ?? []).map((p, idx) => (
                   <div key={idx} className="flex flex-wrap gap-2 items-center">
-                    <select className="flex-1 min-w-[160px] bg-input border border-border rounded px-2 py-1 text-sm"
-                      value={p.skill_class} onChange={(e) => {
-                        const next = [...(selected.required_profs ?? [])]; next[idx] = { ...p, skill_class: e.target.value };
-                        setSelected({ ...selected, required_profs: next });
-                      }}>
-                      <option value="">— classe —</option>
-                      {SKILL_CLASSES.map((c) => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                    <select className="bg-input border border-border rounded px-2 py-1 text-sm" value={p.nivel ?? ""}
-                      onChange={(e) => { const next = [...(selected.required_profs ?? [])]; next[idx] = { ...p, nivel: (e.target.value || null) as any }; setSelected({ ...selected, required_profs: next }); }}>
-                      <option value="">Nível —</option>
-                      {SKILL_RANKS.map((r) => <option key={r} value={r}>Nível {r}</option>)}
-                    </select>
-                    <select className="bg-input border border-border rounded px-2 py-1 text-sm" value={p.maestria ?? ""}
-                      onChange={(e) => { const next = [...(selected.required_profs ?? [])]; next[idx] = { ...p, maestria: (e.target.value || null) as any }; setSelected({ ...selected, required_profs: next }); }}>
-                      <option value="">Maestria —</option>
-                      {SKILL_RANKS.map((r) => <option key={r} value={r}>Maestria {r}</option>)}
-                    </select>
+                    <div className="flex-1 min-w-[160px]">
+                      <ComboSelect
+                        value={p.skill_class}
+                        onChange={(v) => {
+                          const next = [...(selected.required_profs ?? [])]; next[idx] = { ...p, skill_class: v };
+                          setSelected({ ...selected, required_profs: next });
+                        }}
+                        placeholder="— classe —"
+                        options={[
+                          { value: "", label: "— classe —" },
+                          ...SKILL_CLASSES.map((c) => ({ value: c, label: c })),
+                        ]}
+                      />
+                    </div>
+                    <div className="w-32">
+                      <ComboSelect
+                        value={p.nivel ?? ""}
+                        onChange={(v) => { const next = [...(selected.required_profs ?? [])]; next[idx] = { ...p, nivel: (v || null) as any }; setSelected({ ...selected, required_profs: next }); }}
+                        placeholder="Nível —"
+                        options={[
+                          { value: "", label: "Nível —" },
+                          ...SKILL_RANKS.map((r) => ({ value: r, label: `Nível ${r}` })),
+                        ]}
+                      />
+                    </div>
+                    <div className="w-36">
+                      <ComboSelect
+                        value={p.maestria ?? ""}
+                        onChange={(v) => { const next = [...(selected.required_profs ?? [])]; next[idx] = { ...p, maestria: (v || null) as any }; setSelected({ ...selected, required_profs: next }); }}
+                        placeholder="Maestria —"
+                        options={[
+                          { value: "", label: "Maestria —" },
+                          ...SKILL_RANKS.map((r) => ({ value: r, label: `Maestria ${r}` })),
+                        ]}
+                      />
+                    </div>
                     <Button variant="ghost" size="icon" onClick={() => {
                       const next = [...(selected.required_profs ?? [])]; next.splice(idx, 1);
                       setSelected({ ...selected, required_profs: next });
@@ -264,14 +287,20 @@ export function MinigameManager() {
               <div className="space-y-1">
                 {(selected.rewards?.items ?? []).map((ri: RewardItem, idx: number) => (
                   <div key={idx} className="flex gap-2 items-center">
-                    <select className="flex-1 bg-input border border-border rounded px-2 py-1 text-sm"
-                      value={ri.item_id} onChange={(e) => {
-                        const next = [...(selected.rewards.items ?? [])]; next[idx] = { ...ri, item_id: e.target.value };
-                        setSelected({ ...selected, rewards: { ...selected.rewards, items: next } });
-                      }}>
-                      <option value="">— item —</option>
-                      {items.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
-                    </select>
+                    <div className="flex-1">
+                      <ComboSelect
+                        value={ri.item_id}
+                        onChange={(v) => {
+                          const next = [...(selected.rewards.items ?? [])]; next[idx] = { ...ri, item_id: v };
+                          setSelected({ ...selected, rewards: { ...selected.rewards, items: next } });
+                        }}
+                        placeholder="— item —"
+                        options={[
+                          { value: "", label: "— item —" },
+                          ...items.map((it) => ({ value: it.id, label: it.name })),
+                        ]}
+                      />
+                    </div>
                     <Input type="number" min={1} className="w-20" value={ri.qty}
                       onChange={(e) => {
                         const next = [...(selected.rewards.items ?? [])]; next[idx] = { ...ri, qty: Number(e.target.value) };
@@ -295,15 +324,20 @@ export function MinigameManager() {
               <div className="space-y-1">
                 {(selected.reward_skills ?? []).map((rs, idx) => (
                   <div key={idx} className="flex gap-2 items-center">
-                    <select className="flex-1 bg-input border border-border rounded px-2 py-1 text-sm"
-                      value={rs.skill_id}
-                      onChange={(e) => {
-                        const next = [...(selected.reward_skills ?? [])]; next[idx] = { skill_id: e.target.value };
-                        setSelected({ ...selected, reward_skills: next });
-                      }}>
-                      <option value="">— habilidade —</option>
-                      {skills.map((s) => <option key={s.id} value={s.id}>[{s.rank}] {s.name}</option>)}
-                    </select>
+                    <div className="flex-1">
+                      <ComboSelect
+                        value={rs.skill_id}
+                        onChange={(v) => {
+                          const next = [...(selected.reward_skills ?? [])]; next[idx] = { skill_id: v };
+                          setSelected({ ...selected, reward_skills: next });
+                        }}
+                        placeholder="— habilidade —"
+                        options={[
+                          { value: "", label: "— habilidade —" },
+                          ...skills.map((s) => ({ value: s.id, label: `[${s.rank}] ${s.name}` })),
+                        ]}
+                      />
+                    </div>
                     <Button variant="ghost" size="icon" onClick={() => {
                       const next = [...(selected.reward_skills ?? [])]; next.splice(idx, 1);
                       setSelected({ ...selected, reward_skills: next });
@@ -553,12 +587,17 @@ function MiningConfigEditor({ selected, setSelected, items }: { selected: any; s
         <p className="text-xs text-muted-foreground">Deixe vazio no ambiente de teste. No futuro, exija picareta etc.</p>
         {required.map((r, idx) => (
           <div key={idx} className="flex gap-2 items-center">
-            <select className="flex-1 bg-input border border-border rounded px-2 py-1 text-sm"
-              value={r.item_id}
-              onChange={(e) => { const next = [...required]; next[idx] = { ...r, item_id: e.target.value }; set({ required_items: next }); }}>
-              <option value="">— item —</option>
-              {items.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
-            </select>
+            <div className="flex-1">
+              <ComboSelect
+                value={r.item_id}
+                onChange={(v) => { const next = [...required]; next[idx] = { ...r, item_id: v }; set({ required_items: next }); }}
+                placeholder="— item —"
+                options={[
+                  { value: "", label: "— item —" },
+                  ...items.map((it) => ({ value: it.id, label: it.name })),
+                ]}
+              />
+            </div>
             <Input type="number" min={1} max={99} className="w-20" value={r.qty}
               onChange={(e) => { const next = [...required]; next[idx] = { ...r, qty: Math.max(1, Number(e.target.value) || 1) }; set({ required_items: next }); }} />
             <Button variant="ghost" size="icon" onClick={() => { const next = [...required]; next.splice(idx, 1); set({ required_items: next }); }}>
@@ -640,24 +679,29 @@ function ForgeConfigEditor({ selected, setSelected, items, kind }: { selected: a
       <div className="grid gap-3 md:grid-cols-2">
         <div>
           <Label>Item padrão (opcional — jogador pode escolher materiais livres)</Label>
-          <select className="w-full bg-input border border-border rounded px-2 py-2 text-sm"
+          <ComboSelect
             value={cfg.recipe_item_id ?? ""}
-            onChange={(e) => set({ recipe_item_id: e.target.value })}>
-            <option value="">— livre (qualquer receita cadastrada) —</option>
-            {craftable.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
-          </select>
+            onChange={(v) => set({ recipe_item_id: v })}
+            placeholder="— livre (qualquer receita cadastrada) —"
+            options={[
+              { value: "", label: "— livre (qualquer receita cadastrada) —" },
+              ...craftable.map((it) => ({ value: it.id, label: it.name })),
+            ]}
+          />
           {!craftable.length
             ? <div className="text-xs text-muted-foreground mt-1">Nenhum item com receita. Adicione uma receita na aba Itens.</div>
             : <div className="text-xs text-muted-foreground mt-1">Deixe vazio para que o jogador escolha materiais na bolsa e o sistema descubra o item forjado.</div>}
         </div>
         <div>
           <Label>Origem dos materiais</Label>
-          <select className="w-full bg-input border border-border rounded px-2 py-2 text-sm"
+          <ComboSelect
             value={cfg.source ?? "inventory"}
-            onChange={(e) => set({ source: e.target.value })}>
-            <option value="inventory">Apenas mochila</option>
-            <option value="inventory_or_equipped">Mochila ou equipados</option>
-          </select>
+            onChange={(v) => set({ source: v })}
+            options={[
+              { value: "inventory", label: "Apenas mochila" },
+              { value: "inventory_or_equipped", label: "Mochila ou equipados" },
+            ]}
+          />
         </div>
       </div>
 
