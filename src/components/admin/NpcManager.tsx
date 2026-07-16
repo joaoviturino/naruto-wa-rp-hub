@@ -24,7 +24,7 @@ type Npc = {
   hp_max: number; xp: number; energy_max: number;
   reward_xp: number; reward_ryo: number; drop_table: DropRow[];
   avg_damage?: number; crit_chance?: number; crit_multiplier?: number;
-  defense?: number; max_hit_percent?: number;
+  defense?: number;
   kind: NpcKind; dialog_intro: string | null; dialog_outro: string | null;
   shop_items: ShopRow[]; reward_items: RewardRow[]; reward_cooldown_hours: number;
   required_mission_id: string | null;
@@ -290,10 +290,9 @@ export function NpcManager() {
             </p>
             <div className="grid grid-cols-2 gap-3">
               <NumField label="Defesa (%) — reduz dano recebido" value={sel.defense ?? 0} onSave={(v) => save({ data: { ...sel, defense: Math.max(0, Math.min(90, v)) } } as any).then(load)} />
-              <NumField label="Dano máx. por golpe (% do HP)" value={sel.max_hit_percent ?? 50} onSave={(v) => save({ data: { ...sel, max_hit_percent: Math.max(10, Math.min(100, v)) } } as any).then(load)} />
             </div>
             <p className="text-xs text-muted-foreground">
-              Defesa {sel.defense ?? 0}% reduz o dano recebido. Um único golpe nunca tira mais que {sel.max_hit_percent ?? 50}% do HP máx ({Math.ceil((sel.hp_max ?? 0) * (sel.max_hit_percent ?? 50) / 100)}).
+              Defesa {sel.defense ?? 0}% reduz o dano recebido.
             </p>
             <p className="text-xs text-muted-foreground">
               XP {sel.xp} → EF {Math.floor(sel.xp/2)}, EM {sel.xp - Math.floor(sel.xp/2)}, Chakra {sel.xp}.
