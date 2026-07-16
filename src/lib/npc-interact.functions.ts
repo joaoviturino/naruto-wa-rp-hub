@@ -2,6 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { addWithCapacity } from "./character.functions";
+import { snapshotMissionBaseline } from "./missions.functions";
+import { levelFromXp, DEFAULT_LEVEL_CONFIG } from "@/lib/level";
 
 const NINJA_BAG_CAP = 20;
 
@@ -160,6 +162,15 @@ export const acceptMissionFromNpc = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: npc } = await supabaseAdmin.from("npcs").select("offer_mission_id").eq("id", data.npc_id).maybeSingle();
     if (!npc?.offer_mission_id) throw new Error("Este NPC não oferece missão.");
+    const { data: mission } = await supabaseAdmin.from("missions").select("id,objectives,repeatable,cooldown_hours").eq("id", npc.offer_mission_id).maybeSingle();
+    // Snapshot da linha de base para impedir claim instantâneo (itens já possuídos, patente já atingida etc.)
+    const { data: charFull } = await supabaseAdmin.from("characters").select("id,xp,rank,proficiencies").eq("id", me.id).maybeSingle();
+    const { data: invRow } = await supabaseAdmin.from("inventory").select("ninja_bag").eq("character_id", me.id).maybeSingle();
+    const { data: lvlCfg } = await supabaseAdmin.from("level_config").select("*").limit(1).maybeSingle();
+    const level = levelFromXp(charFull?.xp ?? 0, lvlCfg ? { base_xp: lvlCfg.base_xp, growth_factor: lvlCfg.growth_factor, max_level: lvlCfg.max_level } : DEFAULT_LEVEL_CONFIG);
+    const bag = (Array.isArray(invRow?.ninja_bag) ? invRow!.ninja_bag : []) as any[];
+    const baseline = mission ? snapshotMissionBaseline(mission, charFull, bag, level) : {};
+    const initialProgress = { __baseline: baseline } as any;
     const { data: existing } = await supabaseAdmin.from("character_missions")
       .select("status,claimed_at").eq("character_id", me.id).eq("mission_id", npc.offer_mission_id).maybeSingle();
     if (existing) {
@@ -171,13 +182,13 @@ export const acceptMissionFromNpc = createServerFn({ method: "POST" })
         if (Date.now() < nextAt) throw new Error("Ainda em cooldown.");
         // Reinicia
         await supabaseAdmin.from("character_missions").update({
-          status: "active", progress: {}, started_at: new Date().toISOString(), claimed_at: null,
+          status: "active", progress: initialProgress, started_at: new Date().toISOString(), claimed_at: null,
         }).eq("character_id", me.id).eq("mission_id", npc.offer_mission_id);
         return { ok: true, restarted: true };
       }
     }
     await supabaseAdmin.from("character_missions").insert({
-      character_id: me.id, mission_id: npc.offer_mission_id, status: "active", progress: {},
+      character_id: me.id, mission_id: npc.offer_mission_id, status: "active", progress: initialProgress,
     });
     return { ok: true };
   });

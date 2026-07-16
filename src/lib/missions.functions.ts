@@ -97,25 +97,57 @@ function skillRankIdx(r?: string | null) { return r ? SKILL_RANKS.indexOf(r) : -
 /** Recompute derived progress values (rank/level/prof/collect) from live character state. */
 function computeDerivedProgress(mission: any, char: any, inventory: any[], level: number, persisted: Record<string, number>): Record<string, number> {
   const out: Record<string, number> = { ...persisted };
+  const baseline: Record<string, number> = ((persisted as any)?.__baseline ?? {}) as any;
   const objs: any[] = Array.isArray(mission.objectives) ? mission.objectives : [];
   for (const o of objs) {
     if (o.type === "reach_rank") {
-      out[o.id] = rankIdx(char?.rank) >= rankIdx(o.target_ref) ? o.count : 0;
+      const target = rankIdx(o.target_ref);
+      const now = rankIdx(char?.rank);
+      const b = Number(baseline[o.id] ?? -1);
+      out[o.id] = (now >= target && b < target) ? o.count : 0;
     } else if (o.type === "reach_level") {
       const target = Number(o.target_ref ?? 0);
-      out[o.id] = level >= target ? o.count : 0;
+      const b = Number(baseline[o.id] ?? -1);
+      out[o.id] = (level >= target && b < target) ? o.count : 0;
     } else if (o.type === "reach_proficiency") {
       const [cls, rank] = String(o.target_ref ?? "").split("|");
       const p = ((char?.proficiencies ?? {}) as any)[cls] ?? {};
       const best = Math.max(skillRankIdx(p.nivel), skillRankIdx(p.maestria));
-      out[o.id] = best >= skillRankIdx(rank) ? o.count : 0;
+      const target = skillRankIdx(rank);
+      const b = Number(baseline[o.id] ?? -1);
+      out[o.id] = (best >= target && b < target) ? o.count : 0;
     } else if (o.type === "collect_item") {
       const target = o.target_id;
       const totalInBag = inventory.filter((e) => e?.item_id === target).reduce((n, e) => n + Number(e.qty ?? 1), 0);
-      out[o.id] = Math.min(totalInBag, o.count);
+      const b = Number(baseline[o.id] ?? 0);
+      const gained = Math.max(0, totalInBag - b);
+      out[o.id] = Math.min(gained, o.count);
     }
   }
   return out;
+}
+
+/** Snapshot do estado do personagem no momento do aceite — usado como linha de base
+ *  para objetivos "state-based" (collect_item, reach_rank/level/prof) para impedir
+ *  que a missão conte progresso já existente antes do aceite. */
+export function snapshotMissionBaseline(mission: any, char: any, inventory: any[], level: number): Record<string, number> {
+  const base: Record<string, number> = {};
+  const objs: any[] = Array.isArray(mission.objectives) ? mission.objectives : [];
+  for (const o of objs) {
+    if (o.type === "collect_item") {
+      const target = o.target_id;
+      base[o.id] = inventory.filter((e: any) => e?.item_id === target).reduce((n: number, e: any) => n + Number(e.qty ?? 1), 0);
+    } else if (o.type === "reach_rank") {
+      base[o.id] = rankIdx(char?.rank);
+    } else if (o.type === "reach_level") {
+      base[o.id] = Number(level ?? 0);
+    } else if (o.type === "reach_proficiency") {
+      const [cls] = String(o.target_ref ?? "").split("|");
+      const p = ((char?.proficiencies ?? {}) as any)[cls] ?? {};
+      base[o.id] = Math.max(skillRankIdx(p.nivel), skillRankIdx(p.maestria));
+    }
+  }
+  return base;
 }
 
 function isComplete(mission: any, progress: Record<string, number>) {
@@ -154,11 +186,30 @@ export const listMyMissions = createServerFn({ method: "POST" })
     // Missões oferecidas por NPC só aparecem depois que o jogador aceita.
     const { data: giverRows } = await context.supabase.from("npcs").select("offer_mission_id").not("offer_mission_id", "is", null);
     const npcOffered = new Set(((giverRows as any[]) ?? []).map((r) => r.offer_mission_id));
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const out = [];
     for (const m of (missions ?? []) as any[]) {
       if (npcOffered.has(m.id) && !byId.has(m.id)) continue;
       const req = await meetsRequirements(context.supabase, char, level, m.requirements);
-      const cm = byId.get(m.id);
+      let cm = byId.get(m.id);
+      // Garante existência de cmRow + baseline para missões não-npc (auto-início ao aparecer),
+      // e completa baseline em rows antigas que não o tinham.
+      if (req.ok) {
+        const hasBaseline = !!((cm?.progress ?? {}) as any)?.__baseline;
+        if (!cm && !npcOffered.has(m.id)) {
+          const baseline = snapshotMissionBaseline(m, char, bag, level);
+          const progress = { __baseline: baseline } as any;
+          await supabaseAdmin.from("character_missions").insert({
+            character_id: char.id, mission_id: m.id, status: "active", progress,
+          });
+          cm = { character_id: char.id, mission_id: m.id, status: "active", progress, started_at: new Date().toISOString() } as any;
+        } else if (cm && !hasBaseline) {
+          const baseline = snapshotMissionBaseline(m, char, bag, level);
+          const progress = { ...((cm.progress ?? {}) as any), __baseline: baseline } as any;
+          await supabaseAdmin.from("character_missions").update({ progress }).eq("character_id", char.id).eq("mission_id", m.id);
+          cm = { ...cm, progress };
+        }
+      }
       const persisted = (cm?.progress ?? {}) as Record<string, number>;
       const progress = computeDerivedProgress(m, char, bag, level, persisted);
       const complete = isComplete(m, progress);
@@ -192,6 +243,11 @@ export const claimMission = createServerFn({ method: "POST" })
     const { data: m } = await supabaseAdmin.from("missions").select("*").eq("id", data.mission_id).maybeSingle();
     if (!m || !m.active) throw new Error("Missão indisponível.");
     const { data: cmRow } = await supabaseAdmin.from("character_missions").select("*").eq("character_id", char.id).eq("mission_id", m.id).maybeSingle();
+    if (!cmRow) throw new Error("Você precisa aceitar/iniciar essa missão antes.");
+    if (cmRow.status !== "active" && cmRow.status !== "completed") {
+      // 'claimed' cai no cooldown abaixo; qualquer outro estado é inválido.
+      if (cmRow.status !== "claimed") throw new Error("Missão não está ativa.");
+    }
     const { data: lvlCfg } = await context.supabase.from("level_config").select("*").limit(1).maybeSingle();
     const level = computeLevel(char.xp ?? 0, lvlCfg ? { base_xp: lvlCfg.base_xp, growth_factor: lvlCfg.growth_factor, max_level: lvlCfg.max_level } : undefined);
     const { data: inv } = await context.supabase.from("inventory").select("ninja_bag").eq("character_id", char.id).maybeSingle();
@@ -341,6 +397,14 @@ export async function bumpMissionProgress(supabaseAdmin: any, characterId: strin
       if (cm) {
         await supabaseAdmin.from("character_missions").update({ progress }).eq("character_id", characterId).eq("mission_id", m.id);
       } else {
+        // Ao criar a linha por causa de um evento, também grava um baseline zerado
+        // para os objetivos state-based (o personagem já pode ter itens/rank suficiente).
+        const { data: charRow } = await supabaseAdmin.from("characters").select("id,xp,rank,proficiencies").eq("id", characterId).maybeSingle();
+        const { data: invRow } = await supabaseAdmin.from("inventory").select("ninja_bag").eq("character_id", characterId).maybeSingle();
+        const { data: lvlCfg } = await supabaseAdmin.from("level_config").select("*").limit(1).maybeSingle();
+        const level = computeLevel(charRow?.xp ?? 0, lvlCfg ? { base_xp: lvlCfg.base_xp, growth_factor: lvlCfg.growth_factor, max_level: lvlCfg.max_level } : undefined);
+        const bag = (Array.isArray(invRow?.ninja_bag) ? invRow!.ninja_bag : []) as any[];
+        (progress as any).__baseline = snapshotMissionBaseline(m, charRow, bag, level);
         await supabaseAdmin.from("character_missions").insert({ character_id: characterId, mission_id: m.id, progress, status: "active" });
       }
     }
