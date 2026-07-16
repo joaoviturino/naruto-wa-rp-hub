@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { listMyMissions, claimMission, acceptMissionFn } from "@/lib/missions.functions";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,15 +16,60 @@ type Mission = {
   reward_xp: number; reward_ryo: number;
 };
 
+const LS_KEY = "mt:state:v1";
+
+type Persisted = {
+  open: boolean;
+  hidden: boolean;
+  lastMissionId: string | null;
+};
+
+function readPersisted(characterId: string): Persisted {
+  if (typeof window === "undefined") return { open: false, hidden: false, lastMissionId: null };
+  try {
+    const raw = window.localStorage.getItem(`${LS_KEY}:${characterId}`);
+    if (!raw) return { open: false, hidden: false, lastMissionId: null };
+    const p = JSON.parse(raw);
+    return {
+      open: !!p.open,
+      hidden: !!p.hidden,
+      lastMissionId: typeof p.lastMissionId === "string" ? p.lastMissionId : null,
+    };
+  } catch { return { open: false, hidden: false, lastMissionId: null }; }
+}
+
 /** Floating collapsible mission tracker for chat — mobile-first. */
 export function MissionTracker({ characterId }: { characterId: string }) {
   const [rows, setRows] = useState<Mission[]>([]);
   const [open, setOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
+  const [lastMissionId, setLastMissionId] = useState<string | null>(null);
+  const hydratedRef = useRef(false);
   const [busy, setBusy] = useState<Record<string, "accept" | "claim" | null>>({});
   const list = useServerFn(listMyMissions);
   const claim = useServerFn(claimMission);
   const accept = useServerFn(acceptMissionFn);
+
+  // Hidrata do localStorage por personagem — só no cliente.
+  useEffect(() => {
+    if (!characterId) return;
+    const p = readPersisted(characterId);
+    setOpen(p.open);
+    setHidden(p.hidden);
+    setLastMissionId(p.lastMissionId);
+    hydratedRef.current = true;
+  }, [characterId]);
+
+  // Persiste mudanças (após hidratar, para não sobrescrever com defaults).
+  useEffect(() => {
+    if (!characterId || !hydratedRef.current || typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(
+        `${LS_KEY}:${characterId}`,
+        JSON.stringify({ open, hidden, lastMissionId } satisfies Persisted),
+      );
+    } catch {}
+  }, [characterId, open, hidden, lastMissionId]);
 
   const load = useCallback(async () => {
     try { const r = await list(); setRows(((r as any)?.missions ?? []) as Mission[]); } catch {}
@@ -48,6 +93,26 @@ export function MissionTracker({ characterId }: { characterId: string }) {
     return true;
   });
   const readyCount = visible.filter((m) => m.status === "completed" && m.accepted).length;
+
+  // Atualiza "última missão focada" — prioriza a que está pronta; senão, a mais recente em progresso.
+  useEffect(() => {
+    if (!hydratedRef.current || !visible.length) return;
+    const ready = visible.find((m) => m.status === "completed" && m.accepted);
+    const inProg = visible.find((m) => m.accepted && m.status === "active");
+    const pick = ready ?? inProg ?? visible[0];
+    if (pick && pick.id !== lastMissionId) setLastMissionId(pick.id);
+  }, [visible, lastMissionId]);
+
+  // Reordena para colocar a última missão salva no topo quando o painel abre.
+  const ordered = lastMissionId
+    ? [...visible].sort((a, b) => (a.id === lastMissionId ? -1 : b.id === lastMissionId ? 1 : 0))
+    : visible;
+
+  // Se ficou "escondido" mas surgiu uma missão pronta, reexibe automaticamente.
+  useEffect(() => {
+    if (hidden && readyCount > 0) setHidden(false);
+  }, [readyCount, hidden]);
+
   if (hidden || visible.length === 0) return null;
 
   return (
@@ -85,6 +150,7 @@ export function MissionTracker({ characterId }: { characterId: string }) {
         {open && (
           <div className="max-h-[45vh] overflow-y-auto p-2 space-y-2 border-t border-border/60">
             {visible.map((m) => {
+            {ordered.map((m) => {
               const total = m.objectives.length;
               const done = m.objectives.filter((o) => Math.min(Number(m.progress[o.id] ?? 0), o.count) >= o.count).length;
               const phase = derivePhase(m);
