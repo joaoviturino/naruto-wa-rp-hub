@@ -149,7 +149,6 @@ export function MissionTracker({ characterId }: { characterId: string }) {
         </button>
         {open && (
           <div className="max-h-[45vh] overflow-y-auto p-2 space-y-2 border-t border-border/60">
-            {visible.map((m) => {
             {ordered.map((m) => {
               const total = m.objectives.length;
               const done = m.objectives.filter((o) => Math.min(Number(m.progress[o.id] ?? 0), o.count) >= o.count).length;
