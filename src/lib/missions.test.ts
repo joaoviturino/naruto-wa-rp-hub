@@ -14,7 +14,7 @@ const collectMission = {
 
 const rankMission = {
   id: "m2",
-  objectives: [{ id: "o1", type: "reach_rank", target_ref: "C", count: 1 }],
+  objectives: [{ id: "o1", type: "reach_rank", target_ref: "chunin", count: 1 }],
 };
 
 const levelMission = {
@@ -90,15 +90,15 @@ describe("computeDerivedProgress (regressão do bug 'completo antes do aceite')"
   });
 
   it("não completa reach_rank se o player já estava no rank ao aceitar", () => {
-    const char = { rank: "C" };
+    const char = { rank: "chunin" };
     const baseline = snapshotMissionBaseline(rankMission, char, [], 1);
     const derived = computeDerivedProgress(rankMission, char, [], 1, { __baseline: baseline } as any);
     expect(isComplete(rankMission, derived)).toBe(false);
   });
 
   it("completa reach_rank ao promover após o aceite", () => {
-    const baseline = snapshotMissionBaseline(rankMission, { rank: "D" }, [], 1);
-    const derived = computeDerivedProgress(rankMission, { rank: "C" }, [], 1, { __baseline: baseline } as any);
+    const baseline = snapshotMissionBaseline(rankMission, { rank: "genin" }, [], 1);
+    const derived = computeDerivedProgress(rankMission, { rank: "chunin" }, [], 1, { __baseline: baseline } as any);
     expect(isComplete(rankMission, derived)).toBe(true);
   });
 
