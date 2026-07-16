@@ -119,6 +119,8 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
   const rewardNpcs = npcs.filter((n) => n.kind === "reward");
   const learningNpcs = npcs.filter((n) => n.kind === "learning");
   const objectNpcs = npcs.filter((n) => n.kind === "object");
+  const dialogueNpcs = npcs.filter((n) => n.kind === "dialogue");
+  const buyerNpcs = npcs.filter((n) => n.kind === "buyer");
   const getQty = (k: string) => Math.max(1, qtys[k] ?? 1);
   const setQty = (k: string, v: number) => setQtys((s) => ({ ...s, [k]: Math.max(1, Math.min(50, v)) }));
 
