@@ -1,9 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { listMyMissions, claimMission, acceptMissionFn } from "@/lib/missions.functions";
+import { listMyMissions, claimMission } from "@/lib/missions.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Scroll, ChevronDown, ChevronUp, Trophy, CheckCircle2, X, Loader2, Handshake, Sparkles } from "lucide-react";
+import { Scroll, ChevronDown, ChevronUp, Trophy, CheckCircle2, X, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
