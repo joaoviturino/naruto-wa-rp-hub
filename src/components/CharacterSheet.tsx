@@ -16,6 +16,7 @@ import { getLevelConfig } from "@/lib/level.functions";
 import { levelProgress, DEFAULT_LEVEL_CONFIG, type LevelConfig } from "@/lib/level";
 import { listMyPoses, listMySkillPoses, setSkillPose } from "@/lib/pose.functions";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ComboSelect } from "@/components/ui/combo-select";
 
 type Character = {
   id: string; user_id: string; nickname: string; phone_e164: string;
@@ -242,19 +243,16 @@ function PosesTab({ characterId }: { characterId: string }) {
                 <div className="text-sm font-semibold truncate">{s.name}</div>
                 <div className="text-[10px] text-muted-foreground">Rank {s.rank}</div>
               </div>
-              <select
-                value={poses.some((p) => p.id === map[s.id]) ? map[s.id] : "__none__"}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  void assign(s.id, v === "__none__" ? null : v);
-                }}
-                className="w-40 h-8 rounded border border-border bg-input/40 text-xs px-2"
-              >
-                <option value="__none__">— Nenhuma —</option>
-                {poses.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
+              <ComboSelect
+                value={poses.some((p) => p.id === map[s.id]) ? map[s.id] : ""}
+                onChange={(v) => void assign(s.id, v === "" ? null : v)}
+                triggerClassName="w-40 h-8 text-xs bg-input/40"
+                options={[
+                  { value: "", label: "— Nenhuma —" },
+                  ...poses.map((p) => ({ value: p.id, label: p.name })),
+                ]}
+                placeholder="— Nenhuma —"
+              />
             </div>
           ))}
         </div>

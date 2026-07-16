@@ -10,6 +10,7 @@ import { upsertNpc, deleteNpc, setNpcSkills } from "@/lib/npc.functions";
 import { setNpcLearningSteps } from "@/lib/minigame.functions";
 import { toast } from "sonner";
 import { NpcGroupManager } from "./NpcGroupManager";
+import { ComboSelect } from "@/components/ui/combo-select";
 
 type DropRow = { item_id: string; qty: number; chance: number };
 type ShopRow = { item_id: string; price: number; stock: number };
@@ -313,16 +314,18 @@ export function NpcManager() {
                   onBlur={async (e) => { await save({ data: { ...sel, dialog_outro: e.target.value } } as any); load(); }} />
                 <div>
                   <Label>Missão oferecida ao jogador (opcional)</Label>
-                  <select
+                  <ComboSelect
                     value={sel.offer_mission_id ?? ""}
-                    onChange={async (e) => {
-                      const v = e.target.value || null;
-                      await save({ data: { ...sel, offer_mission_id: v } } as any); load();
+                    onChange={async (v) => {
+                      await save({ data: { ...sel, offer_mission_id: v || null } } as any); load();
                     }}
-                    className="w-full bg-input border border-border rounded px-2 py-1 text-sm mt-1">
-                    <option value="">— Não oferece missão —</option>
-                    {missions.map((m) => <option key={m.id} value={m.id}>[{m.rank}] {m.name}</option>)}
-                  </select>
+                    triggerClassName="mt-1 h-9 text-sm"
+                    placeholder="— Não oferece missão —"
+                    options={[
+                      { value: "", label: "— Não oferece missão —" },
+                      ...missions.map((m) => ({ value: m.id, label: `[${m.rank}] ${m.name}` })),
+                    ]}
+                  />
                   <p className="text-[10px] text-muted-foreground mt-1">
                     O jogador aceita a missão com este NPC, faz os objetivos e retorna aqui para entregar. Recompensa da missão é definida na aba <b>Missões</b> — evite duplicar em "Recompensa do NPC" para não pagar duas vezes.
                   </p>
@@ -338,14 +341,17 @@ export function NpcManager() {
               <h4 className="font-display text-lg text-gold">Itens da loja</h4>
               {(sel.shop_items ?? []).map((s, i) => (
                 <div key={i} className="flex items-center gap-2">
-                  <select value={s.item_id}
-                    onChange={async (e) => {
-                      const next = [...sel.shop_items]; next[i] = { ...s, item_id: e.target.value };
-                      await save({ data: { ...sel, shop_items: next } } as any); load();
-                    }}
-                    className="flex-1 bg-input border border-border rounded px-2 py-1 text-sm">
-                    {items.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
-                  </select>
+                  <div className="flex-1">
+                    <ComboSelect
+                      value={s.item_id}
+                      onChange={async (v) => {
+                        const next = [...sel.shop_items]; next[i] = { ...s, item_id: v };
+                        await save({ data: { ...sel, shop_items: next } } as any); load();
+                      }}
+                      triggerClassName="h-9 text-sm"
+                      options={items.map((it) => ({ value: it.id, label: it.name }))}
+                    />
+                  </div>
                   <Input type="number" min={0} className="w-24" defaultValue={s.price}
                     onBlur={async (e) => {
                       const next = [...sel.shop_items]; next[i] = { ...s, price: Math.max(0, Number(e.target.value)) };
@@ -384,14 +390,17 @@ export function NpcManager() {
               </div>
               {(sel.reward_items ?? []).map((r, i) => (
                 <div key={i} className="flex items-center gap-2">
-                  <select value={r.item_id}
-                    onChange={async (e) => {
-                      const next = [...sel.reward_items]; next[i] = { ...r, item_id: e.target.value };
-                      await save({ data: { ...sel, reward_items: next } } as any); load();
-                    }}
-                    className="flex-1 bg-input border border-border rounded px-2 py-1 text-sm">
-                    {items.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
-                  </select>
+                  <div className="flex-1">
+                    <ComboSelect
+                      value={r.item_id}
+                      onChange={async (v) => {
+                        const next = [...sel.reward_items]; next[i] = { ...r, item_id: v };
+                        await save({ data: { ...sel, reward_items: next } } as any); load();
+                      }}
+                      triggerClassName="h-9 text-sm"
+                      options={items.map((it) => ({ value: it.id, label: it.name }))}
+                    />
+                  </div>
                   <Input type="number" min={1} className="w-20" defaultValue={r.qty}
                     onBlur={async (e) => {
                       const next = [...sel.reward_items]; next[i] = { ...r, qty: Math.max(1, Number(e.target.value)) };
@@ -410,16 +419,18 @@ export function NpcManager() {
               }}><Plus size={14} className="mr-1" /> Adicionar item</Button>
               <div>
                 <label className="text-xs text-muted-foreground">Missão obrigatória (opcional)</label>
-                <select
+                <ComboSelect
                   value={sel.required_mission_id ?? ""}
-                  onChange={async (e) => {
-                    const v = e.target.value || null;
-                    await save({ data: { ...sel, required_mission_id: v } } as any); load();
+                  onChange={async (v) => {
+                    await save({ data: { ...sel, required_mission_id: v || null } } as any); load();
                   }}
-                  className="w-full bg-input border border-border rounded px-2 py-1 text-sm mt-1">
-                  <option value="">— Sem requisito —</option>
-                  {missions.map((m) => <option key={m.id} value={m.id}>[{m.rank}] {m.name}</option>)}
-                </select>
+                  triggerClassName="mt-1 h-9 text-sm"
+                  placeholder="— Sem requisito —"
+                  options={[
+                    { value: "", label: "— Sem requisito —" },
+                    ...missions.map((m) => ({ value: m.id, label: `[${m.rank}] ${m.name}` })),
+                  ]}
+                />
                 <p className="text-[10px] text-muted-foreground mt-1">Só poderá receber a recompensa quem já concluiu esta missão.</p>
               </div>
             </div>
@@ -463,16 +474,18 @@ export function NpcManager() {
               </p>
               <div>
                 <Label>Minigame vinculado</Label>
-                <select
+                <ComboSelect
                   value={sel.linked_minigame_id ?? ""}
-                  onChange={async (e) => {
-                    const v = e.target.value || null;
-                    await save({ data: { ...sel, linked_minigame_id: v } } as any); load();
+                  onChange={async (v) => {
+                    await save({ data: { ...sel, linked_minigame_id: v || null } } as any); load();
                   }}
-                  className="w-full bg-input border border-border rounded px-2 py-1 text-sm mt-1">
-                  <option value="">— Nenhum —</option>
-                  {minigames.map((m) => <option key={m.id} value={m.id}>[{m.kind}] {m.name}</option>)}
-                </select>
+                  triggerClassName="mt-1 h-9 text-sm"
+                  placeholder="— Nenhum —"
+                  options={[
+                    { value: "", label: "— Nenhum —" },
+                    ...minigames.map((m) => ({ value: m.id, label: `[${m.kind}] ${m.name}` })),
+                  ]}
+                />
               </div>
             </div>
           )}
@@ -484,14 +497,17 @@ export function NpcManager() {
             <div className="space-y-2">
               {(sel.drop_table ?? []).map((d, i) => (
                 <div key={i} className="flex items-center gap-2">
-                  <select value={d.item_id}
-                    onChange={async (e) => {
-                      const next = [...sel.drop_table]; next[i] = { ...d, item_id: e.target.value };
-                      await save({ data: { ...sel, drop_table: next } } as any); load();
-                    }}
-                    className="flex-1 bg-input border border-border rounded px-2 py-1 text-sm">
-                    {items.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
-                  </select>
+                  <div className="flex-1">
+                    <ComboSelect
+                      value={d.item_id}
+                      onChange={async (v) => {
+                        const next = [...sel.drop_table]; next[i] = { ...d, item_id: v };
+                        await save({ data: { ...sel, drop_table: next } } as any); load();
+                      }}
+                      triggerClassName="h-9 text-sm"
+                      options={items.map((it) => ({ value: it.id, label: it.name }))}
+                    />
+                  </div>
                   <Input type="number" min={1} className="w-20" defaultValue={d.qty}
                     onBlur={async (e) => {
                       const v = Math.max(1, Number(e.target.value));
@@ -638,16 +654,26 @@ function LearningStepsEditor({ steps, minigames, onSave }: { steps: LearningStep
         <div key={i} className="rounded bg-secondary/40 p-2 space-y-2">
           <div className="flex items-center gap-2">
             <div className="text-[10px] uppercase tracking-widest text-muted-foreground">#{i + 1}</div>
-            <select className="flex-1 bg-input border border-border rounded px-2 py-1 text-sm"
-              value={s.minigame_id}
-              onChange={(e) => { const arr = [...draft]; arr[i] = { ...s, minigame_id: e.target.value }; setDraft(arr); }}>
-              {minigames.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.kind})</option>)}
-            </select>
-            <select className="bg-input border border-border rounded px-2 py-1 text-sm" value={s.required_rank ?? ""}
-              onChange={(e) => { const arr = [...draft]; arr[i] = { ...s, required_rank: e.target.value || null }; setDraft(arr); }}>
-              <option value="">— patente —</option>
-              {NINJA_RANKS_.map((r) => <option key={r} value={r}>{r}</option>)}
-            </select>
+            <div className="flex-1 min-w-[160px]">
+              <ComboSelect
+                value={s.minigame_id}
+                onChange={(v) => { const arr = [...draft]; arr[i] = { ...s, minigame_id: v }; setDraft(arr); }}
+                triggerClassName="h-9 text-sm"
+                options={minigames.map((m) => ({ value: m.id, label: `${m.name} (${m.kind})` }))}
+              />
+            </div>
+            <div className="w-32">
+              <ComboSelect
+                value={s.required_rank ?? ""}
+                onChange={(v) => { const arr = [...draft]; arr[i] = { ...s, required_rank: v || null }; setDraft(arr); }}
+                triggerClassName="h-9 text-sm"
+                placeholder="— patente —"
+                options={[
+                  { value: "", label: "— patente —" },
+                  ...NINJA_RANKS_.map((r) => ({ value: r, label: r })),
+                ]}
+              />
+            </div>
             <Button size="sm" variant="outline" onClick={() => move(i, -1)} disabled={i === 0}>↑</Button>
             <Button size="sm" variant="outline" onClick={() => move(i, 1)} disabled={i === draft.length - 1}>↓</Button>
             <Button size="sm" variant="destructive" onClick={() => setDraft(draft.filter((_, idx) => idx !== i))}><Trash2 size={12}/></Button>
@@ -656,20 +682,42 @@ function LearningStepsEditor({ steps, minigames, onSave }: { steps: LearningStep
             <div className="text-[10px] text-muted-foreground">Proficiências extras exigidas neste passo</div>
             {(s.required_profs ?? []).map((p, pi) => (
               <div key={pi} className="flex flex-wrap gap-1 items-center">
-                <select className="flex-1 min-w-[140px] bg-input border border-border rounded px-2 py-1 text-xs"
-                  value={p.skill_class}
-                  onChange={(e) => { const arr = [...draft]; const rp = [...s.required_profs]; rp[pi] = { ...p, skill_class: e.target.value }; arr[i] = { ...s, required_profs: rp }; setDraft(arr); }}>
-                  <option value="">— classe —</option>
-                  {SKILL_CLASSES_.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
-                <select className="bg-input border border-border rounded px-1 py-1 text-xs" value={p.nivel ?? ""}
-                  onChange={(e) => { const arr = [...draft]; const rp = [...s.required_profs]; rp[pi] = { ...p, nivel: (e.target.value || null) as any }; arr[i] = { ...s, required_profs: rp }; setDraft(arr); }}>
-                  <option value="">Nível —</option>{SKILL_RANKS_.map((r) => <option key={r} value={r}>N {r}</option>)}
-                </select>
-                <select className="bg-input border border-border rounded px-1 py-1 text-xs" value={p.maestria ?? ""}
-                  onChange={(e) => { const arr = [...draft]; const rp = [...s.required_profs]; rp[pi] = { ...p, maestria: (e.target.value || null) as any }; arr[i] = { ...s, required_profs: rp }; setDraft(arr); }}>
-                  <option value="">Maestria —</option>{SKILL_RANKS_.map((r) => <option key={r} value={r}>M {r}</option>)}
-                </select>
+                <div className="flex-1 min-w-[140px]">
+                  <ComboSelect
+                    value={p.skill_class}
+                    onChange={(v) => { const arr = [...draft]; const rp = [...s.required_profs]; rp[pi] = { ...p, skill_class: v }; arr[i] = { ...s, required_profs: rp }; setDraft(arr); }}
+                    triggerClassName="h-8 text-xs"
+                    placeholder="— classe —"
+                    options={[
+                      { value: "", label: "— classe —" },
+                      ...SKILL_CLASSES_.map((c) => ({ value: c, label: c })),
+                    ]}
+                  />
+                </div>
+                <div className="w-28">
+                  <ComboSelect
+                    value={p.nivel ?? ""}
+                    onChange={(v) => { const arr = [...draft]; const rp = [...s.required_profs]; rp[pi] = { ...p, nivel: (v || null) as any }; arr[i] = { ...s, required_profs: rp }; setDraft(arr); }}
+                    triggerClassName="h-8 text-xs"
+                    placeholder="Nível —"
+                    options={[
+                      { value: "", label: "Nível —" },
+                      ...SKILL_RANKS_.map((r) => ({ value: r, label: `N ${r}` })),
+                    ]}
+                  />
+                </div>
+                <div className="w-28">
+                  <ComboSelect
+                    value={p.maestria ?? ""}
+                    onChange={(v) => { const arr = [...draft]; const rp = [...s.required_profs]; rp[pi] = { ...p, maestria: (v || null) as any }; arr[i] = { ...s, required_profs: rp }; setDraft(arr); }}
+                    triggerClassName="h-8 text-xs"
+                    placeholder="Maestria —"
+                    options={[
+                      { value: "", label: "Maestria —" },
+                      ...SKILL_RANKS_.map((r) => ({ value: r, label: `M ${r}` })),
+                    ]}
+                  />
+                </div>
                 <Button size="icon" variant="ghost" onClick={() => { const arr = [...draft]; arr[i] = { ...s, required_profs: s.required_profs.filter((_, x) => x !== pi) }; setDraft(arr); }}><Trash2 size={12}/></Button>
               </div>
             ))}

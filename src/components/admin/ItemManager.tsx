@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ComboSelect } from "@/components/ui/combo-select";
 import { useServerFn } from "@tanstack/react-start";
 import { upsertItem, deleteItem } from "@/lib/admin.functions";
 import { toast } from "sonner";
@@ -255,29 +256,28 @@ function ItemDialog({ open, onOpenChange, initial, missions, skills, adminUserId
 function Field({ label, children }: any) {
   return <div><Label>{label}</Label>{children}</div>;
 }
-const NATIVE_SELECT_CLASS =
-  "flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
-function SimpleSelect({ value, onChange, options }: any) {
+function SimpleSelect({ value, onChange, options }: { value: any; onChange: (v: string) => void; options: any[] }) {
   return (
-    <select
-      className={NATIVE_SELECT_CLASS}
+    <ComboSelect
       value={value ?? ""}
-      onChange={(e) => onChange(e.target.value)}
-    >
-      {value == null && <option value="" disabled>Selecionar</option>}
-      {options.map((o: any) => <option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
+      onChange={onChange}
+      triggerClassName="h-10"
+      placeholder="Selecionar"
+      options={options.map((o: any) => ({ value: o.value, label: o.label }))}
+    />
   );
 }
-function NullableSelect({ value, onChange, options }: any) {
+function NullableSelect({ value, onChange, options }: { value: any; onChange: (v: string | null) => void; options: any[] }) {
   return (
-    <select
-      className={NATIVE_SELECT_CLASS}
-      value={value ?? "__none__"}
-      onChange={(e) => onChange(e.target.value === "__none__" ? null : e.target.value)}
-    >
-      <option value="__none__">— Nenhum —</option>
-      {options.map((o: any) => <option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
+    <ComboSelect
+      value={value ?? ""}
+      onChange={(v) => onChange(v === "" ? null : v)}
+      triggerClassName="h-10"
+      placeholder="— Nenhum —"
+      options={[
+        { value: "", label: "— Nenhum —" },
+        ...options.map((o: any) => ({ value: o.value, label: o.label })),
+      ]}
+    />
   );
 }

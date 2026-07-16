@@ -12,6 +12,7 @@ import { setLocationSpawnGroups } from "@/lib/npc.functions";
 import { setLocationMinigames } from "@/lib/minigame.functions";
 import { setLocationLibraries } from "@/lib/library.functions";
 import { LocationMapEditor } from "./LocationMapEditor";
+import { ComboSelect } from "@/components/ui/combo-select";
 
 type Loc = { id: string; name: string; description: string | null; image_url: string | null;
   map_x?: number; map_y?: number;
@@ -258,10 +259,15 @@ export function LocationManager() {
               })}
             </div>
             <div className="flex gap-2">
-              <select value={linkTo} onChange={(e) => setLinkTo(e.target.value)} className="flex-1 bg-input border border-border rounded px-2 py-1 text-sm">
-                <option value="">— conectar a…</option>
-                {availableToLink.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-              </select>
+              <div className="flex-1">
+                <ComboSelect
+                  value={linkTo}
+                  onChange={setLinkTo}
+                  placeholder="— conectar a…"
+                  triggerClassName="h-9 text-sm"
+                  options={availableToLink.map((l) => ({ value: l.id, label: l.name }))}
+                />
+              </div>
               <Button size="sm" onClick={linkAdd} disabled={!linkTo}><Plus size={14} /></Button>
             </div>
           </div>
