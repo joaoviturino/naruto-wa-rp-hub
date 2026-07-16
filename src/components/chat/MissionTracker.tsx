@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { listMyMissions, claimMission, acceptMissionFn } from "@/lib/missions.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Scroll, ChevronDown, ChevronUp, Trophy, CheckCircle2, X } from "lucide-react";
+import { Scroll, ChevronDown, ChevronUp, Trophy, CheckCircle2, X, Loader2, Handshake, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +21,7 @@ export function MissionTracker({ characterId }: { characterId: string }) {
   const [rows, setRows] = useState<Mission[]>([]);
   const [open, setOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
+  const [busy, setBusy] = useState<Record<string, "accept" | "claim" | null>>({});
   const list = useServerFn(listMyMissions);
   const claim = useServerFn(claimMission);
   const accept = useServerFn(acceptMissionFn);
@@ -39,10 +40,15 @@ export function MissionTracker({ characterId }: { characterId: string }) {
     return () => { supabase.removeChannel(ch); };
   }, [characterId, load]);
 
-  // Only show missions the player has actively engaged with.
-  const active = rows.filter((m) => (m.accepted && (m.status === "active" || m.status === "completed")));
-  const readyCount = active.filter((m) => m.status === "completed").length;
-  if (hidden || active.length === 0) return null;
+  // Estados exibidos: Não aceito (available), Em progresso, Pronto para reivindicar, Reivindicado.
+  // Ignoramos apenas as travadas por requisito e as em cooldown puro (sem interesse imediato).
+  const visible = rows.filter((m) => {
+    if (m.status === "locked" || m.status === "cooldown") return false;
+    // "available" = existe/ativa no catálogo mas ainda não foi aceita pelo jogador.
+    return true;
+  });
+  const readyCount = visible.filter((m) => m.status === "completed" && m.accepted).length;
+  if (hidden || visible.length === 0) return null;
 
   return (
     <div
@@ -59,13 +65,13 @@ export function MissionTracker({ characterId }: { characterId: string }) {
           className="w-full flex items-center gap-2 px-3 py-2 text-sm font-display text-gold hover:bg-gold/10 transition"
         >
           <Scroll size={14} />
-          <span className="flex-1 text-left">Missões ativas</span>
+          <span className="flex-1 text-left">Missões</span>
           {readyCount > 0 && (
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 flex items-center gap-1">
               <Trophy size={10} /> {readyCount}
             </span>
           )}
-          <span className="text-[10px] text-muted-foreground">{active.length}</span>
+          <span className="text-[10px] text-muted-foreground">{visible.length}</span>
           {open ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
           <span
             role="button"
@@ -78,15 +84,18 @@ export function MissionTracker({ characterId }: { characterId: string }) {
         </button>
         {open && (
           <div className="max-h-[45vh] overflow-y-auto p-2 space-y-2 border-t border-border/60">
-            {active.map((m) => {
+            {visible.map((m) => {
               const total = m.objectives.length;
               const done = m.objectives.filter((o) => Math.min(Number(m.progress[o.id] ?? 0), o.count) >= o.count).length;
+              const phase = derivePhase(m);
+              const b = busy[m.id] ?? null;
               return (
                 <div key={m.id} className="rounded-md border border-border/60 bg-secondary/20 p-2">
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-xs font-semibold truncate">{m.name}</div>
-                    <span className="text-[10px] text-muted-foreground shrink-0">{done}/{total}</span>
+                    <StateBadge phase={phase} />
                   </div>
+                  <div className="mt-0.5 text-[10px] text-muted-foreground">{done}/{total} objetivos</div>
                   <ul className="mt-1 space-y-1">
                     {m.objectives.map((o) => {
                       const cur = Math.min(Number(m.progress[o.id] ?? 0), o.count);
@@ -110,14 +119,48 @@ export function MissionTracker({ characterId }: { characterId: string }) {
                       );
                     })}
                   </ul>
-                  {m.status === "completed" && (
-                    <div className="mt-2 flex justify-end">
-                      <Button size="sm" className="h-6 text-[11px] px-2" onClick={async () => {
-                        try { await claim({ data: { mission_id: m.id } } as any); toast.success("Recompensa recebida!"); load(); }
-                        catch (e: any) { toast.error(e.message ?? "Não foi possível reivindicar."); }
-                      }}>Reivindicar</Button>
-                    </div>
-                  )}
+                  <div className="mt-2 flex justify-end">
+                    {phase === "not_accepted" && (
+                      <Button
+                        size="sm" variant="secondary"
+                        className="h-6 text-[11px] px-2"
+                        disabled={b !== null}
+                        onClick={async () => {
+                          setBusy((s) => ({ ...s, [m.id]: "accept" }));
+                          try { await accept({ data: { mission_id: m.id } } as any); toast.success("Missão aceita!"); await load(); }
+                          catch (e: any) { toast.error(e.message ?? "Não foi possível aceitar."); }
+                          finally { setBusy((s) => ({ ...s, [m.id]: null })); }
+                        }}
+                      >
+                        {b === "accept" ? <Loader2 size={10} className="animate-spin" /> : "Aceitar"}
+                      </Button>
+                    )}
+                    {phase === "in_progress" && (
+                      <Button size="sm" className="h-6 text-[11px] px-2" disabled variant="outline">
+                        Em progresso
+                      </Button>
+                    )}
+                    {phase === "ready" && (
+                      <Button
+                        size="sm"
+                        className="h-6 text-[11px] px-2"
+                        disabled={b !== null}
+                        onClick={async () => {
+                          setBusy((s) => ({ ...s, [m.id]: "claim" }));
+                          try { await claim({ data: { mission_id: m.id } } as any); toast.success("Recompensa recebida!"); await load(); }
+                          catch (e: any) { toast.error(e.message ?? "Não foi possível reivindicar."); }
+                          finally { setBusy((s) => ({ ...s, [m.id]: null })); }
+                        }}
+                      >
+                        {b === "claim" ? <Loader2 size={10} className="animate-spin" /> : "Reivindicar"}
+                      </Button>
+                    )}
+                    {phase === "claimed" && (
+                      <Button size="sm" className="h-6 text-[11px] px-2" disabled variant="outline">
+                        Reivindicado
+                      </Button>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -128,5 +171,27 @@ export function MissionTracker({ characterId }: { characterId: string }) {
   );
 }
 
-// Silence unused warnings for potentially untriggered helper.
-void acceptMissionFn;
+type Phase = "not_accepted" | "in_progress" | "ready" | "claimed";
+
+function derivePhase(m: Mission): Phase {
+  if (m.status === "claimed") return "claimed";
+  if (!m.accepted) return "not_accepted";
+  if (m.status === "completed") return "ready";
+  return "in_progress";
+}
+
+function StateBadge({ phase }: { phase: Phase }) {
+  const map: Record<Phase, { label: string; cls: string; icon: React.ReactNode }> = {
+    not_accepted: { label: "Não aceito", cls: "bg-amber-500/15 text-amber-300 border-amber-500/30", icon: <Handshake size={10} /> },
+    in_progress: { label: "Em progresso", cls: "bg-blue-500/15 text-blue-300 border-blue-500/30", icon: <Loader2 size={10} /> },
+    ready: { label: "Pronto", cls: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30", icon: <Trophy size={10} /> },
+    claimed: { label: "Reivindicado", cls: "bg-muted/30 text-muted-foreground border-border", icon: <Sparkles size={10} /> },
+  };
+  const s = map[phase];
+  return (
+    <span className={cn("text-[10px] px-1.5 py-0.5 rounded border flex items-center gap-1 shrink-0", s.cls)}>
+      {s.icon}
+      {s.label}
+    </span>
+  );
+}
