@@ -249,6 +249,28 @@ export const startMinigameRun = createServerFn({ method: "POST" })
     }
     // Crafting (forge / tailoring): valida seleção do jogador + descobre item resultante
     let runContext: any = {};
+    if ((game.kind as string) === "mining") {
+      const cfg = (game.config ?? {}) as any;
+      const req: Array<{ item_id: string; qty: number }> = Array.isArray(cfg.required_items) ? cfg.required_items : [];
+      if (req.length) {
+        const { data: inv } = await context.supabase
+          .from("inventory").select("ninja_bag").eq("character_id", char.id).maybeSingle();
+        const bag = ((inv?.ninja_bag as any[]) ?? []).filter((e: any) => e && e.item_id);
+        const missingItems: string[] = [];
+        for (const r of req) {
+          const have = bag.filter((b: any) => b.item_id === r.item_id)
+            .reduce((s: number, b: any) => s + (Number(b.qty) || 1), 0);
+          if (have < r.qty) missingItems.push(r.item_id);
+        }
+        if (missingItems.length) {
+          const { data: itemRows } = await context.supabase
+            .from("items").select("id,name").in("id", missingItems);
+          const names = (itemRows ?? []).map((i: any) => i.name).join(", ") || "itens obrigatórios";
+          throw new Error("Você precisa carregar: " + names);
+        }
+      }
+      runContext = { breaks: 0 };
+    }
     if ((game.kind as string) === "forge" || (game.kind as string) === "tailoring") {
       const cfg = (game.config ?? {}) as any;
       const selection = (data.forge_selection ?? []).filter((s) => s.qty > 0);
