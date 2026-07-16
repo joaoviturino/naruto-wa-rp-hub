@@ -186,11 +186,30 @@ export const listMyMissions = createServerFn({ method: "POST" })
     // Missões oferecidas por NPC só aparecem depois que o jogador aceita.
     const { data: giverRows } = await context.supabase.from("npcs").select("offer_mission_id").not("offer_mission_id", "is", null);
     const npcOffered = new Set(((giverRows as any[]) ?? []).map((r) => r.offer_mission_id));
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const out = [];
     for (const m of (missions ?? []) as any[]) {
       if (npcOffered.has(m.id) && !byId.has(m.id)) continue;
       const req = await meetsRequirements(context.supabase, char, level, m.requirements);
-      const cm = byId.get(m.id);
+      let cm = byId.get(m.id);
+      // Garante existência de cmRow + baseline para missões não-npc (auto-início ao aparecer),
+      // e completa baseline em rows antigas que não o tinham.
+      if (req.ok) {
+        const hasBaseline = !!((cm?.progress ?? {}) as any)?.__baseline;
+        if (!cm && !npcOffered.has(m.id)) {
+          const baseline = snapshotMissionBaseline(m, char, bag, level);
+          const progress = { __baseline: baseline } as any;
+          await supabaseAdmin.from("character_missions").insert({
+            character_id: char.id, mission_id: m.id, status: "active", progress,
+          });
+          cm = { character_id: char.id, mission_id: m.id, status: "active", progress, started_at: new Date().toISOString() } as any;
+        } else if (cm && !hasBaseline) {
+          const baseline = snapshotMissionBaseline(m, char, bag, level);
+          const progress = { ...((cm.progress ?? {}) as any), __baseline: baseline } as any;
+          await supabaseAdmin.from("character_missions").update({ progress }).eq("character_id", char.id).eq("mission_id", m.id);
+          cm = { ...cm, progress };
+        }
+      }
       const persisted = (cm?.progress ?? {}) as Record<string, number>;
       const progress = computeDerivedProgress(m, char, bag, level, persisted);
       const complete = isComplete(m, progress);
@@ -224,6 +243,11 @@ export const claimMission = createServerFn({ method: "POST" })
     const { data: m } = await supabaseAdmin.from("missions").select("*").eq("id", data.mission_id).maybeSingle();
     if (!m || !m.active) throw new Error("Missão indisponível.");
     const { data: cmRow } = await supabaseAdmin.from("character_missions").select("*").eq("character_id", char.id).eq("mission_id", m.id).maybeSingle();
+    if (!cmRow) throw new Error("Você precisa aceitar/iniciar essa missão antes.");
+    if (cmRow.status !== "active" && cmRow.status !== "completed") {
+      // 'claimed' cai no cooldown abaixo; qualquer outro estado é inválido.
+      if (cmRow.status !== "claimed") throw new Error("Missão não está ativa.");
+    }
     const { data: lvlCfg } = await context.supabase.from("level_config").select("*").limit(1).maybeSingle();
     const level = computeLevel(char.xp ?? 0, lvlCfg ? { base_xp: lvlCfg.base_xp, growth_factor: lvlCfg.growth_factor, max_level: lvlCfg.max_level } : undefined);
     const { data: inv } = await context.supabase.from("inventory").select("ninja_bag").eq("character_id", char.id).maybeSingle();
