@@ -212,6 +212,42 @@ export type Database = {
           },
         ]
       }
+      character_mounts: {
+        Row: {
+          acquired_at: string
+          character_id: string
+          id: string
+          mount_id: string
+        }
+        Insert: {
+          acquired_at?: string
+          character_id: string
+          id?: string
+          mount_id: string
+        }
+        Update: {
+          acquired_at?: string
+          character_id?: string
+          id?: string
+          mount_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "character_mounts_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "character_mounts_mount_id_fkey"
+            columns: ["mount_id"]
+            isOneToOne: false
+            referencedRelation: "mounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       character_npc_rewards: {
         Row: {
           character_id: string
@@ -1526,6 +1562,39 @@ export type Database = {
         }
         Relationships: []
       }
+      mounts: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string | null
+          name: string
+          rank: string | null
+          speed_multiplier: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          name: string
+          rank?: string | null
+          speed_multiplier?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          name?: string
+          rank?: string | null
+          speed_multiplier?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       npc_group_members: {
         Row: {
           group_id: string
@@ -2350,6 +2419,71 @@ export type Database = {
             columns: ["req_prereq_skill_id"]
             isOneToOne: false
             referencedRelation: "skills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      travel_sessions: {
+        Row: {
+          arrives_at: string
+          character_id: string
+          created_at: string
+          from_location_id: string | null
+          id: string
+          mount_id: string | null
+          started_at: string
+          status: string
+          to_location_id: string
+        }
+        Insert: {
+          arrives_at: string
+          character_id: string
+          created_at?: string
+          from_location_id?: string | null
+          id?: string
+          mount_id?: string | null
+          started_at?: string
+          status?: string
+          to_location_id: string
+        }
+        Update: {
+          arrives_at?: string
+          character_id?: string
+          created_at?: string
+          from_location_id?: string | null
+          id?: string
+          mount_id?: string | null
+          started_at?: string
+          status?: string
+          to_location_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "travel_sessions_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "travel_sessions_from_location_id_fkey"
+            columns: ["from_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "travel_sessions_mount_id_fkey"
+            columns: ["mount_id"]
+            isOneToOne: false
+            referencedRelation: "mounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "travel_sessions_to_location_id_fkey"
+            columns: ["to_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
             referencedColumns: ["id"]
           },
         ]

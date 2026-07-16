@@ -18,6 +18,7 @@ import { NpcInteractPanel } from "@/components/chat/NpcInteractPanel";
 import { DuelInvitesInline } from "@/components/chat/DuelInvitesInline";
 import { ChatHud } from "@/components/chat/ChatHud";
 import { MissionTracker } from "@/components/chat/MissionTracker";
+import { ActionHotkey } from "@/components/chat/ActionHotkey";
 
 export const Route = createFileRoute("/_authenticated/chat")({ component: ChatPage });
 
@@ -533,6 +534,13 @@ function ChatPage() {
       {activeMinigame && (
         <MinigameDialog minigame={activeMinigame} open onOpenChange={(v) => { if (!v) setActiveMinigame(null); }}
           onCompleted={refreshMinigames} />
+      )}
+      {character && (
+        <ActionHotkey
+          currentLocationId={character.current_location_id}
+          onArrived={loadCore}
+          disabled={!!combatId || !!pvpAtLocation}
+        />
       )}
     </div>
   );

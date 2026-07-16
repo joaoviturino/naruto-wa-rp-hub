@@ -65,6 +65,14 @@ export const sendLocationMessage = createServerFn({ method: "POST" })
       .from("characters").select("id,current_location_id").eq("user_id", context.userId).maybeSingle();
     if (!char) throw new Error("Sem personagem.");
     if (char.current_location_id !== data.locationId) throw new Error("Você não está neste local.");
+    // Bloqueio durante viagem em andamento
+    try {
+      const { data: t } = await context.supabase
+        .from("travel_sessions").select("id,arrives_at").eq("character_id", char.id).eq("status", "traveling").maybeSingle();
+      if (t && new Date((t as any).arrives_at).getTime() > Date.now()) {
+        throw new Error("Você está viajando agora — aguarde chegar ao destino.");
+      }
+    } catch (e: any) { if (e?.message?.startsWith("Você está viajando")) throw e; }
     // Chat travado quando há duelo PvP ativo no local (mesmo para espectadores).
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

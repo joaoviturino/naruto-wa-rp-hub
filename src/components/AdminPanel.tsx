@@ -22,11 +22,12 @@ import { LibraryManager } from "@/components/admin/LibraryManager";
 import { LevelManager } from "@/components/admin/LevelManager";
 import { ProficiencyManager } from "@/components/admin/ProficiencyManager";
 import { ServerControl } from "@/components/admin/ServerControl";
+import { MountManager } from "@/components/admin/MountManager";
 import { NINJA_RANKS } from "@/components/admin/shared";
 import {
   Pencil, BatteryCharging, Eye, LayoutDashboard, Users, Package, Sparkles,
   ScrollText, GitBranch, MapPin, Ghost, Gamepad2, BookOpen, TrendingUp,
-  ShieldCheck, Server, MessageSquare, Award, UsersRound, Menu, X,
+  ShieldCheck, Server, MessageSquare, Award, UsersRound, Menu, X, Rabbit,
 } from "lucide-react";
 
 type NavItem = { id: string; label: string; icon: React.ComponentType<{ size?: number; className?: string }>; group: string };
@@ -42,6 +43,7 @@ const NAV: NavItem[] = [
   { id: "clans",     label: "Árvore de Clã", icon: GitBranch,   group: "Mundo" },
   { id: "locations", label: "Locais",    icon: MapPin,          group: "Mundo" },
   { id: "npcs",      label: "NPCs",      icon: Ghost,           group: "Mundo" },
+  { id: "mounts",    label: "Montarias", icon: Rabbit,          group: "Mundo" },
   { id: "minigames", label: "Minigames", icon: Gamepad2,        group: "Mundo" },
   { id: "library",   label: "Biblioteca", icon: BookOpen,       group: "Mundo" },
   { id: "levels",    label: "Níveis",    icon: TrendingUp,      group: "Sistema" },
@@ -156,6 +158,7 @@ export function AdminPanel() {
             {active === "clans" && <ClanTreeManager />}
             {active === "locations" && <LocationManager />}
             {active === "npcs" && <NpcManager />}
+            {active === "mounts" && adminUserId && <MountManager adminUserId={adminUserId} />}
             {active === "minigames" && <MinigameManager />}
             {active === "library" && <LibraryManager />}
             {active === "levels" && <LevelManager />}
