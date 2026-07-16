@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { listMyMissions, claimMission } from "@/lib/missions.functions";
+import { listMyMissions, claimMission, acceptMissionFn } from "@/lib/missions.functions";
 import { Scroll, CheckCircle2, Lock, Clock, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -16,6 +16,7 @@ type MissionRow = {
   status: "locked" | "active" | "completed" | "claimed" | "cooldown";
   cooldown_until: string | null;
   requirement_reason: string | null;
+  accepted?: boolean;
 };
 
 export function DailyMissionsPanel({ characterId }: { characterId: string }) {
@@ -24,6 +25,7 @@ export function DailyMissionsPanel({ characterId }: { characterId: string }) {
   const [loading, setLoading] = useState(false);
   const list = useServerFn(listMyMissions);
   const claim = useServerFn(claimMission);
+  const accept = useServerFn(acceptMissionFn);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -65,7 +67,10 @@ export function DailyMissionsPanel({ characterId }: { characterId: string }) {
         </div>
       </div>
       <div className="grid gap-2">
-        {filtered.map((m) => <MissionCard key={m.id} m={m} onClaim={async () => {
+        {filtered.map((m) => <MissionCard key={m.id} m={m} onAccept={async () => {
+          try { await accept({ data: { mission_id: m.id } } as any); toast.success("Missão aceita!"); load(); }
+          catch (e: any) { toast.error(e.message ?? "Não foi possível aceitar."); }
+        }} onClaim={async () => {
           try { await claim({ data: { mission_id: m.id } } as any); toast.success("Recompensa recebida!"); load(); }
           catch (e: any) { toast.error(e.message ?? "Não foi possível reivindicar."); }
         }} />)}
@@ -82,10 +87,11 @@ function statusBadge(m: MissionRow) {
   }
   if (m.status === "locked") return <span className="text-xs text-red-300 flex items-center gap-1"><Lock size={12} /> {m.requirement_reason ?? "bloqueada"}</span>;
   if (m.status === "completed") return <span className="text-xs text-emerald-400 flex items-center gap-1"><Trophy size={12} /> pronto para reivindicar</span>;
+  if (!m.accepted) return <span className="text-xs text-amber-300">disponível — aceite para começar</span>;
   return <span className="text-xs text-muted-foreground">em andamento</span>;
 }
 
-function MissionCard({ m, onClaim }: { m: MissionRow; onClaim: () => void }) {
+function MissionCard({ m, onAccept, onClaim }: { m: MissionRow; onAccept: () => void; onClaim: () => void }) {
   return (
     <div className="rounded border border-border/60 p-3 bg-secondary/20">
       <div className="flex items-center justify-between gap-2">
@@ -117,6 +123,7 @@ function MissionCard({ m, onClaim }: { m: MissionRow; onClaim: () => void }) {
           {(m.rewards?.items?.length ?? 0) > 0 && ` · ${m.rewards.items.length} item(ns)`}
           {(m.rewards?.skill_ids?.length ?? 0) > 0 && ` · ${m.rewards.skill_ids.length} habilidade(s)`}
         </div>
+        {!m.accepted && m.status === "active" && <Button size="sm" variant="secondary" onClick={onAccept}>Aceitar</Button>}
         {m.status === "completed" && <Button size="sm" onClick={onClaim}>Reivindicar</Button>}
       </div>
     </div>
