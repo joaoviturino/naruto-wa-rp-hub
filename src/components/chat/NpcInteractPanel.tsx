@@ -173,6 +173,35 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
           ))}
         </div>
       )}
+      {buyerNpcs.length > 0 && (
+        <div className="space-y-1">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1"><HandCoins size={11} /> Compradores</div>
+          {buyerNpcs.map((n) => (
+            <Button key={n.id} size="sm" variant="outline" className="w-full justify-start gap-2" onClick={() => setOpen(n)}>
+              <HandCoins size={12} className="text-gold" />
+              <span className="flex-1 truncate text-left">{n.name}</span>
+              <Badge variant="secondary" className="text-[10px]">Vender itens</Badge>
+            </Button>
+          ))}
+        </div>
+      )}
+      {dialogueNpcs.length > 0 && (
+        <div className="space-y-1">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1"><Handshake size={11} /> Diálogos</div>
+          {dialogueNpcs.map((n) => {
+            const offer = n.offer_status;
+            return (
+              <Button key={n.id} size="sm" variant="outline" className="w-full justify-start gap-2" onClick={() => setOpen(n)}>
+                <Handshake size={12} className="text-gold" />
+                <span className="flex-1 truncate text-left">{n.name}</span>
+                {offer === "available" && <Badge className="text-[10px]">Nova missão</Badge>}
+                {offer === "in_progress" && <Badge variant="secondary" className="text-[10px]">Em andamento</Badge>}
+                {offer === "ready" && <Badge className="text-[10px] bg-emerald-600 hover:bg-emerald-600">Entregar</Badge>}
+              </Button>
+            );
+          })}
+        </div>
+      )}
       {rewardNpcs.length > 0 && (
         <div className="space-y-1">
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1"><Gift size={11} /> Recompensas</div>
