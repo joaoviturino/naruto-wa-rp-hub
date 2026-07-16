@@ -316,9 +316,7 @@ export function MinigameManager() {
 
           <div className="flex gap-2">
             <Button onClick={save}><Save size={14} className="mr-1" /> Salvar</Button>
-            {selected.kind !== "mining" && (
-              <Button variant="secondary" onClick={() => { setTestResult(null); setTesting(true); }}>▶ Testar</Button>
-            )}
+            <Button variant="secondary" onClick={() => { setTestResult(null); setTesting(true); }}>▶ Testar</Button>
             {selected.id && <Button variant="destructive" onClick={() => del(selected.id)}><Trash2 size={14} className="mr-1" /> Apagar</Button>}
             <Button variant="outline" onClick={() => setSelected(null)}>Fechar</Button>
           </div>
@@ -348,6 +346,14 @@ export function MinigameManager() {
               </div>
             ) : selected.kind === "sequence" ? (
               <SequenceGame background={selected.background_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
+            ) : selected.kind === "mining" ? (
+              <MiningGame
+                runId="test"
+                background={selected.background_url}
+                config={selected.config ?? {}}
+                testMode
+                onExit={(b) => setTestResult({ score: b, success: true })}
+              />
             ) : selected.kind === "forge" ? (
               <ForgeGame
                 background={selected.background_url}
