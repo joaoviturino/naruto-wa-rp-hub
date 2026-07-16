@@ -14,6 +14,7 @@ import { CleanupGame } from "@/components/minigame/CleanupGame";
 import { SequenceGame } from "@/components/minigame/SequenceGame";
 import { ForgeGame } from "@/components/minigame/ForgeGame";
 import { TailoringGame } from "@/components/minigame/TailoringGame";
+import { MiningGame } from "@/components/minigame/MiningGame";
 
 type Item = { id: string; name: string; meta?: any; image_url?: string | null };
 type SkillLite = { id: string; name: string; rank: string };
@@ -352,7 +353,7 @@ export function MinigameManager() {
                 background={selected.background_url}
                 config={selected.config ?? {}}
                 testMode
-                onExit={(b) => setTestResult({ score: b, success: true })}
+                onExit={(b: number) => setTestResult({ score: b, success: true })}
               />
             ) : selected.kind === "forge" ? (
               <ForgeGame
