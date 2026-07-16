@@ -4,13 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Trash2, Upload, Plus } from "lucide-react";
+import { Trash2, Upload, Plus, Search, Swords, Store, ShoppingBag, Gift, GraduationCap, MessageCircle, Package, Users, ChevronDown } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { upsertNpc, deleteNpc, setNpcSkills } from "@/lib/npc.functions";
 import { setNpcLearningSteps } from "@/lib/minigame.functions";
 import { toast } from "sonner";
 import { NpcGroupManager } from "./NpcGroupManager";
 import { ComboSelect } from "@/components/ui/combo-select";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 type DropRow = { item_id: string; qty: number; chance: number };
 type ShopRow = { item_id: string; price: number; stock: number };
@@ -53,6 +56,16 @@ const SKILL_CLASSES_ = [
   "tenseijutsu","tonjutsu","yuugoujutsu",
 ];
 
+const KIND_META: Record<NpcKind, { label: string; icon: any; color: string }> = {
+  aggressive: { label: "Agressivo", icon: Swords, color: "text-red-400 border-red-500/40 bg-red-500/10" },
+  shop:       { label: "Loja",      icon: Store, color: "text-amber-400 border-amber-500/40 bg-amber-500/10" },
+  buyer:      { label: "Comprador", icon: ShoppingBag, color: "text-emerald-400 border-emerald-500/40 bg-emerald-500/10" },
+  reward:     { label: "Recompensa",icon: Gift, color: "text-gold border-gold/40 bg-gold/10" },
+  learning:   { label: "Aprendizado", icon: GraduationCap, color: "text-sky-400 border-sky-500/40 bg-sky-500/10" },
+  dialogue:   { label: "Diálogo",   icon: MessageCircle, color: "text-violet-400 border-violet-500/40 bg-violet-500/10" },
+  object:     { label: "Objeto",    icon: Package, color: "text-slate-300 border-slate-500/40 bg-slate-500/10" },
+};
+
 export function NpcManager() {
   const [npcs, setNpcs] = useState<Npc[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
@@ -63,6 +76,9 @@ export function NpcManager() {
   const [learningSteps, setLearningSteps] = useState<Record<string, LearningStep[]>>({});
   const [selected, setSelected] = useState<string | null>(null);
   const [name, setName] = useState("");
+  const [query, setQuery] = useState("");
+  const [kindFilter, setKindFilter] = useState<NpcKind | "all">("all");
+  const [groupsOpen, setGroupsOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const bgRef = useRef<HTMLInputElement>(null);
   const musicRef = useRef<HTMLInputElement>(null);
