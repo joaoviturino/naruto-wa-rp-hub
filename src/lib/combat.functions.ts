@@ -614,14 +614,14 @@ export const playerAttack = createServerFn({ method: "POST" })
     log.push({
       seq: log.length + 1, actor: "player", actor_name: activePlayer.nickname, target_name: state.npc.name,
       skill_name: skill.name, energy_type: pool, energy_used: data.energy_used,
-      effective, damage, raw_damage: rawDamage, defense, hit_cap: hitCap, speed, crit_mul: Number(skill.bonus_critical),
+      effective, damage, raw_damage: rawDamage, defense, speed, crit_mul: Number(skill.bonus_critical),
       pose_url: poseUrl,
       actor_char_id: activePlayer.character_id,
       target_npc_idx: targetIdx,
       animation_url: (skill as any).animation_url ?? null,
       animation_mode: ((skill as any).animation_mode ?? "overlay") as any,
       sound_url: (skill as any).sound_url ?? null,
-      msg: `${activePlayer.nickname} usa ${skill.name} (${pool.toUpperCase()} ${data.energy_used})${masteryMul > 1 ? ` [Maestria ×${masteryMul.toFixed(1)}]` : ""}${toolConsumedLabel ? ` [-${toolQtyConsumed} ${toolConsumedLabel}]` : ""} → ${damage} de dano${defense > 0 ? ` (def ${defense}%)` : ""}${damage < afterDef ? ` [cap ${maxHitPct}%]` : ""}.`,
+      msg: `${activePlayer.nickname} usa ${skill.name} (${pool.toUpperCase()} ${data.energy_used})${masteryMul > 1 ? ` [Maestria ×${masteryMul.toFixed(1)}]` : ""}${toolConsumedLabel ? ` [-${toolQtyConsumed} ${toolConsumedLabel}]` : ""} → ${damage} de dano${defense > 0 ? ` (def ${defense}%)` : ""}.`,
       ...(toolConsumedLabel ? { tool_consumed: toolConsumedLabel, tool_qty: toolQtyConsumed, tool_crit_mul: toolCritMul } : {}),
     });
     if (brokenWeapons.length) {
