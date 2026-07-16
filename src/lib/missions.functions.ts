@@ -238,6 +238,41 @@ export const listMyMissions = createServerFn({ method: "POST" })
   });
 
 /* -------- CLAIM -------- */
+/** Aceite explícito (para missões não-NPC listadas em DailyMissionsPanel). */
+export const acceptMissionFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ mission_id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: char } = await context.supabase
+      .from("characters").select("id,xp,rank,proficiencies").eq("user_id", context.userId).maybeSingle();
+    if (!char) throw new Error("Sem personagem.");
+    const { data: m } = await supabaseAdmin.from("missions").select("*").eq("id", data.mission_id).maybeSingle();
+    if (!m || !m.active) throw new Error("Missão indisponível.");
+    const { data: lvlCfg } = await context.supabase.from("level_config").select("*").limit(1).maybeSingle();
+    const level = computeLevel(char.xp ?? 0, lvlCfg ? { base_xp: lvlCfg.base_xp, growth_factor: lvlCfg.growth_factor, max_level: lvlCfg.max_level } : undefined);
+    const { data: inv } = await context.supabase.from("inventory").select("ninja_bag").eq("character_id", char.id).maybeSingle();
+    const bag = (Array.isArray(inv?.ninja_bag) ? inv!.ninja_bag : []) as any[];
+    const { data: existing } = await supabaseAdmin.from("character_missions").select("*").eq("character_id", char.id).eq("mission_id", m.id).maybeSingle();
+    const baseline = snapshotMissionBaseline(m, char, bag, level);
+    const nextProgress = {
+      ...((existing?.progress ?? {}) as any),
+      __baseline: baseline,
+      __accepted: true,
+      __accepted_at: new Date().toISOString(),
+    };
+    if (existing) {
+      await supabaseAdmin.from("character_missions")
+        .update({ progress: nextProgress, status: existing.status === "claimed" ? "active" : existing.status, claimed_at: existing.status === "claimed" ? null : existing.claimed_at })
+        .eq("character_id", char.id).eq("mission_id", m.id);
+    } else {
+      await supabaseAdmin.from("character_missions").insert({
+        character_id: char.id, mission_id: m.id, status: "active", progress: nextProgress,
+      });
+    }
+    return { ok: true };
+  });
+
 export const claimMission = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ mission_id: z.string().uuid() }).parse(i))
