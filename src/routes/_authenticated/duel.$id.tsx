@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Sword, ShieldHalf, SkipForward, Flag, Loader2, Sparkles } from "lucide-react";
+import { ComboSelect } from "@/components/ui/combo-select";
 
 export const Route = createFileRoute("/_authenticated/duel/$id")({
   component: DuelRoom,
@@ -191,13 +192,20 @@ function DuelRoom() {
                 <div className="grid gap-2 sm:grid-cols-2">
                   <div>
                     <label className="text-[10px] uppercase tracking-widest text-muted-foreground">Habilidade</label>
-                    <select value={skillId} onChange={(e) => setSkillId(e.target.value)} className="w-full bg-input border border-border rounded px-2 py-1 text-sm">
-                      <option value="">— escolher —</option>
-                      {skills.map((s) => {
+                    <ComboSelect
+                      value={skillId}
+                      onChange={setSkillId}
+                      placeholder="— escolher —"
+                      triggerClassName="w-full h-9 text-sm"
+                      options={skills.map((s) => {
                         const cd = mySide?.cooldowns?.[s.id] ?? 0;
-                        return <option key={s.id} value={s.id} disabled={cd > 0}>{s.name} ({s.rank}){cd > 0 ? ` — recarga ${cd}` : ""}</option>;
+                        return {
+                          value: s.id,
+                          label: `${s.name} (${s.rank})${cd > 0 ? ` — recarga ${cd}` : ""}`,
+                          disabled: cd > 0,
+                        };
                       })}
-                    </select>
+                    />
                   </div>
                   <div>
                     <label className="text-[10px] uppercase tracking-widest text-muted-foreground">Energia investida ({energyPct}%)</label>
