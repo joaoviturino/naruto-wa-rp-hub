@@ -408,3 +408,25 @@
   height: 0;
 }
 
+/* --- Global fix: native <select> dropdowns legibility on desktop --- */
+select {
+  color: hsl(var(--foreground));
+  background-color: hsl(var(--input, var(--background)));
+  color-scheme: dark;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  padding-right: 1.75rem !important;
+}
+select option,
+select optgroup {
+  background-color: hsl(var(--popover, var(--background)));
+  color: hsl(var(--popover-foreground, var(--foreground)));
+}
+select:focus {
+  outline: 2px solid hsl(var(--ring, var(--primary)));
+  outline-offset: 1px;
+}
+
