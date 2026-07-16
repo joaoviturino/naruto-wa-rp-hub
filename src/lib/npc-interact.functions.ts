@@ -170,7 +170,7 @@ export const acceptMissionFromNpc = createServerFn({ method: "POST" })
     const level = levelFromXp(charFull?.xp ?? 0, lvlCfg ? { base_xp: lvlCfg.base_xp, growth_factor: lvlCfg.growth_factor, max_level: lvlCfg.max_level } : DEFAULT_LEVEL_CONFIG);
     const bag = (Array.isArray(invRow?.ninja_bag) ? invRow!.ninja_bag : []) as any[];
     const baseline = mission ? snapshotMissionBaseline(mission, charFull, bag, level) : {};
-    const initialProgress = { __baseline: baseline } as any;
+    const initialProgress = { __baseline: baseline, __accepted: true, __accepted_at: new Date().toISOString() } as any;
     const { data: existing } = await supabaseAdmin.from("character_missions")
       .select("status,claimed_at").eq("character_id", me.id).eq("mission_id", npc.offer_mission_id).maybeSingle();
     if (existing) {

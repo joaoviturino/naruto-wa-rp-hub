@@ -156,6 +156,10 @@ function isComplete(mission: any, progress: Record<string, number>) {
   return objs.every((o) => Number(progress[o.id] ?? 0) >= Number(o.count ?? 1));
 }
 
+function isAccepted(progress: any): boolean {
+  return !!(progress && progress.__accepted === true);
+}
+
 async function meetsRequirements(supa: any, char: any, level: number, req: any): Promise<{ ok: boolean; reason?: string }> {
   const r = req ?? {};
   if (r.min_rank && rankIdx(char?.rank) < rankIdx(r.min_rank)) return { ok: false, reason: `Requer patente ${r.min_rank}` };
@@ -213,6 +217,7 @@ export const listMyMissions = createServerFn({ method: "POST" })
       const persisted = (cm?.progress ?? {}) as Record<string, number>;
       const progress = computeDerivedProgress(m, char, bag, level, persisted);
       const complete = isComplete(m, progress);
+      const accepted = isAccepted(persisted);
       let effectiveStatus: "locked" | "active" | "completed" | "claimed" | "cooldown" = "active";
       if (!req.ok) effectiveStatus = "locked";
       else if (cm?.status === "claimed") {
@@ -221,9 +226,10 @@ export const listMyMissions = createServerFn({ method: "POST" })
           const nextAt = new Date(cm.claimed_at ?? cm.completed_at ?? cm.started_at).getTime() + Number(m.cooldown_hours ?? 24) * 3600_000;
           effectiveStatus = Date.now() < nextAt ? "cooldown" : "active";
         }
-      } else if (complete || cm?.status === "completed") effectiveStatus = "completed";
+      } else if (complete && accepted) effectiveStatus = "completed";
+      else if (cm?.status === "completed" && accepted) effectiveStatus = "completed";
       out.push({
-        ...m, progress, status: effectiveStatus,
+        ...m, progress, status: effectiveStatus, accepted,
         cooldown_until: cm?.claimed_at ? new Date(new Date(cm.claimed_at).getTime() + Number(m.cooldown_hours ?? 24) * 3600_000).toISOString() : null,
         requirement_reason: req.ok ? null : req.reason,
       });
@@ -232,6 +238,41 @@ export const listMyMissions = createServerFn({ method: "POST" })
   });
 
 /* -------- CLAIM -------- */
+/** Aceite explícito (para missões não-NPC listadas em DailyMissionsPanel). */
+export const acceptMissionFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ mission_id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: char } = await context.supabase
+      .from("characters").select("id,xp,rank,proficiencies").eq("user_id", context.userId).maybeSingle();
+    if (!char) throw new Error("Sem personagem.");
+    const { data: m } = await supabaseAdmin.from("missions").select("*").eq("id", data.mission_id).maybeSingle();
+    if (!m || !m.active) throw new Error("Missão indisponível.");
+    const { data: lvlCfg } = await context.supabase.from("level_config").select("*").limit(1).maybeSingle();
+    const level = computeLevel(char.xp ?? 0, lvlCfg ? { base_xp: lvlCfg.base_xp, growth_factor: lvlCfg.growth_factor, max_level: lvlCfg.max_level } : undefined);
+    const { data: inv } = await context.supabase.from("inventory").select("ninja_bag").eq("character_id", char.id).maybeSingle();
+    const bag = (Array.isArray(inv?.ninja_bag) ? inv!.ninja_bag : []) as any[];
+    const { data: existing } = await supabaseAdmin.from("character_missions").select("*").eq("character_id", char.id).eq("mission_id", m.id).maybeSingle();
+    const baseline = snapshotMissionBaseline(m, char, bag, level);
+    const nextProgress = {
+      ...((existing?.progress ?? {}) as any),
+      __baseline: baseline,
+      __accepted: true,
+      __accepted_at: new Date().toISOString(),
+    };
+    if (existing) {
+      await supabaseAdmin.from("character_missions")
+        .update({ progress: nextProgress, status: existing.status === "claimed" ? "active" : existing.status, claimed_at: existing.status === "claimed" ? null : existing.claimed_at })
+        .eq("character_id", char.id).eq("mission_id", m.id);
+    } else {
+      await supabaseAdmin.from("character_missions").insert({
+        character_id: char.id, mission_id: m.id, status: "active", progress: nextProgress,
+      });
+    }
+    return { ok: true };
+  });
+
 export const claimMission = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ mission_id: z.string().uuid() }).parse(i))
@@ -244,6 +285,7 @@ export const claimMission = createServerFn({ method: "POST" })
     if (!m || !m.active) throw new Error("Missão indisponível.");
     const { data: cmRow } = await supabaseAdmin.from("character_missions").select("*").eq("character_id", char.id).eq("mission_id", m.id).maybeSingle();
     if (!cmRow) throw new Error("Você precisa aceitar/iniciar essa missão antes.");
+    if (!isAccepted(cmRow.progress)) throw new Error("Aceite a missão antes de reivindicar a recompensa.");
     if (cmRow.status !== "active" && cmRow.status !== "completed") {
       // 'claimed' cai no cooldown abaixo; qualquer outro estado é inválido.
       if (cmRow.status !== "claimed") throw new Error("Missão não está ativa.");
