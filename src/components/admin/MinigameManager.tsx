@@ -582,12 +582,31 @@ function MiningConfigEditor({ selected, setSelected, items }: { selected: any; s
           </div>
           {drops.map((d, idx) => (
             <div key={idx} className="grid grid-cols-2 md:grid-cols-[1fr_90px_80px_80px_40px] gap-2 items-center">
-              <select className="bg-input border border-border rounded px-2 py-1 text-sm col-span-2 md:col-span-1"
-                value={d.item_id}
-                onChange={(e) => { const next = [...drops]; next[idx] = { ...d, item_id: e.target.value }; set({ drops: next }); }}>
-                <option value="">— item —</option>
-                {items.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
-              </select>
+              <Select
+                value={d.item_id || undefined}
+                onValueChange={(v) => { const next = [...drops]; next[idx] = { ...d, item_id: v }; set({ drops: next }); }}
+              >
+                <SelectTrigger className="col-span-2 md:col-span-1 h-9 text-sm">
+                  <SelectValue placeholder="— material —" />
+                </SelectTrigger>
+                <SelectContent className="max-h-72">
+                  {items.filter((it) => (it.type ?? "").toLowerCase() === "material").length === 0 && (
+                    <div className="px-2 py-2 text-xs text-muted-foreground italic">
+                      Nenhum item do tipo "material" cadastrado.
+                    </div>
+                  )}
+                  {items
+                    .filter((it) => (it.type ?? "").toLowerCase() === "material")
+                    .map((it) => (
+                      <SelectItem key={it.id} value={it.id}>
+                        <div className="flex items-center gap-2">
+                          {it.image_url && <img src={it.image_url} alt="" className="w-4 h-4 object-contain" />}
+                          <span>{it.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
               <Input type="number" min={0} max={100} step={0.1} value={d.chance}
                 onChange={(e) => { const next = [...drops]; next[idx] = { ...d, chance: Math.max(0, Math.min(100, Number(e.target.value) || 0)) }; set({ drops: next }); }} />
               <Input type="number" min={1} max={99} value={d.min_qty}
