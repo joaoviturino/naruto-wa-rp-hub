@@ -14,11 +14,13 @@ export function MiningGame({
   background,
   config,
   onExit,
+  testMode = false,
 }: {
   runId: string;
   background: string | null;
   config: any;
   onExit: (breaks: number) => void;
+  testMode?: boolean;
 }) {
   const strike = useServerFn(mineNode);
   const nodeHp = Math.max(1, Number(config?.node_hp) || 4);
@@ -82,7 +84,23 @@ export function MiningGame({
     busyRef.current = true;
     setBroken(true);
     try {
-      const r = await strike({ data: { run_id: runId } });
+      let r: { breaks: number; xp: number; drops: Drop[] };
+      if (testMode) {
+        // Simulação local: rola drops a partir da config
+        const dropsCfg: Array<{ item_id: string; name?: string; image_url?: string | null; chance: number; min?: number; max?: number }> = Array.isArray(config?.drops) ? config.drops : [];
+        const rolled: Drop[] = [];
+        for (const d of dropsCfg) {
+          if (Math.random() <= (Number(d.chance) || 0)) {
+            const min = Math.max(1, Number(d.min) || 1);
+            const max = Math.max(min, Number(d.max) || min);
+            const qty = Math.floor(min + Math.random() * (max - min + 1));
+            rolled.push({ item_id: d.item_id, name: d.name || "Item", image_url: d.image_url ?? null, qty });
+          }
+        }
+        r = { breaks: breaks + 1, xp: Number(config?.xp_per_break) || 0, drops: rolled };
+      } else {
+        r = await strike({ data: { run_id: runId } }) as any;
+      }
       setBreaks(r.breaks);
       setTotalXp((x) => x + (r.xp || 0));
       spawnParticles(28);
