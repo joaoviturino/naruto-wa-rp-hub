@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ComboSelect } from "@/components/ui/combo-select";
 import { useServerFn } from "@tanstack/react-start";
 import { upsertItem, deleteItem } from "@/lib/admin.functions";
 import { toast } from "sonner";
@@ -255,7 +256,7 @@ function ItemDialog({ open, onOpenChange, initial, missions, skills, adminUserId
 function Field({ label, children }: any) {
   return <div><Label>{label}</Label>{children}</div>;
 }
-function SimpleSelect({ value, onChange, options }: any) {
+function SimpleSelect({ value, onChange, options }: { value: any; onChange: (v: string) => void; options: any[] }) {
   return (
     <ComboSelect
       value={value ?? ""}
@@ -266,7 +267,7 @@ function SimpleSelect({ value, onChange, options }: any) {
     />
   );
 }
-function NullableSelect({ value, onChange, options }: any) {
+function NullableSelect({ value, onChange, options }: { value: any; onChange: (v: string | null) => void; options: any[] }) {
   return (
     <ComboSelect
       value={value ?? ""}
