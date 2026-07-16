@@ -1665,6 +1665,7 @@ export type Database = {
         Row: {
           avg_damage: number
           battle_bg_url: string | null
+          buy_items: Json
           created_at: string
           crit_chance: number
           crit_multiplier: number
@@ -1697,6 +1698,7 @@ export type Database = {
         Insert: {
           avg_damage?: number
           battle_bg_url?: string | null
+          buy_items?: Json
           created_at?: string
           crit_chance?: number
           crit_multiplier?: number
@@ -1729,6 +1731,7 @@ export type Database = {
         Update: {
           avg_damage?: number
           battle_bg_url?: string | null
+          buy_items?: Json
           created_at?: string
           crit_chance?: number
           crit_multiplier?: number
@@ -2427,7 +2430,14 @@ export type Database = {
         | "anbu"
         | "sannin"
         | "kage"
-      npc_kind: "aggressive" | "shop" | "reward" | "learning" | "object"
+      npc_kind:
+        | "aggressive"
+        | "shop"
+        | "reward"
+        | "learning"
+        | "object"
+        | "dialogue"
+        | "buyer"
       proficiency_kind:
         | "kenjutsu"
         | "shurikenjutsu"
@@ -2662,7 +2672,15 @@ export const Constants = {
         "sannin",
         "kage",
       ],
-      npc_kind: ["aggressive", "shop", "reward", "learning", "object"],
+      npc_kind: [
+        "aggressive",
+        "shop",
+        "reward",
+        "learning",
+        "object",
+        "dialogue",
+        "buyer",
+      ],
       proficiency_kind: [
         "kenjutsu",
         "shurikenjutsu",
