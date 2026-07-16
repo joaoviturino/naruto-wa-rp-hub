@@ -7,8 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { Store, Gift, MessageSquare, Coins, Minus, Plus, Lock, GraduationCap, Box, CheckCircle2, Target, Sparkles } from "lucide-react";
-import { listLocationInteractNpcs, buyFromShop, claimNpcReward } from "@/lib/npc-interact.functions";
+import { Store, Gift, MessageSquare, Coins, Minus, Plus, Lock, GraduationCap, Box, CheckCircle2, Target, Sparkles, HandCoins, Handshake } from "lucide-react";
+import { listLocationInteractNpcs, buyFromShop, claimNpcReward, sellToBuyer } from "@/lib/npc-interact.functions";
 import { acceptMissionFromNpc } from "@/lib/npc-interact.functions";
 import { claimMission } from "@/lib/missions.functions";
 import { listNpcLearningSteps } from "@/lib/minigame.functions";
@@ -17,10 +17,11 @@ import { NpcMusic } from "@/components/NpcMusic";
 
 type LearnBlock = { id: string; kind: "text" | "image"; text?: string | null; image_url?: string | null };
 type Npc = {
-  id: string; name: string; image_url: string | null; kind: "shop" | "reward" | "learning" | "object";
+  id: string; name: string; image_url: string | null; kind: "shop" | "reward" | "learning" | "object" | "dialogue" | "buyer";
   dialog_intro: string | null; dialog_outro: string | null;
   music_url?: string | null;
   shop_items?: { item_id: string; price: number; stock: number }[];
+  buy_items?: { item_id: string; price: number; max_per_day: number }[];
   reward_items?: { item_id: string; qty: number }[];
   reward_xp?: number; reward_ryo?: number;
   cooldown_remaining_ms?: number;
