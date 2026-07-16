@@ -29,7 +29,7 @@ const npcPayload = z.object({
     qty: z.number().int().min(1).max(99).default(1),
     chance: z.number().min(0).max(100), // percentual
   })).optional(),
-  kind: z.enum(["aggressive","shop","reward","learning","object"]).optional(),
+  kind: z.enum(["aggressive","shop","reward","learning","object","dialogue","buyer"]).optional(),
   dialog_intro: z.string().max(4000).nullish(),
   dialog_outro: z.string().max(4000).nullish(),
   required_mission_id: z.string().uuid().nullish(),
@@ -38,6 +38,11 @@ const npcPayload = z.object({
     item_id: z.string().uuid(),
     price: z.number().int().min(0).max(10_000_000),
     stock: z.number().int().min(-1).max(9999).default(-1),
+  })).optional(),
+  buy_items: z.array(z.object({
+    item_id: z.string().uuid(),
+    price: z.number().int().min(0).max(10_000_000),
+    max_per_day: z.number().int().min(-1).max(9999).default(-1),
   })).optional(),
   reward_items: z.array(z.object({
     item_id: z.string().uuid(),

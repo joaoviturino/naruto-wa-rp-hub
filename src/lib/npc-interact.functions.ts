@@ -32,7 +32,7 @@ export const listLocationInteractNpcs = createServerFn({ method: "POST" })
     if (!me.current_location_id) return { npcs: [] as any[] };
     const { data } = await context.supabase
       .from("location_npcs")
-      .select("npc:npcs(id,name,image_url,kind,dialog_intro,dialog_outro,shop_items,reward_items,reward_xp,reward_ryo,reward_cooldown_hours,required_mission_id,offer_mission_id,tutorial_blocks,learning_min_read_seconds,linked_minigame_id,music_url)")
+      .select("npc:npcs(id,name,image_url,kind,dialog_intro,dialog_outro,shop_items,buy_items,reward_items,reward_xp,reward_ryo,reward_cooldown_hours,required_mission_id,offer_mission_id,tutorial_blocks,learning_min_read_seconds,linked_minigame_id,music_url)")
       .eq("location_id", me.current_location_id);
     const list = ((data as any[]) ?? []).map((r) => r.npc).filter((n: any) => n && n.kind !== "aggressive");
     // Enriquece reward com cooldown remaining
@@ -288,4 +288,32 @@ export const claimNpcReward = createServerFn({ method: "POST" })
     }
     await supabaseAdmin.from("character_npc_rewards").insert({ character_id: me.id, npc_id: data.npc_id });
     return { ok: true, xp, ryo, items: rItems.length };
+  });
+
+/** Vende itens da bolsa do jogador para um NPC comprador. */
+export const sellToBuyer = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    npc_id: z.string().uuid(),
+    item_id: z.string().uuid(),
+    qty: z.number().int().min(1).max(999).default(1),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    const me = await assertNpcHere(context, data.npc_id);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: npc } = await supabaseAdmin.from("npcs").select("kind,buy_items,name").eq("id", data.npc_id).maybeSingle();
+    if (!npc || (npc as any).kind !== "buyer") throw new Error("Este NPC não compra itens.");
+    const entries = (Array.isArray((npc as any).buy_items) ? (npc as any).buy_items : []) as any[];
+    const entry = entries.find((e) => e.item_id === data.item_id);
+    if (!entry) throw new Error("Este NPC não compra esse item.");
+    const { data: inv } = await supabaseAdmin.from("inventory").select("ninja_bag").eq("character_id", me.id).maybeSingle();
+    const bag = (Array.isArray(inv?.ninja_bag) ? inv!.ninja_bag : []).map((e: any) => ({ item_id: e.item_id, qty: Number(e.qty ?? 1) }));
+    const idx = bag.findIndex((e) => e.item_id === data.item_id);
+    if (idx < 0 || bag[idx].qty < data.qty) throw new Error("Você não possui a quantidade indicada.");
+    bag[idx].qty -= data.qty;
+    const nextBag = bag.filter((e) => e.qty > 0);
+    const gain = Number(entry.price) * data.qty;
+    await supabaseAdmin.from("inventory").update({ ninja_bag: nextBag }).eq("character_id", me.id);
+    await supabaseAdmin.from("characters").update({ ryo: Number(me.ryo ?? 0) + gain }).eq("id", me.id);
+    return { ok: true, earned: gain };
   });

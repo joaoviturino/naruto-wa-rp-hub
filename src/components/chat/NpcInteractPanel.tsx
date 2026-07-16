@@ -7,8 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
-import { Store, Gift, MessageSquare, Coins, Minus, Plus, Lock, GraduationCap, Box, CheckCircle2, Target, Sparkles } from "lucide-react";
-import { listLocationInteractNpcs, buyFromShop, claimNpcReward } from "@/lib/npc-interact.functions";
+import { Store, Gift, MessageSquare, Coins, Minus, Plus, Lock, GraduationCap, Box, CheckCircle2, Target, Sparkles, HandCoins, Handshake } from "lucide-react";
+import { listLocationInteractNpcs, buyFromShop, claimNpcReward, sellToBuyer } from "@/lib/npc-interact.functions";
 import { acceptMissionFromNpc } from "@/lib/npc-interact.functions";
 import { claimMission } from "@/lib/missions.functions";
 import { listNpcLearningSteps } from "@/lib/minigame.functions";
@@ -17,10 +17,11 @@ import { NpcMusic } from "@/components/NpcMusic";
 
 type LearnBlock = { id: string; kind: "text" | "image"; text?: string | null; image_url?: string | null };
 type Npc = {
-  id: string; name: string; image_url: string | null; kind: "shop" | "reward" | "learning" | "object";
+  id: string; name: string; image_url: string | null; kind: "shop" | "reward" | "learning" | "object" | "dialogue" | "buyer";
   dialog_intro: string | null; dialog_outro: string | null;
   music_url?: string | null;
   shop_items?: { item_id: string; price: number; stock: number }[];
+  buy_items?: { item_id: string; price: number; max_per_day: number }[];
   reward_items?: { item_id: string; qty: number }[];
   reward_xp?: number; reward_ryo?: number;
   cooldown_remaining_ms?: number;
@@ -55,9 +56,11 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
   const [objMinigame, setObjMinigame] = useState<any | null>(null);
   const [objOpen, setObjOpen] = useState(false);
   const [charId, setCharId] = useState<string | null>(null);
+  const [bag, setBag] = useState<{ item_id: string; qty: number }[]>([]);
   const list = useServerFn(listLocationInteractNpcs);
   const buy = useServerFn(buyFromShop);
   const claim = useServerFn(claimNpcReward);
+  const sell = useServerFn(sellToBuyer);
   const accept = useServerFn(acceptMissionFromNpc);
   const turnIn = useServerFn(claimMission);
 
@@ -76,11 +79,27 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
         for (const it of (data as Item[]) ?? []) map[it.id] = it;
         setItems(map);
       }
+      // Também carrega catálogo dos itens que os NPCs compradores aceitam.
+      const buyIds = new Set<string>();
+      for (const n of r.npcs as Npc[]) for (const s of n.buy_items ?? []) buyIds.add(s.item_id);
+      if (buyIds.size) {
+        const { data } = await supabase.from("items").select("id,name,image_url,description,type").in("id", Array.from(buyIds));
+        setItems((m) => {
+          const next = { ...m };
+          for (const it of (data as Item[]) ?? []) next[it.id] = it;
+          return next;
+        });
+      }
       const { data: me } = await supabase.auth.getUser();
       if (me.user) {
         const { data: ch } = await supabase.from("characters").select("id,ryo").eq("user_id", me.user.id).maybeSingle();
         setRyo(Number((ch as any)?.ryo ?? 0));
         setCharId((ch as any)?.id ?? null);
+        if ((ch as any)?.id) {
+          const { data: inv } = await supabase.from("inventory").select("ninja_bag").eq("character_id", (ch as any).id).maybeSingle();
+          const arr = (Array.isArray((inv as any)?.ninja_bag) ? (inv as any).ninja_bag : []) as any[];
+          setBag(arr.map((e) => ({ item_id: e.item_id, qty: Number(e.qty ?? 1) })));
+        }
       }
     } catch {/* ignore */}
   }
@@ -106,6 +125,8 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
   const rewardNpcs = npcs.filter((n) => n.kind === "reward");
   const learningNpcs = npcs.filter((n) => n.kind === "learning");
   const objectNpcs = npcs.filter((n) => n.kind === "object");
+  const dialogueNpcs = npcs.filter((n) => n.kind === "dialogue");
+  const buyerNpcs = npcs.filter((n) => n.kind === "buyer");
   const getQty = (k: string) => Math.max(1, qtys[k] ?? 1);
   const setQty = (k: string, v: number) => setQtys((s) => ({ ...s, [k]: Math.max(1, Math.min(50, v)) }));
 
@@ -158,6 +179,35 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
           ))}
         </div>
       )}
+      {buyerNpcs.length > 0 && (
+        <div className="space-y-1">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1"><HandCoins size={11} /> Compradores</div>
+          {buyerNpcs.map((n) => (
+            <Button key={n.id} size="sm" variant="outline" className="w-full justify-start gap-2" onClick={() => setOpen(n)}>
+              <HandCoins size={12} className="text-gold" />
+              <span className="flex-1 truncate text-left">{n.name}</span>
+              <Badge variant="secondary" className="text-[10px]">Vender itens</Badge>
+            </Button>
+          ))}
+        </div>
+      )}
+      {dialogueNpcs.length > 0 && (
+        <div className="space-y-1">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1"><Handshake size={11} /> Diálogos</div>
+          {dialogueNpcs.map((n) => {
+            const offer = n.offer_status;
+            return (
+              <Button key={n.id} size="sm" variant="outline" className="w-full justify-start gap-2" onClick={() => setOpen(n)}>
+                <Handshake size={12} className="text-gold" />
+                <span className="flex-1 truncate text-left">{n.name}</span>
+                {offer === "available" && <Badge className="text-[10px]">Nova missão</Badge>}
+                {offer === "in_progress" && <Badge variant="secondary" className="text-[10px]">Em andamento</Badge>}
+                {offer === "ready" && <Badge className="text-[10px] bg-emerald-600 hover:bg-emerald-600">Entregar</Badge>}
+              </Button>
+            );
+          })}
+        </div>
+      )}
       {rewardNpcs.length > 0 && (
         <div className="space-y-1">
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1"><Gift size={11} /> Recompensas</div>
@@ -205,8 +255,14 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
                   <div className="flex-1 min-w-0">
                     <div className="truncate">{open.name}</div>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <Badge variant="outline" className="text-[10px]">{open.kind === "shop" ? "Loja" : "Recompensa"}</Badge>
-                      {open.kind === "shop" && (
+                      <Badge variant="outline" className="text-[10px]">{
+                        open.kind === "shop" ? "Loja" :
+                        open.kind === "buyer" ? "Comprador" :
+                        open.kind === "dialogue" ? "Diálogo" :
+                        open.kind === "learning" ? "Aprendizagem" :
+                        "Recompensa"
+                      }</Badge>
+                      {(open.kind === "shop" || open.kind === "buyer") && (
                         <span className="text-xs text-gold flex items-center gap-1"><Coins size={12} /> {ryo} Ryo</span>
                       )}
                     </div>
@@ -281,6 +337,92 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
                       </div>
                     );
                   })}
+                </div>
+              ) : open.kind === "buyer" ? (
+                <div className="grid gap-2 sm:grid-cols-2 max-h-[55vh] overflow-y-auto pr-1">
+                  {open.dialog_intro && (
+                    <div className="sm:col-span-2 text-sm italic text-muted-foreground border-l-2 border-gold pl-3">
+                      {open.dialog_intro}
+                    </div>
+                  )}
+                  {(open.buy_items ?? []).length === 0 && <p className="text-sm text-muted-foreground sm:col-span-2">Este NPC ainda não compra nada.</p>}
+                  {(open.buy_items ?? []).map((s, i) => {
+                    const it = items[s.item_id];
+                    const owned = bag.find((b) => b.item_id === s.item_id)?.qty ?? 0;
+                    const key = `${open.id}:sell:${s.item_id}`;
+                    const qty = Math.min(Math.max(1, qtys[key] ?? 1), Math.max(1, owned));
+                    const total = Number(s.price) * qty;
+                    const cannot = owned <= 0;
+                    return (
+                      <div key={i} className="border border-border rounded-lg p-2 flex flex-col gap-2 bg-secondary/20">
+                        <div className="flex gap-2">
+                          <div className="w-14 h-14 rounded bg-secondary overflow-hidden shrink-0 border border-border">
+                            {it?.image_url && <img src={it.image_url} className="w-full h-full object-cover" alt="" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-display truncate">{it?.name ?? "?"}</div>
+                            {it?.type && <Badge variant="outline" className="text-[9px] mt-0.5">{it.type}</Badge>}
+                            <div className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
+                              <Coins size={10} className="text-gold" /> {s.price} Ryo/un.
+                              <span>•</span>
+                              <span>Você tem {owned}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 mt-auto">
+                          <Button variant="outline" size="icon" className="h-7 w-7" disabled={cannot || qty <= 1}
+                            onClick={() => setQty(key, qty - 1)}><Minus size={12} /></Button>
+                          <div className="w-8 text-center text-sm font-mono">{qty}</div>
+                          <Button variant="outline" size="icon" className="h-7 w-7" disabled={cannot || qty >= owned}
+                            onClick={() => setQty(key, qty + 1)}><Plus size={12} /></Button>
+                          <Button size="sm" className="flex-1" disabled={busy || cannot}
+                            onClick={async () => {
+                              setBusy(true);
+                              try {
+                                const r = await sell({ data: { npc_id: open.id, item_id: s.item_id, qty } });
+                                toast.success(`Vendido ${qty}× por ${r.earned} Ryo.`);
+                                setQty(key, 1);
+                                await load();
+                              } catch (e: any) { toast.error(e.message); }
+                              finally { setBusy(false); }
+                            }}>
+                            {cannot ? "Sem estoque" : `Vender ${total}`}
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : open.kind === "dialogue" ? (
+                <div className="space-y-2">
+                  {open.offer_mission ? (
+                    <MissionOfferBlock
+                      npc={open}
+                      busy={busy}
+                      onAccept={async () => {
+                        setBusy(true);
+                        try { await accept({ data: { npc_id: open.id } }); toast.success("Missão aceita!"); await load(); }
+                        catch (e: any) { toast.error(e.message); }
+                        finally { setBusy(false); }
+                      }}
+                      onTurnIn={async () => {
+                        setBusy(true);
+                        try {
+                          const r: any = await turnIn({ data: { mission_id: open.offer_mission!.id } });
+                          toast.success(`Missão entregue! +${r?.applied?.xp ?? 0} XP · +${r?.applied?.ryo ?? 0} Ryo`);
+                          if (open.dialog_outro) setOutro(open.dialog_outro);
+                          await load();
+                        }
+                        catch (e: any) { toast.error(e.message); }
+                        finally { setBusy(false); }
+                      }}
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Este NPC ainda não tem missão vinculada.</p>
+                  )}
+                  <div className="flex justify-end">
+                    <Button variant="outline" onClick={() => { setOpen(null); load(); }}>Fechar</Button>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-2">
