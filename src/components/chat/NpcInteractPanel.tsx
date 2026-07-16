@@ -338,6 +338,92 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
                     );
                   })}
                 </div>
+              ) : open.kind === "buyer" ? (
+                <div className="grid gap-2 sm:grid-cols-2 max-h-[55vh] overflow-y-auto pr-1">
+                  {open.dialog_intro && (
+                    <div className="sm:col-span-2 text-sm italic text-muted-foreground border-l-2 border-gold pl-3">
+                      {open.dialog_intro}
+                    </div>
+                  )}
+                  {(open.buy_items ?? []).length === 0 && <p className="text-sm text-muted-foreground sm:col-span-2">Este NPC ainda não compra nada.</p>}
+                  {(open.buy_items ?? []).map((s, i) => {
+                    const it = items[s.item_id];
+                    const owned = bag.find((b) => b.item_id === s.item_id)?.qty ?? 0;
+                    const key = `${open.id}:sell:${s.item_id}`;
+                    const qty = Math.min(Math.max(1, qtys[key] ?? 1), Math.max(1, owned));
+                    const total = Number(s.price) * qty;
+                    const cannot = owned <= 0;
+                    return (
+                      <div key={i} className="border border-border rounded-lg p-2 flex flex-col gap-2 bg-secondary/20">
+                        <div className="flex gap-2">
+                          <div className="w-14 h-14 rounded bg-secondary overflow-hidden shrink-0 border border-border">
+                            {it?.image_url && <img src={it.image_url} className="w-full h-full object-cover" alt="" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-display truncate">{it?.name ?? "?"}</div>
+                            {it?.type && <Badge variant="outline" className="text-[9px] mt-0.5">{it.type}</Badge>}
+                            <div className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
+                              <Coins size={10} className="text-gold" /> {s.price} Ryo/un.
+                              <span>•</span>
+                              <span>Você tem {owned}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 mt-auto">
+                          <Button variant="outline" size="icon" className="h-7 w-7" disabled={cannot || qty <= 1}
+                            onClick={() => setQty(key, qty - 1)}><Minus size={12} /></Button>
+                          <div className="w-8 text-center text-sm font-mono">{qty}</div>
+                          <Button variant="outline" size="icon" className="h-7 w-7" disabled={cannot || qty >= owned}
+                            onClick={() => setQty(key, qty + 1)}><Plus size={12} /></Button>
+                          <Button size="sm" className="flex-1" disabled={busy || cannot}
+                            onClick={async () => {
+                              setBusy(true);
+                              try {
+                                const r = await sell({ data: { npc_id: open.id, item_id: s.item_id, qty } });
+                                toast.success(`Vendido ${qty}× por ${r.earned} Ryo.`);
+                                setQty(key, 1);
+                                await load();
+                              } catch (e: any) { toast.error(e.message); }
+                              finally { setBusy(false); }
+                            }}>
+                            {cannot ? "Sem estoque" : `Vender ${total}`}
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : open.kind === "dialogue" ? (
+                <div className="space-y-2">
+                  {open.offer_mission ? (
+                    <MissionOfferBlock
+                      npc={open}
+                      busy={busy}
+                      onAccept={async () => {
+                        setBusy(true);
+                        try { await accept({ data: { npc_id: open.id } }); toast.success("Missão aceita!"); await load(); }
+                        catch (e: any) { toast.error(e.message); }
+                        finally { setBusy(false); }
+                      }}
+                      onTurnIn={async () => {
+                        setBusy(true);
+                        try {
+                          const r: any = await turnIn({ data: { mission_id: open.offer_mission!.id } });
+                          toast.success(`Missão entregue! +${r?.applied?.xp ?? 0} XP · +${r?.applied?.ryo ?? 0} Ryo`);
+                          if (open.dialog_outro) setOutro(open.dialog_outro);
+                          await load();
+                        }
+                        catch (e: any) { toast.error(e.message); }
+                        finally { setBusy(false); }
+                      }}
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Este NPC ainda não tem missão vinculada.</p>
+                  )}
+                  <div className="flex justify-end">
+                    <Button variant="outline" onClick={() => { setOpen(null); load(); }}>Fechar</Button>
+                  </div>
+                </div>
               ) : (
                 <div className="space-y-2">
                   {open.offer_mission && (
