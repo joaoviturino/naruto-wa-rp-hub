@@ -254,22 +254,36 @@ export const acceptMissionFn = createServerFn({ method: "POST" })
     const { data: inv } = await context.supabase.from("inventory").select("ninja_bag").eq("character_id", char.id).maybeSingle();
     const bag = (Array.isArray(inv?.ninja_bag) ? inv!.ninja_bag : []) as any[];
     const { data: existing } = await supabaseAdmin.from("character_missions").select("*").eq("character_id", char.id).eq("mission_id", m.id).maybeSingle();
+    const prevProgress = (existing?.progress ?? {}) as any;
+    const alreadyAccepted = isAccepted(prevProgress);
+    const isRestart = existing?.status === "claimed"; // repeatable reaceite após claim
+
+    // Idempotência: só (re)captura baseline quando é o primeiro aceite ou um restart de missão repetível.
+    // Se já foi aceita e ainda está ativa, mantém baseline/timestamp originais — nada de "renascer completa".
+    if (existing && alreadyAccepted && !isRestart) {
+      return { ok: true, already: true };
+    }
+
     const baseline = snapshotMissionBaseline(m, char, bag, level);
-    const nextProgress = {
-      ...((existing?.progress ?? {}) as any),
-      __baseline: baseline,
-      __accepted: true,
-      __accepted_at: new Date().toISOString(),
-    };
+    const nowIso = new Date().toISOString();
+    const nextProgress: any = isRestart
+      ? { __baseline: baseline, __accepted: true, __accepted_at: nowIso } // restart limpa contadores
+      : { ...prevProgress, __baseline: baseline, __accepted: true, __accepted_at: nowIso };
+
     if (existing) {
       await supabaseAdmin.from("character_missions")
-        .update({ progress: nextProgress, status: existing.status === "claimed" ? "active" : existing.status, claimed_at: existing.status === "claimed" ? null : existing.claimed_at })
+        .update({
+          progress: nextProgress,
+          status: isRestart ? "active" : existing.status,
+          claimed_at: isRestart ? null : existing.claimed_at,
+          started_at: isRestart ? nowIso : (existing as any).started_at ?? nowIso,
+        })
         .eq("character_id", char.id).eq("mission_id", m.id);
-    } else {
-      await supabaseAdmin.from("character_missions").insert({
-        character_id: char.id, mission_id: m.id, status: "active", progress: nextProgress,
-      });
+      return { ok: true, restarted: isRestart };
     }
+    await supabaseAdmin.from("character_missions").insert({
+      character_id: char.id, mission_id: m.id, status: "active", progress: nextProgress,
+    });
     return { ok: true };
   });
 
