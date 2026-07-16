@@ -499,3 +499,91 @@ export const setNpcLearningSteps = createServerFn({ method: "POST" })
     }
     return { ok: true };
   });
+
+/** Mineração: registra a quebra de um nó e sorteia drops no servidor. */
+export const mineNode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ run_id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: run } = await supabaseAdmin
+      .from("minigame_runs")
+      .select("id,character_id,context,completed_at,characters(user_id),minigames(kind,config)")
+      .eq("id", data.run_id).maybeSingle();
+    if (!run) throw new Error("Sessão de mineração inválida.");
+    if ((run as any).characters.user_id !== context.userId) throw new Error("Forbidden");
+    if (run.completed_at) throw new Error("Sessão já encerrada.");
+    const game: any = (run as any).minigames;
+    if (game?.kind !== "mining") throw new Error("Não é uma sessão de mineração.");
+    const cfg = (game.config ?? {}) as any;
+    const minMs = Math.max(300, Number(cfg.min_break_interval_ms) || 800);
+    const ctxRun = (run.context ?? {}) as any;
+    const lastAt = ctxRun.last_break_at ? new Date(ctxRun.last_break_at).getTime() : 0;
+    if (lastAt && Date.now() - lastAt < minMs) throw new Error("Aguarde antes da próxima quebra.");
+
+    // Requer itens (ex.: picareta) continuamente presentes
+    const required: Array<{ item_id: string; qty: number }> = Array.isArray(cfg.required_items) ? cfg.required_items : [];
+    const { data: inv } = await supabaseAdmin
+      .from("inventory").select("ninja_bag").eq("character_id", run.character_id).maybeSingle();
+    const bag: Array<{ item_id: string; qty: number }> = ((inv?.ninja_bag as any[]) ?? [])
+      .filter((e: any) => e && e.item_id)
+      .map((e: any) => ({ item_id: e.item_id, qty: typeof e.qty === "number" && e.qty > 0 ? e.qty : 1 }));
+    if (required.length) {
+      for (const r of required) {
+        const have = bag.filter((b) => b.item_id === r.item_id).reduce((s, b) => s + b.qty, 0);
+        if (have < r.qty) throw new Error("Ferramenta necessária foi perdida.");
+      }
+    }
+
+    // Rola drops
+    const drops: Array<{ item_id: string; chance: number; min_qty: number; max_qty: number }> = Array.isArray(cfg.drops) ? cfg.drops : [];
+    const rolled: Array<{ item_id: string; qty: number }> = [];
+    for (const d of drops) {
+      const chance = Math.max(0, Math.min(100, Number(d.chance) || 0));
+      if (Math.random() * 100 < chance) {
+        const min = Math.max(1, Number(d.min_qty) || 1);
+        const max = Math.max(min, Number(d.max_qty) || min);
+        const qty = min + Math.floor(Math.random() * (max - min + 1));
+        rolled.push({ item_id: d.item_id, qty });
+      }
+    }
+
+    // Credita drops
+    if (rolled.length) {
+      for (const it of rolled) {
+        const idx = bag.findIndex((b) => b.item_id === it.item_id);
+        if (idx === -1) bag.push({ item_id: it.item_id, qty: it.qty });
+        else bag[idx].qty += it.qty;
+      }
+      await supabaseAdmin.from("inventory").update({ ninja_bag: bag }).eq("character_id", run.character_id);
+    }
+
+    // XP por quebra
+    const xpPerBreak = Math.max(0, Number(cfg.xp_per_break) || 0);
+    if (xpPerBreak) {
+      const { data: c } = await supabaseAdmin.from("characters").select("xp").eq("id", run.character_id).maybeSingle();
+      await supabaseAdmin.from("characters").update({ xp: (c?.xp ?? 0) + xpPerBreak }).eq("id", run.character_id);
+    }
+
+    // Atualiza contexto da sessão
+    const breaks = (Number(ctxRun.breaks) || 0) + 1;
+    const nextCtx = { ...ctxRun, breaks, last_break_at: new Date().toISOString() };
+    await supabaseAdmin.from("minigame_runs").update({ context: nextCtx, score: breaks }).eq("id", run.id);
+
+    // Enriquece drops com nomes/imagens
+    const ids = Array.from(new Set(rolled.map((r) => r.item_id)));
+    const { data: itemRows } = ids.length
+      ? await supabaseAdmin.from("items").select("id,name,image_url").in("id", ids)
+      : { data: [] as any[] };
+    const byId = new Map((itemRows ?? []).map((i: any) => [i.id, i]));
+    return {
+      drops: rolled.map((r) => ({
+        item_id: r.item_id, qty: r.qty,
+        name: byId.get(r.item_id)?.name ?? "?",
+        image_url: byId.get(r.item_id)?.image_url ?? null,
+      })),
+      xp: xpPerBreak,
+      breaks,
+      next_at: Date.now() + minMs,
+    };
+  });
