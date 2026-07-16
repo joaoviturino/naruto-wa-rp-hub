@@ -588,14 +588,11 @@ export const playerAttack = createServerFn({ method: "POST" })
     const powerMul = 1 + powerBonus / 100;
     const rawDamage = Math.round(effective * Number(skill.bonus_critical) * masteryMul * powerMul * toolCritMul);
 
-    // Mitigação e cap por golpe vindos do NPC alvo
+    // Mitigação vinda do NPC alvo (defesa reduz dano recebido)
     const { data: npcCfg } = await supabaseAdmin
-      .from("npcs").select("defense,max_hit_percent").eq("id", state.npc.id).maybeSingle();
+      .from("npcs").select("defense").eq("id", state.npc.id).maybeSingle();
     const defense = Math.max(0, Math.min(90, Number((npcCfg as any)?.defense ?? 0)));
-    const maxHitPct = Math.max(10, Math.min(100, Number((npcCfg as any)?.max_hit_percent ?? 50)));
-    const afterDef = Math.max(1, Math.round(rawDamage * (1 - defense / 100)));
-    const hitCap = Math.max(1, Math.ceil((state.npc.hp_max ?? 0) * maxHitPct / 100));
-    const damage = Math.min(afterDef, hitCap);
+    const damage = Math.max(1, Math.round(rawDamage * (1 - defense / 100)));
 
     // Aplica cooldown
     if (Number(skill.cooldown_turns ?? 0) > 0) {
