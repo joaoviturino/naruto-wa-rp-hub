@@ -17,6 +17,7 @@ import { MinigameDialog } from "@/components/minigame/MinigameDialog";
 import { NpcInteractPanel } from "@/components/chat/NpcInteractPanel";
 import { DuelInvitesInline } from "@/components/chat/DuelInvitesInline";
 import { ChatHud } from "@/components/chat/ChatHud";
+import { MissionTracker } from "@/components/chat/MissionTracker";
 
 export const Route = createFileRoute("/_authenticated/chat")({ component: ChatPage });
 
@@ -387,6 +388,7 @@ function ChatPage() {
   return (
     <div className="mx-auto max-w-6xl md:grid md:gap-4 md:grid-cols-[280px_1fr] md:p-4">
       {character && <ChatHud characterId={character.id} />}
+      {character && <MissionTracker characterId={character.id} />}
       {/* HUD mobile (barra superior) */}
       {character && (
         <div className="md:hidden">
