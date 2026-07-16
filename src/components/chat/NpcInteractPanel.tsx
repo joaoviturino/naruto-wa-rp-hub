@@ -249,8 +249,14 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
                   <div className="flex-1 min-w-0">
                     <div className="truncate">{open.name}</div>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <Badge variant="outline" className="text-[10px]">{open.kind === "shop" ? "Loja" : "Recompensa"}</Badge>
-                      {open.kind === "shop" && (
+                      <Badge variant="outline" className="text-[10px]">{
+                        open.kind === "shop" ? "Loja" :
+                        open.kind === "buyer" ? "Comprador" :
+                        open.kind === "dialogue" ? "Diálogo" :
+                        open.kind === "learning" ? "Aprendizagem" :
+                        "Recompensa"
+                      }</Badge>
+                      {(open.kind === "shop" || open.kind === "buyer") && (
                         <span className="text-xs text-gold flex items-center gap-1"><Coins size={12} /> {ryo} Ryo</span>
                       )}
                     </div>
