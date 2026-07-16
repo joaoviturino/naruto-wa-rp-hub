@@ -59,6 +59,7 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
   const list = useServerFn(listLocationInteractNpcs);
   const buy = useServerFn(buyFromShop);
   const claim = useServerFn(claimNpcReward);
+  const sell = useServerFn(sellToBuyer);
   const accept = useServerFn(acceptMissionFromNpc);
   const turnIn = useServerFn(claimMission);
 
@@ -76,6 +77,17 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
         const map: Record<string, Item> = {};
         for (const it of (data as Item[]) ?? []) map[it.id] = it;
         setItems(map);
+      }
+      // Também carrega catálogo dos itens que os NPCs compradores aceitam.
+      const buyIds = new Set<string>();
+      for (const n of r.npcs as Npc[]) for (const s of n.buy_items ?? []) buyIds.add(s.item_id);
+      if (buyIds.size) {
+        const { data } = await supabase.from("items").select("id,name,image_url,description,type").in("id", Array.from(buyIds));
+        setItems((m) => {
+          const next = { ...m };
+          for (const it of (data as Item[]) ?? []) next[it.id] = it;
+          return next;
+        });
       }
       const { data: me } = await supabase.auth.getUser();
       if (me.user) {
