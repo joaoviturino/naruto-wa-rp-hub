@@ -24,7 +24,6 @@ const npcPayload = z.object({
   crit_chance: z.number().int().min(0).max(100).optional(),
   crit_multiplier: z.number().min(1).max(10).optional(),
   defense: z.number().int().min(0).max(90).optional(),
-  max_hit_percent: z.number().int().min(10).max(100).optional(),
   drop_table: z.array(z.object({
     item_id: z.string().uuid(),
     qty: z.number().int().min(1).max(99).default(1),
