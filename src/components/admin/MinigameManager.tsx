@@ -134,6 +134,8 @@ export function MinigameManager() {
                       ? { duration_seconds: 60, max_mistakes: 2, tiles: [] }
                       : (kind === "forge" || kind === "tailoring")
                       ? { duration_seconds: 90, difficulty: 2, hammer_hits: 8, heat_target: 70, temper_target: 40, recipe_item_id: "", source: "inventory" }
+                      : kind === "mining"
+                      ? { node_hp: 4, swing_cooldown_ms: 500, min_break_interval_ms: 800, xp_per_break: 1, required_items: [], drops: [] }
                       : { duration_seconds: 60, spots: 12, target_score: 8 };
                     setSelected({ ...selected, kind, config });
                   }}>
@@ -141,6 +143,7 @@ export function MinigameManager() {
                   <option value="sequence">Sequência (acerto)</option>
                   <option value="forge">Forja (fabricação)</option>
                   <option value="tailoring">Confecção (costura)</option>
+                  <option value="mining">Mineração (idle)</option>
                 </select>
               </div>
               <div><Label>Nome</Label><Input value={selected.name} onChange={(e) => setSelected({ ...selected, name: e.target.value })} /></div>
@@ -230,6 +233,8 @@ export function MinigameManager() {
             <SequenceConfigEditor selected={selected} setSelected={setSelected} />
           ) : (selected.kind === "forge" || selected.kind === "tailoring") ? (
             <ForgeConfigEditor selected={selected} setSelected={setSelected} items={items} kind={selected.kind} />
+          ) : selected.kind === "mining" ? (
+            <MiningConfigEditor selected={selected} setSelected={setSelected} items={items} />
           ) : (
             <div className="scroll-panel rounded-lg p-4 space-y-3">
               <h4 className="font-display text-lg text-gold">Configuração da limpeza</h4>
@@ -311,7 +316,9 @@ export function MinigameManager() {
 
           <div className="flex gap-2">
             <Button onClick={save}><Save size={14} className="mr-1" /> Salvar</Button>
-            <Button variant="secondary" onClick={() => { setTestResult(null); setTesting(true); }}>▶ Testar</Button>
+            {selected.kind !== "mining" && (
+              <Button variant="secondary" onClick={() => { setTestResult(null); setTesting(true); }}>▶ Testar</Button>
+            )}
             {selected.id && <Button variant="destructive" onClick={() => del(selected.id)}><Trash2 size={14} className="mr-1" /> Apagar</Button>}
             <Button variant="outline" onClick={() => setSelected(null)}>Fechar</Button>
           </div>
