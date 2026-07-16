@@ -196,72 +196,131 @@ export function NpcManager() {
 
   const sel = npcs.find((n) => n.id === selected);
   const selSkills = selected ? assigned[selected] ?? new Set<string>() : new Set<string>();
+  const filtered = npcs.filter((n) => {
+    if (kindFilter !== "all" && n.kind !== kindFilter) return false;
+    if (query && !n.name.toLowerCase().includes(query.toLowerCase())) return false;
+    return true;
+  });
+  const kindCounts = npcs.reduce<Record<string, number>>((acc, n) => { acc[n.kind] = (acc[n.kind] ?? 0) + 1; return acc; }, {});
 
   return (
     <div className="space-y-4">
-      <NpcGroupManager npcs={npcs.map((n) => ({ id: n.id, name: n.name, kind: n.kind }))} />
+      <Collapsible open={groupsOpen} onOpenChange={setGroupsOpen} className="scroll-panel rounded-lg">
+        <CollapsibleTrigger className="w-full flex items-center gap-2 p-3 hover:bg-secondary/40 rounded-lg">
+          <Users size={16} className="text-gold" />
+          <span className="font-display text-sm">Grupos de NPCs</span>
+          <Badge variant="outline" className="text-[10px]">gerenciar</Badge>
+          <ChevronDown size={16} className={`ml-auto transition-transform ${groupsOpen ? "rotate-180" : ""}`} />
+        </CollapsibleTrigger>
+        <CollapsibleContent className="p-3 pt-0">
+          <NpcGroupManager npcs={npcs.map((n) => ({ id: n.id, name: n.name, kind: n.kind }))} />
+        </CollapsibleContent>
+      </Collapsible>
+
       <div className="grid gap-4 md:grid-cols-[320px_1fr]">
         <div className="space-y-3">
-        <div className="scroll-panel rounded-lg p-4 space-y-2">
-          <h3 className="font-display text-lg text-gold">Novo NPC</h3>
-          <Input placeholder="Nome" value={name} onChange={(e) => setName(e.target.value)} />
-          <Button onClick={create} className="w-full"><Plus size={14} className="mr-1" /> Criar</Button>
-        </div>
-        <div className="scroll-panel rounded-lg p-2 max-h-[500px] overflow-y-auto">
-          {npcs.map((n) => (
-            <div key={n.id} className={`flex items-center gap-2 p-2 rounded cursor-pointer ${selected===n.id?"bg-secondary":"hover:bg-secondary/50"}`}
-              onClick={() => setSelected(n.id)}>
-              <div className="w-8 h-8 rounded bg-input overflow-hidden shrink-0">
-                {n.image_url && <img src={n.image_url} alt="" className="w-full h-full object-cover" />}
-              </div>
-              <div className="flex-1 text-sm truncate">{n.name}</div>
-              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); remove(n.id); }}><Trash2 size={14} /></Button>
+          <div className="scroll-panel rounded-lg p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <Input placeholder="Nome do novo NPC" value={name} onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") create(); }} />
+              <Button onClick={create} size="icon" title="Criar"><Plus size={16} /></Button>
             </div>
-          ))}
-          {npcs.length === 0 && <div className="text-xs text-muted-foreground p-3">Nenhum NPC ainda.</div>}
-        </div>
+          </div>
+          <div className="scroll-panel rounded-lg p-3 space-y-2">
+            <div className="relative">
+              <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar…" className="pl-7 h-8 text-sm" />
+            </div>
+            <div className="flex flex-wrap gap-1">
+              <button type="button" onClick={() => setKindFilter("all")}
+                className={`text-[10px] px-2 py-0.5 rounded border ${kindFilter === "all" ? "bg-gold text-background border-gold" : "border-border text-muted-foreground hover:bg-secondary"}`}>
+                Todos <span className="opacity-60">({npcs.length})</span>
+              </button>
+              {(Object.keys(KIND_META) as NpcKind[]).map((k) => {
+                const meta = KIND_META[k];
+                const active = kindFilter === k;
+                const count = kindCounts[k] ?? 0;
+                if (!count && !active) return null;
+                return (
+                  <button key={k} type="button" onClick={() => setKindFilter(active ? "all" : k)}
+                    className={`text-[10px] px-2 py-0.5 rounded border inline-flex items-center gap-1 ${active ? "bg-gold text-background border-gold" : `${meta.color}`}`}>
+                    <meta.icon size={10} /> {meta.label} <span className="opacity-60">({count})</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="scroll-panel rounded-lg p-2 max-h-[520px] overflow-y-auto">
+            {filtered.map((n) => {
+              const meta = KIND_META[n.kind] ?? KIND_META.aggressive;
+              const Icon = meta.icon;
+              return (
+                <div key={n.id} className={`group flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${selected===n.id?"bg-secondary ring-1 ring-gold/40":"hover:bg-secondary/50"}`}
+                  onClick={() => setSelected(n.id)}>
+                  <div className="w-9 h-9 rounded bg-input overflow-hidden shrink-0 border border-border">
+                    {n.image_url ? <img src={n.image_url} alt="" className="w-full h-full object-cover" /> : <Icon size={16} className="w-full h-full p-2 text-muted-foreground" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm truncate">{n.name}</div>
+                    <div className={`text-[9px] px-1 py-px rounded border inline-flex items-center gap-0.5 ${meta.color}`}>
+                      <Icon size={8} /> {meta.label}
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 h-7 w-7" onClick={(e) => { e.stopPropagation(); remove(n.id); }}><Trash2 size={12} /></Button>
+                </div>
+              );
+            })}
+            {filtered.length === 0 && <div className="text-xs text-muted-foreground p-3 text-center">{npcs.length === 0 ? "Nenhum NPC ainda." : "Nada com esse filtro."}</div>}
+          </div>
       </div>
 
       {sel ? (
         <div className="space-y-4">
-          <div className="scroll-panel rounded-lg p-4 space-y-3">
-            <div className="flex flex-wrap gap-2">
-              {(["aggressive","dialogue","shop","buyer","reward","learning","object"] as NpcKind[]).map((k) => (
-                <Button key={k} size="sm" variant={sel.kind === k ? "default" : "outline"}
-                  onClick={async () => { await save({ data: { ...sel, kind: k } } as any); load(); }}>
-                  {k === "aggressive" ? "Agressivo" : k === "shop" ? "Loja" : k === "buyer" ? "Comprador" : k === "reward" ? "Recompensa" : k === "learning" ? "Aprendizagem" : k === "dialogue" ? "Diálogo" : "Objeto"}
-                </Button>
-              ))}
+          {/* Sticky header: identidade rápida + tipo */}
+          <div className="scroll-panel rounded-lg p-3 sticky top-2 z-10 backdrop-blur bg-background/80 border-border">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded bg-secondary overflow-hidden shrink-0 border border-border">
+                {sel.image_url && <img src={sel.image_url} className="w-full h-full object-cover" alt="" />}
+              </div>
+              <Input value={sel.name} className="flex-1 font-display text-lg h-10"
+                onChange={async (e) => { await save({ data: { ...sel, name: e.target.value } } as any); load(); }} />
+              <div className="w-44">
+                <ComboSelect
+                  value={sel.kind}
+                  onChange={async (v) => { await save({ data: { ...sel, kind: v as NpcKind } } as any); load(); }}
+                  triggerClassName="h-10 text-sm"
+                  options={(Object.keys(KIND_META) as NpcKind[]).map((k) => ({ value: k, label: KIND_META[k].label }))}
+                />
+              </div>
             </div>
+          </div>
+
+          <Tabs defaultValue="identidade" className="space-y-4">
+            <TabsList className="w-full flex-wrap h-auto justify-start">
+              <TabsTrigger value="identidade">Identidade</TabsTrigger>
+              {sel.kind === "aggressive" && <TabsTrigger value="combate">Combate</TabsTrigger>}
+              {sel.kind === "aggressive" && <TabsTrigger value="drops">Drops & Skills</TabsTrigger>}
+              {sel.kind !== "aggressive" && sel.kind !== "object" && <TabsTrigger value="dialogo">Diálogo & Missão</TabsTrigger>}
+              {sel.kind === "shop" && <TabsTrigger value="loja">Loja</TabsTrigger>}
+              {sel.kind === "buyer" && <TabsTrigger value="compra">Compra</TabsTrigger>}
+              {sel.kind === "reward" && <TabsTrigger value="recompensa">Recompensa</TabsTrigger>}
+              {sel.kind === "learning" && <TabsTrigger value="aprendizagem">Aprendizagem</TabsTrigger>}
+              {sel.kind === "object" && <TabsTrigger value="objeto">Objeto</TabsTrigger>}
+            </TabsList>
+
+            <TabsContent value="identidade" className="space-y-4 mt-0">
+          <div className="scroll-panel rounded-lg p-4 space-y-3">
             <div className="flex items-start gap-4">
               <div className="w-40 h-40 rounded bg-secondary overflow-hidden shrink-0">
                 {sel.image_url && <img src={sel.image_url} className="w-full h-full object-cover" alt="" />}
               </div>
               <div className="flex-1 space-y-2">
-                <Input value={sel.name} onChange={async (e) => { await save({ data: { ...sel, name: e.target.value } } as any); load(); }} />
                 <Textarea defaultValue={sel.description ?? ""} rows={2} placeholder="Descrição"
                   onBlur={async (e) => { await save({ data: { ...sel, description: e.target.value } } as any); load(); }} />
                 <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
                   <Upload size={14} className="mr-1" /> PNG do NPC (aparece no combate)
                 </Button>
                 <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={uploadImage} />
-                {sel.kind === "aggressive" && (
-                <div className="pt-2 border-t border-border/40">
-                  <div className="text-xs text-muted-foreground mb-1">Cenário de fundo (combate)</div>
-                  {sel.battle_bg_url && (
-                    <img src={sel.battle_bg_url} alt="" className="w-full max-w-[240px] rounded border border-border mb-2 object-cover" />
-                  )}
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => bgRef.current?.click()}>
-                      <Upload size={14} className="mr-1" /> Enviar fundo
-                    </Button>
-                    {sel.battle_bg_url && (
-                      <Button variant="ghost" size="sm" onClick={async () => { await save({ data: { ...sel, battle_bg_url: null } } as any); load(); }}>Remover</Button>
-                    )}
-                  </div>
-                  <input ref={bgRef} type="file" accept="image/*" className="hidden" onChange={uploadBattleBg} />
-                </div>
-                )}
                 <div className="pt-2 border-t border-border/40">
                   <div className="text-xs text-muted-foreground mb-1">Música de fundo (toca ao interagir)</div>
                   <Input
@@ -288,8 +347,12 @@ export function NpcManager() {
                 </div>
               </div>
             </div>
+          </div>
+            </TabsContent>
+
             {sel.kind === "aggressive" && (
-            <>
+            <TabsContent value="combate" className="space-y-4 mt-0">
+              <div className="scroll-panel rounded-lg p-4 space-y-3">
             <div className="grid grid-cols-3 gap-3">
               <NumField label="HP máximo" value={sel.hp_max} onSave={(v) => save({ data: { ...sel, hp_max: v } } as any).then(load)} />
               <NumField label="XP (define stats)" value={sel.xp} onSave={(v) => save({ data: { ...sel, xp: v } } as any).then(load)} />
@@ -316,13 +379,29 @@ export function NpcManager() {
             <p className="text-xs text-muted-foreground">
               XP {sel.xp} → EF {Math.floor(sel.xp/2)}, EM {sel.xp - Math.floor(sel.xp/2)}, Chakra {sel.xp}.
             </p>
-            </>
+                <div className="pt-3 border-t border-border/40">
+                  <div className="text-xs text-muted-foreground mb-1">Cenário de fundo (combate)</div>
+                  {sel.battle_bg_url && (
+                    <img src={sel.battle_bg_url} alt="" className="w-full max-w-[240px] rounded border border-border mb-2 object-cover" />
+                  )}
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => bgRef.current?.click()}>
+                      <Upload size={14} className="mr-1" /> Enviar fundo
+                    </Button>
+                    {sel.battle_bg_url && (
+                      <Button variant="ghost" size="sm" onClick={async () => { await save({ data: { ...sel, battle_bg_url: null } } as any); load(); }}>Remover</Button>
+                    )}
+                  </div>
+                  <input ref={bgRef} type="file" accept="image/*" className="hidden" onChange={uploadBattleBg} />
+                </div>
+              </div>
+            </TabsContent>
             )}
-          </div>
 
+            {sel.kind !== "aggressive" && sel.kind !== "object" && (
+            <TabsContent value="dialogo" className="space-y-4 mt-0">
           <div className="scroll-panel rounded-lg p-4 space-y-3">
             <h4 className="font-display text-lg text-gold">Diálogos</h4>
-            {sel.kind !== "aggressive" ? (
               <div className="grid gap-2">
                 <Label>Diálogo de introdução</Label>
                 <Textarea rows={2} defaultValue={sel.dialog_intro ?? ""}
@@ -349,12 +428,12 @@ export function NpcManager() {
                   </p>
                 </div>
               </div>
-            ) : (
-              <p className="text-xs text-muted-foreground">Disponível para NPCs de Loja e Recompensa.</p>
-            )}
           </div>
+            </TabsContent>
+            )}
 
           {sel.kind === "shop" && (
+            <TabsContent value="loja" className="space-y-4 mt-0">
             <div className="scroll-panel rounded-lg p-4 space-y-2">
               <h4 className="font-display text-lg text-gold">Itens da loja</h4>
               {(sel.shop_items ?? []).map((s, i) => (
@@ -396,9 +475,11 @@ export function NpcManager() {
               }}><Plus size={14} className="mr-1" /> Adicionar item</Button>
               <p className="text-xs text-muted-foreground">Use estoque -1 para vender ilimitado.</p>
             </div>
+            </TabsContent>
           )}
 
           {sel.kind === "buyer" && (
+            <TabsContent value="compra" className="space-y-4 mt-0">
             <div className="scroll-panel rounded-lg p-4 space-y-2">
               <h4 className="font-display text-lg text-gold">Itens que este NPC compra</h4>
               <p className="text-xs text-muted-foreground">Configure quais itens o comprador aceita e o preço pago por unidade.</p>
@@ -433,9 +514,11 @@ export function NpcManager() {
                 await save({ data: { ...sel, buy_items: next } } as any); load();
               }}><Plus size={14} className="mr-1" /> Adicionar item</Button>
             </div>
+            </TabsContent>
           )}
 
           {sel.kind === "reward" && (
+            <TabsContent value="recompensa" className="space-y-4 mt-0">
             <div className="scroll-panel rounded-lg p-4 space-y-2">
               <h4 className="font-display text-lg text-gold">Recompensas</h4>
               <div className="grid grid-cols-3 gap-3">
@@ -489,9 +572,11 @@ export function NpcManager() {
                 <p className="text-[10px] text-muted-foreground mt-1">Só poderá receber a recompensa quem já concluiu esta missão.</p>
               </div>
             </div>
+            </TabsContent>
           )}
 
           {sel.kind === "learning" && (
+            <TabsContent value="aprendizagem" className="space-y-4 mt-0">
             <div className="scroll-panel rounded-lg p-4 space-y-3">
               <h4 className="font-display text-lg text-gold">Aprendizagem</h4>
               <div className="grid gap-3 md:grid-cols-2">
@@ -519,9 +604,11 @@ export function NpcManager() {
                 }}
               />
             </div>
+            </TabsContent>
           )}
 
           {sel.kind === "object" && (
+            <TabsContent value="objeto" className="space-y-4 mt-0">
             <div className="scroll-panel rounded-lg p-4 space-y-3">
               <h4 className="font-display text-lg text-gold">Objeto interativo</h4>
               <p className="text-xs text-muted-foreground">
@@ -543,9 +630,11 @@ export function NpcManager() {
                 />
               </div>
             </div>
+            </TabsContent>
           )}
 
           {sel.kind === "aggressive" && (
+          <TabsContent value="drops" className="space-y-4 mt-0">
           <div className="scroll-panel rounded-lg p-4 space-y-2">
             <h4 className="font-display text-lg text-gold">Tabela de drop</h4>
             {/* drop table below */}
@@ -590,9 +679,6 @@ export function NpcManager() {
               await save({ data: { ...sel, drop_table: next } } as any); load();
             }}><Plus size={14} className="mr-1" /> Adicionar drop</Button>
           </div>
-          )}
-
-          {sel.kind === "aggressive" && (
           <div className="scroll-panel rounded-lg p-4 space-y-2">
             <h4 className="font-display text-lg text-gold">Habilidades ({selSkills.size})</h4>
             <div className="grid gap-1 max-h-[300px] overflow-y-auto pr-2">
@@ -612,10 +698,14 @@ export function NpcManager() {
               {skills.length === 0 && <p className="text-xs text-muted-foreground">Nenhuma habilidade cadastrada.</p>}
             </div>
           </div>
+          </TabsContent>
           )}
+          </Tabs>
         </div>
       ) : (
-        <div className="text-muted-foreground text-sm p-6">Selecione um NPC à esquerda para editar HP, XP, imagem e habilidades.</div>
+        <div className="text-muted-foreground text-sm p-8 text-center border border-dashed border-border rounded-lg">
+          Selecione um NPC à esquerda para editar, ou crie um novo acima.
+        </div>
       )}
       </div>
     </div>
