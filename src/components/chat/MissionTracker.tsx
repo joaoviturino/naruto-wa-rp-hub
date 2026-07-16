@@ -45,10 +45,9 @@ export function MissionTracker({ characterId }: { characterId: string }) {
   const [hidden, setHidden] = useState(false);
   const [lastMissionId, setLastMissionId] = useState<string | null>(null);
   const hydratedRef = useRef(false);
-  const [busy, setBusy] = useState<Record<string, "accept" | "claim" | null>>({});
+  const [busy, setBusy] = useState<Record<string, "claim" | null>>({});
   const list = useServerFn(listMyMissions);
   const claim = useServerFn(claimMission);
-  const accept = useServerFn(acceptMissionFn);
 
   // Hidrata do localStorage por personagem — só no cliente.
   useEffect(() => {
@@ -85,20 +84,19 @@ export function MissionTracker({ characterId }: { characterId: string }) {
     return () => { supabase.removeChannel(ch); };
   }, [characterId, load]);
 
-  // Estados exibidos: Não aceito (available), Em progresso, Pronto para reivindicar, Reivindicado.
-  // Ignoramos apenas as travadas por requisito e as em cooldown puro (sem interesse imediato).
+  // Exibe apenas missões já aceitas pelo jogador: em progresso, prontas ou reivindicadas.
+  // Aceitar missões só acontece no local (NPC), nunca por este popup.
   const visible = rows.filter((m) => {
-    if (m.status === "locked" || m.status === "cooldown") return false;
-    // "available" = existe/ativa no catálogo mas ainda não foi aceita pelo jogador.
+    if (m.status === "locked" || m.status === "cooldown" || !m.accepted) return false;
     return true;
   });
-  const readyCount = visible.filter((m) => m.status === "completed" && m.accepted).length;
+  const readyCount = visible.filter((m) => m.status === "completed").length;
 
   // Atualiza "última missão focada" — prioriza a que está pronta; senão, a mais recente em progresso.
   useEffect(() => {
     if (!hydratedRef.current || !visible.length) return;
-    const ready = visible.find((m) => m.status === "completed" && m.accepted);
-    const inProg = visible.find((m) => m.accepted && m.status === "active");
+    const ready = visible.find((m) => m.status === "completed");
+    const inProg = visible.find((m) => m.status === "active");
     const pick = ready ?? inProg ?? visible[0];
     if (pick && pick.id !== lastMissionId) setLastMissionId(pick.id);
   }, [visible, lastMissionId]);
