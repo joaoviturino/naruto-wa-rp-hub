@@ -14,8 +14,9 @@ import { ComboSelect } from "@/components/ui/combo-select";
 
 type DropRow = { item_id: string; qty: number; chance: number };
 type ShopRow = { item_id: string; price: number; stock: number };
+type BuyRow = { item_id: string; price: number; max_per_day: number };
 type RewardRow = { item_id: string; qty: number };
-type NpcKind = "aggressive" | "shop" | "reward" | "learning" | "object";
+type NpcKind = "aggressive" | "shop" | "reward" | "learning" | "object" | "dialogue" | "buyer";
 type LearnBlock = { id: string; kind: "text" | "image"; text?: string | null; image_url?: string | null };
 type Npc = {
   id: string; name: string; image_url: string | null; description: string | null;
@@ -27,6 +28,7 @@ type Npc = {
   defense?: number;
   kind: NpcKind; dialog_intro: string | null; dialog_outro: string | null;
   shop_items: ShopRow[]; reward_items: RewardRow[]; reward_cooldown_hours: number;
+  buy_items: BuyRow[];
   required_mission_id: string | null;
   offer_mission_id: string | null;
   tutorial_blocks?: LearnBlock[];
@@ -85,6 +87,7 @@ export function NpcManager() {
       music_url: r.music_url ?? null,
       drop_table: Array.isArray(r.drop_table) ? r.drop_table : [],
       shop_items: Array.isArray(r.shop_items) ? r.shop_items : [],
+      buy_items: Array.isArray(r.buy_items) ? r.buy_items : [],
       reward_items: Array.isArray(r.reward_items) ? r.reward_items : [],
       reward_cooldown_hours: Number(r.reward_cooldown_hours ?? 24),
       required_mission_id: r.required_mission_id ?? null,
@@ -207,10 +210,10 @@ export function NpcManager() {
         <div className="space-y-4">
           <div className="scroll-panel rounded-lg p-4 space-y-3">
             <div className="flex flex-wrap gap-2">
-              {(["aggressive","shop","reward","learning","object"] as NpcKind[]).map((k) => (
+              {(["aggressive","dialogue","shop","buyer","reward","learning","object"] as NpcKind[]).map((k) => (
                 <Button key={k} size="sm" variant={sel.kind === k ? "default" : "outline"}
                   onClick={async () => { await save({ data: { ...sel, kind: k } } as any); load(); }}>
-                  {k === "aggressive" ? "Agressivo" : k === "shop" ? "Loja" : k === "reward" ? "Recompensa" : k === "learning" ? "Aprendizagem" : "Objeto"}
+                  {k === "aggressive" ? "Agressivo" : k === "shop" ? "Loja" : k === "buyer" ? "Comprador" : k === "reward" ? "Recompensa" : k === "learning" ? "Aprendizagem" : k === "dialogue" ? "Diálogo" : "Objeto"}
                 </Button>
               ))}
             </div>
