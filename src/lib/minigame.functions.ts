@@ -49,6 +49,23 @@ const forgeConfigSchema = z.object({
 // Confecção reutiliza a estrutura da forja (mesmas fases mecânicas).
 const tailoringConfigSchema = forgeConfigSchema;
 
+const miningConfigSchema = z.object({
+  node_hp: z.number().int().min(1).max(20).default(4),
+  swing_cooldown_ms: z.number().int().min(150).max(5000).default(500),
+  min_break_interval_ms: z.number().int().min(300).max(10000).default(800),
+  xp_per_break: z.number().int().min(0).max(1000).default(1),
+  required_items: z.array(z.object({
+    item_id: z.string().uuid(),
+    qty: z.number().int().min(1).max(99).default(1),
+  })).default([]),
+  drops: z.array(z.object({
+    item_id: z.string().uuid(),
+    chance: z.number().min(0).max(100).default(50),
+    min_qty: z.number().int().min(1).max(99).default(1),
+    max_qty: z.number().int().min(1).max(99).default(1),
+  })).default([]),
+}).default({ node_hp: 4, swing_cooldown_ms: 500, min_break_interval_ms: 800, xp_per_break: 1, required_items: [], drops: [] });
+
 const configSchema = z.any();
 
 const ninjaRank = z.enum(["estudante","genin","chunin","tokubetsu_jonin","jonin","anbu","sannin","kage"]);
@@ -63,7 +80,7 @@ const rewardSkillsSchema = z.array(z.object({ skill_id: z.string().uuid() })).de
 const upsertSchema = z.object({
   id: z.string().uuid().optional(),
   slug: z.string().trim().min(2).max(40).regex(/^[a-z0-9_-]+$/, "slug inválido"),
-  kind: z.enum(["cleanup", "sequence", "forge", "tailoring"]).default("cleanup"),
+  kind: z.enum(["cleanup", "sequence", "forge", "tailoring", "mining"]).default("cleanup"),
   name: z.string().min(2).max(80),
   description: z.string().max(2000).nullish(),
   background_url: z.string().nullish(),
@@ -85,6 +102,7 @@ const upsertSchema = z.object({
     data.kind === "sequence" ? sequenceConfigSchema :
     data.kind === "forge" ? forgeConfigSchema :
     data.kind === "tailoring" ? tailoringConfigSchema :
+    data.kind === "mining" ? miningConfigSchema :
     cleanupConfigSchema;
   const r = parser.safeParse(data.config);
   if (!r.success) {
