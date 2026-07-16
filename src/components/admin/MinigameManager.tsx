@@ -16,7 +16,9 @@ import { ForgeGame } from "@/components/minigame/ForgeGame";
 import { TailoringGame } from "@/components/minigame/TailoringGame";
 import { MiningGame } from "@/components/minigame/MiningGame";
 
-type Item = { id: string; name: string; meta?: any; image_url?: string | null };
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+type Item = { id: string; name: string; type?: string | null; meta?: any; image_url?: string | null };
 type SkillLite = { id: string; name: string; rank: string };
 type RewardItem = { item_id: string; qty: number };
 type Minigame = {
@@ -58,7 +60,7 @@ export function MinigameManager() {
   async function load() {
     const [{ data: mg }, { data: it }, { data: sk }] = await Promise.all([
       supabase.from("minigames").select("*").order("name"),
-      supabase.from("items").select("id,name,meta,image_url").order("name"),
+      supabase.from("items").select("id,name,type,meta,image_url").order("name"),
       supabase.from("skills").select("id,name,rank").order("name"),
     ]);
     setList(((mg as any[]) ?? []) as Minigame[]);
