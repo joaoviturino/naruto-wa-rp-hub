@@ -134,6 +134,8 @@ export function MinigameManager() {
                       ? { duration_seconds: 60, max_mistakes: 2, tiles: [] }
                       : (kind === "forge" || kind === "tailoring")
                       ? { duration_seconds: 90, difficulty: 2, hammer_hits: 8, heat_target: 70, temper_target: 40, recipe_item_id: "", source: "inventory" }
+                      : kind === "mining"
+                      ? { node_hp: 4, swing_cooldown_ms: 500, min_break_interval_ms: 800, xp_per_break: 1, required_items: [], drops: [] }
                       : { duration_seconds: 60, spots: 12, target_score: 8 };
                     setSelected({ ...selected, kind, config });
                   }}>
@@ -141,6 +143,7 @@ export function MinigameManager() {
                   <option value="sequence">Sequência (acerto)</option>
                   <option value="forge">Forja (fabricação)</option>
                   <option value="tailoring">Confecção (costura)</option>
+                  <option value="mining">Mineração (idle)</option>
                 </select>
               </div>
               <div><Label>Nome</Label><Input value={selected.name} onChange={(e) => setSelected({ ...selected, name: e.target.value })} /></div>
@@ -230,6 +233,8 @@ export function MinigameManager() {
             <SequenceConfigEditor selected={selected} setSelected={setSelected} />
           ) : (selected.kind === "forge" || selected.kind === "tailoring") ? (
             <ForgeConfigEditor selected={selected} setSelected={setSelected} items={items} kind={selected.kind} />
+          ) : selected.kind === "mining" ? (
+            <MiningConfigEditor selected={selected} setSelected={setSelected} items={items} />
           ) : (
             <div className="scroll-panel rounded-lg p-4 space-y-3">
               <h4 className="font-display text-lg text-gold">Configuração da limpeza</h4>
@@ -311,7 +316,9 @@ export function MinigameManager() {
 
           <div className="flex gap-2">
             <Button onClick={save}><Save size={14} className="mr-1" /> Salvar</Button>
-            <Button variant="secondary" onClick={() => { setTestResult(null); setTesting(true); }}>▶ Testar</Button>
+            {selected.kind !== "mining" && (
+              <Button variant="secondary" onClick={() => { setTestResult(null); setTesting(true); }}>▶ Testar</Button>
+            )}
             {selected.id && <Button variant="destructive" onClick={() => del(selected.id)}><Trash2 size={14} className="mr-1" /> Apagar</Button>}
             <Button variant="outline" onClick={() => setSelected(null)}>Fechar</Button>
           </div>
@@ -497,6 +504,97 @@ function SequenceConfigEditor({ selected, setSelected }: { selected: any; setSel
 function nextOrder(tiles: Tile[]) {
   const orders = tiles.filter((t) => t.correct && t.order != null).map((t) => t.order as number);
   return orders.length ? Math.max(...orders) + 1 : 0;
+}
+
+function MiningConfigEditor({ selected, setSelected, items }: { selected: any; setSelected: (s: any) => void; items: Item[] }) {
+  const cfg = selected.config ?? {};
+  const required: Array<{ item_id: string; qty: number }> = Array.isArray(cfg.required_items) ? cfg.required_items : [];
+  const drops: Array<{ item_id: string; chance: number; min_qty: number; max_qty: number }> = Array.isArray(cfg.drops) ? cfg.drops : [];
+  function set(patch: any) { setSelected({ ...selected, config: { ...cfg, ...patch } }); }
+  return (
+    <div className="scroll-panel rounded-lg p-4 space-y-4">
+      <h4 className="font-display text-lg text-gold">Configuração da mineração</h4>
+
+      <div className="grid gap-3 md:grid-cols-4">
+        <div><Label>HP da rocha (golpes)</Label>
+          <Input type="number" min={1} max={20} value={cfg.node_hp ?? 4}
+            onChange={(e) => set({ node_hp: Math.max(1, Math.min(20, Number(e.target.value) || 4)) })} />
+        </div>
+        <div><Label>Cooldown do golpe (ms)</Label>
+          <Input type="number" min={150} max={5000} value={cfg.swing_cooldown_ms ?? 500}
+            onChange={(e) => set({ swing_cooldown_ms: Math.max(150, Number(e.target.value) || 500) })} />
+        </div>
+        <div><Label>Intervalo mín. entre quebras (ms)</Label>
+          <Input type="number" min={300} max={10000} value={cfg.min_break_interval_ms ?? 800}
+            onChange={(e) => set({ min_break_interval_ms: Math.max(300, Number(e.target.value) || 800) })} />
+        </div>
+        <div><Label>XP por quebra</Label>
+          <Input type="number" min={0} max={1000} value={cfg.xp_per_break ?? 1}
+            onChange={(e) => set({ xp_per_break: Math.max(0, Number(e.target.value) || 0) })} />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label>Ferramentas necessárias no inventário</Label>
+          <Button size="sm" variant="outline" onClick={() => set({ required_items: [...required, { item_id: "", qty: 1 }] })}>
+            <Plus size={14} className="mr-1" /> Item
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">Deixe vazio no ambiente de teste. No futuro, exija picareta etc.</p>
+        {required.map((r, idx) => (
+          <div key={idx} className="flex gap-2 items-center">
+            <select className="flex-1 bg-input border border-border rounded px-2 py-1 text-sm"
+              value={r.item_id}
+              onChange={(e) => { const next = [...required]; next[idx] = { ...r, item_id: e.target.value }; set({ required_items: next }); }}>
+              <option value="">— item —</option>
+              {items.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
+            </select>
+            <Input type="number" min={1} max={99} className="w-20" value={r.qty}
+              onChange={(e) => { const next = [...required]; next[idx] = { ...r, qty: Math.max(1, Number(e.target.value) || 1) }; set({ required_items: next }); }} />
+            <Button variant="ghost" size="icon" onClick={() => { const next = [...required]; next.splice(idx, 1); set({ required_items: next }); }}>
+              <Trash2 size={14} />
+            </Button>
+          </div>
+        ))}
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label>Tabela de drops</Label>
+          <Button size="sm" variant="outline" onClick={() => set({ drops: [...drops, { item_id: "", chance: 50, min_qty: 1, max_qty: 1 }] })}>
+            <Plus size={14} className="mr-1" /> Drop
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">Cada linha é rolada independentemente por quebra. Chance em %.</p>
+        <div className="space-y-1">
+          <div className="hidden md:grid grid-cols-[1fr_90px_80px_80px_40px] gap-2 text-[10px] uppercase tracking-widest text-muted-foreground px-1">
+            <span>Item</span><span>Chance %</span><span>Min</span><span>Max</span><span></span>
+          </div>
+          {drops.map((d, idx) => (
+            <div key={idx} className="grid grid-cols-2 md:grid-cols-[1fr_90px_80px_80px_40px] gap-2 items-center">
+              <select className="bg-input border border-border rounded px-2 py-1 text-sm col-span-2 md:col-span-1"
+                value={d.item_id}
+                onChange={(e) => { const next = [...drops]; next[idx] = { ...d, item_id: e.target.value }; set({ drops: next }); }}>
+                <option value="">— item —</option>
+                {items.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
+              </select>
+              <Input type="number" min={0} max={100} step={0.1} value={d.chance}
+                onChange={(e) => { const next = [...drops]; next[idx] = { ...d, chance: Math.max(0, Math.min(100, Number(e.target.value) || 0)) }; set({ drops: next }); }} />
+              <Input type="number" min={1} max={99} value={d.min_qty}
+                onChange={(e) => { const next = [...drops]; next[idx] = { ...d, min_qty: Math.max(1, Number(e.target.value) || 1) }; set({ drops: next }); }} />
+              <Input type="number" min={1} max={99} value={d.max_qty}
+                onChange={(e) => { const next = [...drops]; next[idx] = { ...d, max_qty: Math.max(1, Number(e.target.value) || 1) }; set({ drops: next }); }} />
+              <Button variant="ghost" size="icon" onClick={() => { const next = [...drops]; next.splice(idx, 1); set({ drops: next }); }}>
+                <Trash2 size={14} />
+              </Button>
+            </div>
+          ))}
+          {!drops.length && <div className="text-xs text-muted-foreground italic p-2">Nenhum drop configurado — o jogador não ganhará nada por quebra.</div>}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function ForgeConfigEditor({ selected, setSelected, items, kind }: { selected: any; setSelected: (s: any) => void; items: Item[]; kind?: string }) {

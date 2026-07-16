@@ -7,6 +7,7 @@ import { CleanupGame } from "./CleanupGame";
 import { SequenceGame } from "./SequenceGame";
 import { ForgeGame } from "./ForgeGame";
 import { TailoringGame } from "./TailoringGame";
+import { MiningGame } from "./MiningGame";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -41,6 +42,41 @@ export function MinigameDialog({
   const isForge = minigame.kind === "forge";
   const isTailoring = minigame.kind === "tailoring";
   const isCrafting = isForge || isTailoring;
+  const isMining = minigame.kind === "mining";
+
+  // Requisitos do minigame de mineração (ex.: picareta)
+  const [miningReq, setMiningReq] = useState<Array<{ item_id: string; qty: number; name: string; have: number; image_url: string | null }>>([]);
+  useEffect(() => {
+    let cancel = false;
+    async function loadMiningReq() {
+      if (!isMining || !open) return;
+      const cfgReq: Array<{ item_id: string; qty: number }> = Array.isArray(minigame.config?.required_items) ? minigame.config.required_items : [];
+      if (!cfgReq.length) { setMiningReq([]); return; }
+      const { data: userRes } = await supabase.auth.getUser();
+      const uid = userRes.user?.id;
+      if (!uid) return;
+      const { data: ch } = await supabase.from("characters").select("id").eq("user_id", uid).maybeSingle();
+      if (!ch) return;
+      const { data: inv } = await supabase.from("inventory").select("ninja_bag").eq("character_id", ch.id).maybeSingle();
+      const bag = ((inv?.ninja_bag as any[]) ?? []).filter((e: any) => e && e.item_id);
+      const ids = cfgReq.map((r) => r.item_id);
+      const { data: itemsData } = ids.length
+        ? await supabase.from("items").select("id,name,image_url").in("id", ids)
+        : { data: [] as any[] };
+      const byId = new Map((itemsData ?? []).map((i: any) => [i.id, i]));
+      const rows = cfgReq.map((r) => {
+        const have = bag.filter((b: any) => b.item_id === r.item_id).reduce((s: number, b: any) => s + (Number(b.qty) || 1), 0);
+        return {
+          item_id: r.item_id, qty: r.qty, have,
+          name: byId.get(r.item_id)?.name ?? "?", image_url: byId.get(r.item_id)?.image_url ?? null,
+        };
+      });
+      if (!cancel) setMiningReq(rows);
+    }
+    loadMiningReq();
+    return () => { cancel = true; };
+  }, [minigame.id, isMining, open, minigame.config]);
+  const miningMissing = miningReq.some((r) => r.have < r.qty);
 
   const forgeMatch = (() => {
     if (!isCrafting) return null;
@@ -141,6 +177,15 @@ export function MinigameDialog({
     onOpenChange(false);
   }
 
+  async function exitMining(breaksCount: number) {
+    if (!runId) { close(); return; }
+    try {
+      await complete({ data: { run_id: runId, score: breaksCount, success: true } });
+      onCompleted?.();
+    } catch (e: any) { /* silencioso — não bloqueia saída */ }
+    close();
+  }
+
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) close(); }}>
       <DialogContent className="max-w-3xl">
@@ -154,6 +199,20 @@ export function MinigameDialog({
             <div className="flex-1 space-y-3">
               <div className="font-display text-lg text-gold">{minigame.npc_name ?? "NPC"}</div>
               <p className="whitespace-pre-wrap text-sm">{minigame.dialog_intro || "Bora começar?"}</p>
+              {isMining && miningReq.length > 0 && (
+                <div className="rounded border border-border p-3 bg-secondary/30 space-y-2">
+                  <div className="text-xs uppercase tracking-widest text-muted-foreground">Ferramentas necessárias</div>
+                  <ul className="space-y-1">
+                    {miningReq.map((r) => (
+                      <li key={r.item_id} className={`flex items-center gap-2 text-sm ${r.have >= r.qty ? "text-emerald-300" : "text-red-300"}`}>
+                        {r.image_url && <img src={r.image_url} className="w-6 h-6 object-contain" alt="" />}
+                        <span>{r.name}</span>
+                        <span className="ml-auto tabular-nums">{r.have}/{r.qty}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {isCrafting && (
                 <div className="rounded border border-border p-3 bg-secondary/30 space-y-3">
                   <div className="text-xs uppercase tracking-widest text-muted-foreground">Bolsa Ninja — escolha os materiais</div>
@@ -200,8 +259,8 @@ export function MinigameDialog({
                 </div>
               )}
               <div className="flex gap-2">
-                <Button onClick={begin} disabled={busy || (isCrafting && !forgeMatch)}>
-                  {busy ? "…" : (isForge ? "Iniciar Forja" : isTailoring ? "Iniciar Confecção" : "Aceitar missão")}
+                <Button onClick={begin} disabled={busy || (isCrafting && !forgeMatch) || (isMining && miningMissing)}>
+                  {busy ? "…" : (isForge ? "Iniciar Forja" : isTailoring ? "Iniciar Confecção" : isMining ? "Começar a Minerar" : "Aceitar missão")}
                 </Button>
                 <Button variant="outline" onClick={close}>Sair</Button>
               </div>
@@ -216,6 +275,8 @@ export function MinigameDialog({
             ? <TailoringGame background={minigame.background_url} config={minigame.config ?? {}} preview={forgeMatch ? { name: forgeMatch.name, icon: forgeMatch.image_url } : undefined} onFinish={onFinish} />
             : minigame.kind === "sequence"
             ? <SequenceGame background={minigame.background_url} config={minigame.config ?? {}} onFinish={onFinish} />
+            : minigame.kind === "mining" && runId
+            ? <MiningGame runId={runId} background={minigame.background_url} config={minigame.config ?? {}} onExit={exitMining} />
             : <CleanupGame background={minigame.background_url} tileset={minigame.tileset_url} config={minigame.config ?? {}} onFinish={onFinish} />
           )
         )}

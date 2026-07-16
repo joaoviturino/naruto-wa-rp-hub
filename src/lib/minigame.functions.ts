@@ -49,6 +49,23 @@ const forgeConfigSchema = z.object({
 // Confecção reutiliza a estrutura da forja (mesmas fases mecânicas).
 const tailoringConfigSchema = forgeConfigSchema;
 
+const miningConfigSchema = z.object({
+  node_hp: z.number().int().min(1).max(20).default(4),
+  swing_cooldown_ms: z.number().int().min(150).max(5000).default(500),
+  min_break_interval_ms: z.number().int().min(300).max(10000).default(800),
+  xp_per_break: z.number().int().min(0).max(1000).default(1),
+  required_items: z.array(z.object({
+    item_id: z.string().uuid(),
+    qty: z.number().int().min(1).max(99).default(1),
+  })).default([]),
+  drops: z.array(z.object({
+    item_id: z.string().uuid(),
+    chance: z.number().min(0).max(100).default(50),
+    min_qty: z.number().int().min(1).max(99).default(1),
+    max_qty: z.number().int().min(1).max(99).default(1),
+  })).default([]),
+}).default({ node_hp: 4, swing_cooldown_ms: 500, min_break_interval_ms: 800, xp_per_break: 1, required_items: [], drops: [] });
+
 const configSchema = z.any();
 
 const ninjaRank = z.enum(["estudante","genin","chunin","tokubetsu_jonin","jonin","anbu","sannin","kage"]);
@@ -63,7 +80,7 @@ const rewardSkillsSchema = z.array(z.object({ skill_id: z.string().uuid() })).de
 const upsertSchema = z.object({
   id: z.string().uuid().optional(),
   slug: z.string().trim().min(2).max(40).regex(/^[a-z0-9_-]+$/, "slug inválido"),
-  kind: z.enum(["cleanup", "sequence", "forge", "tailoring"]).default("cleanup"),
+  kind: z.enum(["cleanup", "sequence", "forge", "tailoring", "mining"]).default("cleanup"),
   name: z.string().min(2).max(80),
   description: z.string().max(2000).nullish(),
   background_url: z.string().nullish(),
@@ -85,6 +102,7 @@ const upsertSchema = z.object({
     data.kind === "sequence" ? sequenceConfigSchema :
     data.kind === "forge" ? forgeConfigSchema :
     data.kind === "tailoring" ? tailoringConfigSchema :
+    data.kind === "mining" ? miningConfigSchema :
     cleanupConfigSchema;
   const r = parser.safeParse(data.config);
   if (!r.success) {
@@ -231,6 +249,28 @@ export const startMinigameRun = createServerFn({ method: "POST" })
     }
     // Crafting (forge / tailoring): valida seleção do jogador + descobre item resultante
     let runContext: any = {};
+    if ((game.kind as string) === "mining") {
+      const cfg = (game.config ?? {}) as any;
+      const req: Array<{ item_id: string; qty: number }> = Array.isArray(cfg.required_items) ? cfg.required_items : [];
+      if (req.length) {
+        const { data: inv } = await context.supabase
+          .from("inventory").select("ninja_bag").eq("character_id", char.id).maybeSingle();
+        const bag = ((inv?.ninja_bag as any[]) ?? []).filter((e: any) => e && e.item_id);
+        const missingItems: string[] = [];
+        for (const r of req) {
+          const have = bag.filter((b: any) => b.item_id === r.item_id)
+            .reduce((s: number, b: any) => s + (Number(b.qty) || 1), 0);
+          if (have < r.qty) missingItems.push(r.item_id);
+        }
+        if (missingItems.length) {
+          const { data: itemRows } = await context.supabase
+            .from("items").select("id,name").in("id", missingItems);
+          const names = (itemRows ?? []).map((i: any) => i.name).join(", ") || "itens obrigatórios";
+          throw new Error("Você precisa carregar: " + names);
+        }
+      }
+      runContext = { breaks: 0 };
+    }
     if ((game.kind as string) === "forge" || (game.kind as string) === "tailoring") {
       const cfg = (game.config ?? {}) as any;
       const selection = (data.forge_selection ?? []).filter((s) => s.qty > 0);
@@ -458,4 +498,92 @@ export const setNpcLearningSteps = createServerFn({ method: "POST" })
       if (error) throw new Error(error.message);
     }
     return { ok: true };
+  });
+
+/** Mineração: registra a quebra de um nó e sorteia drops no servidor. */
+export const mineNode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ run_id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: run } = await supabaseAdmin
+      .from("minigame_runs")
+      .select("id,character_id,context,completed_at,characters(user_id),minigames(kind,config)")
+      .eq("id", data.run_id).maybeSingle();
+    if (!run) throw new Error("Sessão de mineração inválida.");
+    if ((run as any).characters.user_id !== context.userId) throw new Error("Forbidden");
+    if (run.completed_at) throw new Error("Sessão já encerrada.");
+    const game: any = (run as any).minigames;
+    if (game?.kind !== "mining") throw new Error("Não é uma sessão de mineração.");
+    const cfg = (game.config ?? {}) as any;
+    const minMs = Math.max(300, Number(cfg.min_break_interval_ms) || 800);
+    const ctxRun = (run.context ?? {}) as any;
+    const lastAt = ctxRun.last_break_at ? new Date(ctxRun.last_break_at).getTime() : 0;
+    if (lastAt && Date.now() - lastAt < minMs) throw new Error("Aguarde antes da próxima quebra.");
+
+    // Requer itens (ex.: picareta) continuamente presentes
+    const required: Array<{ item_id: string; qty: number }> = Array.isArray(cfg.required_items) ? cfg.required_items : [];
+    const { data: inv } = await supabaseAdmin
+      .from("inventory").select("ninja_bag").eq("character_id", run.character_id).maybeSingle();
+    const bag: Array<{ item_id: string; qty: number }> = ((inv?.ninja_bag as any[]) ?? [])
+      .filter((e: any) => e && e.item_id)
+      .map((e: any) => ({ item_id: e.item_id, qty: typeof e.qty === "number" && e.qty > 0 ? e.qty : 1 }));
+    if (required.length) {
+      for (const r of required) {
+        const have = bag.filter((b) => b.item_id === r.item_id).reduce((s, b) => s + b.qty, 0);
+        if (have < r.qty) throw new Error("Ferramenta necessária foi perdida.");
+      }
+    }
+
+    // Rola drops
+    const drops: Array<{ item_id: string; chance: number; min_qty: number; max_qty: number }> = Array.isArray(cfg.drops) ? cfg.drops : [];
+    const rolled: Array<{ item_id: string; qty: number }> = [];
+    for (const d of drops) {
+      const chance = Math.max(0, Math.min(100, Number(d.chance) || 0));
+      if (Math.random() * 100 < chance) {
+        const min = Math.max(1, Number(d.min_qty) || 1);
+        const max = Math.max(min, Number(d.max_qty) || min);
+        const qty = min + Math.floor(Math.random() * (max - min + 1));
+        rolled.push({ item_id: d.item_id, qty });
+      }
+    }
+
+    // Credita drops
+    if (rolled.length) {
+      for (const it of rolled) {
+        const idx = bag.findIndex((b) => b.item_id === it.item_id);
+        if (idx === -1) bag.push({ item_id: it.item_id, qty: it.qty });
+        else bag[idx].qty += it.qty;
+      }
+      await supabaseAdmin.from("inventory").update({ ninja_bag: bag }).eq("character_id", run.character_id);
+    }
+
+    // XP por quebra
+    const xpPerBreak = Math.max(0, Number(cfg.xp_per_break) || 0);
+    if (xpPerBreak) {
+      const { data: c } = await supabaseAdmin.from("characters").select("xp").eq("id", run.character_id).maybeSingle();
+      await supabaseAdmin.from("characters").update({ xp: (c?.xp ?? 0) + xpPerBreak }).eq("id", run.character_id);
+    }
+
+    // Atualiza contexto da sessão
+    const breaks = (Number(ctxRun.breaks) || 0) + 1;
+    const nextCtx = { ...ctxRun, breaks, last_break_at: new Date().toISOString() };
+    await supabaseAdmin.from("minigame_runs").update({ context: nextCtx, score: breaks }).eq("id", run.id);
+
+    // Enriquece drops com nomes/imagens
+    const ids = Array.from(new Set(rolled.map((r) => r.item_id)));
+    const { data: itemRows } = ids.length
+      ? await supabaseAdmin.from("items").select("id,name,image_url").in("id", ids)
+      : { data: [] as any[] };
+    const byId = new Map((itemRows ?? []).map((i: any) => [i.id, i]));
+    return {
+      drops: rolled.map((r) => ({
+        item_id: r.item_id, qty: r.qty,
+        name: byId.get(r.item_id)?.name ?? "?",
+        image_url: byId.get(r.item_id)?.image_url ?? null,
+      })),
+      xp: xpPerBreak,
+      breaks,
+      next_at: Date.now() + minMs,
+    };
   });
