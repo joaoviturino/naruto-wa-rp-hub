@@ -56,6 +56,7 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
   const [objMinigame, setObjMinigame] = useState<any | null>(null);
   const [objOpen, setObjOpen] = useState(false);
   const [charId, setCharId] = useState<string | null>(null);
+  const [bag, setBag] = useState<{ item_id: string; qty: number }[]>([]);
   const list = useServerFn(listLocationInteractNpcs);
   const buy = useServerFn(buyFromShop);
   const claim = useServerFn(claimNpcReward);
@@ -94,6 +95,11 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
         const { data: ch } = await supabase.from("characters").select("id,ryo").eq("user_id", me.user.id).maybeSingle();
         setRyo(Number((ch as any)?.ryo ?? 0));
         setCharId((ch as any)?.id ?? null);
+        if ((ch as any)?.id) {
+          const { data: inv } = await supabase.from("inventory").select("ninja_bag").eq("character_id", (ch as any).id).maybeSingle();
+          const arr = (Array.isArray((inv as any)?.ninja_bag) ? (inv as any).ninja_bag : []) as any[];
+          setBag(arr.map((e) => ({ item_id: e.item_id, qty: Number(e.qty ?? 1) })));
+        }
       }
     } catch {/* ignore */}
   }
