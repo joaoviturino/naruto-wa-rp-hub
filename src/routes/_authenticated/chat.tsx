@@ -495,6 +495,13 @@ function ChatPage() {
                   ⚔ Duelo em andamento — chat travado neste local.
                 </div>
               )}
+              {character && (
+                <ActionHotkey
+                  currentLocationId={character.current_location_id}
+                  onArrived={loadCore}
+                  disabled={!!combatId || !!pvpAtLocation}
+                />
+              )}
               <Dialog open={sceneOpen} onOpenChange={setSceneOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline" size="icon" title="Anexar cena" disabled={!!pvpAtLocation}><ImagePlus size={16} /></Button>
@@ -534,13 +541,6 @@ function ChatPage() {
       {activeMinigame && (
         <MinigameDialog minigame={activeMinigame} open onOpenChange={(v) => { if (!v) setActiveMinigame(null); }}
           onCompleted={refreshMinigames} />
-      )}
-      {character && (
-        <ActionHotkey
-          currentLocationId={character.current_location_id}
-          onArrived={loadCore}
-          disabled={!!combatId || !!pvpAtLocation}
-        />
       )}
     </div>
   );

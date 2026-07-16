@@ -19,25 +19,26 @@ export function ActionHotkey({ currentLocationId, onArrived, disabled }: Props) 
 
   return (
     <>
-      <div className="fixed right-4 bottom-24 md:bottom-6 z-40">
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <button
-              aria-label="Ações"
-              className="grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br from-gold via-amber-400 to-blood text-background shadow-lg shadow-black/50 hover:scale-105 active:scale-95 transition ring-2 ring-background">
-              <Zap size={22} />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent side="top" align="end" className="w-64 p-2">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            aria-label="Ações"
+            disabled={disabled}
+            title="Ações"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-input bg-background text-gold hover:bg-accent hover:text-accent-foreground disabled:opacity-50 disabled:pointer-events-none transition">
+            <Zap size={16} />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent side="top" align="start" className="w-64 p-2">
             <div className="text-[10px] uppercase tracking-widest text-muted-foreground px-2 pt-1 pb-2">Ações</div>
             <ActionButton icon={Compass} label="Mover-se" onClick={openTravel} />
             <ActionButton icon={Drama} label="Cenar" onClick={() => soon("Cenar")} soon />
             <ActionButton icon={Sparkles} label="Usar habilidade" onClick={() => soon("Usar habilidade")} soon />
             <ActionButton icon={Package} label="Usar item" onClick={() => soon("Usar item")} soon />
             <ActionButton icon={Backpack} label="Ver inventário" onClick={() => soon("Ver inventário")} soon />
-          </PopoverContent>
-        </Popover>
-      </div>
+        </PopoverContent>
+      </Popover>
       <TravelDialog open={travelOpen} onOpenChange={setTravelOpen}
         currentLocationId={currentLocationId} onArrived={onArrived} />
     </>
