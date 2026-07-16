@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { Megaphone, Wrench, Trash2, Power } from "lucide-react";
+import { ComboSelect } from "@/components/ui/combo-select";
 
 type Config = {
   maintenance_enabled: boolean;
@@ -176,12 +177,17 @@ function BroadcastCard() {
       <div className="grid grid-cols-2 gap-2">
         <div>
           <Label>Tipo</Label>
-          <select className="w-full bg-input rounded px-2 py-2 text-sm mt-1" value={variant} onChange={(e) => setVariant(e.target.value as any)}>
-            <option value="info">Info</option>
-            <option value="success">Sucesso</option>
-            <option value="warning">Aviso</option>
-            <option value="error">Urgente</option>
-          </select>
+          <ComboSelect
+            value={variant}
+            onChange={(v) => setVariant(v as any)}
+            triggerClassName="mt-1"
+            options={[
+              { value: "info", label: "Info" },
+              { value: "success", label: "Sucesso" },
+              { value: "warning", label: "Aviso" },
+              { value: "error", label: "Urgente" },
+            ]}
+          />
         </div>
         <div>
           <Label>Expira em (min)</Label>
