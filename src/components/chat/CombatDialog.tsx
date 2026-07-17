@@ -232,7 +232,9 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   useEffect(() => {
     if (energy > currentMaxEnergy) setEnergy(currentMaxEnergy);
   }, [currentMaxEnergy]);
-  const skillsByTab = useMemo(() => skills.filter((s) => s.energy_type === skillTab), [skills, skillTab]);
+  const skillsByTab = useMemo(() => skills.filter((s) => s.energy_type === skillTab && !s.is_defensive), [skills, skillTab]);
+  const defensiveSkills = useMemo(() => skills.filter((s) => s.is_defensive), [skills]);
+  const defenseSkill = defensiveSkills.find((s) => s.id === selectedDefense) ?? null;
   const consumables = useMemo(() => bag.filter((e) => itemMap[e.item_id]?.type === "consumable"), [bag, itemMap]);
 
   // Enfileira TODAS as novas entradas do log (jogador + resposta do NPC vêm juntas do backend)
