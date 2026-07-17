@@ -92,7 +92,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   async function loadSkills() {
     const { data } = await supabase
       .from("character_skills")
-      .select("skill:skills(id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,description,meta)")
+      .select("skill:skills(id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,description,meta,is_defensive,defense_percent,accuracy)")
       .eq("character_id", myCharId);
     const list = ((data as any[]) ?? []).map((r) => r.skill).filter(Boolean) as Skill[];
     setSkills(list);
