@@ -11,6 +11,7 @@ const MountInput = z.object({
   id: z.string().uuid().optional(),
   name: z.string().min(1),
   image_url: z.string().url().nullish(),
+  travel_gif_url: z.string().url().nullish(),
   description: z.string().max(2000).nullish(),
   rank: z.string().max(40).nullish(),
   speed_multiplier: z.number().min(0.05).max(1),
@@ -31,6 +32,7 @@ export const upsertMount = createServerFn({ method: "POST" })
     const payload = {
       name: data.name,
       image_url: data.image_url ?? null,
+      travel_gif_url: data.travel_gif_url ?? null,
       description: data.description ?? null,
       rank: data.rank ?? null,
       speed_multiplier: data.speed_multiplier,
