@@ -157,6 +157,7 @@ export function AdminPanel() {
             {active === "skills" && adminUserId && <SkillManager adminUserId={adminUserId} />}
             {active === "profs" && <ProficiencyManager />}
             {active === "missions" && <MissionManager />}
+            {active === "jobs" && <JobManager />}
             {active === "clans" && <ClanTreeManager />}
             {active === "locations" && <LocationManager />}
             {active === "npcs" && <NpcManager />}
