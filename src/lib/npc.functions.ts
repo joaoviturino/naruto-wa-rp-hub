@@ -117,6 +117,25 @@ export const setLocationNpcs = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/** Substitui a lista de locais em que este NPC pode aparecer. */
+export const setNpcLocations = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    npc_id: z.string().uuid(),
+    location_ids: z.array(z.string().uuid()),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin.from("location_npcs").delete().eq("npc_id", data.npc_id);
+    if (data.location_ids.length) {
+      const rows = data.location_ids.map((location_id) => ({ location_id, npc_id: data.npc_id }));
+      const { error } = await supabaseAdmin.from("location_npcs").insert(rows);
+      if (error) throw new Error(error.message);
+    }
+    return { ok: true };
+  });
+
 export const setLocationSpawnGroups = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({

@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Trash2, Upload, Plus, Search, Swords, Store, ShoppingBag, Gift, GraduationCap, MessageCircle, Package, Users, ChevronDown } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
-import { upsertNpc, deleteNpc, setNpcSkills } from "@/lib/npc.functions";
+import { upsertNpc, deleteNpc, setNpcSkills, setNpcLocations } from "@/lib/npc.functions";
 import { setNpcLearningSteps } from "@/lib/minigame.functions";
 import { toast } from "sonner";
 import { NpcGroupManager } from "./NpcGroupManager";
@@ -42,6 +42,7 @@ type Skill = { id: string; name: string; rank: string };
 type Item = { id: string; name: string; type: string };
 type Mission = { id: string; name: string; rank: string };
 type MinigameLite = { id: string; name: string; kind: string };
+type LocationLite = { id: string; name: string };
 
 type LearningStep = { id?: string; minigame_id: string; position: number; required_rank: string | null; required_profs: Array<{ skill_class: string; nivel?: string | null; maestria?: string | null }> };
 
@@ -73,6 +74,9 @@ export function NpcManager() {
   const [missions, setMissions] = useState<Mission[]>([]);
   const [minigames, setMinigames] = useState<MinigameLite[]>([]);
   const [assigned, setAssigned] = useState<Record<string, Set<string>>>({});
+  const [locations, setLocations] = useState<LocationLite[]>([]);
+  const [npcLocs, setNpcLocs] = useState<Record<string, Set<string>>>({});
+  const [locQuery, setLocQuery] = useState("");
   const [learningSteps, setLearningSteps] = useState<Record<string, LearningStep[]>>({});
   const [selected, setSelected] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -85,16 +89,19 @@ export function NpcManager() {
   const save = useServerFn(upsertNpc);
   const del = useServerFn(deleteNpc);
   const setSkillsFn = useServerFn(setNpcSkills);
+  const setLocsFn = useServerFn(setNpcLocations);
   const saveSteps = useServerFn(setNpcLearningSteps);
 
   async function load() {
-    const [n, s, ns, it, mi, mg] = await Promise.all([
+    const [n, s, ns, it, mi, mg, locs, lnpcs] = await Promise.all([
       supabase.from("npcs").select("*").order("name"),
       supabase.from("skills").select("id,name,rank").order("name"),
       supabase.from("npc_skills").select("npc_id,skill_id"),
       supabase.from("items").select("id,name,type").order("name"),
       supabase.from("missions").select("id,name,rank").order("name"),
       supabase.from("minigames").select("id,name,kind").order("name"),
+      supabase.from("locations").select("id,name").order("name"),
+      supabase.from("location_npcs").select("location_id,npc_id"),
     ]);
     setNpcs(((n.data as any[]) ?? []).map((r) => ({
       ...r,
@@ -116,6 +123,12 @@ export function NpcManager() {
     setItems((it.data as Item[]) ?? []);
     setMissions((mi.data as Mission[]) ?? []);
     setMinigames((mg.data as MinigameLite[]) ?? []);
+    setLocations((locs.data as LocationLite[]) ?? []);
+    const lmap: Record<string, Set<string>> = {};
+    ((lnpcs.data as any[]) ?? []).forEach((r) => {
+      (lmap[r.npc_id] ??= new Set<string>()).add(r.location_id);
+    });
+    setNpcLocs(lmap);
     const map: Record<string, Set<string>> = {};
     (ns.data ?? []).forEach((r: any) => {
       if (!map[r.npc_id]) map[r.npc_id] = new Set();
@@ -346,6 +359,52 @@ export function NpcManager() {
                   <input ref={musicRef} type="file" accept="audio/*" className="hidden" onChange={uploadMusic} />
                 </div>
               </div>
+            </div>
+          </div>
+          <div className="scroll-panel rounded-lg p-4 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <h4 className="font-display text-sm text-gold">Locais deste NPC</h4>
+              <Badge variant="outline" className="text-[10px]">
+                {(npcLocs[sel.id]?.size ?? 0)} selecionado(s)
+              </Badge>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Marque os locais em que este NPC deve aparecer. Vale para todos os tipos (agressivo, loja, recompensa, aprendizado, diálogo, objeto).
+            </p>
+            <div className="relative">
+              <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input value={locQuery} onChange={(e) => setLocQuery(e.target.value)} placeholder="Buscar local…" className="pl-7 h-8 text-sm" />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 max-h-64 overflow-y-auto rounded border border-border/50 p-2 bg-input/20">
+              {locations
+                .filter((l) => !locQuery || l.name.toLowerCase().includes(locQuery.toLowerCase()))
+                .map((l) => {
+                  const set = npcLocs[sel.id] ?? new Set<string>();
+                  const checked = set.has(l.id);
+                  return (
+                    <label key={l.id} className={`flex items-center gap-2 text-xs px-2 py-1 rounded cursor-pointer ${checked ? "bg-gold/15 border border-gold/40" : "hover:bg-secondary/50 border border-transparent"}`}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={async (e) => {
+                          const cur = new Set(npcLocs[sel.id] ?? new Set<string>());
+                          if (e.target.checked) cur.add(l.id); else cur.delete(l.id);
+                          setNpcLocs((prev) => ({ ...prev, [sel.id]: cur }));
+                          try {
+                            await setLocsFn({ data: { npc_id: sel.id, location_ids: Array.from(cur) } } as any);
+                          } catch (err: any) {
+                            toast.error(err.message ?? "Falha ao salvar");
+                            load();
+                          }
+                        }}
+                      />
+                      <span className="truncate">{l.name}</span>
+                    </label>
+                  );
+                })}
+              {locations.length === 0 && (
+                <div className="text-xs text-muted-foreground p-2 col-span-full italic">Nenhum local cadastrado.</div>
+              )}
             </div>
           </div>
             </TabsContent>
