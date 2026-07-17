@@ -526,15 +526,50 @@ export const mineNode = createServerFn({ method: "POST" })
     const required: Array<{ item_id: string; qty: number }> = Array.isArray(cfg.required_items) ? cfg.required_items : [];
     const { data: inv } = await supabaseAdmin
       .from("inventory").select("ninja_bag").eq("character_id", run.character_id).maybeSingle();
-    const bag: Array<{ item_id: string; qty: number }> = ((inv?.ninja_bag as any[]) ?? [])
+    const bag: Array<{ item_id: string; qty: number; dur?: number | null }> = ((inv?.ninja_bag as any[]) ?? [])
       .filter((e: any) => e && e.item_id)
-      .map((e: any) => ({ item_id: e.item_id, qty: typeof e.qty === "number" && e.qty > 0 ? e.qty : 1 }));
+      .map((e: any) => ({
+        item_id: e.item_id,
+        qty: typeof e.qty === "number" && e.qty > 0 ? e.qty : 1,
+        dur: typeof e.dur === "number" ? e.dur : null,
+      }));
     if (required.length) {
       for (const r of required) {
         const have = bag.filter((b) => b.item_id === r.item_id).reduce((s, b) => s + b.qty, 0);
         if (have < r.qty) throw new Error("Ferramenta necessária foi perdida.");
       }
     }
+
+    // ============ DURABILIDADE (ferramentas do minigame) ============
+    // Para cada required com item que tem durability > 0, decrementa 1 por golpe.
+    // Uma quebra por golpe (não por break de nó): consome do tempo real.
+    const brokenNow: Array<{ item_id: string; name: string }> = [];
+    if (required.length) {
+      const reqIds = Array.from(new Set(required.map((r) => r.item_id)));
+      const { data: reqItems } = await supabaseAdmin
+        .from("items").select("id,name,durability,image_url").in("id", reqIds);
+      const reqInfo = new Map<string, { name: string; durability: number | null; image_url: string | null }>();
+      (reqItems ?? []).forEach((i: any) => reqInfo.set(i.id, { name: i.name, durability: i.durability, image_url: i.image_url }));
+      for (const r of required) {
+        const info = reqInfo.get(r.item_id);
+        const maxDur = info?.durability ?? 0;
+        if (!maxDur || maxDur <= 0) continue; // sem durabilidade -> ignora
+        // Pega a primeira entrada com essa item_id
+        const entry = bag.find((b) => b.item_id === r.item_id && b.qty > 0);
+        if (!entry) throw new Error(`Ferramenta quebrada: ${info?.name ?? "item obrigatório"}. Repare para continuar.`);
+        if (entry.dur == null || entry.dur > maxDur) entry.dur = maxDur;
+        entry.dur -= 1;
+        if (entry.dur <= 0) {
+          entry.qty -= 1;
+          entry.dur = null;
+          brokenNow.push({ item_id: r.item_id, name: info?.name ?? "Ferramenta" });
+          // Se ainda houver estoque, próxima usa dur fresh no próximo golpe
+          // Se qty=0, será removido no cleanup abaixo — próximo golpe lançará erro.
+        }
+      }
+    }
+    // Limpa entradas zeradas
+    for (let i = bag.length - 1; i >= 0; i--) if (bag[i].qty <= 0) bag.splice(i, 1);
 
     // Rola drops
     const drops: Array<{ item_id: string; chance: number; min_qty: number; max_qty: number }> = Array.isArray(cfg.drops) ? cfg.drops : [];
@@ -552,12 +587,14 @@ export const mineNode = createServerFn({ method: "POST" })
     // Credita drops
     if (rolled.length) {
       for (const it of rolled) {
-        const idx = bag.findIndex((b) => b.item_id === it.item_id);
+        // Prefere empilhar em stack sem durabilidade
+        const idx = bag.findIndex((b) => b.item_id === it.item_id && (b.dur == null));
         if (idx === -1) bag.push({ item_id: it.item_id, qty: it.qty });
         else bag[idx].qty += it.qty;
       }
-      await supabaseAdmin.from("inventory").update({ ninja_bag: bag }).eq("character_id", run.character_id);
     }
+    // Sempre persiste bag (durabilidade + drops)
+    await supabaseAdmin.from("inventory").update({ ninja_bag: bag }).eq("character_id", run.character_id);
 
     // XP por quebra
     const xpPerBreak = Math.max(0, Number(cfg.xp_per_break) || 0);
@@ -577,6 +614,21 @@ export const mineNode = createServerFn({ method: "POST" })
       ? await supabaseAdmin.from("items").select("id,name,image_url").in("id", ids)
       : { data: [] as any[] };
     const byId = new Map((itemRows ?? []).map((i: any) => [i.id, i]));
+    // Snapshot das ferramentas atuais (para HUD)
+    const toolIds = Array.from(new Set(required.map((r) => r.item_id)));
+    let tools: Array<{ item_id: string; name: string; image_url: string | null; qty: number; dur: number | null; max: number | null }> = [];
+    if (toolIds.length) {
+      const { data: toolInfo } = await supabaseAdmin.from("items").select("id,name,image_url,durability").in("id", toolIds);
+      tools = (toolInfo ?? []).map((i: any) => {
+        const entry = bag.find((b) => b.item_id === i.id);
+        return {
+          item_id: i.id, name: i.name, image_url: i.image_url ?? null,
+          qty: entry?.qty ?? 0,
+          dur: entry?.dur ?? (entry && i.durability ? i.durability : null),
+          max: i.durability ?? null,
+        };
+      });
+    }
     return {
       drops: rolled.map((r) => ({
         item_id: r.item_id, qty: r.qty,
@@ -586,5 +638,67 @@ export const mineNode = createServerFn({ method: "POST" })
       xp: xpPerBreak,
       breaks,
       next_at: Date.now() + minMs,
+      tools,
+      broken_now: brokenNow,
     };
+  });
+
+/** Repara todas as ferramentas requeridas de um minigame ativo, cobrando ryo. */
+export const repairMinigameTools = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ run_id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: run } = await supabaseAdmin
+      .from("minigame_runs")
+      .select("id,character_id,characters(user_id,ryo),minigames(kind,config)")
+      .eq("id", data.run_id).maybeSingle();
+    if (!run) throw new Error("Sessão inválida.");
+    if ((run as any).characters.user_id !== context.userId) throw new Error("Forbidden");
+    const game: any = (run as any).minigames;
+    const cfg = (game?.config ?? {}) as any;
+    const required: Array<{ item_id: string; qty: number }> = Array.isArray(cfg.required_items) ? cfg.required_items : [];
+    if (!required.length) throw new Error("Este minigame não usa ferramentas.");
+    const reqIds = Array.from(new Set(required.map((r) => r.item_id)));
+    const { data: reqItems } = await supabaseAdmin
+      .from("items").select("id,name,durability").in("id", reqIds);
+    const info = new Map<string, { name: string; durability: number | null }>();
+    (reqItems ?? []).forEach((i: any) => info.set(i.id, { name: i.name, durability: i.durability }));
+
+    const { data: inv } = await supabaseAdmin
+      .from("inventory").select("ninja_bag").eq("character_id", run.character_id).maybeSingle();
+    const bag: Array<{ item_id: string; qty: number; dur?: number | null }> = ((inv?.ninja_bag as any[]) ?? [])
+      .filter((e: any) => e && e.item_id)
+      .map((e: any) => ({
+        item_id: e.item_id,
+        qty: typeof e.qty === "number" && e.qty > 0 ? e.qty : 1,
+        dur: typeof e.dur === "number" ? e.dur : null,
+      }));
+
+    const costPerPoint = Math.max(1, Number(cfg.repair_cost_per_point) || 2);
+    let totalCost = 0;
+    const repaired: string[] = [];
+    for (const r of required) {
+      const it = info.get(r.item_id);
+      const max = it?.durability ?? 0;
+      if (!max) continue;
+      for (const b of bag) {
+        if (b.item_id !== r.item_id) continue;
+        const cur = b.dur == null ? max : b.dur;
+        const missing = Math.max(0, max - cur);
+        if (missing > 0) {
+          totalCost += missing * costPerPoint;
+          b.dur = max;
+          repaired.push(it?.name ?? "Ferramenta");
+        }
+      }
+    }
+    if (!totalCost) return { ok: true, cost: 0, repaired: [] };
+
+    const currentRyo = Number((run as any).characters.ryo ?? 0);
+    if (currentRyo < totalCost) throw new Error(`Ryo insuficiente. Necessário: ${totalCost}.`);
+
+    await supabaseAdmin.from("inventory").update({ ninja_bag: bag }).eq("character_id", run.character_id);
+    await supabaseAdmin.from("characters").update({ ryo: currentRyo - totalCost }).eq("id", run.character_id);
+    return { ok: true, cost: totalCost, repaired };
   });
