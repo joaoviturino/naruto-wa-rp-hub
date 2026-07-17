@@ -241,6 +241,18 @@ export function MinigameManager() {
                 </Button>
               </div>
             </div>
+            <div className="pt-3 border-t border-border/40 grid gap-2 md:grid-cols-[1fr_auto]">
+              <div>
+                <Label>Emprego exigido</Label>
+                <JobPicker value={selected.required_job_id ?? null}
+                  onChange={(v) => setSelected({ ...selected, required_job_id: v })} />
+              </div>
+              <label className="flex items-end gap-2 text-sm pb-1">
+                <input type="checkbox" checked={selected.job_required ?? true}
+                  onChange={(e) => setSelected({ ...selected, job_required: e.target.checked })} />
+                Obrigatório
+              </label>
+            </div>
           </div>
 
           <div className="scroll-panel rounded-lg p-4 space-y-3">
