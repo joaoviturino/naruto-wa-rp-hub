@@ -372,7 +372,7 @@ function BotPanel() {
   }
   useEffect(() => {
     load();
-    const ch = supabase.channel("bot_admin")
+    const ch = supabase.channel(`bot_admin_${Math.random().toString(36).slice(2)}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "bot_sessions" }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "outbound_messages" }, load)
       .subscribe();
