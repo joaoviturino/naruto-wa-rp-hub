@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { mineNode } from "@/lib/minigame.functions";
 import { toast } from "sonner";
 import { Pickaxe, X, Sparkles } from "lucide-react";
+import { ToolDurabilityHud, type ToolStatus } from "./ToolDurabilityHud";
 
 type Drop = { item_id: string; qty: number; name: string; image_url: string | null };
 type FloatingDrop = Drop & { key: number };
@@ -34,6 +35,8 @@ export function MiningGame({
   const [feed, setFeed] = useState<FloatingDrop[]>([]);
   const [particles, setParticles] = useState<Particle[]>([]);
   const [floatingDrops, setFloatingDrops] = useState<FloatingDrop[]>([]);
+  const [tools, setTools] = useState<ToolStatus[]>([]);
+  const [toolBroken, setToolBroken] = useState(false);
   const lastSwingRef = useRef(0);
   const busyRef = useRef(false);
   const startedAt = useRef<number>(Date.now());
@@ -84,7 +87,7 @@ export function MiningGame({
     busyRef.current = true;
     setBroken(true);
     try {
-      let r: { breaks: number; xp: number; drops: Drop[] };
+      let r: { breaks: number; xp: number; drops: Drop[]; tools?: ToolStatus[]; broken_now?: { item_id: string; name: string }[] };
       if (testMode) {
         // Simulação local: rola drops a partir da config
         const dropsCfg: Array<{ item_id: string; name?: string; image_url?: string | null; chance: number; min?: number; max?: number }> = Array.isArray(config?.drops) ? config.drops : [];
@@ -103,6 +106,10 @@ export function MiningGame({
       }
       setBreaks(r.breaks);
       setTotalXp((x) => x + (r.xp || 0));
+      if (r.tools) setTools(r.tools);
+      if (r.broken_now?.length) {
+        toast.error(`Ferramenta quebrou: ${r.broken_now.map((b) => b.name).join(", ")}`);
+      }
       spawnParticles(28);
       if (r.drops?.length) {
         const stamped: FloatingDrop[] = r.drops.map((d) => ({ ...d, key: Math.random() }));
@@ -113,7 +120,9 @@ export function MiningGame({
         }, 1600);
       }
     } catch (e: any) {
-      toast.error(e.message || "Falha ao minerar.");
+      const msg = e.message || "Falha ao minerar.";
+      toast.error(msg);
+      if (/quebrada|ferramenta/i.test(msg)) setToolBroken(true);
       // reverte estado — permite recomeçar
       setBroken(false);
       setHits(nodeHp - 1);
@@ -167,6 +176,13 @@ export function MiningGame({
           <X size={14} className="mr-1" /> Sair
         </Button>
       </div>
+
+      <ToolDurabilityHud
+        runId={runId}
+        tools={tools}
+        testMode={testMode}
+        onRepaired={(t) => { setTools(t); setToolBroken(false); }}
+      />
 
       {/* Feed de drops (lateral) */}
       <div className="absolute right-2 top-16 z-20 max-w-[45%] sm:max-w-[220px] space-y-1 pointer-events-none">
@@ -273,10 +289,10 @@ export function MiningGame({
         <Button
           size="lg"
           onClick={doSwing}
-          disabled={broken}
+          disabled={broken || toolBroken}
           className="w-full max-w-xs bg-gold text-black hover:bg-gold/90 font-bold text-base h-12 shadow-lg"
         >
-          <Pickaxe size={18} className="mr-2" /> Golpear
+          <Pickaxe size={18} className="mr-2" /> {toolBroken ? "Ferramenta quebrada" : "Golpear"}
         </Button>
       </div>
 
