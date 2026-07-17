@@ -706,11 +706,43 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                           ×{s.bonus_energetic} energ • ×{s.bonus_critical} crit • ×{s.bonus_speed} spd
                           {cd > 0 ? ` • ⏳ ${cd}` : (s.cooldown_turns ? ` • CD ${s.cooldown_turns}` : "")}
                           <span className="ml-1">• máx {maxES} ({s.cost_percent ?? 20}%)</span>
+                          {typeof s.accuracy === "number" && s.accuracy < 100 && (
+                            <span className="ml-1 text-amber-300">• {s.accuracy}% acerto</span>
+                          )}
                         </div>
                       </button>
                     );
                   })}
                 </div>
+                {defensiveSkills.length > 0 && (
+                  <div className="mt-3 rounded-md border border-sky-500/40 bg-sky-500/5 p-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="text-[11px] font-display text-sky-300">Defender (opcional)</div>
+                      {defenseSkill && (
+                        <button onClick={() => setSelectedDefense(null)}
+                          className="text-[10px] text-muted-foreground hover:text-red-300">Cancelar defesa</button>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mb-2">
+                      Escolha uma postura defensiva antes de agir. Ela reduz o dano do próximo golpe recebido.
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {defensiveSkills.map((s) => {
+                        const cd = myCooldowns[s.id] ?? 0;
+                        const active = selectedDefense === s.id;
+                        return (
+                          <button key={s.id} disabled={cd > 0}
+                            onClick={() => setSelectedDefense(active ? null : s.id)}
+                            className={`rounded-md border px-2 py-1 text-[10px] transition ${active ? "border-sky-400 bg-sky-500/20 text-sky-100" : "border-border hover:border-sky-400/60"} ${cd > 0 ? "opacity-40 cursor-not-allowed" : ""}`}>
+                            🛡️ {s.name}
+                            <span className="ml-1 opacity-70">−{s.defense_percent ?? 50}%</span>
+                            {cd > 0 && <span className="ml-1">⏳{cd}</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 <div className="flex items-end gap-2 mt-3">
                   <div className="flex-1">
                     <div className="text-xs text-muted-foreground mb-1">
