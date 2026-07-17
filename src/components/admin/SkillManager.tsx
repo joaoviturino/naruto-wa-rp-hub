@@ -12,10 +12,9 @@ import { toast } from "sonner";
 import { ImageUpload } from "@/components/ImageUpload";
 import { NINJA_RANKS, SKILL_RANKS, ELEMENTS, CLASSIFICATIONS, RANGES, labelize } from "./shared";
 import { useProficiencies } from "@/hooks/useProficiencies";
-import { Trash2, Pencil, Plus, Swords } from "lucide-react";
+import { Trash2, Pencil, Plus, Swords, FlaskConical } from "lucide-react";
 import { RestoreEffectFields } from "./RestoreEffectFields";
 import { SkillTestDialog } from "./SkillTestDialog";
-import { FlaskConical } from "lucide-react";
 
 export function SkillManager({ adminUserId }: { adminUserId: string }) {
   const [skills, setSkills] = useState<any[]>([]);
