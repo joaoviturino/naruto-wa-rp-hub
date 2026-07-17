@@ -217,6 +217,34 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
           <Field label="Cooldown (turnos)">
             <Input type="number" min={0} max={50} value={f.cooldown_turns ?? 0} onChange={(e) => up("cooldown_turns", Number(e.target.value))} />
           </Field>
+          <Field label="Precisão (chance de acertar %)">
+            <Input type="number" min={1} max={100} value={f.accuracy ?? 100}
+              onChange={(e) => up("accuracy", Math.max(1, Math.min(100, Number(e.target.value))))} />
+            <div className="text-[10px] text-muted-foreground mt-1">
+              Ex.: 90 = 10% de chance de errar. Energia e cooldown são gastos mesmo ao errar.
+            </div>
+          </Field>
+          <div className="sm:col-span-2 rounded-md border border-sky-500/40 bg-sky-500/5 p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-display text-sky-300">Habilidade defensiva</div>
+              <label className="inline-flex items-center gap-2 text-xs">
+                <input type="checkbox" checked={!!f.is_defensive}
+                  onChange={(e) => up("is_defensive", e.target.checked)} />
+                Marcar como defensiva
+              </label>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Habilidades defensivas aparecem no menu <b>Defender</b> do combate. Quando ativadas,
+              reduzem o dano do próximo golpe recebido pela % configurada.
+            </p>
+            {f.is_defensive && (
+              <div>
+                <Label>Redução de dano (%)</Label>
+                <Input type="number" min={0} max={100} value={f.defense_percent ?? 50}
+                  onChange={(e) => up("defense_percent", Math.max(0, Math.min(100, Number(e.target.value))))} />
+              </div>
+            )}
+          </div>
           {(f.req_class === "shurikenjutsu" || f.skill_class === "shurikenjutsu") && (
             <Field label="Qtd. de ferramentas consumidas por uso">
               <Input type="number" min={1} max={999}
