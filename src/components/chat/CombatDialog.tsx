@@ -247,6 +247,20 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
     lastLogSeq.current = fresh[fresh.length - 1].seq;
     for (const entry of fresh) {
       if (entry.pose_url || entry.sound_url || entry.animation_url) animQueue.current.push(entry);
+      // MISS: mostra um "flutuante" cinza no alvo para deixar claro que errou.
+      if (entry.missed) {
+        const missId = `${entry.seq}-miss`;
+        if (entry.actor === "player") {
+          const idx = typeof entry.target_npc_idx === "number"
+            ? entry.target_npc_idx
+            : npcs.findIndex((n: any) => n.name === entry.target_name);
+          if (idx >= 0) pushBurst(`npc:${idx}`, { id: missId, amount: 0, label: "MISS" });
+        } else if (entry.actor === "npc") {
+          const cid = entry.target_char_id
+            ?? players.find((x: any) => x.nickname === entry.target_name)?.character_id;
+          if (cid) pushBurst(`player:${cid}`, { id: missId, amount: 0, label: "MISS" });
+        }
+      }
       // Números de dano flutuantes
       if (Number(entry.damage) > 0) {
         const id = `${entry.seq}-${Math.random().toString(36).slice(2, 7)}`;
