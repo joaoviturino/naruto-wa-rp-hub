@@ -31,6 +31,9 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const [selectedSkill, setSelectedSkill] = useState<string>("");
   const [selectedDefense, setSelectedDefense] = useState<string | null>(null);
   const [energy, setEnergy] = useState<number>(10);
+  const [energyStr, setEnergyStr] = useState<string>("10");
+  // Mantém a string em sync quando `energy` é alterado por outra fonte (skill mudou, clamp, etc.).
+  useEffect(() => { setEnergyStr(String(energy)); }, [energy]);
   const [busy, setBusy] = useState(false);
   const [fleeing, setFleeing] = useState(false);
   const [bag, setBag] = useState<BagEntry[]>([]);
