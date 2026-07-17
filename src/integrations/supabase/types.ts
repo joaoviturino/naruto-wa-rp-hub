@@ -218,18 +218,30 @@ export type Database = {
           character_id: string
           id: string
           mount_id: string
+          pose_id: string | null
+          pose_offset_x: number
+          pose_offset_y: number
+          pose_scale: number
         }
         Insert: {
           acquired_at?: string
           character_id: string
           id?: string
           mount_id: string
+          pose_id?: string | null
+          pose_offset_x?: number
+          pose_offset_y?: number
+          pose_scale?: number
         }
         Update: {
           acquired_at?: string
           character_id?: string
           id?: string
           mount_id?: string
+          pose_id?: string | null
+          pose_offset_x?: number
+          pose_offset_y?: number
+          pose_scale?: number
         }
         Relationships: [
           {
@@ -244,6 +256,13 @@ export type Database = {
             columns: ["mount_id"]
             isOneToOne: false
             referencedRelation: "mounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "character_mounts_pose_id_fkey"
+            columns: ["pose_id"]
+            isOneToOne: false
+            referencedRelation: "character_poses"
             referencedColumns: ["id"]
           },
         ]
@@ -1571,6 +1590,7 @@ export type Database = {
           name: string
           rank: string | null
           speed_multiplier: number
+          travel_gif_url: string | null
           updated_at: string
         }
         Insert: {
@@ -1581,6 +1601,7 @@ export type Database = {
           name: string
           rank?: string | null
           speed_multiplier?: number
+          travel_gif_url?: string | null
           updated_at?: string
         }
         Update: {
@@ -1591,6 +1612,7 @@ export type Database = {
           name?: string
           rank?: string | null
           speed_multiplier?: number
+          travel_gif_url?: string | null
           updated_at?: string
         }
         Relationships: []
