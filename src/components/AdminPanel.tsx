@@ -41,6 +41,7 @@ const NAV: NavItem[] = [
   { id: "skills",    label: "Habilidades", icon: Sparkles,      group: "Conteúdo" },
   { id: "profs",     label: "Proficiências", icon: Award,       group: "Conteúdo" },
   { id: "missions",  label: "Missões",   icon: ScrollText,      group: "Conteúdo" },
+  { id: "jobs",      label: "Empregos",  icon: Briefcase,       group: "Conteúdo" },
   { id: "clans",     label: "Árvore de Clã", icon: GitBranch,   group: "Mundo" },
   { id: "locations", label: "Locais",    icon: MapPin,          group: "Mundo" },
   { id: "npcs",      label: "NPCs",      icon: Ghost,           group: "Mundo" },
