@@ -64,7 +64,7 @@ function PartyPage() {
   useEffect(() => { load(); }, [user.id]);
   useEffect(() => {
     if (!me) return;
-    const ch = supabase.channel(`party-page-${me.id}`)
+    const ch = supabase.channel(`party-page-${me.id}-${Math.random().toString(36).slice(2)}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "party_invites" }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "party_members" }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "parties" }, load)
