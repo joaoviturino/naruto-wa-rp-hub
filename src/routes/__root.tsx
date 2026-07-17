@@ -7,7 +7,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -42,6 +42,76 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   useEffect(() => {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
   }, [error]);
+
+  // ---- Auto-recovery ---------------------------------------------------
+  // Some errors are transient (network flap, realtime re-mount, chunk load
+  // failure after a deploy). Try to recover automatically 2x with backoff
+  // before showing the manual "This page didn't load" fallback.
+  const attemptRef = useRef(0);
+  const [status, setStatus] = useState<"recovering" | "failed">("recovering");
+  const [countdown, setCountdown] = useState(0);
+
+  const message = String(error?.message ?? "");
+  const category: "network" | "auth" | "chunk" | "realtime" | "unknown" =
+    /network|failed to fetch|load failed|timeout|abort/i.test(message)
+      ? "network"
+      : /unauthor|401|403|jwt|token/i.test(message)
+      ? "auth"
+      : /chunkloaderror|dynamically imported module|loading chunk/i.test(message)
+      ? "chunk"
+      : /realtime|channel|postgres_changes|subscribe/i.test(message)
+      ? "realtime"
+      : "unknown";
+
+  useEffect(() => {
+    // Chunk errors after a deploy are only fixed by a hard reload.
+    if (category === "chunk") {
+      const t = setTimeout(() => window.location.reload(), 1200);
+      return () => clearTimeout(t);
+    }
+    if (attemptRef.current >= 2) {
+      setStatus("failed");
+      return;
+    }
+    attemptRef.current += 1;
+    const delayMs = attemptRef.current === 1 ? 800 : 2500;
+    setCountdown(Math.ceil(delayMs / 1000));
+    const tick = setInterval(() => setCountdown((c) => Math.max(0, c - 1)), 1000);
+    const t = setTimeout(() => {
+      clearInterval(tick);
+      router.invalidate();
+      reset();
+    }, delayMs);
+    return () => { clearTimeout(t); clearInterval(tick); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [error]);
+
+  const headline =
+    status === "recovering"
+      ? "Recarregando…"
+      : category === "network"
+      ? "Sem conexão estável"
+      : category === "auth"
+      ? "Sua sessão expirou"
+      : category === "realtime"
+      ? "Falha no canal em tempo real"
+      : "Não foi possível carregar";
+
+  const advice =
+    status === "recovering"
+      ? `Tentando recuperar automaticamente… (${countdown}s)`
+      : category === "network"
+      ? "Verifique sua internet e toque em Tentar de novo."
+      : category === "auth"
+      ? "Faça login novamente para continuar."
+      : category === "realtime"
+      ? "Feche e reabra a página. Se persistir, alterne o Wi-Fi/4G."
+      : "Toque em Tentar de novo, ou volte para a home.";
+
+  const primaryAction = category === "auth"
+    ? { label: "Fazer login", onClick: () => { window.location.href = "/auth"; } }
+    : { label: "Tentar de novo", onClick: () => { attemptRef.current = 0; setStatus("recovering"); router.invalidate(); reset(); } };
+  // ----------------------------------------------------------------------
 
   const diagnostics = (() => {
     const nav = typeof navigator !== "undefined" ? navigator : ({} as Navigator);
@@ -104,11 +174,14 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
+        {status === "recovering" && (
+          <div className="mx-auto mb-3 h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        )}
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This page didn't load
+          {headline}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
+          {advice}
         </p>
         <details className="mt-4 text-left rounded-md border border-border bg-card/60 p-3 text-xs">
           <summary className="cursor-pointer font-medium text-foreground">Detalhes técnicos</summary>
@@ -139,21 +212,28 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
           </pre>
         </details>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
-          <button
-            onClick={() => {
-              router.invalidate();
-              reset();
-            }}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Try again
-          </button>
+          {status === "failed" && (
+            <button
+              onClick={primaryAction.onClick}
+              className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            >
+              {primaryAction.label}
+            </button>
+          )}
           <a
             href="/"
             className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
           >
-            Go home
+            Voltar à home
           </a>
+          {status === "failed" && (
+            <button
+              onClick={() => window.location.reload()}
+              className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            >
+              Recarregar
+            </button>
+          )}
         </div>
       </div>
     </div>
