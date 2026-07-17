@@ -225,8 +225,11 @@ export function LocationManager() {
                     }}
                     placeholder="— nenhum (local raiz)"
                     triggerClassName="h-9 text-sm"
-                    options={locs.filter((l) => l.id !== sel.id && l.parent_id !== sel.id)
-                      .map((l) => ({ value: l.id, label: l.name }))}
+                    options={[
+                      { value: "", label: "— nenhum (local raiz)" },
+                      ...locs.filter((l) => l.id !== sel.id && l.parent_id !== sel.id)
+                        .map((l) => ({ value: l.id, label: l.name })),
+                    ]}
                   />
                   <p className="text-[11px] text-muted-foreground">
                     Sublocais do mesmo pai têm viagem rápida entre si (5s por conexão).
