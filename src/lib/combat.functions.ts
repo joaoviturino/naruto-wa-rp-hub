@@ -352,6 +352,7 @@ export const playerAttack = createServerFn({ method: "POST" })
     energy_used: z.number().int().min(1).max(100000),
     target_index: z.number().int().min(0).max(10).optional(),
     heal_target_char_id: z.string().uuid().optional(),
+    defensive_skill_id: z.string().uuid().optional(),
   }).parse(i))
   .handler(async ({ data, context }) => {
     const me = await loadMyChar(context);
