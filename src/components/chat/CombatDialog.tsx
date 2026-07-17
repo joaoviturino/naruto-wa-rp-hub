@@ -704,7 +704,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                     })}
                   </div>
                 </div>
-                <div className="grid gap-2 sm:grid-cols-2 max-h-56 overflow-y-auto no-scrollbar pr-1">
+                <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 max-h-60 overflow-y-auto no-scrollbar pr-1">
                   {skillsByTab.length === 0 && <p className="text-xs text-muted-foreground p-3 text-center col-span-full">Nenhuma habilidade nesta categoria.</p>}
                   {skillsByTab.map((s) => {
                     const cd = myCooldowns[s.id] ?? 0;
