@@ -409,8 +409,10 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
       await attack({ data: {
         session_id: sessionId, skill_id: currentSkill.id, energy_used: energy,
         target_index: targetIdx,
+        ...(selectedDefense ? { defensive_skill_id: selectedDefense } : {}),
         ...(isHealSkill && healTarget === "single" ? { heal_target_char_id: healTargetId } : {}),
       } });
+      setSelectedDefense(null); // consome a defesa após enviar o turno
     } catch (e: any) { toast.error(e.message); }
     finally { setBusy(false); }
   }
