@@ -65,7 +65,7 @@ export function PvpInvitesWatcher() {
       if (!me?.id || cancelled) return;
       setMyId(me.id);
       await refresh(me.id);
-      channel = supabase.channel(`pvp_watch_${me.id}`)
+      channel = supabase.channel(`pvp_watch_${me.id}_${Math.random().toString(36).slice(2)}`)
         .on("postgres_changes", { event: "*", schema: "public", table: "pvp_duels" }, () => refresh(me.id));
       channel.subscribe();
     })();

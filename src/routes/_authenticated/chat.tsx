@@ -131,7 +131,7 @@ function ChatPage() {
       catch { /* noop */ }
     }
     loadInvites(); loadPartyMembers(); checkCombat();
-    const ch = supabase.channel(`invites-${character.id}`)
+    const ch = supabase.channel(`invites-${character.id}-${Math.random().toString(36).slice(2)}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "party_invites" }, loadInvites)
       .on("postgres_changes", { event: "*", schema: "public", table: "party_members" }, loadPartyMembers)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "characters" }, loadPartyMembers)
@@ -184,7 +184,7 @@ function ChatPage() {
   useEffect(() => {
     if (!currentLoc) { setMessages([]); return; }
     loadMessages(currentLoc.id);
-    const ch = supabase.channel(`loc-${currentLoc.id}`)
+    const ch = supabase.channel(`loc-${currentLoc.id}-${Math.random().toString(36).slice(2)}`)
       .on("postgres_changes",
         { event: "INSERT", schema: "public", table: "location_messages", filter: `location_id=eq.${currentLoc.id}` },
         async (payload) => {
@@ -224,7 +224,7 @@ function ChatPage() {
       if (nextPvpId) setCombatId(nextPvpId);
     }
     refreshPvp();
-    const ch = supabase.channel(`pvp-loc-${currentLoc.id}`)
+    const ch = supabase.channel(`pvp-loc-${currentLoc.id}-${Math.random().toString(36).slice(2)}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "combat_sessions", filter: `location_id=eq.${currentLoc.id}` },
         () => refreshPvp())
       .on("postgres_changes", { event: "*", schema: "public", table: "pvp_duels" },
