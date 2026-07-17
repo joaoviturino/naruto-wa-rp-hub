@@ -260,7 +260,7 @@ export function MinigameManager() {
             <SequenceConfigEditor selected={selected} setSelected={setSelected} />
           ) : (selected.kind === "forge" || selected.kind === "tailoring") ? (
             <ForgeConfigEditor selected={selected} setSelected={setSelected} items={items} kind={selected.kind} />
-          ) : selected.kind === "mining" ? (
+          ) : (selected.kind === "mining" || selected.kind === "logging") ? (
             <MiningConfigEditor selected={selected} setSelected={setSelected} items={items} />
           ) : (
             <div className="scroll-panel rounded-lg p-4 space-y-3">
