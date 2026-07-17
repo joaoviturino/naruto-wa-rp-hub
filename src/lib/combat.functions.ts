@@ -1124,7 +1124,7 @@ async function finalizePvp(supabaseAdmin: any, sessId: string, state: PvpState, 
 
 async function handlePvpAttack(
   supabaseAdmin: any, supabaseUser: any, sess: any, myId: string,
-  data: { session_id: string; skill_id: string; energy_used: number; target_index?: number; heal_target_char_id?: string },
+  data: { session_id: string; skill_id: string; energy_used: number; target_index?: number; heal_target_char_id?: string; defensive_skill_id?: string },
 ) {
   const state = sess.state as PvpState;
   const log: LogEntry[] = Array.isArray(sess.log) ? (sess.log as any) : [];
@@ -1139,11 +1139,22 @@ async function handlePvpAttack(
   const cd = activePlayer.cooldowns[data.skill_id] ?? 0;
   if (cd > 0) throw new Error(`Habilidade em cooldown por mais ${cd} turno(s).`);
 
+  // Defesa opcional — o escudo protege este jogador do próximo golpe adversário.
+  if (data.defensive_skill_id) {
+    const shield = await consumeDefensiveSkill(supabaseUser, activePlayer, data.defensive_skill_id, log);
+    (state as any)._shields = (state as any)._shields ?? {};
+    (state as any)._shields[activePlayer.character_id] = { percent: shield.percent, name: shield.skillName };
+    // marcadores PvP no último log
+    const last = log[log.length - 1] as any;
+    last.pvp_actor_side = mySide; last.pvp_actor_idx = state.active_idx;
+    last.pvp_target_side = mySide; last.pvp_target_idx = state.active_idx;
+  }
+
   const { data: owned } = await supabaseUser
     .from("character_skills").select("skill_id").eq("character_id", myId).eq("skill_id", data.skill_id).maybeSingle();
   if (!owned) throw new Error("Você não conhece essa habilidade.");
   const { data: skill } = await supabaseUser.from("skills")
-    .select("id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class,skill_class,meta,animation_url,animation_mode,sound_url")
+    .select("id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class,skill_class,meta,animation_url,animation_mode,sound_url,accuracy")
     .eq("id", data.skill_id).maybeSingle();
   if (!skill) throw new Error("Habilidade inexistente.");
 
