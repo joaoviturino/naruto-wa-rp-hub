@@ -19,7 +19,7 @@ type DropRow = { item_id: string; qty: number; chance: number };
 type ShopRow = { item_id: string; price: number; stock: number };
 type BuyRow = { item_id: string; price: number; max_per_day: number };
 type RewardRow = { item_id: string; qty: number };
-type NpcKind = "aggressive" | "shop" | "reward" | "learning" | "object" | "dialogue" | "buyer";
+type NpcKind = "aggressive" | "shop" | "reward" | "learning" | "object" | "dialogue" | "buyer" | "employer";
 type LearnBlock = { id: string; kind: "text" | "image"; text?: string | null; image_url?: string | null };
 type Npc = {
   id: string; name: string; image_url: string | null; description: string | null;
@@ -65,6 +65,7 @@ const KIND_META: Record<NpcKind, { label: string; icon: any; color: string }> = 
   learning:   { label: "Aprendizado", icon: GraduationCap, color: "text-sky-400 border-sky-500/40 bg-sky-500/10" },
   dialogue:   { label: "Diálogo",   icon: MessageCircle, color: "text-violet-400 border-violet-500/40 bg-violet-500/10" },
   object:     { label: "Objeto",    icon: Package, color: "text-slate-300 border-slate-500/40 bg-slate-500/10" },
+  employer:   { label: "Empregador", icon: MessageCircle, color: "text-cyan-400 border-cyan-500/40 bg-cyan-500/10" },
 };
 
 export function NpcManager() {
