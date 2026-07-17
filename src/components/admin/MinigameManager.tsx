@@ -780,3 +780,19 @@ function ForgeConfigEditor({ selected, setSelected, items, kind }: { selected: a
     </div>
   );
 }
+function JobPicker({ value, onChange }: { value: string | null; onChange: (v: string | null) => void }) {
+  const [jobs, setJobs] = useState<{ id: string; name: string; active: boolean }[]>([]);
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from("jobs").select("id,name,active").order("name");
+      setJobs((data as any[]) ?? []);
+    })();
+  }, []);
+  return (
+    <select value={value ?? ""} onChange={(e) => onChange(e.target.value || null)}
+      className="w-full bg-background border border-border rounded px-2 h-9 text-sm">
+      <option value="">— nenhum —</option>
+      {jobs.map((j) => <option key={j.id} value={j.id}>{j.name}{j.active ? "" : " (inativo)"}</option>)}
+    </select>
+  );
+}
