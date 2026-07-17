@@ -430,6 +430,15 @@ export const completeMinigameRun = createServerFn({ method: "POST" })
       score: data.score, success: data.success, rewards_applied: applied, completed_at: new Date().toISOString(),
     }).eq("id", data.run_id);
 
+    // Bump last_activity_at do emprego vinculado se o run teve sucesso.
+    if (data.success && (run.minigames as any).required_job_id) {
+      await supabaseAdmin.from("character_jobs")
+        .update({ last_activity_at: new Date().toISOString() })
+        .eq("character_id", run.character_id)
+        .eq("job_id", (run.minigames as any).required_job_id)
+        .eq("status", "active");
+    }
+
     // Missões — registrar conclusão de minigame e (se houver) fabricação.
     if (data.success) {
       try {
