@@ -835,7 +835,7 @@ async function runSingleNpcAttack(supabaseAdmin: any, npcState: NpcState, state:
   const critChance = Math.max(0, Math.min(100, Number(npcCfg?.crit_chance ?? 10)));
   const critMul = Math.max(1, Number(npcCfg?.crit_multiplier ?? 1.5));
   const { data: skills } = await supabaseAdmin
-    .from("npc_skills").select("skill:skills(id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic,animation_url,animation_mode,sound_url)").eq("npc_id", npcState.id);
+    .from("npc_skills").select("skill:skills(id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic,animation_url,animation_mode,sound_url,accuracy)").eq("npc_id", npcState.id);
   const pool = ((skills as any[]) ?? []).map((r: any) => r.skill).filter(Boolean);
   if (pool.length === 0) return;
   const affordable = pool.filter((s: any) => npcState.energy >= s.base_cost);
@@ -860,24 +860,40 @@ async function runSingleNpcAttack(supabaseAdmin: any, npcState: NpcState, state:
   // Regra "quem é mais rápido pega primeiro": se speed do jogador for maior E jogador matou o NPC, NPC não age.
   // Aqui já sabemos que NPC não morreu — mas se a fala for do jogador mais rápido, aplicamos multiplicador de dano reduzido (30% menos) como penalidade por reação.
   const speedPenalty = incomingSpeed > speed ? 0.7 : 1;
-  const finalDamage = Math.round(damage * speedPenalty);
+  let finalDamage = Math.round(damage * speedPenalty);
 
   // Escolhe um jogador vivo aleatório como alvo
   const alive = state.players.filter((p) => p.alive);
   if (!alive.length) return;
   const target = alive[Math.floor(Math.random() * alive.length)];
-  const taken = damageTargetPlayer(target, finalDamage);
+
+  // Precisão do golpe do NPC: pode errar.
+  const accuracy = Math.max(1, Math.min(100, Number((skill as any).accuracy ?? 100)));
+  const missed = Math.random() * 100 >= accuracy;
+
+  // Escudo defensivo do alvo (postura declarada pelo jogador na sua ação).
+  let shieldInfo: { percent: number; name: string } | undefined;
+  if (!missed) {
+    const shield = applyShield(state, target.character_id, finalDamage);
+    finalDamage = shield.final;
+    shieldInfo = shield.shielded;
+  }
+  const taken = missed ? { pool: "hp" as const, taken: 0 } : damageTargetPlayer(target, finalDamage);
 
   log.push({
     seq: log.length + 1, actor: "npc", actor_name: npcState.name, target_name: target.nickname,
     skill_name: skill.name, energy_type: skill.energy_type as Pool, energy_used: energy,
-    effective, damage: finalDamage, speed, crit_mul: isCrit ? critMul : Number(skill.bonus_critical),
+    effective, damage: missed ? 0 : finalDamage, speed, crit_mul: isCrit ? critMul : Number(skill.bonus_critical),
     animation_url: (skill as any).animation_url ?? null,
     animation_mode: ((skill as any).animation_mode ?? "overlay") as any,
     target_char_id: target.character_id,
     actor_char_id: npcState.id,
     sound_url: (skill as any).sound_url ?? null,
-    msg: `${npcState.name} usa ${skill.name}${isCrit ? " (CRÍTICO!)" : ""} → ${target.nickname} sofre ${taken.taken} de dano na vida${speedPenalty < 1 ? " (reação lenta)" : ""}.`,
+    missed,
+    ...(shieldInfo ? { shield_reduced_by: shieldInfo.percent, shield_name: shieldInfo.name } : {}),
+    msg: missed
+      ? `${npcState.name} usa ${skill.name} — mas ERRA o golpe contra ${target.nickname}!`
+      : `${npcState.name} usa ${skill.name}${isCrit ? " (CRÍTICO!)" : ""} → ${target.nickname} sofre ${taken.taken} de dano${shieldInfo ? ` (defesa ${shieldInfo.name} −${shieldInfo.percent}%)` : ""}${speedPenalty < 1 ? " (reação lenta)" : ""}.`,
   });
   npcState.energy = Math.max(0, npcState.energy - energy);
 }
