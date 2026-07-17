@@ -975,3 +975,86 @@ function EmployerJobPicker({ value, onChange }: { value: string | null; onChange
     </select>
   );
 }
+
+function ChestAdminSection({ npcId }: { npcId: string }) {
+  const [chest, setChest] = useState<any>(null);
+  const [capacity, setCapacity] = useState(100);
+  const [players, setPlayers] = useState<{ id: string; nickname: string }[]>([]);
+  const [owner, setOwner] = useState<string | null>(null);
+  const [auth, setAuth] = useState<Set<string>>(new Set());
+  const [filter, setFilter] = useState("");
+
+  async function load() {
+    const [{ data: ch }, { data: chars }] = await Promise.all([
+      supabase.from("npc_chests").select("id,capacity").eq("npc_id", npcId).maybeSingle(),
+      supabase.from("characters").select("id,nickname").order("nickname"),
+    ]);
+    setChest(ch);
+    setCapacity(Number((ch as any)?.capacity ?? 100));
+    setPlayers((chars as any[]) ?? []);
+    if (ch) {
+      const { data: perms } = await supabase.from("chest_permissions")
+        .select("character_id,is_owner").eq("chest_id", (ch as any).id);
+      const o = (perms as any[])?.find((p) => p.is_owner)?.character_id ?? null;
+      setOwner(o);
+      setAuth(new Set(((perms as any[]) ?? []).filter((p) => !p.is_owner).map((p) => p.character_id)));
+    } else { setOwner(null); setAuth(new Set()); }
+  }
+  useEffect(() => { load(); }, [npcId]);
+
+  const { upsertNpcChest, deleteNpcChest, setChestPermissions } = require("@/lib/chest.functions");
+  const upFn = useServerFn(upsertNpcChest);
+  const delFn = useServerFn(deleteNpcChest);
+  const permFn = useServerFn(setChestPermissions);
+
+  async function saveChest() {
+    try {
+      const r: any = await upFn({ data: { npc_id: npcId, capacity: Number(capacity) || 100 } });
+      await permFn({ data: { chest_id: r.id, owner_character_id: owner, authorized_character_ids: Array.from(auth) } });
+      toast.success("Baú salvo.");
+      load();
+    } catch (e: any) { toast.error(e.message); }
+  }
+
+  const filtered = players.filter((p) => (p.nickname ?? "").toLowerCase().includes(filter.toLowerCase()));
+
+  return (
+    <div className="scroll-panel rounded-lg p-4 space-y-3 mt-2">
+      <h4 className="font-display text-lg text-gold flex items-center gap-2">Baú vinculado</h4>
+      <p className="text-xs text-muted-foreground">Itens comprados por este NPC vão para o baú. O dono não pode vender aqui (anti-farm).</p>
+      <div className="flex items-end gap-2">
+        <div className="flex-1"><label className="text-xs">Capacidade</label>
+          <Input type="number" min={1} value={capacity} onChange={(e) => setCapacity(Number(e.target.value))} />
+        </div>
+        <Button size="sm" onClick={saveChest}>Salvar baú</Button>
+        {chest && <Button size="sm" variant="destructive" onClick={async () => {
+          if (!confirm("Remover baú?")) return;
+          try { await delFn({ data: { chest_id: chest.id } }); toast.success("Removido."); load(); }
+          catch (e: any) { toast.error(e.message); }
+        }}>Remover</Button>}
+      </div>
+      <div>
+        <label className="text-xs">Dono (único)</label>
+        <select value={owner ?? ""} onChange={(e) => setOwner(e.target.value || null)}
+          className="w-full bg-background border border-border rounded px-2 h-9 text-sm">
+          <option value="">— nenhum —</option>
+          {players.map((p) => <option key={p.id} value={p.id}>{p.nickname}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="text-xs">Autorizados</label>
+        <Input placeholder="Filtrar…" value={filter} onChange={(e) => setFilter(e.target.value)} className="h-8 text-sm mb-1" />
+        <div className="max-h-40 overflow-y-auto border border-border rounded p-2 space-y-1">
+          {filtered.map((p) => (
+            <label key={p.id} className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={auth.has(p.id)} onChange={(e) => {
+                const n = new Set(auth); if (e.target.checked) n.add(p.id); else n.delete(p.id); setAuth(n);
+              }} />
+              {p.nickname}
+            </label>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
