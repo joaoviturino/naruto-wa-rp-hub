@@ -32,6 +32,8 @@ type Minigame = {
   required_rank?: string | null;
   required_profs?: Array<{ skill_class: string; nivel?: string | null; maestria?: string | null }>;
   reward_skills?: Array<{ skill_id: string }>;
+  required_job_id?: string | null;
+  job_required?: boolean;
 };
 
 const EMPTY: Minigame = {
@@ -42,6 +44,7 @@ const EMPTY: Minigame = {
   rewards: { xp: 0, ryo: 0, ef: 0, em: 0, chakra: 0, items: [] },
   cooldown_hours: 24, active: true,
   one_time: false, required_rank: null, required_profs: [], reward_skills: [],
+  required_job_id: null, job_required: true,
 };
 
 const NINJA_RANKS = ["estudante","genin","chunin","tokubetsu_jonin","jonin","anbu","sannin","kage"];
@@ -90,6 +93,8 @@ export function MinigameManager() {
         required_rank: selected.required_rank || null,
         required_profs: (selected.required_profs ?? []).filter((p) => p.skill_class),
         reward_skills: (selected.reward_skills ?? []).filter((s) => s.skill_id),
+        required_job_id: selected.required_job_id || null,
+        job_required: selected.job_required ?? true,
       };
       const r = await upsert({ data: payload });
       toast.success("Minigame salvo.");
