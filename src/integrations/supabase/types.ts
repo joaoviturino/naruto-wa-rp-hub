@@ -2304,6 +2304,7 @@ export type Database = {
       }
       skills: {
         Row: {
+          accuracy: number
           animation_mode: string
           animation_url: string | null
           base_cost: number
@@ -2316,11 +2317,13 @@ export type Database = {
             | null
           cooldown_turns: number
           cost_percent: number
+          defense_percent: number
           description: string | null
           element: Database["public"]["Enums"]["element"] | null
           energy_type: string
           id: string
           image_url: string | null
+          is_defensive: boolean
           meta: Json
           name: string
           range: Database["public"]["Enums"]["skill_range"] | null
@@ -2336,6 +2339,7 @@ export type Database = {
           type: string | null
         }
         Insert: {
+          accuracy?: number
           animation_mode?: string
           animation_url?: string | null
           base_cost?: number
@@ -2348,11 +2352,13 @@ export type Database = {
             | null
           cooldown_turns?: number
           cost_percent?: number
+          defense_percent?: number
           description?: string | null
           element?: Database["public"]["Enums"]["element"] | null
           energy_type?: string
           id?: string
           image_url?: string | null
+          is_defensive?: boolean
           meta?: Json
           name: string
           range?: Database["public"]["Enums"]["skill_range"] | null
@@ -2368,6 +2374,7 @@ export type Database = {
           type?: string | null
         }
         Update: {
+          accuracy?: number
           animation_mode?: string
           animation_url?: string | null
           base_cost?: number
@@ -2380,11 +2387,13 @@ export type Database = {
             | null
           cooldown_turns?: number
           cost_percent?: number
+          defense_percent?: number
           description?: string | null
           element?: Database["public"]["Enums"]["element"] | null
           energy_type?: string
           id?: string
           image_url?: string | null
+          is_defensive?: boolean
           meta?: Json
           name?: string
           range?: Database["public"]["Enums"]["skill_range"] | null
