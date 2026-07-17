@@ -386,12 +386,19 @@ export const playerAttack = createServerFn({ method: "POST" })
     const cd = activePlayer.cooldowns[data.skill_id] ?? 0;
     if (cd > 0) throw new Error(`Habilidade em cooldown por mais ${cd} turno(s).`);
 
+    // Defesa opcional declarada pelo jogador — aplica antes do turno do NPC.
+    if (data.defensive_skill_id) {
+      const shield = await consumeDefensiveSkill(context.supabase, activePlayer, data.defensive_skill_id, log);
+      state._shields = state._shields ?? {};
+      state._shields[activePlayer.character_id] = { percent: shield.percent, name: shield.skillName };
+    }
+
     // Habilidade precisa pertencer ao jogador
     const { data: owned } = await context.supabase
       .from("character_skills").select("skill_id").eq("character_id", me.id).eq("skill_id", data.skill_id).maybeSingle();
     if (!owned) throw new Error("Você não conhece essa habilidade.");
     const { data: skill } = await context.supabase.from("skills")
-      .select("id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class,skill_class,classification,meta,animation_url,animation_mode,sound_url").eq("id", data.skill_id).maybeSingle();
+      .select("id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class,skill_class,classification,meta,animation_url,animation_mode,sound_url,accuracy").eq("id", data.skill_id).maybeSingle();
     if (!skill) throw new Error("Habilidade inexistente.");
     const combatClass = String((skill as any).skill_class ?? skill.req_class ?? "").toLowerCase();
     const healCfg = (skill as any).meta?.heal as { target?: "single" | "team" } | undefined;
