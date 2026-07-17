@@ -404,6 +404,9 @@ const skillPayload = z.object({
   bonus_critical: z.number().min(0).max(100).default(1),
   bonus_energetic: z.number().min(0).max(100).default(1),
   cooldown_turns: z.number().int().min(0).max(50).default(0),
+  is_defensive: z.boolean().default(false),
+  defense_percent: z.number().int().min(0).max(100).default(50),
+  accuracy: z.number().int().min(1).max(100).default(100),
   meta: metaSchema,
 });
 
