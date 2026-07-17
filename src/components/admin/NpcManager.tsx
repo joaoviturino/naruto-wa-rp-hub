@@ -576,6 +576,7 @@ export function NpcManager() {
                 await save({ data: { ...sel, buy_items: next } } as any); load();
               }}><Plus size={14} className="mr-1" /> Adicionar item</Button>
             </div>
+            <ChestAdminSection npcId={sel.id} />
             </TabsContent>
           )}
 
