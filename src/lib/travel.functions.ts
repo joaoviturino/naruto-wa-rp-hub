@@ -41,9 +41,20 @@ export const listMyMounts = createServerFn({ method: "GET" })
     if (!char) return { mounts: [] };
     const { data } = await context.supabase
       .from("character_mounts")
-      .select("mount:mounts(id,name,image_url,travel_gif_url,description,rank,speed_multiplier)")
+      .select("pose_id,pose_offset_x,pose_offset_y,pose_scale,pose:poses(id,name,image_url),mount:mounts(id,name,image_url,travel_gif_url,description,rank,speed_multiplier)")
       .eq("character_id", char.id);
-    return { mounts: ((data as any[]) ?? []).map((r) => r.mount).filter(Boolean) };
+    return {
+      mounts: ((data as any[]) ?? [])
+        .filter((r) => r.mount)
+        .map((r) => ({
+          ...r.mount,
+          pose_id: r.pose_id ?? null,
+          pose_offset_x: Number(r.pose_offset_x ?? 0),
+          pose_offset_y: Number(r.pose_offset_y ?? 0),
+          pose_scale: Number(r.pose_scale ?? 1),
+          pose_image_url: r.pose?.image_url ?? null,
+        })),
+    };
   });
 
 /** Inicia uma viagem até um local. Calcula duração e persiste sessão. */
