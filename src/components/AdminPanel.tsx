@@ -288,6 +288,31 @@ function Players() {
   const [viewOpen, setViewOpen] = useState(false);
   const setXpFn = useServerFn(setUserXp);
   const restoreFn = useServerFn(restoreEnergies);
+  const resetOne = useServerFn(resetPlayerProgress);
+  const resetAll = useServerFn(resetAllPlayers);
+  const [resetTarget, setResetTarget] = useState<{ id: string | null; name: string } | null>(null);
+  const [resetXp, setResetXp] = useState(true);
+  const [resetInv, setResetInv] = useState(true);
+  const [resetting, setResetting] = useState(false);
+
+  async function doReset() {
+    if (!resetTarget) return;
+    if (!resetXp && !resetInv) { toast.error("Selecione ao menos XP ou Inventário."); return; }
+    setResetting(true);
+    try {
+      if (resetTarget.id) {
+        await resetOne({ data: { character_id: resetTarget.id, resetXp, resetInventory: resetInv } });
+        toast.success(`${resetTarget.name} zerado.`);
+      } else {
+        const r: any = await resetAll({ data: { resetXp, resetInventory: resetInv } });
+        toast.success(`Zerado para todos os jogadores${r?.affected ? ` (${r.affected} linhas)` : ""}.`);
+      }
+      setResetTarget(null);
+      load();
+    } catch (e: any) { toast.error(e.message); }
+    finally { setResetting(false); }
+  }
+
   async function load() {
     const { data } = await supabase.from("characters")
       .select("id,nickname,phone_e164,village,xp,rank,user_id,clan:clans(name,rarity)")
@@ -297,6 +322,12 @@ function Players() {
   useEffect(() => { load(); }, []);
   return (
     <>
+    <div className="flex justify-end mb-2">
+      <Button size="sm" variant="destructive"
+        onClick={() => { setResetXp(true); setResetInv(true); setResetTarget({ id: null, name: "TODOS os jogadores" }); }}>
+        <AlertTriangle size={14} className="mr-1" /> Zerar TODOS
+      </Button>
+    </div>
     <div className="scroll-panel rounded-lg overflow-x-auto">
       <table className="w-full text-sm min-w-[720px]">
         <thead className="bg-secondary/50">
@@ -340,6 +371,10 @@ function Players() {
                     title="Ver ficha, inventário e databook do jogador">
                     <Eye size={14} /> Ver
                   </Button>
+                  <Button size="sm" variant="outline" title="Zerar XP e/ou inventário"
+                    onClick={() => { setResetXp(true); setResetInv(true); setResetTarget({ id: c.id, name: c.nickname }); }}>
+                    <RotateCcw size={14} /> Zerar
+                  </Button>
                 </div>
               </td>
             </tr>
@@ -350,6 +385,32 @@ function Players() {
     </div>
     <PlayerEditor characterId={editingId} open={open} onOpenChange={setOpen} onSaved={load} />
     <AdminPlayerViewer characterId={viewingId} open={viewOpen} onOpenChange={setViewOpen} />
+    {resetTarget && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => !resetting && setResetTarget(null)}>
+        <div className="scroll-panel rounded-lg max-w-md w-full p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-2 text-blood">
+            <AlertTriangle size={18} /> <h3 className="font-display text-lg">Zerar progresso</h3>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Você está prestes a zerar <b className="text-foreground">{resetTarget.name}</b>. Esta ação é irreversível.
+          </p>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input type="checkbox" checked={resetXp} onChange={(e) => setResetXp(e.target.checked)} />
+            Zerar XP (define como 0)
+          </label>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input type="checkbox" checked={resetInv} onChange={(e) => setResetInv(e.target.checked)} />
+            Zerar inventário (bolsa, secundários e itens equipados)
+          </label>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" disabled={resetting} onClick={() => setResetTarget(null)}>Cancelar</Button>
+            <Button variant="destructive" disabled={resetting} onClick={doReset}>
+              {resetting ? "Zerando…" : "Confirmar zerar"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    )}
     </>
   );
 }
