@@ -69,6 +69,7 @@ const KIND_META: Record<NpcKind, { label: string; icon: any; color: string }> = 
 };
 
 export function NpcManager() {
+  // (EmployerJobPicker defined at file bottom)
   const [npcs, setNpcs] = useState<Npc[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [items, setItems] = useState<Item[]>([]);
