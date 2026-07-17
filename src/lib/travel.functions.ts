@@ -41,7 +41,7 @@ export const listMyMounts = createServerFn({ method: "GET" })
     if (!char) return { mounts: [] };
     const { data } = await context.supabase
       .from("character_mounts")
-      .select("pose_id,pose_offset_x,pose_offset_y,pose_scale,pose:poses(id,name,image_url),mount:mounts(id,name,image_url,travel_gif_url,description,rank,speed_multiplier)")
+      .select("pose_id,pose_offset_x,pose_offset_y,pose_scale,pose:character_poses(id,name,image_url),mount:mounts(id,name,image_url,travel_gif_url,description,rank,speed_multiplier)")
       .eq("character_id", char.id);
     return {
       mounts: ((data as any[]) ?? [])
