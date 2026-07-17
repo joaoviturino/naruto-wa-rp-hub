@@ -760,21 +760,101 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                     </div>
                   </div>
                 )}
-                <div className="flex items-end gap-2 mt-3">
-                  <div className="flex-1">
-                    <div className="text-xs text-muted-foreground mb-1">
-                      Energia ({currentSkill?.energy_type.toUpperCase() ?? "—"}) — máx {currentMaxEnergy} ({currentPct}%)
-                      {isHealSkill && (
-                        <span className="ml-2 text-emerald-300">
-                          • cura ≈ energia gasta{healTarget === "team" ? " (time inteiro)" : " (alvo único — clique num aliado)"}
+                <div className="mt-3 rounded-lg border border-border bg-input/30 p-3">
+                  {/* Cabeçalho da energia — mobile-first: uma linha só, informações compactas */}
+                  <div className="flex items-center justify-between gap-2 mb-2 min-w-0">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Energia</div>
+                      <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                        <Badge variant="outline" className="text-[10px] shrink-0">
+                          {currentSkill?.energy_type.toUpperCase() ?? "—"}
+                        </Badge>
+                        <span className="text-[11px] text-muted-foreground truncate">
+                          {currentPoolNow}/{currentPoolMax} • cap {currentMaxEnergy} ({currentPct}%)
                         </span>
+                      </div>
+                    </div>
+                    <button type="button"
+                      onClick={() => setEnergy(Math.min(currentMaxEnergy, currentPoolNow || currentMaxEnergy))}
+                      disabled={!currentSkill}
+                      className="shrink-0 rounded-md border border-gold/50 bg-gold/10 px-3 py-1.5 text-xs font-display text-gold hover:bg-gold/20 active:scale-95 transition disabled:opacity-40">
+                      MAX
+                    </button>
+                  </div>
+
+                  {/* Stepper: [−] [input grande] [+] — touch friendly */}
+                  <div className="flex items-stretch gap-2">
+                    <button type="button" aria-label="Diminuir"
+                      onClick={() => setEnergy(Math.max(1, energy - 1))}
+                      disabled={!currentSkill || energy <= 1}
+                      className="h-11 w-11 shrink-0 rounded-md border border-border bg-background/60 text-lg font-bold hover:border-gold/60 active:scale-95 transition disabled:opacity-40">
+                      −
+                    </button>
+                    <div className="relative flex-1">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={energyStr}
+                        onFocus={(e) => e.currentTarget.select()}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/[^0-9]/g, "");
+                          setEnergyStr(raw);
+                          if (raw === "") return; // permite apagar tudo
+                          const n = Number(raw);
+                          if (Number.isFinite(n)) setEnergy(Math.min(currentMaxEnergy, Math.max(1, n)));
+                        }}
+                        onBlur={() => {
+                          const n = Number(energyStr);
+                          const clamped = !Number.isFinite(n) || n < 1 ? 1 : Math.min(currentMaxEnergy, n);
+                          setEnergy(clamped);
+                          setEnergyStr(String(clamped));
+                        }}
+                        className="w-full h-11 rounded-md border border-border bg-background/60 text-center font-display text-xl tabular-nums focus:border-gold outline-none transition"
+                      />
+                      {energyStr !== "" && (
+                        <button type="button" aria-label="Limpar"
+                          onClick={() => setEnergyStr("")}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full w-5 h-5 grid place-items-center text-muted-foreground hover:text-red-300 hover:bg-red-500/10">
+                          ×
+                        </button>
                       )}
                     </div>
-                    <Input type="number" min={1} max={currentMaxEnergy} value={energy}
-                      onChange={(e) => setEnergy(Math.max(1, Math.min(currentMaxEnergy, Number(e.target.value))))} />
+                    <button type="button" aria-label="Aumentar"
+                      onClick={() => setEnergy(Math.min(currentMaxEnergy, energy + 1))}
+                      disabled={!currentSkill || energy >= currentMaxEnergy}
+                      className="h-11 w-11 shrink-0 rounded-md border border-border bg-background/60 text-lg font-bold hover:border-gold/60 active:scale-95 transition disabled:opacity-40">
+                      +
+                    </button>
                   </div>
-                  <Button onClick={doAttack} disabled={!currentSkill || busy || currentCd > 0} className="shrink-0">
-                    <Sword size={14} className="mr-1" /> {busy ? "..." : isHealSkill ? "Curar" : "Atacar"}
+
+                  {/* Presets rápidos — pills de %, distribuídos em grid pra ficar 100% clicável no mobile */}
+                  <div className="grid grid-cols-4 gap-1.5 mt-2">
+                    {[25, 50, 75, 100].map((p) => {
+                      const val = Math.max(1, Math.floor((currentMaxEnergy * p) / 100));
+                      const active = energy === val;
+                      return (
+                        <button key={p} type="button" disabled={!currentSkill}
+                          onClick={() => setEnergy(val)}
+                          className={`h-8 rounded-md border text-[11px] font-display transition active:scale-95 ${active ? "border-gold bg-gold/15 text-gold" : "border-border hover:border-gold/60 text-muted-foreground"} disabled:opacity-40`}>
+                          {p}%
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {isHealSkill && (
+                    <div className="mt-2 text-[11px] text-emerald-300">
+                      💚 cura ≈ energia gasta{healTarget === "team" ? " (time inteiro)" : " (alvo único — clique num aliado)"}
+                    </div>
+                  )}
+
+                  {/* CTA — full-width no mobile, alinhado à direita no desktop */}
+                  <Button onClick={doAttack} disabled={!currentSkill || busy || currentCd > 0}
+                    className="w-full mt-3 h-12 text-base font-display sm:h-11 sm:text-sm">
+                    <Sword size={16} className="mr-1.5" />
+                    {busy ? "..." : isHealSkill ? `Curar (−${energy})` : `Atacar (−${energy} ${currentSkill?.energy_type.toUpperCase() ?? ""})`}
+                    {defenseSkill && <span className="ml-2 opacity-80 text-[10px]">+ 🛡️ {defenseSkill.name}</span>}
                   </Button>
                 </div>
               </TabsContent>
