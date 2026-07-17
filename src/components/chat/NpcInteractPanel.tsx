@@ -243,6 +243,13 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
           ))}
         </div>
       )}
+      {employerNpcs.length > 0 && (
+        <div className="space-y-1">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1"><HandCoins size={11} /> Empregadores</div>
+          {employerNpcs.map((n) => <EmployerRow key={n.id} npc={n} />)}
+        </div>
+      )}
+      <ChestsHere locationId={locationId} />
 
       <Dialog open={!!open} onOpenChange={(v) => { if (!v) { setOpen(null); load(); } }}>
         <DialogContent className="max-w-2xl">
