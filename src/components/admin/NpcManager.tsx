@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Trash2, Upload, Plus, Search, Swords, Store, ShoppingBag, Gift, GraduationCap, MessageCircle, Package, Users, ChevronDown } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
-import { upsertNpc, deleteNpc, setNpcSkills } from "@/lib/npc.functions";
+import { upsertNpc, deleteNpc, setNpcSkills, setNpcLocations } from "@/lib/npc.functions";
 import { setNpcLearningSteps } from "@/lib/minigame.functions";
 import { toast } from "sonner";
 import { NpcGroupManager } from "./NpcGroupManager";
@@ -42,6 +42,7 @@ type Skill = { id: string; name: string; rank: string };
 type Item = { id: string; name: string; type: string };
 type Mission = { id: string; name: string; rank: string };
 type MinigameLite = { id: string; name: string; kind: string };
+type LocationLite = { id: string; name: string };
 
 type LearningStep = { id?: string; minigame_id: string; position: number; required_rank: string | null; required_profs: Array<{ skill_class: string; nivel?: string | null; maestria?: string | null }> };
 
@@ -73,6 +74,9 @@ export function NpcManager() {
   const [missions, setMissions] = useState<Mission[]>([]);
   const [minigames, setMinigames] = useState<MinigameLite[]>([]);
   const [assigned, setAssigned] = useState<Record<string, Set<string>>>({});
+  const [locations, setLocations] = useState<LocationLite[]>([]);
+  const [npcLocs, setNpcLocs] = useState<Record<string, Set<string>>>({});
+  const [locQuery, setLocQuery] = useState("");
   const [learningSteps, setLearningSteps] = useState<Record<string, LearningStep[]>>({});
   const [selected, setSelected] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -85,16 +89,19 @@ export function NpcManager() {
   const save = useServerFn(upsertNpc);
   const del = useServerFn(deleteNpc);
   const setSkillsFn = useServerFn(setNpcSkills);
+  const setLocsFn = useServerFn(setNpcLocations);
   const saveSteps = useServerFn(setNpcLearningSteps);
 
   async function load() {
-    const [n, s, ns, it, mi, mg] = await Promise.all([
+    const [n, s, ns, it, mi, mg, locs, lnpcs] = await Promise.all([
       supabase.from("npcs").select("*").order("name"),
       supabase.from("skills").select("id,name,rank").order("name"),
       supabase.from("npc_skills").select("npc_id,skill_id"),
       supabase.from("items").select("id,name,type").order("name"),
       supabase.from("missions").select("id,name,rank").order("name"),
       supabase.from("minigames").select("id,name,kind").order("name"),
+      supabase.from("locations").select("id,name").order("name"),
+      supabase.from("location_npcs").select("location_id,npc_id"),
     ]);
     setNpcs(((n.data as any[]) ?? []).map((r) => ({
       ...r,
@@ -116,6 +123,12 @@ export function NpcManager() {
     setItems((it.data as Item[]) ?? []);
     setMissions((mi.data as Mission[]) ?? []);
     setMinigames((mg.data as MinigameLite[]) ?? []);
+    setLocations((locs.data as LocationLite[]) ?? []);
+    const lmap: Record<string, Set<string>> = {};
+    ((lnpcs.data as any[]) ?? []).forEach((r) => {
+      (lmap[r.npc_id] ??= new Set<string>()).add(r.location_id);
+    });
+    setNpcLocs(lmap);
     const map: Record<string, Set<string>> = {};
     (ns.data ?? []).forEach((r: any) => {
       if (!map[r.npc_id]) map[r.npc_id] = new Set();
