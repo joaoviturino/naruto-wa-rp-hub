@@ -10,7 +10,7 @@ import { ImageUpload } from "@/components/ImageUpload";
 import { toast } from "sonner";
 import { Plus, Trash2, Rabbit, Save, UserPlus, UserMinus } from "lucide-react";
 
-type Mount = { id: string; name: string; image_url: string | null; description: string | null; rank: string | null; speed_multiplier: number };
+type Mount = { id: string; name: string; image_url: string | null; travel_gif_url: string | null; description: string | null; rank: string | null; speed_multiplier: number };
 type Char = { id: string; nickname: string };
 
 export function MountManager({ adminUserId }: { adminUserId: string }) {
@@ -49,6 +49,7 @@ export function MountManager({ adminUserId }: { adminUserId: string }) {
         id: editing.id,
         name: editing.name.trim(),
         image_url: editing.image_url ?? null,
+        travel_gif_url: editing.travel_gif_url ?? null,
         description: editing.description ?? null,
         rank: editing.rank ?? null,
         speed_multiplier: Number(editing.speed_multiplier ?? 0.5),
@@ -114,6 +115,23 @@ export function MountManager({ adminUserId }: { adminUserId: string }) {
                 <ImageUpload label="Enviar imagem" bucket="npcs" userId={adminUserId}
                   onUploaded={(url) => setEditing({ ...editing, image_url: url })} />
               </div>
+            </div>
+            <div>
+              <Label>GIF de viagem (mostrado no popup enquanto o jogador se move)</Label>
+              <div className="flex items-center gap-2 mt-1">
+                {editing.travel_gif_url && (
+                  <img src={editing.travel_gif_url} className="w-16 h-16 rounded object-contain bg-black/40" alt="" />
+                )}
+                <ImageUpload label="Enviar GIF" bucket="npcs" userId={adminUserId}
+                  onUploaded={(url) => setEditing({ ...editing, travel_gif_url: url })} />
+                {editing.travel_gif_url && (
+                  <Button size="sm" variant="outline"
+                    onClick={() => setEditing({ ...editing, travel_gif_url: null })}>
+                    <Trash2 size={12} className="mr-1" /> Remover
+                  </Button>
+                )}
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1">Ideal: GIF transparente em loop mostrando a montaria em movimento.</p>
             </div>
           </div>
           <div className="flex gap-2">

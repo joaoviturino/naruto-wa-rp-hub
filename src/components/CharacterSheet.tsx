@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { getLevelConfig } from "@/lib/level.functions";
 import { levelProgress, DEFAULT_LEVEL_CONFIG, type LevelConfig } from "@/lib/level";
 import { listMyPoses, listMySkillPoses, setSkillPose } from "@/lib/pose.functions";
+import { MountsTab } from "@/components/MountsTab";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ComboSelect } from "@/components/ui/combo-select";
 
@@ -138,11 +139,12 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
       </div>
 
       <Tabs defaultValue="ficha" className="p-4 sm:p-6">
-        <TabsList className="w-full sm:w-auto grid grid-cols-4 sm:inline-flex">
+        <TabsList className="w-full sm:w-auto grid grid-cols-5 sm:inline-flex">
           <TabsTrigger value="ficha" className="text-xs sm:text-sm">Ficha</TabsTrigger>
           <TabsTrigger value="inventario" className="text-xs sm:text-sm">Inventário</TabsTrigger>
           <TabsTrigger value="databook" className="text-xs sm:text-sm">Databook</TabsTrigger>
           <TabsTrigger value="poses" className="text-xs sm:text-sm">Poses</TabsTrigger>
+          <TabsTrigger value="montarias" className="text-xs sm:text-sm">Montarias</TabsTrigger>
         </TabsList>
         <TabsContent value="ficha" className="mt-4">
           <div className="scroll-panel rounded-lg p-4 sm:p-6 space-y-4">
@@ -168,6 +170,9 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
         </TabsContent>
         <TabsContent value="poses" className="mt-4">
           <PosesTab characterId={characterId} />
+        </TabsContent>
+        <TabsContent value="montarias" className="mt-4">
+          <MountsTab />
         </TabsContent>
       </Tabs>
     </div>
