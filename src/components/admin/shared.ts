@@ -28,6 +28,34 @@ export const VILLAGES = [
 
 export const ELEMENTS = ["katon","suiton","fuuton","doton","raiton"] as const;
 
+// Limite de proficiências elementais permitidas por patente ninja.
+// Estudante/Genin: 1 · Chūnin: 2 · Tok. Jōnin: 3 · Jōnin: 4 · ANBU/Sannin/Kage: 5.
+export const ELEMENT_LIMIT_BY_RANK: Record<string, number> = {
+  estudante: 1,
+  genin: 1,
+  chunin: 2,
+  tokubetsu_jonin: 3,
+  jonin: 4,
+  anbu: 5,
+  sannin: 5,
+  kage: 5,
+};
+
+export function elementLimitForRank(rank: string | null | undefined): number {
+  if (!rank) return 1;
+  return ELEMENT_LIMIT_BY_RANK[rank] ?? 1;
+}
+
+export function countElementProficiencies(profs: any): number {
+  if (!profs || typeof profs !== "object") return 0;
+  let n = 0;
+  for (const el of ELEMENTS) {
+    const e = profs[el];
+    if (e && (e.nivel || e.maestria)) n++;
+  }
+  return n;
+}
+
 export const ITEM_TYPES = [
   "consumable","tool","material","armor_helmet","armor_vest","armor_pants","armor_boots","weapon","weapon_primary","weapon_secondary",
 ] as const;
