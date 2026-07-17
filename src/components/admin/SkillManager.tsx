@@ -345,6 +345,9 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
                 bonus_critical: Number(f.bonus_critical ?? 1),
                 bonus_energetic: Number(f.bonus_energetic ?? 1),
                 cooldown_turns: Number(f.cooldown_turns ?? 0),
+                accuracy: Math.max(1, Math.min(100, Number(f.accuracy ?? 100))),
+                is_defensive: !!f.is_defensive,
+                defense_percent: Math.max(0, Math.min(100, Number(f.defense_percent ?? 50))),
                 meta,
               } } as any);
               toast.success("Habilidade salva."); onSaved();
