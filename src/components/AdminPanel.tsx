@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useServerFn } from "@tanstack/react-start";
-import { enqueueMessage, resetBotSession, requestBotQr, setUserXp, restoreEnergies } from "@/lib/admin.functions";
+import { enqueueMessage, resetBotSession, requestBotQr, setUserXp, restoreEnergies, resetPlayerProgress, resetAllPlayers } from "@/lib/admin.functions";
 import { toast } from "sonner";
 import { PlayerEditor } from "@/components/admin/PlayerEditor";
 import { AdminPlayerViewer } from "@/components/admin/AdminPlayerViewer";
@@ -27,7 +27,7 @@ import { NINJA_RANKS } from "@/components/admin/shared";
 import {
   Pencil, BatteryCharging, Eye, LayoutDashboard, Users, Package, Sparkles,
   ScrollText, GitBranch, MapPin, Ghost, Gamepad2, BookOpen, TrendingUp,
-  ShieldCheck, Server, MessageSquare, Award, UsersRound, Menu, X, Rabbit,
+  ShieldCheck, Server, MessageSquare, Award, UsersRound, Menu, X, Rabbit, RotateCcw, AlertTriangle,
 } from "lucide-react";
 
 type NavItem = { id: string; label: string; icon: React.ComponentType<{ size?: number; className?: string }>; group: string };
