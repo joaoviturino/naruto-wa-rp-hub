@@ -118,6 +118,57 @@ function damageTargetPlayer(p: Player, dmg: number): { pool: "hp"; taken: number
   return { pool: "hp", taken };
 }
 
+/**
+ * Consome uma habilidade defensiva declarada pelo jogador no mesmo turno.
+ * Valida posse/is_defensive/cooldown, deduz o custo da pool e devolve o
+ * percentual de redução para o próximo golpe recebido.
+ */
+async function consumeDefensiveSkill(
+  supabaseUser: any, activePlayer: Player, defensiveSkillId: string, log: LogEntry[],
+): Promise<{ percent: number; skillName: string }> {
+  const { data: owned } = await supabaseUser
+    .from("character_skills").select("skill_id")
+    .eq("character_id", activePlayer.character_id).eq("skill_id", defensiveSkillId).maybeSingle();
+  if (!owned) throw new Error("Você não conhece essa habilidade de defesa.");
+  const { data: sk } = await supabaseUser.from("skills")
+    .select("id,name,energy_type,cost_percent,cooldown_turns,is_defensive,defense_percent,animation_url,animation_mode,sound_url")
+    .eq("id", defensiveSkillId).maybeSingle();
+  if (!sk) throw new Error("Habilidade inexistente.");
+  if (!(sk as any).is_defensive) throw new Error("Essa habilidade não é defensiva.");
+  activePlayer.cooldowns = activePlayer.cooldowns ?? {};
+  const cd = activePlayer.cooldowns[defensiveSkillId] ?? 0;
+  if (cd > 0) throw new Error(`Defesa em cooldown por mais ${cd} turno(s).`);
+  const pool = (sk.energy_type as Pool);
+  const poolMax = pool === "ef" ? activePlayer.ef_max : pool === "em" ? activePlayer.em_max : activePlayer.chakra_max;
+  const costPct = Math.max(1, Math.min(100, Number((sk as any).cost_percent ?? 20)));
+  const cost = Math.max(1, Math.floor((poolMax * costPct) / 100));
+  if ((activePlayer as any)[pool] < cost) throw new Error(`Energia insuficiente para defender (${pool.toUpperCase()}).`);
+  (activePlayer as any)[pool] -= cost;
+  if (Number((sk as any).cooldown_turns ?? 0) > 0) activePlayer.cooldowns[defensiveSkillId] = Number((sk as any).cooldown_turns);
+  const percent = Math.max(0, Math.min(100, Number((sk as any).defense_percent ?? 50)));
+  log.push({
+    seq: log.length + 1, actor: "player", actor_name: activePlayer.nickname, target_name: activePlayer.nickname,
+    skill_name: (sk as any).name, energy_type: pool, energy_used: cost, effective: 0, damage: 0, speed: 0, crit_mul: 1,
+    actor_char_id: activePlayer.character_id, target_char_id: activePlayer.character_id,
+    animation_url: (sk as any).animation_url ?? null,
+    animation_mode: ((sk as any).animation_mode ?? "overlay") as any,
+    sound_url: (sk as any).sound_url ?? null,
+    msg: `${activePlayer.nickname} assume postura defensiva com ${(sk as any).name} (−${percent}% no próximo golpe).`,
+    is_defense: true, defense_percent_applied: percent,
+  } as any);
+  return { percent, skillName: (sk as any).name };
+}
+
+/** Consome o escudo defensivo ativo (se existir) sobre um jogador alvo, retornando o dano final. */
+function applyShield(state: CombatState | PvpState, targetCharId: string, incoming: number): { final: number; shielded?: { percent: number; name: string } } {
+  const shields = (state as any)._shields as Record<string, { percent: number; name: string }> | undefined;
+  if (!shields || !shields[targetCharId]) return { final: incoming };
+  const s = shields[targetCharId];
+  const reduced = Math.max(0, Math.round(incoming * (1 - s.percent / 100)));
+  delete shields[targetCharId];
+  return { final: reduced, shielded: s };
+}
+
 async function loadMyChar(context: { supabase: any; userId: string }) {
   const { data, error } = await context.supabase
     .from("characters").select("id,nickname,avatar_url,inventory_bg_url,xp,current_location_id,ef_current,em_current,chakra_current,hp_current").eq("user_id", context.userId).maybeSingle();
