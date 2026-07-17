@@ -103,6 +103,12 @@ type LogEntry = {
   heal?: boolean;
   heal_mode?: "single" | "team";
   heal_target_ids?: string[];
+  missed?: boolean;
+  is_defense?: boolean;
+  defense_percent_applied?: number;
+  shield_reduced_by?: number;
+  shield_name?: string;
+  [key: string]: any;
 };
 
 function computeStats(xp: number) {
