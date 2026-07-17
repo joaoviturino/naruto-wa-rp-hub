@@ -10,7 +10,7 @@ import { Compass, Footprints, MapPin, X, Sparkles } from "lucide-react";
 
 type Loc = { id: string; name: string; image_url: string | null; map_x: number; map_y: number; parent_id: string | null };
 type Conn = { a_id: string; b_id: string };
-type Mount = { id: string; name: string; image_url: string | null; description: string | null; rank: string | null; speed_multiplier: number };
+type Mount = { id: string; name: string; image_url: string | null; travel_gif_url: string | null; description: string | null; rank: string | null; speed_multiplier: number };
 
 const NODE_W = 130;
 const NODE_H = 60;
@@ -125,9 +125,13 @@ export function TravelDialog({ open, onOpenChange, currentLocationId, onArrived 
         <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle className="flex items-center gap-2"><Compass size={16} className="text-gold" /> Viajando…</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <div className="relative rounded-lg overflow-hidden h-40 bg-secondary/40 border border-border">
+            <div className="relative rounded-lg overflow-hidden h-52 bg-secondary/40 border border-border">
               {toLoc?.image_url && <img src={toLoc.image_url} className="absolute inset-0 w-full h-full object-cover opacity-70" alt="" />}
               <div className="absolute inset-0 bg-gradient-to-t from-background/90 to-transparent" />
+              {mount?.travel_gif_url && (
+                <img src={mount.travel_gif_url} alt=""
+                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 max-h-[80%] max-w-[70%] object-contain drop-shadow-[0_6px_16px_rgba(0,0,0,0.6)] pointer-events-none" />
+              )}
               <div className="absolute bottom-2 left-3 right-3">
                 <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Destino</div>
                 <div className="font-display text-xl text-gold">{toLoc?.name ?? "?"}</div>
