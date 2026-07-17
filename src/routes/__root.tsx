@@ -43,6 +43,64 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
   }, [error]);
 
+  const diagnostics = (() => {
+    const nav = typeof navigator !== "undefined" ? navigator : ({} as Navigator);
+    const win = typeof window !== "undefined" ? window : ({} as Window);
+    return {
+      when: new Date().toISOString(),
+      url: typeof win.location !== "undefined" ? win.location.href : "(ssr)",
+      route: typeof win.location !== "undefined" ? win.location.pathname + win.location.search : "(ssr)",
+      userAgent: nav.userAgent ?? "(unknown)",
+      platform: (nav as any).platform ?? "(unknown)",
+      language: nav.language ?? "(unknown)",
+      viewport:
+        typeof win.innerWidth === "number"
+          ? `${win.innerWidth}x${win.innerHeight} @dpr${win.devicePixelRatio ?? 1}`
+          : "(ssr)",
+      online: typeof nav.onLine === "boolean" ? String(nav.onLine) : "(unknown)",
+      message: String(error?.message ?? error),
+      stack: error?.stack ?? "(no stack)",
+    };
+  })();
+
+  const report = [
+    `When:       ${diagnostics.when}`,
+    `URL:        ${diagnostics.url}`,
+    `Route:      ${diagnostics.route}`,
+    `Viewport:   ${diagnostics.viewport}`,
+    `Online:     ${diagnostics.online}`,
+    `Platform:   ${diagnostics.platform}`,
+    `Language:   ${diagnostics.language}`,
+    `UserAgent:  ${diagnostics.userAgent}`,
+    ``,
+    `Message:    ${diagnostics.message}`,
+    ``,
+    `Stack:`,
+    diagnostics.stack,
+  ].join("\n");
+
+  const copyReport = async () => {
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(report);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = report;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      // eslint-disable-next-line no-alert
+      alert("Diagnóstico copiado. Cole no chat com o suporte.");
+    } catch {
+      // eslint-disable-next-line no-alert
+      alert("Não foi possível copiar automaticamente. Selecione e copie o texto manualmente.");
+    }
+  };
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
@@ -54,14 +112,31 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         </p>
         <details className="mt-4 text-left rounded-md border border-border bg-card/60 p-3 text-xs">
           <summary className="cursor-pointer font-medium text-foreground">Detalhes técnicos</summary>
-          <div className="mt-2 font-mono text-[11px] text-blood break-words whitespace-pre-wrap">
-            {String(error?.message ?? error)}
+          <div className="mt-3 flex justify-end">
+            <button
+              type="button"
+              onClick={copyReport}
+              className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-2 py-1 text-[11px] font-medium text-foreground hover:bg-accent"
+            >
+              Copiar diagnóstico
+            </button>
           </div>
-          {error?.stack && (
-            <pre className="mt-2 max-h-48 overflow-auto text-[10px] text-muted-foreground whitespace-pre-wrap">
-              {error.stack}
-            </pre>
-          )}
+          <div className="mt-2 grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 font-mono text-[11px] text-muted-foreground">
+            <span className="text-foreground">Quando</span><span className="break-all">{diagnostics.when}</span>
+            <span className="text-foreground">URL</span><span className="break-all">{diagnostics.url}</span>
+            <span className="text-foreground">Rota</span><span className="break-all">{diagnostics.route}</span>
+            <span className="text-foreground">Viewport</span><span>{diagnostics.viewport}</span>
+            <span className="text-foreground">Online</span><span>{diagnostics.online}</span>
+            <span className="text-foreground">Plataforma</span><span className="break-all">{diagnostics.platform}</span>
+            <span className="text-foreground">Idioma</span><span>{diagnostics.language}</span>
+            <span className="text-foreground">UserAgent</span><span className="break-all">{diagnostics.userAgent}</span>
+          </div>
+          <div className="mt-3 font-mono text-[11px] text-blood break-words whitespace-pre-wrap">
+            {diagnostics.message}
+          </div>
+          <pre className="mt-2 max-h-48 overflow-auto text-[10px] text-muted-foreground whitespace-pre-wrap">
+            {diagnostics.stack}
+          </pre>
         </details>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
