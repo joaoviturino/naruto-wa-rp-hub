@@ -32,7 +32,7 @@ export const listLocationInteractNpcs = createServerFn({ method: "POST" })
     if (!me.current_location_id) return { npcs: [] as any[] };
     const { data } = await context.supabase
       .from("location_npcs")
-      .select("npc:npcs(id,name,image_url,kind,dialog_intro,dialog_outro,shop_items,buy_items,reward_items,reward_xp,reward_ryo,reward_cooldown_hours,required_mission_id,offer_mission_id,tutorial_blocks,learning_min_read_seconds,linked_minigame_id,music_url)")
+      .select("npc:npcs(id,name,image_url,kind,dialog_intro,dialog_outro,shop_items,buy_items,reward_items,reward_xp,reward_ryo,reward_cooldown_hours,required_mission_id,offer_mission_id,tutorial_blocks,learning_min_read_seconds,linked_minigame_id,music_url,offered_job_id)")
       .eq("location_id", me.current_location_id);
     const list = ((data as any[]) ?? []).map((r) => r.npc).filter((n: any) => n && n.kind !== "aggressive");
     // Enriquece reward com cooldown remaining
