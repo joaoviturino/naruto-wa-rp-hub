@@ -19,6 +19,7 @@ type Skill = {
   id: string; name: string; energy_type: "ef" | "em" | "chakra"; base_cost: number;
   bonus_speed: number; bonus_critical: number; bonus_energetic: number;
   cooldown_turns?: number; description?: string | null; cost_percent?: number;
+  is_defensive?: boolean; defense_percent?: number; accuracy?: number;
   meta?: any;
 };
 type BagEntry = { item_id: string; qty: number };
