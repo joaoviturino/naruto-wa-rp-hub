@@ -19,6 +19,7 @@ type Skill = {
   id: string; name: string; energy_type: "ef" | "em" | "chakra"; base_cost: number;
   bonus_speed: number; bonus_critical: number; bonus_energetic: number;
   cooldown_turns?: number; description?: string | null; cost_percent?: number;
+  is_defensive?: boolean; defense_percent?: number; accuracy?: number;
   meta?: any;
 };
 type BagEntry = { item_id: string; qty: number };
@@ -28,6 +29,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const [session, setSession] = useState<any>(null);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [selectedSkill, setSelectedSkill] = useState<string>("");
+  const [selectedDefense, setSelectedDefense] = useState<string | null>(null);
   const [energy, setEnergy] = useState<number>(10);
   const [busy, setBusy] = useState(false);
   const [fleeing, setFleeing] = useState(false);
@@ -91,7 +93,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   async function loadSkills() {
     const { data } = await supabase
       .from("character_skills")
-      .select("skill:skills(id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,description,meta)")
+      .select("skill:skills(id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,description,meta,is_defensive,defense_percent,accuracy)")
       .eq("character_id", myCharId);
     const list = ((data as any[]) ?? []).map((r) => r.skill).filter(Boolean) as Skill[];
     setSkills(list);
@@ -230,7 +232,9 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   useEffect(() => {
     if (energy > currentMaxEnergy) setEnergy(currentMaxEnergy);
   }, [currentMaxEnergy]);
-  const skillsByTab = useMemo(() => skills.filter((s) => s.energy_type === skillTab), [skills, skillTab]);
+  const skillsByTab = useMemo(() => skills.filter((s) => s.energy_type === skillTab && !s.is_defensive), [skills, skillTab]);
+  const defensiveSkills = useMemo(() => skills.filter((s) => s.is_defensive), [skills]);
+  const defenseSkill = defensiveSkills.find((s) => s.id === selectedDefense) ?? null;
   const consumables = useMemo(() => bag.filter((e) => itemMap[e.item_id]?.type === "consumable"), [bag, itemMap]);
 
   // Enfileira TODAS as novas entradas do log (jogador + resposta do NPC vêm juntas do backend)
@@ -243,6 +247,20 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
     lastLogSeq.current = fresh[fresh.length - 1].seq;
     for (const entry of fresh) {
       if (entry.pose_url || entry.sound_url || entry.animation_url) animQueue.current.push(entry);
+      // MISS: mostra um "flutuante" cinza no alvo para deixar claro que errou.
+      if (entry.missed) {
+        const missId = `${entry.seq}-miss`;
+        if (entry.actor === "player") {
+          const idx = typeof entry.target_npc_idx === "number"
+            ? entry.target_npc_idx
+            : npcs.findIndex((n: any) => n.name === entry.target_name);
+          if (idx >= 0) pushBurst(`npc:${idx}`, { id: missId, amount: 0, label: "MISS" });
+        } else if (entry.actor === "npc") {
+          const cid = entry.target_char_id
+            ?? players.find((x: any) => x.nickname === entry.target_name)?.character_id;
+          if (cid) pushBurst(`player:${cid}`, { id: missId, amount: 0, label: "MISS" });
+        }
+      }
       // Números de dano flutuantes
       if (Number(entry.damage) > 0) {
         const id = `${entry.seq}-${Math.random().toString(36).slice(2, 7)}`;
@@ -407,8 +425,10 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
       await attack({ data: {
         session_id: sessionId, skill_id: currentSkill.id, energy_used: energy,
         target_index: targetIdx,
+        ...(selectedDefense ? { defensive_skill_id: selectedDefense } : {}),
         ...(isHealSkill && healTarget === "single" ? { heal_target_char_id: healTargetId } : {}),
       } });
+      setSelectedDefense(null); // consome a defesa após enviar o turno
     } catch (e: any) { toast.error(e.message); }
     finally { setBusy(false); }
   }
@@ -700,11 +720,43 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                           ×{s.bonus_energetic} energ • ×{s.bonus_critical} crit • ×{s.bonus_speed} spd
                           {cd > 0 ? ` • ⏳ ${cd}` : (s.cooldown_turns ? ` • CD ${s.cooldown_turns}` : "")}
                           <span className="ml-1">• máx {maxES} ({s.cost_percent ?? 20}%)</span>
+                          {typeof s.accuracy === "number" && s.accuracy < 100 && (
+                            <span className="ml-1 text-amber-300">• {s.accuracy}% acerto</span>
+                          )}
                         </div>
                       </button>
                     );
                   })}
                 </div>
+                {defensiveSkills.length > 0 && (
+                  <div className="mt-3 rounded-md border border-sky-500/40 bg-sky-500/5 p-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="text-[11px] font-display text-sky-300">Defender (opcional)</div>
+                      {defenseSkill && (
+                        <button onClick={() => setSelectedDefense(null)}
+                          className="text-[10px] text-muted-foreground hover:text-red-300">Cancelar defesa</button>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mb-2">
+                      Escolha uma postura defensiva antes de agir. Ela reduz o dano do próximo golpe recebido.
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {defensiveSkills.map((s) => {
+                        const cd = myCooldowns[s.id] ?? 0;
+                        const active = selectedDefense === s.id;
+                        return (
+                          <button key={s.id} disabled={cd > 0}
+                            onClick={() => setSelectedDefense(active ? null : s.id)}
+                            className={`rounded-md border px-2 py-1 text-[10px] transition ${active ? "border-sky-400 bg-sky-500/20 text-sky-100" : "border-border hover:border-sky-400/60"} ${cd > 0 ? "opacity-40 cursor-not-allowed" : ""}`}>
+                            🛡️ {s.name}
+                            <span className="ml-1 opacity-70">−{s.defense_percent ?? 50}%</span>
+                            {cd > 0 && <span className="ml-1">⏳{cd}</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 <div className="flex items-end gap-2 mt-3">
                   <div className="flex-1">
                     <div className="text-xs text-muted-foreground mb-1">

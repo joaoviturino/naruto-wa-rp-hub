@@ -39,16 +39,24 @@ function DamageNumber({ burst, onExpire }: { burst: DamageBurst; onExpire: () =>
     ? "text-emerald-300"
     : burst.crit
       ? "text-gold"
-      : "text-red-300";
+      : burst.label
+        ? "text-slate-200"
+        : "text-red-300";
   const size = burst.crit ? "text-4xl sm:text-5xl" : "text-2xl sm:text-3xl";
   return (
     <div
       className={`absolute left-1/2 top-[45%] animate-damage-float font-display font-black ${size} ${color} drop-shadow-[0_0_10px_rgba(0,0,0,0.9)]`}
       style={{ transform: `translate(calc(-50% + ${offset}px), 0)` }}
     >
-      {burst.heal ? "+" : "-"}
-      {burst.amount}
-      {burst.crit && <span className="ml-1 text-sm align-super">CRIT!</span>}
+      {burst.label ? (
+        burst.label
+      ) : (
+        <>
+          {burst.heal ? "+" : "-"}
+          {burst.amount}
+          {burst.crit && <span className="ml-1 text-sm align-super">CRIT!</span>}
+        </>
+      )}
     </div>
   );
 }

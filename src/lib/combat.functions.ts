@@ -44,6 +44,8 @@ type CombatState = {
   active: number; // index do jogador cuja vez é
   /** Índice do inimigo em `npcs` que o jogador atacará neste turno. */
   target?: number;
+  /** Escudos defensivos ativos por character_id: aplicados ao próximo golpe recebido. */
+  _shields?: Record<string, { percent: number; name: string }>;
 };
 
 /** Normaliza sessões antigas (`state.npc` sem `state.npcs`) migrando para array. */
@@ -101,6 +103,12 @@ type LogEntry = {
   heal?: boolean;
   heal_mode?: "single" | "team";
   heal_target_ids?: string[];
+  missed?: boolean;
+  is_defense?: boolean;
+  defense_percent_applied?: number;
+  shield_reduced_by?: number;
+  shield_name?: string;
+  [key: string]: any;
 };
 
 function computeStats(xp: number) {
@@ -114,6 +122,57 @@ function damageTargetPlayer(p: Player, dmg: number): { pool: "hp"; taken: number
   p.hp = Math.max(0, p.hp - taken);
   if (p.hp <= 0) p.alive = false;
   return { pool: "hp", taken };
+}
+
+/**
+ * Consome uma habilidade defensiva declarada pelo jogador no mesmo turno.
+ * Valida posse/is_defensive/cooldown, deduz o custo da pool e devolve o
+ * percentual de redução para o próximo golpe recebido.
+ */
+async function consumeDefensiveSkill(
+  supabaseUser: any, activePlayer: Player, defensiveSkillId: string, log: LogEntry[],
+): Promise<{ percent: number; skillName: string }> {
+  const { data: owned } = await supabaseUser
+    .from("character_skills").select("skill_id")
+    .eq("character_id", activePlayer.character_id).eq("skill_id", defensiveSkillId).maybeSingle();
+  if (!owned) throw new Error("Você não conhece essa habilidade de defesa.");
+  const { data: sk } = await supabaseUser.from("skills")
+    .select("id,name,energy_type,cost_percent,cooldown_turns,is_defensive,defense_percent,animation_url,animation_mode,sound_url")
+    .eq("id", defensiveSkillId).maybeSingle();
+  if (!sk) throw new Error("Habilidade inexistente.");
+  if (!(sk as any).is_defensive) throw new Error("Essa habilidade não é defensiva.");
+  activePlayer.cooldowns = activePlayer.cooldowns ?? {};
+  const cd = activePlayer.cooldowns[defensiveSkillId] ?? 0;
+  if (cd > 0) throw new Error(`Defesa em cooldown por mais ${cd} turno(s).`);
+  const pool = (sk.energy_type as Pool);
+  const poolMax = pool === "ef" ? activePlayer.ef_max : pool === "em" ? activePlayer.em_max : activePlayer.chakra_max;
+  const costPct = Math.max(1, Math.min(100, Number((sk as any).cost_percent ?? 20)));
+  const cost = Math.max(1, Math.floor((poolMax * costPct) / 100));
+  if ((activePlayer as any)[pool] < cost) throw new Error(`Energia insuficiente para defender (${pool.toUpperCase()}).`);
+  (activePlayer as any)[pool] -= cost;
+  if (Number((sk as any).cooldown_turns ?? 0) > 0) activePlayer.cooldowns[defensiveSkillId] = Number((sk as any).cooldown_turns);
+  const percent = Math.max(0, Math.min(100, Number((sk as any).defense_percent ?? 50)));
+  log.push({
+    seq: log.length + 1, actor: "player", actor_name: activePlayer.nickname, target_name: activePlayer.nickname,
+    skill_name: (sk as any).name, energy_type: pool, energy_used: cost, effective: 0, damage: 0, speed: 0, crit_mul: 1,
+    actor_char_id: activePlayer.character_id, target_char_id: activePlayer.character_id,
+    animation_url: (sk as any).animation_url ?? null,
+    animation_mode: ((sk as any).animation_mode ?? "overlay") as any,
+    sound_url: (sk as any).sound_url ?? null,
+    msg: `${activePlayer.nickname} assume postura defensiva com ${(sk as any).name} (−${percent}% no próximo golpe).`,
+    is_defense: true, defense_percent_applied: percent,
+  } as any);
+  return { percent, skillName: (sk as any).name };
+}
+
+/** Consome o escudo defensivo ativo (se existir) sobre um jogador alvo, retornando o dano final. */
+function applyShield(state: CombatState | PvpState, targetCharId: string, incoming: number): { final: number; shielded?: { percent: number; name: string } } {
+  const shields = (state as any)._shields as Record<string, { percent: number; name: string }> | undefined;
+  if (!shields || !shields[targetCharId]) return { final: incoming };
+  const s = shields[targetCharId];
+  const reduced = Math.max(0, Math.round(incoming * (1 - s.percent / 100)));
+  delete shields[targetCharId];
+  return { final: reduced, shielded: s };
 }
 
 async function loadMyChar(context: { supabase: any; userId: string }) {
@@ -299,6 +358,7 @@ export const playerAttack = createServerFn({ method: "POST" })
     energy_used: z.number().int().min(1).max(100000),
     target_index: z.number().int().min(0).max(10).optional(),
     heal_target_char_id: z.string().uuid().optional(),
+    defensive_skill_id: z.string().uuid().optional(),
   }).parse(i))
   .handler(async ({ data, context }) => {
     const me = await loadMyChar(context);
@@ -332,12 +392,19 @@ export const playerAttack = createServerFn({ method: "POST" })
     const cd = activePlayer.cooldowns[data.skill_id] ?? 0;
     if (cd > 0) throw new Error(`Habilidade em cooldown por mais ${cd} turno(s).`);
 
+    // Defesa opcional declarada pelo jogador — aplica antes do turno do NPC.
+    if (data.defensive_skill_id) {
+      const shield = await consumeDefensiveSkill(context.supabase, activePlayer, data.defensive_skill_id, log);
+      state._shields = state._shields ?? {};
+      state._shields[activePlayer.character_id] = { percent: shield.percent, name: shield.skillName };
+    }
+
     // Habilidade precisa pertencer ao jogador
     const { data: owned } = await context.supabase
       .from("character_skills").select("skill_id").eq("character_id", me.id).eq("skill_id", data.skill_id).maybeSingle();
     if (!owned) throw new Error("Você não conhece essa habilidade.");
     const { data: skill } = await context.supabase.from("skills")
-      .select("id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class,skill_class,classification,meta,animation_url,animation_mode,sound_url").eq("id", data.skill_id).maybeSingle();
+      .select("id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class,skill_class,classification,meta,animation_url,animation_mode,sound_url,accuracy").eq("id", data.skill_id).maybeSingle();
     if (!skill) throw new Error("Habilidade inexistente.");
     const combatClass = String((skill as any).skill_class ?? skill.req_class ?? "").toLowerCase();
     const healCfg = (skill as any).meta?.heal as { target?: "single" | "team" } | undefined;
@@ -592,7 +659,12 @@ export const playerAttack = createServerFn({ method: "POST" })
     const { data: npcCfg } = await supabaseAdmin
       .from("npcs").select("defense").eq("id", state.npc.id).maybeSingle();
     const defense = Math.max(0, Math.min(90, Number((npcCfg as any)?.defense ?? 0)));
-    const damage = Math.max(1, Math.round(rawDamage * (1 - defense / 100)));
+    let damage = Math.max(1, Math.round(rawDamage * (1 - defense / 100)));
+
+    // Precisão: rola chance de errar. Energia e cooldown já foram consumidos.
+    const accuracy = Math.max(1, Math.min(100, Number((skill as any).accuracy ?? 100)));
+    const missed = Math.random() * 100 >= accuracy;
+    if (missed) damage = 0;
 
     // Aplica cooldown
     if (Number(skill.cooldown_turns ?? 0) > 0) {
@@ -621,7 +693,10 @@ export const playerAttack = createServerFn({ method: "POST" })
       animation_url: (skill as any).animation_url ?? null,
       animation_mode: ((skill as any).animation_mode ?? "overlay") as any,
       sound_url: (skill as any).sound_url ?? null,
-      msg: `${activePlayer.nickname} usa ${skill.name} (${pool.toUpperCase()} ${data.energy_used})${masteryMul > 1 ? ` [Maestria ×${masteryMul.toFixed(1)}]` : ""}${toolConsumedLabel ? ` [-${toolQtyConsumed} ${toolConsumedLabel}]` : ""} → ${damage} de dano${defense > 0 ? ` (def ${defense}%)` : ""}.`,
+      missed,
+      msg: missed
+        ? `${activePlayer.nickname} usa ${skill.name} — mas ERRA o golpe!`
+        : `${activePlayer.nickname} usa ${skill.name} (${pool.toUpperCase()} ${data.energy_used})${masteryMul > 1 ? ` [Maestria ×${masteryMul.toFixed(1)}]` : ""}${toolConsumedLabel ? ` [-${toolQtyConsumed} ${toolConsumedLabel}]` : ""} → ${damage} de dano${defense > 0 ? ` (def ${defense}%)` : ""}.`,
       ...(toolConsumedLabel ? { tool_consumed: toolConsumedLabel, tool_qty: toolQtyConsumed, tool_crit_mul: toolCritMul } : {}),
     });
     if (brokenWeapons.length) {
@@ -630,8 +705,10 @@ export const playerAttack = createServerFn({ method: "POST" })
         msg: `${brokenWeapons.join(" e ")} quebrou pelo uso! Arma desequipada.`,
       } as any);
     }
-    state.npc.hp = Math.max(0, state.npc.hp - damage);
-    if (state.npc.hp <= 0) state.npc.alive = false;
+    if (!missed) {
+      state.npc.hp = Math.max(0, state.npc.hp - damage);
+      if (state.npc.hp <= 0) state.npc.alive = false;
+    }
     // Reflete mudança no array (state.npc é referência, mas garantimos)
     state.npcs[targetIdx] = state.npc;
 
@@ -758,7 +835,7 @@ async function runSingleNpcAttack(supabaseAdmin: any, npcState: NpcState, state:
   const critChance = Math.max(0, Math.min(100, Number(npcCfg?.crit_chance ?? 10)));
   const critMul = Math.max(1, Number(npcCfg?.crit_multiplier ?? 1.5));
   const { data: skills } = await supabaseAdmin
-    .from("npc_skills").select("skill:skills(id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic,animation_url,animation_mode,sound_url)").eq("npc_id", npcState.id);
+    .from("npc_skills").select("skill:skills(id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic,animation_url,animation_mode,sound_url,accuracy)").eq("npc_id", npcState.id);
   const pool = ((skills as any[]) ?? []).map((r: any) => r.skill).filter(Boolean);
   if (pool.length === 0) return;
   const affordable = pool.filter((s: any) => npcState.energy >= s.base_cost);
@@ -783,24 +860,40 @@ async function runSingleNpcAttack(supabaseAdmin: any, npcState: NpcState, state:
   // Regra "quem é mais rápido pega primeiro": se speed do jogador for maior E jogador matou o NPC, NPC não age.
   // Aqui já sabemos que NPC não morreu — mas se a fala for do jogador mais rápido, aplicamos multiplicador de dano reduzido (30% menos) como penalidade por reação.
   const speedPenalty = incomingSpeed > speed ? 0.7 : 1;
-  const finalDamage = Math.round(damage * speedPenalty);
+  let finalDamage = Math.round(damage * speedPenalty);
 
   // Escolhe um jogador vivo aleatório como alvo
   const alive = state.players.filter((p) => p.alive);
   if (!alive.length) return;
   const target = alive[Math.floor(Math.random() * alive.length)];
-  const taken = damageTargetPlayer(target, finalDamage);
+
+  // Precisão do golpe do NPC: pode errar.
+  const accuracy = Math.max(1, Math.min(100, Number((skill as any).accuracy ?? 100)));
+  const missed = Math.random() * 100 >= accuracy;
+
+  // Escudo defensivo do alvo (postura declarada pelo jogador na sua ação).
+  let shieldInfo: { percent: number; name: string } | undefined;
+  if (!missed) {
+    const shield = applyShield(state, target.character_id, finalDamage);
+    finalDamage = shield.final;
+    shieldInfo = shield.shielded;
+  }
+  const taken = missed ? { pool: "hp" as const, taken: 0 } : damageTargetPlayer(target, finalDamage);
 
   log.push({
     seq: log.length + 1, actor: "npc", actor_name: npcState.name, target_name: target.nickname,
     skill_name: skill.name, energy_type: skill.energy_type as Pool, energy_used: energy,
-    effective, damage: finalDamage, speed, crit_mul: isCrit ? critMul : Number(skill.bonus_critical),
+    effective, damage: missed ? 0 : finalDamage, speed, crit_mul: isCrit ? critMul : Number(skill.bonus_critical),
     animation_url: (skill as any).animation_url ?? null,
     animation_mode: ((skill as any).animation_mode ?? "overlay") as any,
     target_char_id: target.character_id,
     actor_char_id: npcState.id,
     sound_url: (skill as any).sound_url ?? null,
-    msg: `${npcState.name} usa ${skill.name}${isCrit ? " (CRÍTICO!)" : ""} → ${target.nickname} sofre ${taken.taken} de dano na vida${speedPenalty < 1 ? " (reação lenta)" : ""}.`,
+    missed,
+    ...(shieldInfo ? { shield_reduced_by: shieldInfo.percent, shield_name: shieldInfo.name } : {}),
+    msg: missed
+      ? `${npcState.name} usa ${skill.name} — mas ERRA o golpe contra ${target.nickname}!`
+      : `${npcState.name} usa ${skill.name}${isCrit ? " (CRÍTICO!)" : ""} → ${target.nickname} sofre ${taken.taken} de dano${shieldInfo ? ` (defesa ${shieldInfo.name} −${shieldInfo.percent}%)` : ""}${speedPenalty < 1 ? " (reação lenta)" : ""}.`,
   });
   npcState.energy = Math.max(0, npcState.energy - energy);
 }
@@ -1031,7 +1124,7 @@ async function finalizePvp(supabaseAdmin: any, sessId: string, state: PvpState, 
 
 async function handlePvpAttack(
   supabaseAdmin: any, supabaseUser: any, sess: any, myId: string,
-  data: { session_id: string; skill_id: string; energy_used: number; target_index?: number; heal_target_char_id?: string },
+  data: { session_id: string; skill_id: string; energy_used: number; target_index?: number; heal_target_char_id?: string; defensive_skill_id?: string },
 ) {
   const state = sess.state as PvpState;
   const log: LogEntry[] = Array.isArray(sess.log) ? (sess.log as any) : [];
@@ -1046,11 +1139,22 @@ async function handlePvpAttack(
   const cd = activePlayer.cooldowns[data.skill_id] ?? 0;
   if (cd > 0) throw new Error(`Habilidade em cooldown por mais ${cd} turno(s).`);
 
+  // Defesa opcional — o escudo protege este jogador do próximo golpe adversário.
+  if (data.defensive_skill_id) {
+    const shield = await consumeDefensiveSkill(supabaseUser, activePlayer, data.defensive_skill_id, log);
+    (state as any)._shields = (state as any)._shields ?? {};
+    (state as any)._shields[activePlayer.character_id] = { percent: shield.percent, name: shield.skillName };
+    // marcadores PvP no último log
+    const last = log[log.length - 1] as any;
+    last.pvp_actor_side = mySide; last.pvp_actor_idx = state.active_idx;
+    last.pvp_target_side = mySide; last.pvp_target_idx = state.active_idx;
+  }
+
   const { data: owned } = await supabaseUser
     .from("character_skills").select("skill_id").eq("character_id", myId).eq("skill_id", data.skill_id).maybeSingle();
   if (!owned) throw new Error("Você não conhece essa habilidade.");
   const { data: skill } = await supabaseUser.from("skills")
-    .select("id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class,skill_class,meta,animation_url,animation_mode,sound_url")
+    .select("id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class,skill_class,meta,animation_url,animation_mode,sound_url,accuracy")
     .eq("id", data.skill_id).maybeSingle();
   if (!skill) throw new Error("Habilidade inexistente.");
 
@@ -1145,12 +1249,27 @@ async function handlePvpAttack(
     const speed = effective * Number(skill.bonus_speed);
     const rawDamage = Math.max(1, Math.round(effective * Number(skill.bonus_critical) * masteryMul * powerMul));
     const hitCap = Math.max(1, Math.ceil((target.hp_max ?? 0) * PVP_MAX_HIT_PCT / 100));
-    const damage = Math.min(rawDamage, hitCap);
+    let damage = Math.min(rawDamage, hitCap);
+
+    // Precisão do golpe do jogador em PvP.
+    const accuracy = Math.max(1, Math.min(100, Number((skill as any).accuracy ?? 100)));
+    const missed = Math.random() * 100 >= accuracy;
+    if (missed) damage = 0;
+
+    // Escudo defensivo do alvo (postura declarada na ação anterior).
+    let shieldInfo: { percent: number; name: string } | undefined;
+    if (!missed) {
+      const shield = applyShield(state as any, target.character_id, damage);
+      damage = shield.final;
+      shieldInfo = shield.shielded;
+    }
 
     if (Number(skill.cooldown_turns ?? 0) > 0) activePlayer.cooldowns[data.skill_id] = Number(skill.cooldown_turns);
 
-    target.hp = Math.max(0, target.hp - damage);
-    if (target.hp <= 0) target.alive = false;
+    if (!missed) {
+      target.hp = Math.max(0, target.hp - damage);
+      if (target.hp <= 0) target.alive = false;
+    }
 
     log.push({
       seq: log.length + 1, actor: "player", actor_name: activePlayer.nickname, target_name: target.nickname,
@@ -1163,7 +1282,11 @@ async function handlePvpAttack(
       animation_url: (skill as any).animation_url ?? null,
       animation_mode: ((skill as any).animation_mode ?? "overlay") as any,
       sound_url: (skill as any).sound_url ?? null,
-      msg: `${activePlayer.nickname} usa ${skill.name} (${pool.toUpperCase()} ${data.energy_used})${masteryMul > 1 ? ` [Maestria ×${masteryMul.toFixed(1)}]` : ""} → ${damage} de dano${damage < rawDamage ? ` [cap ${PVP_MAX_HIT_PCT}%]` : ""}.`,
+      missed,
+      ...(shieldInfo ? { shield_reduced_by: shieldInfo.percent, shield_name: shieldInfo.name } : {}),
+      msg: missed
+        ? `${activePlayer.nickname} usa ${skill.name} — mas ERRA o golpe!`
+        : `${activePlayer.nickname} usa ${skill.name} (${pool.toUpperCase()} ${data.energy_used})${masteryMul > 1 ? ` [Maestria ×${masteryMul.toFixed(1)}]` : ""} → ${damage} de dano${shieldInfo ? ` (defesa ${shieldInfo.name} −${shieldInfo.percent}%)` : ""}${damage < rawDamage && !shieldInfo ? ` [cap ${PVP_MAX_HIT_PCT}%]` : ""}.`,
       pvp_actor_side: mySide, pvp_actor_idx: state.active_idx,
       pvp_target_side: enemySide, pvp_target_idx: tIdx,
     } as any);
