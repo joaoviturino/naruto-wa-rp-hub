@@ -10,7 +10,12 @@ import { Compass, Footprints, MapPin, X, Sparkles } from "lucide-react";
 
 type Loc = { id: string; name: string; image_url: string | null; map_x: number; map_y: number; parent_id: string | null };
 type Conn = { a_id: string; b_id: string };
-type Mount = { id: string; name: string; image_url: string | null; travel_gif_url: string | null; description: string | null; rank: string | null; speed_multiplier: number };
+type Mount = {
+  id: string; name: string; image_url: string | null; travel_gif_url: string | null;
+  description: string | null; rank: string | null; speed_multiplier: number;
+  pose_id?: string | null; pose_offset_x?: number; pose_offset_y?: number; pose_scale?: number;
+  pose_image_url?: string | null;
+};
 
 const NODE_W = 130;
 const NODE_H = 60;
@@ -131,6 +136,14 @@ export function TravelDialog({ open, onOpenChange, currentLocationId, onArrived 
               {mount?.travel_gif_url && (
                 <img src={mount.travel_gif_url} alt=""
                   className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 max-h-[80%] max-w-[70%] object-contain drop-shadow-[0_6px_16px_rgba(0,0,0,0.6)] pointer-events-none" />
+              )}
+              {mount?.pose_image_url && (
+                <img src={mount.pose_image_url} alt=""
+                  className="absolute left-1/2 top-1/2 max-h-[70%] max-w-[70%] object-contain pointer-events-none drop-shadow-[0_4px_12px_rgba(0,0,0,0.55)]"
+                  style={{
+                    transform: `translate(calc(-50% + ${mount.pose_offset_x ?? 0}%), calc(-50% + ${mount.pose_offset_y ?? 0}%)) scale(${mount.pose_scale ?? 1})`,
+                    transformOrigin: "center",
+                  }} />
               )}
               <div className="absolute bottom-2 left-3 right-3">
                 <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Destino</div>
