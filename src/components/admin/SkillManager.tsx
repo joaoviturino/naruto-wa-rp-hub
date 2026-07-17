@@ -12,8 +12,9 @@ import { toast } from "sonner";
 import { ImageUpload } from "@/components/ImageUpload";
 import { NINJA_RANKS, SKILL_RANKS, ELEMENTS, CLASSIFICATIONS, RANGES, labelize } from "./shared";
 import { useProficiencies } from "@/hooks/useProficiencies";
-import { Trash2, Pencil, Plus, Swords } from "lucide-react";
+import { Trash2, Pencil, Plus, Swords, FlaskConical } from "lucide-react";
 import { RestoreEffectFields } from "./RestoreEffectFields";
+import { SkillTestDialog } from "./SkillTestDialog";
 
 export function SkillManager({ adminUserId }: { adminUserId: string }) {
   const [skills, setSkills] = useState<any[]>([]);
@@ -86,6 +87,7 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
   const SKILL_CLASSES = useProficiencies();
   const save = useServerFn(upsertSkill);
   const [f, setF] = useState<any>(initial ?? {});
+  const [testOpen, setTestOpen] = useState(false);
   useEffect(() => { setF(initial ?? {}); }, [initial]);
   function up(k: string, v: any) { setF((p: any) => ({ ...p, [k]: v })); }
 
@@ -315,6 +317,9 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
         </div>
         <div className="flex justify-end gap-2 mt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button variant="secondary" onClick={() => setTestOpen(true)}>
+            <FlaskConical size={14} /> Testar
+          </Button>
           <Button onClick={async () => {
             try {
               // Normaliza meta.restore e faz cura HP roteada pelo sistema Iryo.
@@ -354,6 +359,7 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
             } catch (e: any) { toast.error(e.message); }
           }}>Salvar</Button>
         </div>
+        <SkillTestDialog open={testOpen} onOpenChange={setTestOpen} skill={f} />
       </DialogContent>
     </Dialog>
   );
