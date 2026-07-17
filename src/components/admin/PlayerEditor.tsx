@@ -10,7 +10,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { updatePlayer, grantSkill, revokeSkill, grantItem, revokeItem, completeMission, uncompleteMission, giftRyo } from "@/lib/admin.functions";
 import { adminListPoses, adminUpsertPose, adminDeletePose } from "@/lib/pose.functions";
 import { toast } from "sonner";
-import { NINJA_RANKS, SKILL_RANKS, VILLAGES, ELEMENTS, labelize } from "./shared";
+import { NINJA_RANKS, SKILL_RANKS, VILLAGES, ELEMENTS, labelize, elementLimitForRank, countElementProficiencies } from "./shared";
 import { useProficiencies } from "@/hooks/useProficiencies";
 import { X, Plus } from "lucide-react";
 import { ImageUpload } from "@/components/ImageUpload";
@@ -61,13 +61,25 @@ export function PlayerEditor({ characterId, open, onOpenChange, onSaved }: {
 
   function up(k: string, v: any) { setChar((p: any) => ({ ...p, [k]: v })); }
   function upProf(k: string, field: "nivel" | "maestria", v: string | null) {
-    setChar((p: any) => ({
-      ...p,
-      proficiencies: {
-        ...(p.proficiencies ?? {}),
-        [k]: { ...((p.proficiencies ?? {})[k] ?? {}), [field]: v },
-      },
-    }));
+    setChar((p: any) => {
+      const profs = { ...(p.proficiencies ?? {}) };
+      const current = { ...(profs[k] ?? {}), [field]: v };
+      // Se for elemento e estamos ativando (não limpando), respeita o limite por patente.
+      if (v && (ELEMENTS as readonly string[]).includes(k)) {
+        const prev = profs[k] ?? {};
+        const wasActive = !!(prev.nivel || prev.maestria);
+        if (!wasActive) {
+          const active = countElementProficiencies(profs);
+          const limit = elementLimitForRank(p.rank);
+          if (active >= limit) {
+            toast.error(`Esta patente permite apenas ${limit} elemento(s). Remova outro antes.`);
+            return p;
+          }
+        }
+      }
+      profs[k] = current;
+      return { ...p, proficiencies: profs };
+    });
   }
 
   const skillIds = new Set(charSkills.map((s) => s.skill_id));
@@ -177,6 +189,10 @@ export function PlayerEditor({ characterId, open, onOpenChange, onSaved }: {
             <p className="text-xs text-muted-foreground mb-2">
               Cada classe tem <b>Nível</b> (proficiência geral) e <b>Rank de Maestria</b> (domínio prático). Deixe em branco se o jogador não pratica a classe.
             </p>
+            <p className="text-xs text-muted-foreground mb-2">
+              <b>Limite elemental para {NINJA_RANKS.find((r)=>r.value===char.rank)?.label ?? char.rank}:</b>{" "}
+              {countElementProficiencies(char.proficiencies)} / {elementLimitForRank(char.rank)} elemento(s) ativos.
+            </p>
             <div className="grid gap-2 sm:grid-cols-2 max-h-[60vh] overflow-y-auto pr-2">
               {SKILL_CLASSES.map((c) => {
                 const entry = char.proficiencies?.[c.value] ?? {};
@@ -199,6 +215,12 @@ export function PlayerEditor({ characterId, open, onOpenChange, onSaved }: {
                   Object.entries(char.proficiencies ?? {}).forEach(([k, v]: any) => {
                     if (v && (v.nivel || v.maestria)) cleaned[k] = { nivel: v.nivel ?? null, maestria: v.maestria ?? null };
                   });
+                  const elCount = countElementProficiencies(cleaned);
+                  const elLimit = elementLimitForRank(char.rank);
+                  if (elCount > elLimit) {
+                    toast.error(`Esta patente permite apenas ${elLimit} elemento(s). Você tem ${elCount}.`);
+                    return;
+                  }
                   await save({ data: { character_id: char.id, proficiencies: cleaned } } as any);
                   toast.success("Proficiências atualizadas."); onSaved();
                 } catch (e: any) { toast.error(e.message); }
