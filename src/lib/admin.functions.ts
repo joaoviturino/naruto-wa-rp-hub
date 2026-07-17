@@ -582,3 +582,69 @@ export const createUploadUrl = createServerFn({ method: "POST" })
     const { data: read } = await supabaseAdmin.storage.from(data.bucket).createSignedUrl(data.path, 60 * 60 * 24 * 365);
     return { uploadUrl: signed.signedUrl, token: signed.token, path: signed.path, readUrl: read?.signedUrl ?? null };
   });
+
+/* ---------- RESET PLAYER PROGRESS ---------- */
+
+const EMPTY_INV = {
+  ninja_bag: [] as any[],
+  secondary_slots: [] as any[],
+  helmet_id: null as string | null,
+  vest_id: null as string | null,
+  pants_id: null as string | null,
+  boots_id: null as string | null,
+  primary_weapon_id: null as string | null,
+  secondary_weapon_id: null as string | null,
+  primary_weapon_durability: null as number | null,
+  secondary_weapon_durability: null as number | null,
+};
+
+/** Zera XP e/ou inventário de um jogador específico. */
+export const resetPlayerProgress = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    character_id: z.string().uuid(),
+    resetXp: z.boolean().default(true),
+    resetInventory: z.boolean().default(true),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    if (data.resetXp) {
+      await supabaseAdmin.from("characters").update({ xp: 0 }).eq("id", data.character_id);
+    }
+    if (data.resetInventory) {
+      await supabaseAdmin.from("inventory").update(EMPTY_INV).eq("character_id", data.character_id);
+    }
+    await supabaseAdmin.from("audit_log").insert({
+      admin_id: context.userId, action: "reset_player", target: data.character_id,
+      meta: { xp: data.resetXp, inventory: data.resetInventory },
+    });
+    return { ok: true };
+  });
+
+/** Zera XP e/ou inventário de TODOS os jogadores. Operação destrutiva. */
+export const resetAllPlayers = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    resetXp: z.boolean().default(true),
+    resetInventory: z.boolean().default(true),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    if (!data.resetXp && !data.resetInventory) return { ok: true, affected: 0 };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    let affected = 0;
+    if (data.resetXp) {
+      const { count } = await supabaseAdmin.from("characters").update({ xp: 0 }, { count: "exact" }).gt("xp", -1);
+      affected = Math.max(affected, count ?? 0);
+    }
+    if (data.resetInventory) {
+      const { count } = await supabaseAdmin.from("inventory").update(EMPTY_INV, { count: "exact" }).not("character_id", "is", null);
+      affected = Math.max(affected, count ?? 0);
+    }
+    await supabaseAdmin.from("audit_log").insert({
+      admin_id: context.userId, action: "reset_all_players", target: null,
+      meta: { xp: data.resetXp, inventory: data.resetInventory, affected },
+    });
+    return { ok: true, affected };
+  });
