@@ -4,6 +4,18 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { shortestPathDistance } from "@/lib/location-graph";
 
 const BASE_SECONDS_PER_NODE = 30;
+const SUB_SECONDS_PER_NODE = 5;
+
+/** Retorna true se `from` e `to` são sublocais do mesmo pai (ou parent/child). */
+function isSublocationMove(
+  from: { id: string; parent_id: string | null },
+  to: { id: string; parent_id: string | null },
+): boolean {
+  if (from.parent_id && to.parent_id && from.parent_id === to.parent_id) return true;
+  if (from.parent_id === to.id) return true;
+  if (to.parent_id === from.id) return true;
+  return false;
+}
 
 /** Retorna a viagem em andamento do usuário atual (se houver). */
 export const getMyTravel = createServerFn({ method: "GET" })
@@ -66,6 +78,15 @@ export const travelTo = createServerFn({ method: "POST" })
     const dist = shortestPathDistance(((conns as any[]) ?? []), char.current_location_id, data.toLocationId);
     if (dist < 0) throw new Error("Não há caminho até esse local.");
 
+    // Sublocal: viagem instantânea/rápida entre sublocais do mesmo pai.
+    const { data: pair } = await context.supabase
+      .from("locations").select("id,parent_id")
+      .in("id", [char.current_location_id, data.toLocationId]);
+    const fromLoc = (pair ?? []).find((l: any) => l.id === char.current_location_id) ?? null;
+    const toLoc = (pair ?? []).find((l: any) => l.id === data.toLocationId) ?? null;
+    const subMove = !!(fromLoc && toLoc && isSublocationMove(fromLoc as any, toLoc as any));
+    const perNode = subMove ? SUB_SECONDS_PER_NODE : BASE_SECONDS_PER_NODE;
+
     let multiplier = 1;
     let mountId: string | null = null;
     if (data.mountId) {
@@ -77,7 +98,7 @@ export const travelTo = createServerFn({ method: "POST" })
       mountId = m.id;
       multiplier = Math.max(0.1, Math.min(1, Number(m.speed_multiplier) || 0.5));
     }
-    const totalSeconds = Math.max(3, Math.round((dist * BASE_SECONDS_PER_NODE) * multiplier));
+    const totalSeconds = Math.max(3, Math.round((dist * perNode) * multiplier));
     const now = new Date();
     const arrives = new Date(now.getTime() + totalSeconds * 1000);
 

@@ -8,7 +8,7 @@ import { shortestPathDistance } from "@/lib/location-graph";
 import { toast } from "sonner";
 import { Compass, Footprints, MapPin, X, Sparkles } from "lucide-react";
 
-type Loc = { id: string; name: string; image_url: string | null; map_x: number; map_y: number };
+type Loc = { id: string; name: string; image_url: string | null; map_x: number; map_y: number; parent_id: string | null };
 type Conn = { a_id: string; b_id: string };
 type Mount = { id: string; name: string; image_url: string | null; description: string | null; rank: string | null; speed_multiplier: number };
 
@@ -37,7 +37,7 @@ export function TravelDialog({ open, onOpenChange, currentLocationId, onArrived 
     if (!open) return;
     (async () => {
       const [{ data: l }, { data: cn }, m, t] = await Promise.all([
-        supabase.from("locations").select("id,name,image_url,map_x,map_y").order("name"),
+        supabase.from("locations").select("id,name,image_url,map_x,map_y,parent_id").order("name"),
         supabase.from("location_connections").select("a_id,b_id"),
         listMounts({}), getT({}),
       ]);
@@ -80,7 +80,15 @@ export function TravelDialog({ open, onOpenChange, currentLocationId, onArrived 
   const selectedLoc = selected ? locs.find((l) => l.id === selected) ?? null : null;
   const currentLoc = currentLocationId ? locs.find((l) => l.id === currentLocationId) ?? null : null;
 
-  const baseSec = Math.max(3, dist * 30);
+  const isSubMove = (() => {
+    if (!currentLoc || !selectedLoc) return false;
+    const a = currentLoc, b = selectedLoc;
+    if (a.parent_id && b.parent_id && a.parent_id === b.parent_id) return true;
+    if (a.parent_id === b.id || b.parent_id === a.id) return true;
+    return false;
+  })();
+  const perNode = isSubMove ? 5 : 30;
+  const baseSec = Math.max(3, dist * perNode);
   const mountMul = chosenMount ? (mounts.find((m) => m.id === chosenMount)?.speed_multiplier ?? 1) : 1;
   const estSec = Math.max(3, Math.round(baseSec * mountMul));
 
