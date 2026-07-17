@@ -32,6 +32,8 @@ type Minigame = {
   required_rank?: string | null;
   required_profs?: Array<{ skill_class: string; nivel?: string | null; maestria?: string | null }>;
   reward_skills?: Array<{ skill_id: string }>;
+  required_job_id?: string | null;
+  job_required?: boolean;
 };
 
 const EMPTY: Minigame = {
@@ -42,6 +44,7 @@ const EMPTY: Minigame = {
   rewards: { xp: 0, ryo: 0, ef: 0, em: 0, chakra: 0, items: [] },
   cooldown_hours: 24, active: true,
   one_time: false, required_rank: null, required_profs: [], reward_skills: [],
+  required_job_id: null, job_required: true,
 };
 
 const NINJA_RANKS = ["estudante","genin","chunin","tokubetsu_jonin","jonin","anbu","sannin","kage"];
@@ -90,6 +93,8 @@ export function MinigameManager() {
         required_rank: selected.required_rank || null,
         required_profs: (selected.required_profs ?? []).filter((p) => p.skill_class),
         reward_skills: (selected.reward_skills ?? []).filter((s) => s.skill_id),
+        required_job_id: selected.required_job_id || null,
+        job_required: selected.job_required ?? true,
       };
       const r = await upsert({ data: payload });
       toast.success("Minigame salvo.");
@@ -235,6 +240,18 @@ export function MinigameManager() {
                   <Plus size={14} className="mr-1" /> Adicionar proficiência
                 </Button>
               </div>
+            </div>
+            <div className="pt-3 border-t border-border/40 grid gap-2 md:grid-cols-[1fr_auto]">
+              <div>
+                <Label>Emprego exigido</Label>
+                <JobPicker value={selected.required_job_id ?? null}
+                  onChange={(v) => setSelected({ ...selected, required_job_id: v })} />
+              </div>
+              <label className="flex items-end gap-2 text-sm pb-1">
+                <input type="checkbox" checked={selected.job_required ?? true}
+                  onChange={(e) => setSelected({ ...selected, job_required: e.target.checked })} />
+                Obrigatório
+              </label>
             </div>
           </div>
 
@@ -761,5 +778,21 @@ function ForgeConfigEditor({ selected, setSelected, items, kind }: { selected: a
         </div>
       </div>
     </div>
+  );
+}
+function JobPicker({ value, onChange }: { value: string | null; onChange: (v: string | null) => void }) {
+  const [jobs, setJobs] = useState<{ id: string; name: string; active: boolean }[]>([]);
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from("jobs").select("id,name,active").order("name");
+      setJobs((data as any[]) ?? []);
+    })();
+  }, []);
+  return (
+    <select value={value ?? ""} onChange={(e) => onChange(e.target.value || null)}
+      className="w-full bg-background border border-border rounded px-2 h-9 text-sm">
+      <option value="">— nenhum —</option>
+      {jobs.map((j) => <option key={j.id} value={j.id}>{j.name}{j.active ? "" : " (inativo)"}</option>)}
+    </select>
   );
 }

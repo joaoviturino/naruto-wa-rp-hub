@@ -137,6 +137,57 @@ export type Database = {
           },
         ]
       }
+      character_jobs: {
+        Row: {
+          character_id: string
+          created_at: string
+          hired_at: string
+          id: string
+          job_id: string
+          last_activity_at: string
+          last_paid_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          character_id: string
+          created_at?: string
+          hired_at?: string
+          id?: string
+          job_id: string
+          last_activity_at?: string
+          last_paid_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          character_id?: string
+          created_at?: string
+          hired_at?: string
+          id?: string
+          job_id?: string
+          last_activity_at?: string
+          last_paid_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "character_jobs_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "character_jobs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       character_knowledges: {
         Row: {
           character_id: string
@@ -527,6 +578,45 @@ export type Database = {
             columns: ["current_location_id"]
             isOneToOne: false
             referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chest_permissions: {
+        Row: {
+          character_id: string
+          chest_id: string
+          created_at: string
+          id: string
+          is_owner: boolean
+        }
+        Insert: {
+          character_id: string
+          chest_id: string
+          created_at?: string
+          id?: string
+          is_owner?: boolean
+        }
+        Update: {
+          character_id?: string
+          chest_id?: string
+          created_at?: string
+          id?: string
+          is_owner?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chest_permissions_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chest_permissions_chest_id_fkey"
+            columns: ["chest_id"]
+            isOneToOne: false
+            referencedRelation: "npc_chests"
             referencedColumns: ["id"]
           },
         ]
@@ -1009,6 +1099,48 @@ export type Database = {
           },
         ]
       }
+      jobs: {
+        Row: {
+          active: boolean
+          created_at: string
+          description: string | null
+          fire_after_days: number
+          id: string
+          image_url: string | null
+          name: string
+          salary_interval_hours: number
+          salary_ryo: number
+          salary_xp: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          fire_after_days?: number
+          id?: string
+          image_url?: string | null
+          name: string
+          salary_interval_hours?: number
+          salary_ryo?: number
+          salary_xp?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          fire_after_days?: number
+          id?: string
+          image_url?: string | null
+          name?: string
+          salary_interval_hours?: number
+          salary_ryo?: number
+          salary_xp?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       knowledges: {
         Row: {
           description: string | null
@@ -1469,11 +1601,13 @@ export type Database = {
           dialog_intro: string | null
           dialog_outro: string | null
           id: string
+          job_required: boolean
           kind: Database["public"]["Enums"]["minigame_kind"]
           name: string
           npc_name: string | null
           npc_portrait_url: string | null
           one_time: boolean
+          required_job_id: string | null
           required_profs: Json
           required_rank: string | null
           reward_skills: Json
@@ -1492,11 +1626,13 @@ export type Database = {
           dialog_intro?: string | null
           dialog_outro?: string | null
           id?: string
+          job_required?: boolean
           kind?: Database["public"]["Enums"]["minigame_kind"]
           name: string
           npc_name?: string | null
           npc_portrait_url?: string | null
           one_time?: boolean
+          required_job_id?: string | null
           required_profs?: Json
           required_rank?: string | null
           reward_skills?: Json
@@ -1515,11 +1651,13 @@ export type Database = {
           dialog_intro?: string | null
           dialog_outro?: string | null
           id?: string
+          job_required?: boolean
           kind?: Database["public"]["Enums"]["minigame_kind"]
           name?: string
           npc_name?: string | null
           npc_portrait_url?: string | null
           one_time?: boolean
+          required_job_id?: string | null
           required_profs?: Json
           required_rank?: string | null
           reward_skills?: Json
@@ -1528,7 +1666,15 @@ export type Database = {
           tileset_url?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "minigames_required_job_id_fkey"
+            columns: ["required_job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       missions: {
         Row: {
@@ -1616,6 +1762,41 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      npc_chests: {
+        Row: {
+          capacity: number
+          contents: Json
+          created_at: string
+          id: string
+          npc_id: string
+          updated_at: string
+        }
+        Insert: {
+          capacity?: number
+          contents?: Json
+          created_at?: string
+          id?: string
+          npc_id: string
+          updated_at?: string
+        }
+        Update: {
+          capacity?: number
+          contents?: Json
+          created_at?: string
+          id?: string
+          npc_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "npc_chests_npc_id_fkey"
+            columns: ["npc_id"]
+            isOneToOne: true
+            referencedRelation: "npcs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       npc_group_members: {
         Row: {
@@ -1776,6 +1957,7 @@ export type Database = {
           music_url: string | null
           name: string
           offer_mission_id: string | null
+          offered_job_id: string | null
           required_mission_id: string | null
           reward_cooldown_hours: number
           reward_items: Json
@@ -1809,6 +1991,7 @@ export type Database = {
           music_url?: string | null
           name: string
           offer_mission_id?: string | null
+          offered_job_id?: string | null
           required_mission_id?: string | null
           reward_cooldown_hours?: number
           reward_items?: Json
@@ -1842,6 +2025,7 @@ export type Database = {
           music_url?: string | null
           name?: string
           offer_mission_id?: string | null
+          offered_job_id?: string | null
           required_mission_id?: string | null
           reward_cooldown_hours?: number
           reward_items?: Json
@@ -1865,6 +2049,13 @@ export type Database = {
             columns: ["offer_mission_id"]
             isOneToOne: false
             referencedRelation: "missions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "npcs_offered_job_id_fkey"
+            columns: ["offered_job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
           {
@@ -2609,6 +2800,7 @@ export type Database = {
         | "object"
         | "dialogue"
         | "buyer"
+        | "employer"
       proficiency_kind:
         | "kenjutsu"
         | "shurikenjutsu"
@@ -2858,6 +3050,7 @@ export const Constants = {
         "object",
         "dialogue",
         "buyer",
+        "employer",
       ],
       proficiency_kind: [
         "kenjutsu",

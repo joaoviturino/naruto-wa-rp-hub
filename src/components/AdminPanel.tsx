@@ -23,11 +23,12 @@ import { LevelManager } from "@/components/admin/LevelManager";
 import { ProficiencyManager } from "@/components/admin/ProficiencyManager";
 import { ServerControl } from "@/components/admin/ServerControl";
 import { MountManager } from "@/components/admin/MountManager";
+import { JobManager } from "@/components/admin/JobManager";
 import { NINJA_RANKS } from "@/components/admin/shared";
 import {
   Pencil, BatteryCharging, Eye, LayoutDashboard, Users, Package, Sparkles,
   ScrollText, GitBranch, MapPin, Ghost, Gamepad2, BookOpen, TrendingUp,
-  ShieldCheck, Server, MessageSquare, Award, UsersRound, Menu, X, Rabbit, RotateCcw, AlertTriangle,
+  ShieldCheck, Server, MessageSquare, Award, UsersRound, Menu, X, Rabbit, RotateCcw, AlertTriangle, Briefcase,
 } from "lucide-react";
 
 type NavItem = { id: string; label: string; icon: React.ComponentType<{ size?: number; className?: string }>; group: string };
@@ -40,6 +41,7 @@ const NAV: NavItem[] = [
   { id: "skills",    label: "Habilidades", icon: Sparkles,      group: "Conteúdo" },
   { id: "profs",     label: "Proficiências", icon: Award,       group: "Conteúdo" },
   { id: "missions",  label: "Missões",   icon: ScrollText,      group: "Conteúdo" },
+  { id: "jobs",      label: "Empregos",  icon: Briefcase,       group: "Conteúdo" },
   { id: "clans",     label: "Árvore de Clã", icon: GitBranch,   group: "Mundo" },
   { id: "locations", label: "Locais",    icon: MapPin,          group: "Mundo" },
   { id: "npcs",      label: "NPCs",      icon: Ghost,           group: "Mundo" },
@@ -155,6 +157,7 @@ export function AdminPanel() {
             {active === "skills" && adminUserId && <SkillManager adminUserId={adminUserId} />}
             {active === "profs" && <ProficiencyManager />}
             {active === "missions" && <MissionManager />}
+            {active === "jobs" && <JobManager />}
             {active === "clans" && <ClanTreeManager />}
             {active === "locations" && <LocationManager />}
             {active === "npcs" && <NpcManager />}

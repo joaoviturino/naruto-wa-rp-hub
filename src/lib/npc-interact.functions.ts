@@ -32,7 +32,7 @@ export const listLocationInteractNpcs = createServerFn({ method: "POST" })
     if (!me.current_location_id) return { npcs: [] as any[] };
     const { data } = await context.supabase
       .from("location_npcs")
-      .select("npc:npcs(id,name,image_url,kind,dialog_intro,dialog_outro,shop_items,buy_items,reward_items,reward_xp,reward_ryo,reward_cooldown_hours,required_mission_id,offer_mission_id,tutorial_blocks,learning_min_read_seconds,linked_minigame_id,music_url)")
+      .select("npc:npcs(id,name,image_url,kind,dialog_intro,dialog_outro,shop_items,buy_items,reward_items,reward_xp,reward_ryo,reward_cooldown_hours,required_mission_id,offer_mission_id,tutorial_blocks,learning_min_read_seconds,linked_minigame_id,music_url,offered_job_id)")
       .eq("location_id", me.current_location_id);
     const list = ((data as any[]) ?? []).map((r) => r.npc).filter((n: any) => n && n.kind !== "aggressive");
     // Enriquece reward com cooldown remaining
@@ -303,6 +303,12 @@ export const sellToBuyer = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: npc } = await supabaseAdmin.from("npcs").select("kind,buy_items,name").eq("id", data.npc_id).maybeSingle();
     if (!npc || (npc as any).kind !== "buyer") throw new Error("Este NPC não compra itens.");
+    // Anti-farm: se o vendedor tem permissão (dono ou autorizado) no baú deste NPC,
+    // ele não pode vender aqui para evitar farm circular de dinheiro.
+    const { callerHasAnyChestPermissionForNpc } = await import("./chest.functions");
+    if (await callerHasAnyChestPermissionForNpc(supabaseAdmin, me.id, data.npc_id)) {
+      throw new Error("Você tem acesso ao baú deste NPC e não pode vender aqui.");
+    }
     const entries = (Array.isArray((npc as any).buy_items) ? (npc as any).buy_items : []) as any[];
     const entry = entries.find((e) => e.item_id === data.item_id);
     if (!entry) throw new Error("Este NPC não compra esse item.");
@@ -315,5 +321,19 @@ export const sellToBuyer = createServerFn({ method: "POST" })
     const gain = Number(entry.price) * data.qty;
     await supabaseAdmin.from("inventory").update({ ninja_bag: nextBag }).eq("character_id", me.id);
     await supabaseAdmin.from("characters").update({ ryo: Number(me.ryo ?? 0) + gain }).eq("id", me.id);
+    // Se o NPC tem baú vinculado, o item vai para o baú (respeitando capacidade).
+    const { data: chest } = await supabaseAdmin.from("npc_chests")
+      .select("id,contents,capacity").eq("npc_id", data.npc_id).maybeSingle();
+    if (chest) {
+      const contents = (Array.isArray((chest as any).contents) ? (chest as any).contents : []) as Array<{ item_id: string; qty: number }>;
+      const total = contents.reduce((s, e) => s + Number(e.qty ?? 0), 0);
+      if (total + data.qty <= Number((chest as any).capacity ?? 0)) {
+        const cIdx = contents.findIndex((e) => e.item_id === data.item_id);
+        if (cIdx >= 0) contents[cIdx].qty += data.qty;
+        else contents.push({ item_id: data.item_id, qty: data.qty });
+        await supabaseAdmin.from("npc_chests").update({ contents }).eq("id", (chest as any).id);
+      }
+      // Se o baú estiver cheio, o item é destruído (padrão MMO); venda ainda paga o Ryo.
+    }
     return { ok: true, earned: gain };
   });

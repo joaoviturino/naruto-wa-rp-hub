@@ -97,6 +97,8 @@ const upsertSchema = z.object({
   required_rank: ninjaRank.nullish(),
   required_profs: requiredProfsSchema,
   reward_skills: rewardSkillsSchema,
+  required_job_id: z.string().uuid().nullish(),
+  job_required: z.boolean().default(true),
 }).superRefine((data, ctx) => {
   const parser =
     data.kind === "sequence" ? sequenceConfigSchema :
@@ -240,6 +242,15 @@ export const startMinigameRun = createServerFn({ method: "POST" })
     }
     const missing = checkRequirements(char, game.required_rank ?? null, (game.required_profs as any[]) ?? []);
     if (missing.length) throw new Error("Requisitos não atendidos: " + missing.join(", "));
+    // Requisito de emprego: se marcado como obrigatório, precisa estar contratado (status=active).
+    if (game.required_job_id && game.job_required !== false) {
+      const { data: cj } = await context.supabase.from("character_jobs")
+        .select("status").eq("character_id", char.id).eq("job_id", game.required_job_id).maybeSingle();
+      if (!cj || (cj as any).status !== "active") {
+        const { data: j } = await context.supabase.from("jobs").select("name").eq("id", game.required_job_id).maybeSingle();
+        throw new Error(`Requer o emprego: ${(j as any)?.name ?? "?"}.`);
+      }
+    }
     // Verifica cooldown
     const { data: last } = await context.supabase
       .from("minigame_runs").select("completed_at").eq("character_id", char.id).eq("minigame_id", data.minigame_id)
@@ -418,6 +429,15 @@ export const completeMinigameRun = createServerFn({ method: "POST" })
     await supabaseAdmin.from("minigame_runs").update({
       score: data.score, success: data.success, rewards_applied: applied, completed_at: new Date().toISOString(),
     }).eq("id", data.run_id);
+
+    // Bump last_activity_at do emprego vinculado se o run teve sucesso.
+    if (data.success && (run.minigames as any).required_job_id) {
+      await supabaseAdmin.from("character_jobs")
+        .update({ last_activity_at: new Date().toISOString() })
+        .eq("character_id", run.character_id)
+        .eq("job_id", (run.minigames as any).required_job_id)
+        .eq("status", "active");
+    }
 
     // Missões — registrar conclusão de minigame e (se houver) fabricação.
     if (data.success) {

@@ -1,3 +1,4 @@
+import * as _chest from "@/lib/chest.functions";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,7 @@ type DropRow = { item_id: string; qty: number; chance: number };
 type ShopRow = { item_id: string; price: number; stock: number };
 type BuyRow = { item_id: string; price: number; max_per_day: number };
 type RewardRow = { item_id: string; qty: number };
-type NpcKind = "aggressive" | "shop" | "reward" | "learning" | "object" | "dialogue" | "buyer";
+type NpcKind = "aggressive" | "shop" | "reward" | "learning" | "object" | "dialogue" | "buyer" | "employer";
 type LearnBlock = { id: string; kind: "text" | "image"; text?: string | null; image_url?: string | null };
 type Npc = {
   id: string; name: string; image_url: string | null; description: string | null;
@@ -65,9 +66,11 @@ const KIND_META: Record<NpcKind, { label: string; icon: any; color: string }> = 
   learning:   { label: "Aprendizado", icon: GraduationCap, color: "text-sky-400 border-sky-500/40 bg-sky-500/10" },
   dialogue:   { label: "Diálogo",   icon: MessageCircle, color: "text-violet-400 border-violet-500/40 bg-violet-500/10" },
   object:     { label: "Objeto",    icon: Package, color: "text-slate-300 border-slate-500/40 bg-slate-500/10" },
+  employer:   { label: "Empregador", icon: MessageCircle, color: "text-cyan-400 border-cyan-500/40 bg-cyan-500/10" },
 };
 
 export function NpcManager() {
+  // (EmployerJobPicker defined at file bottom)
   const [npcs, setNpcs] = useState<Npc[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [items, setItems] = useState<Item[]>([]);
@@ -319,6 +322,7 @@ export function NpcManager() {
               {sel.kind === "reward" && <TabsTrigger value="recompensa">Recompensa</TabsTrigger>}
               {sel.kind === "learning" && <TabsTrigger value="aprendizagem">Aprendizagem</TabsTrigger>}
               {sel.kind === "object" && <TabsTrigger value="objeto">Objeto</TabsTrigger>}
+              {sel.kind === "employer" && <TabsTrigger value="emprego">Emprego</TabsTrigger>}
             </TabsList>
 
             <TabsContent value="identidade" className="space-y-4 mt-0">
@@ -573,6 +577,7 @@ export function NpcManager() {
                 await save({ data: { ...sel, buy_items: next } } as any); load();
               }}><Plus size={14} className="mr-1" /> Adicionar item</Button>
             </div>
+            <ChestAdminSection npcId={sel.id} />
             </TabsContent>
           )}
 
@@ -759,6 +764,21 @@ export function NpcManager() {
           </div>
           </TabsContent>
           )}
+          {sel.kind === "employer" && (
+          <TabsContent value="emprego" className="space-y-4 mt-0">
+            <div className="scroll-panel rounded-lg p-4 space-y-3">
+              <div className="text-sm font-display flex items-center gap-2">Emprego oferecido</div>
+              <EmployerJobPicker
+                value={(sel as any).offered_job_id ?? null}
+                onChange={async (v) => { await save({ data: { ...sel, offered_job_id: v } } as any); load(); }}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                O jogador se apresenta a este NPC para ser contratado e volta aqui para receber o salário.
+                A inatividade é medida por minigames vinculados a este emprego.
+              </p>
+            </div>
+          </TabsContent>
+          )}
           </Tabs>
         </div>
       ) : (
@@ -931,6 +951,110 @@ function LearningStepsEditor({ steps, minigames, onSave }: { steps: LearningStep
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function EmployerJobPicker({ value, onChange }: { value: string | null; onChange: (v: string | null) => void }) {
+  const [jobs, setJobs] = useState<{ id: string; name: string; active: boolean }[]>([]);
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from("jobs").select("id,name,active").order("name");
+      setJobs((data as any[]) ?? []);
+    })();
+  }, []);
+  return (
+    <select
+      value={value ?? ""}
+      onChange={(e) => onChange(e.target.value || null)}
+      className="w-full bg-background border border-border rounded px-2 h-9 text-sm"
+    >
+      <option value="">— sem emprego —</option>
+      {jobs.map((j) => (
+        <option key={j.id} value={j.id}>{j.name}{j.active ? "" : " (inativo)"}</option>
+      ))}
+    </select>
+  );
+}
+
+function ChestAdminSection({ npcId }: { npcId: string }) {
+  const [chest, setChest] = useState<any>(null);
+  const [capacity, setCapacity] = useState(100);
+  const [players, setPlayers] = useState<{ id: string; nickname: string }[]>([]);
+  const [owner, setOwner] = useState<string | null>(null);
+  const [auth, setAuth] = useState<Set<string>>(new Set());
+  const [filter, setFilter] = useState("");
+
+  async function load() {
+    const [{ data: ch }, { data: chars }] = await Promise.all([
+      supabase.from("npc_chests").select("id,capacity").eq("npc_id", npcId).maybeSingle(),
+      supabase.from("characters").select("id,nickname").order("nickname"),
+    ]);
+    setChest(ch);
+    setCapacity(Number((ch as any)?.capacity ?? 100));
+    setPlayers((chars as any[]) ?? []);
+    if (ch) {
+      const { data: perms } = await supabase.from("chest_permissions")
+        .select("character_id,is_owner").eq("chest_id", (ch as any).id);
+      const o = (perms as any[])?.find((p) => p.is_owner)?.character_id ?? null;
+      setOwner(o);
+      setAuth(new Set(((perms as any[]) ?? []).filter((p) => !p.is_owner).map((p) => p.character_id)));
+    } else { setOwner(null); setAuth(new Set()); }
+  }
+  useEffect(() => { load(); }, [npcId]);
+
+  const upFn = useServerFn(_chest.upsertNpcChest);
+  const delFn = useServerFn(_chest.deleteNpcChest);
+  const permFn = useServerFn(_chest.setChestPermissions);
+
+  async function saveChest() {
+    try {
+      const r: any = await upFn({ data: { npc_id: npcId, capacity: Number(capacity) || 100 } });
+      await permFn({ data: { chest_id: r.id, owner_character_id: owner, authorized_character_ids: Array.from(auth) } });
+      toast.success("Baú salvo.");
+      load();
+    } catch (e: any) { toast.error(e.message); }
+  }
+
+  const filtered = players.filter((p) => (p.nickname ?? "").toLowerCase().includes(filter.toLowerCase()));
+
+  return (
+    <div className="scroll-panel rounded-lg p-4 space-y-3 mt-2">
+      <h4 className="font-display text-lg text-gold flex items-center gap-2">Baú vinculado</h4>
+      <p className="text-xs text-muted-foreground">Itens comprados por este NPC vão para o baú. O dono não pode vender aqui (anti-farm).</p>
+      <div className="flex items-end gap-2">
+        <div className="flex-1"><label className="text-xs">Capacidade</label>
+          <Input type="number" min={1} value={capacity} onChange={(e) => setCapacity(Number(e.target.value))} />
+        </div>
+        <Button size="sm" onClick={saveChest}>Salvar baú</Button>
+        {chest && <Button size="sm" variant="destructive" onClick={async () => {
+          if (!confirm("Remover baú?")) return;
+          try { await delFn({ data: { chest_id: chest.id } }); toast.success("Removido."); load(); }
+          catch (e: any) { toast.error(e.message); }
+        }}>Remover</Button>}
+      </div>
+      <div>
+        <label className="text-xs">Dono (único)</label>
+        <select value={owner ?? ""} onChange={(e) => setOwner(e.target.value || null)}
+          className="w-full bg-background border border-border rounded px-2 h-9 text-sm">
+          <option value="">— nenhum —</option>
+          {players.map((p) => <option key={p.id} value={p.id}>{p.nickname}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="text-xs">Autorizados</label>
+        <Input placeholder="Filtrar…" value={filter} onChange={(e) => setFilter(e.target.value)} className="h-8 text-sm mb-1" />
+        <div className="max-h-40 overflow-y-auto border border-border rounded p-2 space-y-1">
+          {filtered.map((p) => (
+            <label key={p.id} className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={auth.has(p.id)} onChange={(e) => {
+                const n = new Set(auth); if (e.target.checked) n.add(p.id); else n.delete(p.id); setAuth(n);
+              }} />
+              {p.nickname}
+            </label>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
