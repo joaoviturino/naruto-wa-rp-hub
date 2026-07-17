@@ -44,6 +44,8 @@ type CombatState = {
   active: number; // index do jogador cuja vez é
   /** Índice do inimigo em `npcs` que o jogador atacará neste turno. */
   target?: number;
+  /** Escudos defensivos ativos por character_id: aplicados ao próximo golpe recebido. */
+  _shields?: Record<string, { percent: number; name: string }>;
 };
 
 /** Normaliza sessões antigas (`state.npc` sem `state.npcs`) migrando para array. */
