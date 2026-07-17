@@ -80,7 +80,7 @@ const rewardSkillsSchema = z.array(z.object({ skill_id: z.string().uuid() })).de
 const upsertSchema = z.object({
   id: z.string().uuid().optional(),
   slug: z.string().trim().min(2).max(40).regex(/^[a-z0-9_-]+$/, "slug inválido"),
-  kind: z.enum(["cleanup", "sequence", "forge", "tailoring", "mining"]).default("cleanup"),
+  kind: z.enum(["cleanup", "sequence", "forge", "tailoring", "mining", "logging"]).default("cleanup"),
   name: z.string().min(2).max(80),
   description: z.string().max(2000).nullish(),
   background_url: z.string().nullish(),
@@ -103,6 +103,7 @@ const upsertSchema = z.object({
     data.kind === "forge" ? forgeConfigSchema :
     data.kind === "tailoring" ? tailoringConfigSchema :
     data.kind === "mining" ? miningConfigSchema :
+    data.kind === "logging" ? miningConfigSchema :
     cleanupConfigSchema;
   const r = parser.safeParse(data.config);
   if (!r.success) {
@@ -249,7 +250,7 @@ export const startMinigameRun = createServerFn({ method: "POST" })
     }
     // Crafting (forge / tailoring): valida seleção do jogador + descobre item resultante
     let runContext: any = {};
-    if ((game.kind as string) === "mining") {
+    if ((game.kind as string) === "mining" || (game.kind as string) === "logging") {
       const cfg = (game.config ?? {}) as any;
       const req: Array<{ item_id: string; qty: number }> = Array.isArray(cfg.required_items) ? cfg.required_items : [];
       if (req.length) {
@@ -514,7 +515,7 @@ export const mineNode = createServerFn({ method: "POST" })
     if ((run as any).characters.user_id !== context.userId) throw new Error("Forbidden");
     if (run.completed_at) throw new Error("Sessão já encerrada.");
     const game: any = (run as any).minigames;
-    if (game?.kind !== "mining") throw new Error("Não é uma sessão de mineração.");
+    if (game?.kind !== "mining" && game?.kind !== "logging") throw new Error("Não é uma sessão de coleta.");
     const cfg = (game.config ?? {}) as any;
     const minMs = Math.max(300, Number(cfg.min_break_interval_ms) || 800);
     const ctxRun = (run.context ?? {}) as any;

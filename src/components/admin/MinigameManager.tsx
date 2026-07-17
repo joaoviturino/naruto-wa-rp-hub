@@ -15,6 +15,7 @@ import { SequenceGame } from "@/components/minigame/SequenceGame";
 import { ForgeGame } from "@/components/minigame/ForgeGame";
 import { TailoringGame } from "@/components/minigame/TailoringGame";
 import { MiningGame } from "@/components/minigame/MiningGame";
+import { LoggingGame } from "@/components/minigame/LoggingGame";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ComboSelect } from "@/components/ui/combo-select";
@@ -137,7 +138,7 @@ export function MinigameManager() {
                       ? { duration_seconds: 60, max_mistakes: 2, tiles: [] }
                       : (kind === "forge" || kind === "tailoring")
                       ? { duration_seconds: 90, difficulty: 2, hammer_hits: 8, heat_target: 70, temper_target: 40, recipe_item_id: "", source: "inventory" }
-                      : kind === "mining"
+                      : (kind === "mining" || kind === "logging")
                       ? { node_hp: 4, swing_cooldown_ms: 500, min_break_interval_ms: 800, xp_per_break: 1, required_items: [], drops: [] }
                       : { duration_seconds: 60, spots: 12, target_score: 8 };
                     setSelected({ ...selected, kind, config });
@@ -148,6 +149,7 @@ export function MinigameManager() {
                     { value: "forge", label: "Forja (fabricação)" },
                     { value: "tailoring", label: "Confecção (costura)" },
                     { value: "mining", label: "Mineração (idle)" },
+                    { value: "logging", label: "Coleta de Madeira (idle)" },
                   ]}
                 />
               </div>
@@ -259,7 +261,7 @@ export function MinigameManager() {
             <SequenceConfigEditor selected={selected} setSelected={setSelected} />
           ) : (selected.kind === "forge" || selected.kind === "tailoring") ? (
             <ForgeConfigEditor selected={selected} setSelected={setSelected} items={items} kind={selected.kind} />
-          ) : selected.kind === "mining" ? (
+          ) : (selected.kind === "mining" || selected.kind === "logging") ? (
             <MiningConfigEditor selected={selected} setSelected={setSelected} items={items} />
           ) : (
             <div className="scroll-panel rounded-lg p-4 space-y-3">
@@ -385,6 +387,14 @@ export function MinigameManager() {
               <SequenceGame background={selected.background_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
             ) : selected.kind === "mining" ? (
               <MiningGame
+                runId="test"
+                background={selected.background_url}
+                config={selected.config ?? {}}
+                testMode
+                onExit={(b: number) => setTestResult({ score: b, success: true })}
+              />
+            ) : selected.kind === "logging" ? (
+              <LoggingGame
                 runId="test"
                 background={selected.background_url}
                 config={selected.config ?? {}}
