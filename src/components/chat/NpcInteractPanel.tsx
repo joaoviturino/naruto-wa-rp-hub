@@ -813,3 +813,164 @@ function MissionOfferBlock({ npc, busy, onAccept, onTurnIn }: {
     </div>
   );
 }
+
+// ============================================================
+// Empregos & Baús inline (dentro do painel de interação)
+// ============================================================
+import { hireFromNpc, quitJob, collectSalary, getNpcJobStatus } from "@/lib/jobs.functions";
+import { listMyAccessibleChestsHere, withdrawFromChest } from "@/lib/chest.functions";
+import { Briefcase, Warehouse } from "lucide-react";
+
+function EmployerRow({ npc }: { npc: any }) {
+  const [openDlg, setOpenDlg] = useState(false);
+  const [status, setStatus] = useState<any>(null);
+  const load = useServerFn(getNpcJobStatus);
+  const hire = useServerFn(hireFromNpc);
+  const quit = useServerFn(quitJob);
+  const pay = useServerFn(collectSalary);
+
+  async function refresh() {
+    try { setStatus(await load({ data: { npc_id: npc.id } })); }
+    catch { setStatus(null); }
+  }
+  useEffect(() => { if (openDlg) refresh(); }, [openDlg]);
+
+  const job = status?.job as any;
+  const employment = status?.employment as any;
+  const active = employment?.status === "active";
+  const nextH = status?.next_pay_ms ? Math.max(1, Math.ceil(status.next_pay_ms / 3600000)) : null;
+
+  return (
+    <>
+      <Button size="sm" variant="outline" className="w-full justify-start gap-2" onClick={() => setOpenDlg(true)}>
+        <Briefcase size={12} className="text-gold" />
+        <span className="flex-1 truncate text-left">{npc.name}</span>
+        <Badge variant="secondary" className="text-[10px]">{active ? "Trabalhando" : "Contratar"}</Badge>
+      </Button>
+      <Dialog open={openDlg} onOpenChange={setOpenDlg}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded overflow-hidden bg-secondary shrink-0">
+                {npc.image_url && <img src={npc.image_url} className="w-full h-full object-cover" alt="" />}
+              </div>
+              {npc.name}
+            </DialogTitle>
+          </DialogHeader>
+          {!job ? (
+            <div className="text-sm text-muted-foreground">Este NPC não está oferecendo emprego no momento.</div>
+          ) : (
+            <div className="space-y-3">
+              <div className="rounded border border-border p-3 space-y-1">
+                <div className="font-display text-gold">{job.name}</div>
+                {job.description && <div className="text-xs text-muted-foreground">{job.description}</div>}
+                <div className="text-xs">Salário: <b>{job.salary_ryo} Ryo</b>{job.salary_xp ? ` + ${job.salary_xp} XP` : ""} a cada {job.salary_interval_hours}h</div>
+                <div className="text-[11px] text-muted-foreground">Demissão após {job.fire_after_days} dias sem trabalhar.</div>
+              </div>
+              {!active ? (
+                <Button className="w-full" onClick={async () => {
+                  try { await hire({ data: { npc_id: npc.id } }); toast.success("Contratado!"); refresh(); }
+                  catch (e: any) { toast.error(e.message); }
+                }}>Aceitar emprego</Button>
+              ) : (
+                <div className="space-y-2">
+                  {nextH !== null && nextH > 0 && <div className="text-xs text-muted-foreground">Próximo pagamento em ~{nextH}h.</div>}
+                  <div className="flex gap-2">
+                    <Button className="flex-1" onClick={async () => {
+                      try { const r: any = await pay({ data: { npc_id: npc.id } }); toast.success(`+${r.ryo} Ryo${r.xp ? `, +${r.xp} XP` : ""}`); refresh(); }
+                      catch (e: any) { toast.error(e.message); }
+                    }}>Coletar salário</Button>
+                    <Button variant="destructive" onClick={async () => {
+                      if (!confirm("Pedir demissão deste emprego?")) return;
+                      try { await quit({ data: { job_id: job.id } }); toast.success("Você pediu demissão."); refresh(); }
+                      catch (e: any) { toast.error(e.message); }
+                    }}>Demitir-se</Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function ChestsHere({ locationId }: { locationId: string }) {
+  const [chests, setChests] = useState<any[]>([]);
+  const [open, setOpen] = useState<any>(null);
+  const [qtys, setQtys] = useState<Record<string, number>>({});
+  const [itemMap, setItemMap] = useState<Record<string, any>>({});
+  const list = useServerFn(listMyAccessibleChestsHere);
+  const withdraw = useServerFn(withdrawFromChest);
+
+  async function load() {
+    try {
+      const r: any = await list({ data: {} } as any);
+      setChests(r.chests ?? []);
+      const allItems = (r.chests ?? []).flatMap((c: any) => (c.contents ?? []).map((e: any) => e.item_id));
+      if (allItems.length) {
+        const { data } = await supabase.from("items").select("id,name,image_url").in("id", allItems);
+        const m: Record<string, any> = {};
+        for (const it of (data as any[]) ?? []) m[it.id] = it;
+        setItemMap(m);
+      }
+    } catch { setChests([]); }
+  }
+  useEffect(() => { load(); }, [locationId]);
+  if (!chests.length) return null;
+
+  return (
+    <div className="space-y-1">
+      <div className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1"><Warehouse size={11} /> Baús acessíveis</div>
+      {chests.map((c) => (
+        <Button key={c.id} size="sm" variant="outline" className="w-full justify-start gap-2" onClick={() => setOpen(c)}>
+          <Warehouse size={12} className="text-gold" />
+          <span className="flex-1 truncate text-left">Baú de {c.npc?.name}</span>
+          <Badge variant="secondary" className="text-[10px]">{c.is_owner ? "Dono" : "Acesso"}</Badge>
+        </Button>
+      ))}
+      <Dialog open={!!open} onOpenChange={(v) => { if (!v) { setOpen(null); load(); } }}>
+        <DialogContent className="max-w-xl">
+          {open && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2"><Warehouse size={16} /> Baú de {open.npc?.name}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+                {(open.contents ?? []).length === 0 && <div className="text-sm text-muted-foreground text-center py-6">Vazio.</div>}
+                {(open.contents ?? []).map((e: any) => {
+                  const it = itemMap[e.item_id];
+                  const qty = Math.max(1, Math.min(e.qty, qtys[e.item_id] ?? 1));
+                  return (
+                    <div key={e.item_id} className="flex items-center gap-2 border border-border rounded p-2">
+                      {it?.image_url && <img src={it.image_url} className="w-9 h-9 rounded object-cover" alt="" />}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm truncate">{it?.name ?? "Item"}</div>
+                        <div className="text-[11px] text-muted-foreground">{e.qty} no baú</div>
+                      </div>
+                      <input type="number" min={1} max={e.qty} value={qty} onChange={(ev) => setQtys((s) => ({ ...s, [e.item_id]: Number(ev.target.value) || 1 }))}
+                        className="w-16 h-8 rounded bg-background border border-border px-2 text-sm" />
+                      <Button size="sm" onClick={async () => {
+                        try {
+                          await withdraw({ data: { chest_id: open.id, item_id: e.item_id, qty } });
+                          toast.success("Retirado.");
+                          const r: any = await list({ data: {} } as any);
+                          setChests(r.chests ?? []);
+                          setOpen(r.chests?.find((c: any) => c.id === open.id) ?? null);
+                        } catch (err: any) { toast.error(err.message); }
+                      }}>Retirar</Button>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="text-[11px] text-muted-foreground">
+                Capacidade: {open.capacity}. {open.is_owner && "Você é o dono deste baú."}
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
