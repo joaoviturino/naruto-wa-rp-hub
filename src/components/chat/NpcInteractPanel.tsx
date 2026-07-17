@@ -17,9 +17,10 @@ import { NpcMusic } from "@/components/NpcMusic";
 
 type LearnBlock = { id: string; kind: "text" | "image"; text?: string | null; image_url?: string | null };
 type Npc = {
-  id: string; name: string; image_url: string | null; kind: "shop" | "reward" | "learning" | "object" | "dialogue" | "buyer";
+  id: string; name: string; image_url: string | null; kind: "shop" | "reward" | "learning" | "object" | "dialogue" | "buyer" | "employer";
   dialog_intro: string | null; dialog_outro: string | null;
   music_url?: string | null;
+  offered_job_id?: string | null;
   shop_items?: { item_id: string; price: number; stock: number }[];
   buy_items?: { item_id: string; price: number; max_per_day: number }[];
   reward_items?: { item_id: string; qty: number }[];
