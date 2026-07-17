@@ -320,6 +320,7 @@ export function NpcManager() {
               {sel.kind === "reward" && <TabsTrigger value="recompensa">Recompensa</TabsTrigger>}
               {sel.kind === "learning" && <TabsTrigger value="aprendizagem">Aprendizagem</TabsTrigger>}
               {sel.kind === "object" && <TabsTrigger value="objeto">Objeto</TabsTrigger>}
+              {sel.kind === "employer" && <TabsTrigger value="emprego">Emprego</TabsTrigger>}
             </TabsList>
 
             <TabsContent value="identidade" className="space-y-4 mt-0">
