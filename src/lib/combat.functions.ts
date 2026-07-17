@@ -1249,12 +1249,27 @@ async function handlePvpAttack(
     const speed = effective * Number(skill.bonus_speed);
     const rawDamage = Math.max(1, Math.round(effective * Number(skill.bonus_critical) * masteryMul * powerMul));
     const hitCap = Math.max(1, Math.ceil((target.hp_max ?? 0) * PVP_MAX_HIT_PCT / 100));
-    const damage = Math.min(rawDamage, hitCap);
+    let damage = Math.min(rawDamage, hitCap);
+
+    // Precisão do golpe do jogador em PvP.
+    const accuracy = Math.max(1, Math.min(100, Number((skill as any).accuracy ?? 100)));
+    const missed = Math.random() * 100 >= accuracy;
+    if (missed) damage = 0;
+
+    // Escudo defensivo do alvo (postura declarada na ação anterior).
+    let shieldInfo: { percent: number; name: string } | undefined;
+    if (!missed) {
+      const shield = applyShield(state as any, target.character_id, damage);
+      damage = shield.final;
+      shieldInfo = shield.shielded;
+    }
 
     if (Number(skill.cooldown_turns ?? 0) > 0) activePlayer.cooldowns[data.skill_id] = Number(skill.cooldown_turns);
 
-    target.hp = Math.max(0, target.hp - damage);
-    if (target.hp <= 0) target.alive = false;
+    if (!missed) {
+      target.hp = Math.max(0, target.hp - damage);
+      if (target.hp <= 0) target.alive = false;
+    }
 
     log.push({
       seq: log.length + 1, actor: "player", actor_name: activePlayer.nickname, target_name: target.nickname,
@@ -1267,7 +1282,11 @@ async function handlePvpAttack(
       animation_url: (skill as any).animation_url ?? null,
       animation_mode: ((skill as any).animation_mode ?? "overlay") as any,
       sound_url: (skill as any).sound_url ?? null,
-      msg: `${activePlayer.nickname} usa ${skill.name} (${pool.toUpperCase()} ${data.energy_used})${masteryMul > 1 ? ` [Maestria ×${masteryMul.toFixed(1)}]` : ""} → ${damage} de dano${damage < rawDamage ? ` [cap ${PVP_MAX_HIT_PCT}%]` : ""}.`,
+      missed,
+      ...(shieldInfo ? { shield_reduced_by: shieldInfo.percent, shield_name: shieldInfo.name } : {}),
+      msg: missed
+        ? `${activePlayer.nickname} usa ${skill.name} — mas ERRA o golpe!`
+        : `${activePlayer.nickname} usa ${skill.name} (${pool.toUpperCase()} ${data.energy_used})${masteryMul > 1 ? ` [Maestria ×${masteryMul.toFixed(1)}]` : ""} → ${damage} de dano${shieldInfo ? ` (defesa ${shieldInfo.name} −${shieldInfo.percent}%)` : ""}${damage < rawDamage && !shieldInfo ? ` [cap ${PVP_MAX_HIT_PCT}%]` : ""}.`,
       pvp_actor_side: mySide, pvp_actor_idx: state.active_idx,
       pvp_target_side: enemySide, pvp_target_idx: tIdx,
     } as any);
