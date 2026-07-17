@@ -242,6 +242,27 @@ export const updatePlayer = createServerFn({ method: "POST" })
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { character_id, ...patch } = data;
+    // Enforce element proficiency limit by rank (server-side).
+    if (patch.proficiencies) {
+      const ELEMENT_LIMIT: Record<string, number> = {
+        estudante: 1, genin: 1, chunin: 2, tokubetsu_jonin: 3,
+        jonin: 4, anbu: 5, sannin: 5, kage: 5,
+      };
+      const ELS = ["katon","suiton","fuuton","doton","raiton"] as const;
+      let rank = patch.rank as string | undefined;
+      if (!rank) {
+        const { data: cur } = await supabaseAdmin.from("characters").select("rank").eq("id", character_id).maybeSingle();
+        rank = (cur as any)?.rank ?? "estudante";
+      }
+      const limit = ELEMENT_LIMIT[rank!] ?? 1;
+      const count = ELS.reduce((n, k) => {
+        const e: any = (patch.proficiencies as any)[k];
+        return n + (e && (e.nivel || e.maestria) ? 1 : 0);
+      }, 0);
+      if (count > limit) {
+        throw new Error(`Esta patente permite apenas ${limit} elemento(s). Recebido ${count}.`);
+      }
+    }
     const { error } = await supabaseAdmin.from("characters").update(patch).eq("id", character_id);
     if (error) throw new Error(error.message);
     await supabaseAdmin.from("audit_log").insert({ admin_id: context.userId, action: "update_player", target: character_id, meta: patch });
