@@ -137,7 +137,7 @@ export function MinigameManager() {
                       ? { duration_seconds: 60, max_mistakes: 2, tiles: [] }
                       : (kind === "forge" || kind === "tailoring")
                       ? { duration_seconds: 90, difficulty: 2, hammer_hits: 8, heat_target: 70, temper_target: 40, recipe_item_id: "", source: "inventory" }
-                      : kind === "mining"
+                      : (kind === "mining" || kind === "logging")
                       ? { node_hp: 4, swing_cooldown_ms: 500, min_break_interval_ms: 800, xp_per_break: 1, required_items: [], drops: [] }
                       : { duration_seconds: 60, spots: 12, target_score: 8 };
                     setSelected({ ...selected, kind, config });
@@ -148,6 +148,7 @@ export function MinigameManager() {
                     { value: "forge", label: "Forja (fabricação)" },
                     { value: "tailoring", label: "Confecção (costura)" },
                     { value: "mining", label: "Mineração (idle)" },
+                    { value: "logging", label: "Coleta de Madeira (idle)" },
                   ]}
                 />
               </div>
