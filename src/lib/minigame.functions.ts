@@ -242,6 +242,15 @@ export const startMinigameRun = createServerFn({ method: "POST" })
     }
     const missing = checkRequirements(char, game.required_rank ?? null, (game.required_profs as any[]) ?? []);
     if (missing.length) throw new Error("Requisitos não atendidos: " + missing.join(", "));
+    // Requisito de emprego: se marcado como obrigatório, precisa estar contratado (status=active).
+    if (game.required_job_id && game.job_required !== false) {
+      const { data: cj } = await context.supabase.from("character_jobs")
+        .select("status").eq("character_id", char.id).eq("job_id", game.required_job_id).maybeSingle();
+      if (!cj || (cj as any).status !== "active") {
+        const { data: j } = await context.supabase.from("jobs").select("name").eq("id", game.required_job_id).maybeSingle();
+        throw new Error(`Requer o emprego: ${(j as any)?.name ?? "?"}.`);
+      }
+    }
     // Verifica cooldown
     const { data: last } = await context.supabase
       .from("minigame_runs").select("completed_at").eq("character_id", char.id).eq("minigame_id", data.minigame_id)
