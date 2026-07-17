@@ -60,7 +60,7 @@ function DuelRoom() {
 
   useEffect(() => { refresh(); }, [id]);
   useEffect(() => {
-    const ch = supabase.channel(`duel_${id}`)
+    const ch = supabase.channel(`duel_${id}_${Math.random().toString(36).slice(2)}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "pvp_duels", filter: `id=eq.${id}` }, refresh)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "pvp_turns", filter: `duel_id=eq.${id}` }, refresh)
       .subscribe();
