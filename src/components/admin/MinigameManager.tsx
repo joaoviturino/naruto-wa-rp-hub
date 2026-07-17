@@ -15,6 +15,7 @@ import { SequenceGame } from "@/components/minigame/SequenceGame";
 import { ForgeGame } from "@/components/minigame/ForgeGame";
 import { TailoringGame } from "@/components/minigame/TailoringGame";
 import { MiningGame } from "@/components/minigame/MiningGame";
+import { LoggingGame } from "@/components/minigame/LoggingGame";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ComboSelect } from "@/components/ui/combo-select";
@@ -386,6 +387,14 @@ export function MinigameManager() {
               <SequenceGame background={selected.background_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
             ) : selected.kind === "mining" ? (
               <MiningGame
+                runId="test"
+                background={selected.background_url}
+                config={selected.config ?? {}}
+                testMode
+                onExit={(b: number) => setTestResult({ score: b, success: true })}
+              />
+            ) : selected.kind === "logging" ? (
+              <LoggingGame
                 runId="test"
                 background={selected.background_url}
                 config={selected.config ?? {}}
