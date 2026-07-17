@@ -29,6 +29,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const [session, setSession] = useState<any>(null);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [selectedSkill, setSelectedSkill] = useState<string>("");
+  const [selectedDefense, setSelectedDefense] = useState<string | null>(null);
   const [energy, setEnergy] = useState<number>(10);
   const [busy, setBusy] = useState(false);
   const [fleeing, setFleeing] = useState(false);
