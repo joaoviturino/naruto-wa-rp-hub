@@ -109,7 +109,7 @@ export function NpcInteractPanel({ locationId, refreshTick }: { locationId: stri
   useEffect(() => {
     if (!charId) return;
     const ch = supabase
-      .channel(`npc-panel-missions:${charId}`)
+      .channel(`npc-panel-missions:${charId}:${Math.random().toString(36).slice(2)}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "character_missions", filter: `character_id=eq.${charId}` },
