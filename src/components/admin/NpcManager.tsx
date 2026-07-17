@@ -361,6 +361,52 @@ export function NpcManager() {
               </div>
             </div>
           </div>
+          <div className="scroll-panel rounded-lg p-4 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <h4 className="font-display text-sm text-gold">Locais deste NPC</h4>
+              <Badge variant="outline" className="text-[10px]">
+                {(npcLocs[sel.id]?.size ?? 0)} selecionado(s)
+              </Badge>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Marque os locais em que este NPC deve aparecer. Vale para todos os tipos (agressivo, loja, recompensa, aprendizado, diálogo, objeto).
+            </p>
+            <div className="relative">
+              <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input value={locQuery} onChange={(e) => setLocQuery(e.target.value)} placeholder="Buscar local…" className="pl-7 h-8 text-sm" />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 max-h-64 overflow-y-auto rounded border border-border/50 p-2 bg-input/20">
+              {locations
+                .filter((l) => !locQuery || l.name.toLowerCase().includes(locQuery.toLowerCase()))
+                .map((l) => {
+                  const set = npcLocs[sel.id] ?? new Set<string>();
+                  const checked = set.has(l.id);
+                  return (
+                    <label key={l.id} className={`flex items-center gap-2 text-xs px-2 py-1 rounded cursor-pointer ${checked ? "bg-gold/15 border border-gold/40" : "hover:bg-secondary/50 border border-transparent"}`}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={async (e) => {
+                          const cur = new Set(npcLocs[sel.id] ?? new Set<string>());
+                          if (e.target.checked) cur.add(l.id); else cur.delete(l.id);
+                          setNpcLocs((prev) => ({ ...prev, [sel.id]: cur }));
+                          try {
+                            await setLocsFn({ data: { npc_id: sel.id, location_ids: Array.from(cur) } } as any);
+                          } catch (err: any) {
+                            toast.error(err.message ?? "Falha ao salvar");
+                            load();
+                          }
+                        }}
+                      />
+                      <span className="truncate">{l.name}</span>
+                    </label>
+                  );
+                })}
+              {locations.length === 0 && (
+                <div className="text-xs text-muted-foreground p-2 col-span-full italic">Nenhum local cadastrado.</div>
+              )}
+            </div>
+          </div>
             </TabsContent>
 
             {sel.kind === "aggressive" && (
