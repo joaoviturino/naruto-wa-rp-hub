@@ -653,7 +653,12 @@ export const playerAttack = createServerFn({ method: "POST" })
     const { data: npcCfg } = await supabaseAdmin
       .from("npcs").select("defense").eq("id", state.npc.id).maybeSingle();
     const defense = Math.max(0, Math.min(90, Number((npcCfg as any)?.defense ?? 0)));
-    const damage = Math.max(1, Math.round(rawDamage * (1 - defense / 100)));
+    let damage = Math.max(1, Math.round(rawDamage * (1 - defense / 100)));
+
+    // Precisão: rola chance de errar. Energia e cooldown já foram consumidos.
+    const accuracy = Math.max(1, Math.min(100, Number((skill as any).accuracy ?? 100)));
+    const missed = Math.random() * 100 >= accuracy;
+    if (missed) damage = 0;
 
     // Aplica cooldown
     if (Number(skill.cooldown_turns ?? 0) > 0) {
@@ -682,7 +687,10 @@ export const playerAttack = createServerFn({ method: "POST" })
       animation_url: (skill as any).animation_url ?? null,
       animation_mode: ((skill as any).animation_mode ?? "overlay") as any,
       sound_url: (skill as any).sound_url ?? null,
-      msg: `${activePlayer.nickname} usa ${skill.name} (${pool.toUpperCase()} ${data.energy_used})${masteryMul > 1 ? ` [Maestria ×${masteryMul.toFixed(1)}]` : ""}${toolConsumedLabel ? ` [-${toolQtyConsumed} ${toolConsumedLabel}]` : ""} → ${damage} de dano${defense > 0 ? ` (def ${defense}%)` : ""}.`,
+      missed,
+      msg: missed
+        ? `${activePlayer.nickname} usa ${skill.name} — mas ERRA o golpe!`
+        : `${activePlayer.nickname} usa ${skill.name} (${pool.toUpperCase()} ${data.energy_used})${masteryMul > 1 ? ` [Maestria ×${masteryMul.toFixed(1)}]` : ""}${toolConsumedLabel ? ` [-${toolQtyConsumed} ${toolConsumedLabel}]` : ""} → ${damage} de dano${defense > 0 ? ` (def ${defense}%)` : ""}.`,
       ...(toolConsumedLabel ? { tool_consumed: toolConsumedLabel, tool_qty: toolQtyConsumed, tool_crit_mul: toolCritMul } : {}),
     });
     if (brokenWeapons.length) {
@@ -691,8 +699,10 @@ export const playerAttack = createServerFn({ method: "POST" })
         msg: `${brokenWeapons.join(" e ")} quebrou pelo uso! Arma desequipada.`,
       } as any);
     }
-    state.npc.hp = Math.max(0, state.npc.hp - damage);
-    if (state.npc.hp <= 0) state.npc.alive = false;
+    if (!missed) {
+      state.npc.hp = Math.max(0, state.npc.hp - damage);
+      if (state.npc.hp <= 0) state.npc.alive = false;
+    }
     // Reflete mudança no array (state.npc é referência, mas garantimos)
     state.npcs[targetIdx] = state.npc;
 
