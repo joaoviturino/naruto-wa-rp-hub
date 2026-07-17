@@ -97,6 +97,8 @@ const upsertSchema = z.object({
   required_rank: ninjaRank.nullish(),
   required_profs: requiredProfsSchema,
   reward_skills: rewardSkillsSchema,
+  required_job_id: z.string().uuid().nullish(),
+  job_required: z.boolean().default(true),
 }).superRefine((data, ctx) => {
   const parser =
     data.kind === "sequence" ? sequenceConfigSchema :
