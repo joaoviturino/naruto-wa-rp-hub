@@ -15,6 +15,7 @@ type Config = {
   maintenance_message: string;
   maintenance_image_url: string | null;
   maintenance_eta: string | null;
+  actions_hotkey_enabled: boolean;
 };
 
 type Broadcast = {
@@ -57,6 +58,7 @@ function MaintenanceCard() {
         maintenance_message: merged.maintenance_message,
         maintenance_image_url: merged.maintenance_image_url,
         maintenance_eta: merged.maintenance_eta,
+        actions_hotkey_enabled: merged.actions_hotkey_enabled,
         updated_at: new Date().toISOString(),
       })
       .eq("id", "main");
@@ -126,6 +128,26 @@ function MaintenanceCard() {
         >
           <Power size={14} /> {cfg.maintenance_enabled ? "Reabrir servidor" : "Bloquear servidor"}
         </Button>
+      </div>
+
+      <div className="border-t border-border pt-4 mt-2">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="font-display text-base text-gold">Hotkey de Ações</div>
+            <p className="text-xs text-muted-foreground">
+              Quando desligado, o botão de ações some do chat para todos os jogadores.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`text-xs ${cfg.actions_hotkey_enabled ? "text-emerald-400" : "text-red-400"}`}>
+              {cfg.actions_hotkey_enabled ? "ATIVO" : "OCULTO"}
+            </span>
+            <Switch
+              checked={cfg.actions_hotkey_enabled}
+              onCheckedChange={(v) => save({ actions_hotkey_enabled: v })}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

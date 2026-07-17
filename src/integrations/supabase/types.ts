@@ -2484,6 +2484,7 @@ export type Database = {
       }
       server_config: {
         Row: {
+          actions_hotkey_enabled: boolean
           id: string
           maintenance_enabled: boolean
           maintenance_eta: string | null
@@ -2494,6 +2495,7 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          actions_hotkey_enabled?: boolean
           id?: string
           maintenance_enabled?: boolean
           maintenance_eta?: string | null
@@ -2504,6 +2506,7 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          actions_hotkey_enabled?: boolean
           id?: string
           maintenance_enabled?: boolean
           maintenance_eta?: string | null

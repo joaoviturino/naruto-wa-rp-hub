@@ -1,14 +1,38 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Compass, Drama, Sparkles, Package, Backpack, Zap } from "lucide-react";
 import { TravelDialog } from "./TravelDialog";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 type Props = { currentLocationId: string | null; onArrived: () => void; disabled?: boolean; };
 
 export function ActionHotkey({ currentLocationId, onArrived, disabled }: Props) {
   const [open, setOpen] = useState(false);
   const [travelOpen, setTravelOpen] = useState(false);
+  const [enabled, setEnabled] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    async function load() {
+      const { data } = await supabase
+        .from("server_config")
+        .select("actions_hotkey_enabled")
+        .eq("id", "main")
+        .maybeSingle();
+      if (alive && data) setEnabled((data as any).actions_hotkey_enabled !== false);
+    }
+    load();
+    const ch = supabase
+      .channel(`server_config-hotkey-${Math.random().toString(36).slice(2)}`)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "server_config", filter: "id=eq.main" }, (payload: any) => {
+        if (payload?.new) setEnabled(payload.new.actions_hotkey_enabled !== false);
+      })
+      .subscribe();
+    return () => { alive = false; supabase.removeChannel(ch); };
+  }, []);
+
+  if (!enabled) return null;
 
   function openTravel() {
     if (disabled) { toast.error("Ação bloqueada agora."); return; }

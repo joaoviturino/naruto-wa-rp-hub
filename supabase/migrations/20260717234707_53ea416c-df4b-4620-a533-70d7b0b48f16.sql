@@ -1,0 +1,1 @@
+ALTER TABLE public.server_config ADD COLUMN IF NOT EXISTS actions_hotkey_enabled boolean NOT NULL DEFAULT true;
