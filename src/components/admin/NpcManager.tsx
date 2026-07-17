@@ -1002,10 +1002,9 @@ function ChestAdminSection({ npcId }: { npcId: string }) {
   }
   useEffect(() => { load(); }, [npcId]);
 
-  const { upsertNpcChest, deleteNpcChest, setChestPermissions } = require("@/lib/chest.functions");
-  const upFn = useServerFn(upsertNpcChest);
-  const delFn = useServerFn(deleteNpcChest);
-  const permFn = useServerFn(setChestPermissions);
+  const upFn = useServerFn(_chest.upsertNpcChest);
+  const delFn = useServerFn(_chest.deleteNpcChest);
+  const permFn = useServerFn(_chest.setChestPermissions);
 
   async function saveChest() {
     try {
