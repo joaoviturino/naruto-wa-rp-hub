@@ -212,11 +212,26 @@ export function LocationManager() {
                   <Upload size={14} className="mr-1" /> Imagem do local
                 </Button>
                 <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={uploadImage} />
-                {sel.parent_id && (
-                  <p className="text-xs text-muted-foreground">
-                    Este local pertence ao grupo <span className="text-gold">{locs.find((l) => l.id === sel.parent_id)?.name ?? "—"}</span>.
+                <div className="pt-1 space-y-1">
+                  <Label className="text-xs">Local pai (torna-o sublocal)</Label>
+                  <ComboSelect
+                    value={sel.parent_id ?? ""}
+                    onChange={async (v) => {
+                      const parent = v || null;
+                      if (parent === sel.id) { toast.error("Um local não pode ser pai de si mesmo."); return; }
+                      const { error } = await supabase.from("locations").update({ parent_id: parent }).eq("id", sel.id);
+                      if (error) toast.error(error.message);
+                      else { toast.success(parent ? "Definido como sublocal." : "Removido do local pai."); load(); }
+                    }}
+                    placeholder="— nenhum (local raiz)"
+                    triggerClassName="h-9 text-sm"
+                    options={locs.filter((l) => l.id !== sel.id && l.parent_id !== sel.id)
+                      .map((l) => ({ value: l.id, label: l.name }))}
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Sublocais do mesmo pai têm viagem rápida entre si (5s por conexão).
                   </p>
-                )}
+                </div>
               </div>
             </div>
           </div>
