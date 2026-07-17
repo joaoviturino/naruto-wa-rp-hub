@@ -413,8 +413,8 @@
  * <select> rendering — some devices don't render appearance:none reliably. */
 @media (min-width: 768px) {
   select {
-    color: hsl(var(--foreground));
-    background-color: hsl(var(--input, var(--background)));
+    color: var(--foreground);
+    background-color: var(--input);
     color-scheme: dark;
     appearance: none;
     -webkit-appearance: none;
@@ -425,11 +425,11 @@
   }
   select option,
   select optgroup {
-    background-color: hsl(var(--popover, var(--background)));
-    color: hsl(var(--popover-foreground, var(--foreground)));
+    background-color: #1a1414;
+    color: #f5ecd7;
   }
   select:focus {
-    outline: 2px solid hsl(var(--ring, var(--primary)));
+    outline: 2px solid var(--ring);
     outline-offset: 1px;
   }
 }
