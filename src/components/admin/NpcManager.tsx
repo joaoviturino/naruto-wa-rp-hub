@@ -761,6 +761,21 @@ export function NpcManager() {
           </div>
           </TabsContent>
           )}
+          {sel.kind === "employer" && (
+          <TabsContent value="emprego" className="space-y-4 mt-0">
+            <div className="scroll-panel rounded-lg p-4 space-y-3">
+              <div className="text-sm font-display flex items-center gap-2">Emprego oferecido</div>
+              <EmployerJobPicker
+                value={(sel as any).offered_job_id ?? null}
+                onChange={async (v) => { await save({ data: { ...sel, offered_job_id: v } } as any); load(); }}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                O jogador se apresenta a este NPC para ser contratado e volta aqui para receber o salário.
+                A inatividade é medida por minigames vinculados a este emprego.
+              </p>
+            </div>
+          </TabsContent>
+          )}
           </Tabs>
         </div>
       ) : (
