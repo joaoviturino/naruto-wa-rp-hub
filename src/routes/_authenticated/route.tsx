@@ -6,6 +6,7 @@ import { PvpInvitesWatcher } from "@/components/chat/PvpInvitesWatcher";
 import { MaintenanceGate } from "@/components/MaintenanceGate";
 import { GlobalBroadcasts } from "@/components/GlobalBroadcasts";
 import { PresenceHeartbeat } from "@/components/chat/PresenceHeartbeat";
+import { OnlinePlayersButton } from "@/components/OnlinePlayersButton";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -43,6 +44,7 @@ function AuthedLayout() {
                 Admin
               </Link>
             )}
+            <OnlinePlayersButton isAdmin={isAdmin} />
             <span className="mx-2 lg:mx-3 text-muted-foreground text-xs hidden lg:inline truncate max-w-[180px]">{user.email}</span>
             <Button variant="outline" size="sm" className="h-8 px-2 sm:px-3 shrink-0" onClick={signOut}>Sair</Button>
           </nav>
