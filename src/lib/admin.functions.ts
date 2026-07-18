@@ -648,3 +648,53 @@ export const resetAllPlayers = createServerFn({ method: "POST" })
     });
     return { ok: true, affected };
   });
+/** Teletransporta todos os jogadores para um local (opcionalmente exceto admins). */
+export const teleportAllPlayers = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    locationId: z.string().uuid(),
+    excludeAdmins: z.boolean().optional().default(true),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: loc, error: lErr } = await supabaseAdmin.from("locations").select("id,name").eq("id", data.locationId).maybeSingle();
+    if (lErr) throw new Error(lErr.message);
+    if (!loc) throw new Error("Local não encontrado.");
+    let excludedIds: string[] = [];
+    if (data.excludeAdmins) {
+      const { data: admins } = await supabaseAdmin.from("user_roles").select("user_id").eq("role", "admin");
+      excludedIds = (admins ?? []).map((r: any) => r.user_id);
+    }
+    let q = supabaseAdmin.from("characters").update({
+      current_location_id: data.locationId,
+      location_entered_at: new Date().toISOString(),
+      last_spawn_roll_at: null,
+    }, { count: "exact" });
+    if (excludedIds.length > 0) q = q.not("user_id", "in", `(${excludedIds.join(",")})`);
+    else q = q.not("id", "is", null);
+    const { count, error } = await q;
+    if (error) throw new Error(error.message);
+    await supabaseAdmin.from("audit_log").insert({
+      admin_id: context.userId, action: "teleport_all", target: data.locationId,
+      meta: { location_name: (loc as any).name, affected: count, exclude_admins: data.excludeAdmins },
+    });
+    return { ok: true, affected: count ?? 0 };
+  });
+
+/** Liga/desliga a trava global do chat local. */
+export const setChatLock = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ locked: z.boolean() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("server_config").update({
+      chat_locked: data.locked, updated_at: new Date().toISOString(),
+    }).eq("id", "main");
+    if (error) throw new Error(error.message);
+    await supabaseAdmin.from("audit_log").insert({
+      admin_id: context.userId, action: "chat_lock", target: null, meta: { locked: data.locked },
+    });
+    return { ok: true };
+  });

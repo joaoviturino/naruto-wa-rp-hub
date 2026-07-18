@@ -6,8 +6,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Megaphone, Wrench, Trash2, Power } from "lucide-react";
+import { Megaphone, Wrench, Trash2, Power, MessageSquareOff, MapPin } from "lucide-react";
 import { ComboSelect } from "@/components/ui/combo-select";
+import { teleportAllPlayers, setChatLock } from "@/lib/admin.functions";
+import { useServerFn } from "@tanstack/react-start";
 
 type Config = {
   maintenance_enabled: boolean;
@@ -17,6 +19,7 @@ type Config = {
   maintenance_eta: string | null;
   actions_hotkey_enabled: boolean;
   initial_spawn_location_id: string | null;
+  chat_locked: boolean;
 };
 
 type Broadcast = {
@@ -33,6 +36,7 @@ export function ServerControl() {
     <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
       <MaintenanceCard />
       <BroadcastCard />
+      <GlobalToolsCard />
     </div>
   );
 }
@@ -257,6 +261,105 @@ function BroadcastCard() {
           </div>
         ))}
         {list.length === 0 && <div className="text-center text-muted-foreground text-sm py-4">Nenhuma mensagem enviada.</div>}
+      </div>
+    </div>
+  );
+}
+
+function GlobalToolsCard() {
+  const [cfg, setCfg] = useState<{ chat_locked: boolean } | null>(null);
+  const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
+  const [targetLoc, setTargetLoc] = useState<string>("");
+  const [excludeAdmins, setExcludeAdmins] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const teleport = useServerFn(teleportAllPlayers);
+  const toggleLock = useServerFn(setChatLock);
+
+  async function load() {
+    const { data } = await supabase.from("server_config").select("chat_locked").eq("id", "main").maybeSingle();
+    setCfg((data as any) ?? { chat_locked: false });
+  }
+  useEffect(() => {
+    load();
+    supabase.from("locations").select("id,name").order("name").then(({ data }) => {
+      setLocations(((data ?? []) as any[]).map((l) => ({ id: l.id, name: l.name })));
+    });
+  }, []);
+
+  async function doToggleLock(v: boolean) {
+    setBusy(true);
+    try {
+      await toggleLock({ data: { locked: v } });
+      setCfg({ chat_locked: v });
+      toast.success(v ? "Chat trancado." : "Chat liberado.");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha ao alterar o chat.");
+    } finally { setBusy(false); }
+  }
+
+  async function doTeleport() {
+    if (!targetLoc) { toast.error("Escolha um local de destino."); return; }
+    const name = locations.find((l) => l.id === targetLoc)?.name ?? "local";
+    if (!confirm(`Teletransportar TODOS os jogadores${excludeAdmins ? " (exceto admins)" : ""} para "${name}"?`)) return;
+    setBusy(true);
+    try {
+      const res = await teleport({ data: { locationId: targetLoc, excludeAdmins } });
+      toast.success(`Teletransportado: ${(res as any)?.affected ?? 0} jogador(es).`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha ao teletransportar.");
+    } finally { setBusy(false); }
+  }
+
+  if (!cfg) return <div className="scroll-panel rounded-lg p-6">Carregando...</div>;
+
+  return (
+    <div className="scroll-panel rounded-lg p-4 sm:p-6 space-y-5 lg:col-span-2">
+      <h3 className="font-display text-xl text-gold flex items-center gap-2"><Power size={18} /> Ferramentas Globais</h3>
+
+      <div className="rounded-lg border border-border p-4 space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <MessageSquareOff size={18} className="text-gold" />
+            <div>
+              <div className="font-display text-base text-gold">Trancar Chat Local</div>
+              <p className="text-xs text-muted-foreground">Impede jogadores comuns de enviar mensagens em qualquer local. Admins ignoram a trava.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className={`text-xs ${cfg.chat_locked ? "text-red-400" : "text-emerald-400"}`}>
+              {cfg.chat_locked ? "TRANCADO" : "LIVRE"}
+            </span>
+            <Switch checked={cfg.chat_locked} disabled={busy} onCheckedChange={doToggleLock} />
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-border p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <MapPin size={18} className="text-gold" />
+          <div>
+            <div className="font-display text-base text-gold">Teletransportar Todos</div>
+            <p className="text-xs text-muted-foreground">Move todos os personagens de uma vez para o local escolhido.</p>
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Label>Local de destino</Label>
+          <ComboSelect
+            value={targetLoc}
+            onChange={(v) => setTargetLoc(v)}
+            options={[{ value: "", label: "— Selecione —" }, ...locations.map((l) => ({ value: l.id, label: l.name }))]}
+          />
+        </div>
+        <div className="flex items-center justify-between gap-3 pt-1">
+          <div>
+            <div className="text-sm">Excluir administradores</div>
+            <p className="text-xs text-muted-foreground">Se ligado, admins não são movidos.</p>
+          </div>
+          <Switch checked={excludeAdmins} onCheckedChange={setExcludeAdmins} />
+        </div>
+        <Button onClick={doTeleport} disabled={busy || !targetLoc} className="w-full sm:w-auto">
+          {busy ? "Executando..." : "Teletransportar todos"}
+        </Button>
       </div>
     </div>
   );
