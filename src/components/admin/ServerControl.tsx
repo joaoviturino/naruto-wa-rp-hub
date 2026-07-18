@@ -6,8 +6,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Megaphone, Wrench, Trash2, Power } from "lucide-react";
+import { Megaphone, Wrench, Trash2, Power, MessageSquareOff, MapPin } from "lucide-react";
 import { ComboSelect } from "@/components/ui/combo-select";
+import { teleportAllPlayers, setChatLock } from "@/lib/admin.functions";
+import { useServerFn } from "@tanstack/react-start";
 
 type Config = {
   maintenance_enabled: boolean;
@@ -17,6 +19,7 @@ type Config = {
   maintenance_eta: string | null;
   actions_hotkey_enabled: boolean;
   initial_spawn_location_id: string | null;
+  chat_locked: boolean;
 };
 
 type Broadcast = {
@@ -33,6 +36,7 @@ export function ServerControl() {
     <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
       <MaintenanceCard />
       <BroadcastCard />
+      <GlobalToolsCard />
     </div>
   );
 }
