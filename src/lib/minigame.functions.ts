@@ -185,10 +185,11 @@ export const listMinigamesForMyLocation = createServerFn({ method: "POST" })
     const minigames = (games ?? []).flatMap((g: any) => {
       if (g.one_time && successByGame.has(g.id)) return [];
       const last = lastByGame.get(g.id);
-      const cdMs = (g.cooldown_hours ?? 0) * 3600 * 1000;
+      const noCooldown = g.kind === "mining" || g.kind === "logging";
+      const cdMs = noCooldown ? 0 : (g.cooldown_hours ?? 0) * 3600 * 1000;
       const next = last ? new Date(last).getTime() + cdMs : 0;
-      const remaining = last ? Math.max(0, next - now) : 0;
-      return [{ ...g, cooldown_remaining_ms: remaining, next_available_at: last ? new Date(next).toISOString() : null }];
+      const remaining = last && !noCooldown ? Math.max(0, next - now) : 0;
+      return [{ ...g, cooldown_remaining_ms: remaining, next_available_at: last && !noCooldown ? new Date(next).toISOString() : null }];
     });
     return { minigames, character_id: char.id, location_id: char.current_location_id };
   });
@@ -251,13 +252,15 @@ export const startMinigameRun = createServerFn({ method: "POST" })
         throw new Error(`Requer o emprego: ${(j as any)?.name ?? "?"}.`);
       }
     }
-    // Verifica cooldown
-    const { data: last } = await context.supabase
-      .from("minigame_runs").select("completed_at").eq("character_id", char.id).eq("minigame_id", data.minigame_id)
-      .not("completed_at", "is", null).order("completed_at", { ascending: false }).limit(1).maybeSingle();
-    if (last?.completed_at && (game.cooldown_hours ?? 0) > 0) {
-      const next = new Date(last.completed_at).getTime() + (game.cooldown_hours * 3600 * 1000);
-      if (next > Date.now()) throw new Error("Missão em recarga. Volte mais tarde.");
+    // Verifica cooldown (mineração e lenhador não têm recarga — atividades contínuas).
+    if ((game.kind as string) !== "mining" && (game.kind as string) !== "logging") {
+      const { data: last } = await context.supabase
+        .from("minigame_runs").select("completed_at").eq("character_id", char.id).eq("minigame_id", data.minigame_id)
+        .not("completed_at", "is", null).order("completed_at", { ascending: false }).limit(1).maybeSingle();
+      if (last?.completed_at && (game.cooldown_hours ?? 0) > 0) {
+        const next = new Date(last.completed_at).getTime() + (game.cooldown_hours * 3600 * 1000);
+        if (next > Date.now()) throw new Error("Missão em recarga. Volte mais tarde.");
+      }
     }
     // Crafting (forge / tailoring): valida seleção do jogador + descobre item resultante
     let runContext: any = {};
