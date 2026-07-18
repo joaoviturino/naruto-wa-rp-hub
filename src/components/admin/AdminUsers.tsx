@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useServerFn } from "@tanstack/react-start";
-import { listUsers, grantRole, revokeRole } from "@/lib/admin.functions";
+import { listUsers, grantRole, revokeRole, adminResetPassword } from "@/lib/admin.functions";
 import { toast } from "sonner";
 
 export function AdminUsers() {
@@ -11,6 +11,7 @@ export function AdminUsers() {
   const list = useServerFn(listUsers);
   const grant = useServerFn(grantRole);
   const revoke = useServerFn(revokeRole);
+  const resetPass = useServerFn(adminResetPassword);
 
   async function load() { try { const data = await list({} as any); setRows(data as any); } catch (e: any) { toast.error(e.message); } }
   useEffect(() => { load(); }, []);
@@ -41,6 +42,14 @@ export function AdminUsers() {
                   </td>
                   <td className="p-2 text-xs text-muted-foreground">{new Date(r.created_at).toLocaleDateString()}</td>
                   <td className="p-2 text-right">
+                    <div className="flex flex-wrap gap-2 justify-end">
+                    <Button size="sm" variant="secondary" onClick={async () => {
+                      const pwd = prompt(`Nova senha para ${r.email} (mínimo 6 caracteres):`);
+                      if (!pwd) return;
+                      if (pwd.length < 6) { toast.error("Senha muito curta."); return; }
+                      try { await resetPass({ data: { user_id: r.id, new_password: pwd } } as any); toast.success("Senha redefinida."); }
+                      catch (e: any) { toast.error(e.message); }
+                    }}>Redefinir senha</Button>
                     {isAdmin ? (
                       <Button size="sm" variant="outline" onClick={async () => {
                         if (!confirm(`Remover admin de ${r.email}?`)) return;
@@ -53,6 +62,7 @@ export function AdminUsers() {
                         catch (e: any) { toast.error(e.message); }
                       }}>Tornar admin</Button>
                     )}
+                    </div>
                   </td>
                 </tr>
               );
