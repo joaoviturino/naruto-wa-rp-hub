@@ -123,7 +123,18 @@ function BookReader({ book, alreadyRead, onClose, onCompleted }: {
 }) {
   const SKILL_CLASSES = useProficiencies();
   const complete = useServerFn(completeBookRead);
-  const [startedAt] = useState(() => Date.now());
+  const storageKey = `book-read-start:${book.id}`;
+  const [startedAt] = useState<number>(() => {
+    if (alreadyRead) return Date.now();
+    try {
+      const raw = typeof window !== "undefined" ? window.localStorage.getItem(storageKey) : null;
+      const saved = raw ? parseInt(raw, 10) : NaN;
+      if (Number.isFinite(saved) && saved > 0 && saved <= Date.now()) return saved;
+    } catch {}
+    const now = Date.now();
+    try { window.localStorage.setItem(storageKey, String(now)); } catch {}
+    return now;
+  });
   const [now, setNow] = useState(() => Date.now());
   const [claiming, setClaiming] = useState(false);
   const [claimed, setClaimed] = useState(alreadyRead);
@@ -151,6 +162,7 @@ function BookReader({ book, alreadyRead, onClose, onCompleted }: {
     try {
       const r: any = await complete({ data: { book_id: book.id } });
       setReward(r.rewards ?? {}); setClaimed(true); onCompleted();
+      try { window.localStorage.removeItem(storageKey); } catch {}
       if (r.alreadyRead) toast.info("Você já leu este livro.");
       else toast.success("Livro concluído!");
     } catch (e: any) { toast.error(e.message); }
