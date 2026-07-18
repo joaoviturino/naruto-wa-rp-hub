@@ -14,6 +14,8 @@ type Conn = { a_id: string; b_id: string };
 
 const VIEW_W = 240;
 const VIEW_H = 180;
+// O minimapa é renderizado com viewBox — encaixa em qualquer largura do
+// contêiner mantendo a mesma proporção lógica.
 const RADIUS = 2; // profundidade de vizinhos a mostrar
 
 function bfs(conns: Conn[], from: string, radius: number): Map<string, number> {
@@ -92,16 +94,15 @@ export function Minimap({
       </button>
       {open && (
         <div
-          className="relative"
+          className="relative w-full"
           style={{
-            width: VIEW_W,
-            height: VIEW_H,
+            aspectRatio: `${VIEW_W} / ${VIEW_H}`,
             backgroundImage:
               "radial-gradient(oklch(0.4 0.02 260 / 0.35) 1px, transparent 1px)",
             backgroundSize: "16px 16px",
           }}
         >
-          <svg width={VIEW_W} height={VIEW_H} className="absolute inset-0 pointer-events-none">
+          <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} preserveAspectRatio="xMidYMid meet" className="absolute inset-0 w-full h-full pointer-events-none">
             {edges.map((c, i) => {
               const a = nodes.find((n) => n.id === c.a_id);
               const b = nodes.find((n) => n.id === c.b_id);
@@ -138,7 +139,7 @@ export function Minimap({
                     ? "border-emerald-400 bg-emerald-400/20 ring-2 ring-emerald-300/50 animate-pulse"
                     : "border-gold/60 bg-card hover:border-gold hover:scale-110"
                 }`}
-                style={{ left: x, top: y, width: isCur ? 22 : 16, height: isCur ? 22 : 16 }}
+                style={{ left: `${(x / VIEW_W) * 100}%`, top: `${(y / VIEW_H) * 100}%`, width: isCur ? 22 : 16, height: isCur ? 22 : 16 }}
               >
                 {n.is_danger_zone && <Skull size={9} className="text-blood" />}
               </button>
