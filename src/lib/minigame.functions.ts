@@ -185,7 +185,7 @@ export const listMinigamesForMyLocation = createServerFn({ method: "POST" })
     const minigames = (games ?? []).flatMap((g: any) => {
       if (g.one_time && successByGame.has(g.id)) return [];
       const last = lastByGame.get(g.id);
-      const noCooldown = g.kind === "mining" || g.kind === "logging";
+      const noCooldown = g.kind === "mining" || g.kind === "logging" || g.kind === "forge" || g.kind === "tailoring";
       const cdMs = noCooldown ? 0 : (g.cooldown_hours ?? 0) * 3600 * 1000;
       const next = last ? new Date(last).getTime() + cdMs : 0;
       const remaining = last && !noCooldown ? Math.max(0, next - now) : 0;
@@ -252,8 +252,9 @@ export const startMinigameRun = createServerFn({ method: "POST" })
         throw new Error(`Requer o emprego: ${(j as any)?.name ?? "?"}.`);
       }
     }
-    // Verifica cooldown (mineração e lenhador não têm recarga — atividades contínuas).
-    if ((game.kind as string) !== "mining" && (game.kind as string) !== "logging") {
+    // Verifica cooldown (mineração, lenhador, forja e confecção não têm recarga — atividades contínuas).
+    const kind = game.kind as string;
+    if (kind !== "mining" && kind !== "logging" && kind !== "forge" && kind !== "tailoring") {
       const { data: last } = await context.supabase
         .from("minigame_runs").select("completed_at").eq("character_id", char.id).eq("minigame_id", data.minigame_id)
         .not("completed_at", "is", null).order("completed_at", { ascending: false }).limit(1).maybeSingle();
