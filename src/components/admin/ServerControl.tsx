@@ -16,6 +16,7 @@ type Config = {
   maintenance_image_url: string | null;
   maintenance_eta: string | null;
   actions_hotkey_enabled: boolean;
+  initial_spawn_location_id: string | null;
 };
 
 type Broadcast = {
@@ -39,12 +40,18 @@ export function ServerControl() {
 function MaintenanceCard() {
   const [cfg, setCfg] = useState<Config | null>(null);
   const [saving, setSaving] = useState(false);
+  const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
 
   async function load() {
     const { data } = await supabase.from("server_config").select("*").eq("id", "main").maybeSingle();
     setCfg(data as Config | null);
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    supabase.from("locations").select("id,name").order("name").then(({ data }) => {
+      setLocations(((data ?? []) as any[]).map((l) => ({ id: l.id, name: l.name })));
+    });
+  }, []);
 
   async function save(next: Partial<Config>) {
     if (!cfg) return;
@@ -59,6 +66,7 @@ function MaintenanceCard() {
         maintenance_image_url: merged.maintenance_image_url,
         maintenance_eta: merged.maintenance_eta,
         actions_hotkey_enabled: merged.actions_hotkey_enabled,
+        initial_spawn_location_id: merged.initial_spawn_location_id,
         updated_at: new Date().toISOString(),
       })
       .eq("id", "main");
@@ -148,6 +156,20 @@ function MaintenanceCard() {
             />
           </div>
         </div>
+      </div>
+
+      <div className="border-t border-border pt-4 mt-2 space-y-2">
+        <div>
+          <div className="font-display text-base text-gold">Local Inicial (Spawn)</div>
+          <p className="text-xs text-muted-foreground">
+            Onde novos personagens nascem ao criar a ficha. Deixe vazio para nenhum spawn automático.
+          </p>
+        </div>
+        <ComboSelect
+          value={cfg.initial_spawn_location_id ?? ""}
+          onChange={(v) => save({ initial_spawn_location_id: v || null })}
+          options={[{ value: "", label: "— Sem spawn —" }, ...locations.map((l) => ({ value: l.id, label: l.name }))]}
+        />
       </div>
     </div>
   );
