@@ -605,6 +605,7 @@ export const resetPlayerProgress = createServerFn({ method: "POST" })
     character_id: z.string().uuid(),
     resetXp: z.boolean().default(true),
     resetInventory: z.boolean().default(true),
+    resetRyo: z.boolean().default(false),
   }).parse(i))
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
@@ -612,12 +613,15 @@ export const resetPlayerProgress = createServerFn({ method: "POST" })
     if (data.resetXp) {
       await supabaseAdmin.from("characters").update({ xp: 0 }).eq("id", data.character_id);
     }
+    if (data.resetRyo) {
+      await supabaseAdmin.from("characters").update({ ryo: 0 }).eq("id", data.character_id);
+    }
     if (data.resetInventory) {
       await supabaseAdmin.from("inventory").update(EMPTY_INV).eq("character_id", data.character_id);
     }
     await supabaseAdmin.from("audit_log").insert({
       admin_id: context.userId, action: "reset_player", target: data.character_id,
-      meta: { xp: data.resetXp, inventory: data.resetInventory },
+      meta: { xp: data.resetXp, inventory: data.resetInventory, ryo: data.resetRyo },
     });
     return { ok: true };
   });
@@ -628,14 +632,19 @@ export const resetAllPlayers = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({
     resetXp: z.boolean().default(true),
     resetInventory: z.boolean().default(true),
+    resetRyo: z.boolean().default(false),
   }).parse(i))
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
-    if (!data.resetXp && !data.resetInventory) return { ok: true, affected: 0 };
+    if (!data.resetXp && !data.resetInventory && !data.resetRyo) return { ok: true, affected: 0 };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     let affected = 0;
     if (data.resetXp) {
       const { count } = await supabaseAdmin.from("characters").update({ xp: 0 }, { count: "exact" }).gt("xp", -1);
+      affected = Math.max(affected, count ?? 0);
+    }
+    if (data.resetRyo) {
+      const { count } = await supabaseAdmin.from("characters").update({ ryo: 0 }, { count: "exact" }).gt("ryo", -1);
       affected = Math.max(affected, count ?? 0);
     }
     if (data.resetInventory) {
@@ -644,7 +653,7 @@ export const resetAllPlayers = createServerFn({ method: "POST" })
     }
     await supabaseAdmin.from("audit_log").insert({
       admin_id: context.userId, action: "reset_all_players", target: null,
-      meta: { xp: data.resetXp, inventory: data.resetInventory, affected },
+      meta: { xp: data.resetXp, inventory: data.resetInventory, ryo: data.resetRyo, affected },
     });
     return { ok: true, affected };
   });
