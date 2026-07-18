@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Users, Sword, Heart, ScrollText } from "lucide-react";
+import { Users, Sword, Heart, ScrollText, ArrowLeftRight } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { invitePartyMember } from "@/lib/party.functions";
 import { challengeDuel } from "@/lib/pvp.functions";
+import { initiateTrade } from "@/lib/trade.functions";
 import { toast } from "sonner";
 import { PublicCharacterView } from "./PublicCharacterView";
 
@@ -17,6 +18,7 @@ export function PlayerActionMenu({
 }) {
   const invite = useServerFn(invitePartyMember);
   const challenge = useServerFn(challengeDuel);
+  const startTrade = useServerFn(initiateTrade);
   const [viewOpen, setViewOpen] = useState(false);
   if (!target) return null;
   return (
@@ -49,6 +51,15 @@ export function PlayerActionMenu({
             } catch (e: any) { toast.error(e.message); }
           }}>
             <Sword size={14} className="mr-2" /> Desafiar para duelo
+          </Button>
+          <Button variant="outline" className="w-full justify-start" onClick={async () => {
+            try {
+              await startTrade({ data: { partner_character_id: target.id } });
+              toast.success("Convite de troca enviado.");
+              onOpenChange(false);
+            } catch (e: any) { toast.error(e.message); }
+          }}>
+            <ArrowLeftRight size={14} className="mr-2" /> Propor troca
           </Button>
           <Button variant="outline" className="w-full justify-start" disabled>
             <Heart size={14} className="mr-2" /> Criar relacionamento <span className="ml-auto text-xs text-muted-foreground">em breve</span>

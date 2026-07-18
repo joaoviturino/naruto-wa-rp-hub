@@ -2574,6 +2574,7 @@ export type Database = {
           maintenance_image_url: string | null
           maintenance_message: string
           maintenance_title: string
+          trade_tax_percent: number
           updated_at: string
           updated_by: string | null
         }
@@ -2587,6 +2588,7 @@ export type Database = {
           maintenance_image_url?: string | null
           maintenance_message?: string
           maintenance_title?: string
+          trade_tax_percent?: number
           updated_at?: string
           updated_by?: string | null
         }
@@ -2600,6 +2602,7 @@ export type Database = {
           maintenance_image_url?: string | null
           maintenance_message?: string
           maintenance_title?: string
+          trade_tax_percent?: number
           updated_at?: string
           updated_by?: string | null
         }
@@ -2743,6 +2746,76 @@ export type Database = {
           },
         ]
       }
+      trade_sessions: {
+        Row: {
+          created_at: string
+          fail_reason: string | null
+          id: string
+          initiator_confirmed: boolean
+          initiator_id: string
+          initiator_offer: Json
+          location_id: string
+          partner_confirmed: boolean
+          partner_id: string
+          partner_offer: Json
+          status: string
+          tax_percent: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          fail_reason?: string | null
+          id?: string
+          initiator_confirmed?: boolean
+          initiator_id: string
+          initiator_offer?: Json
+          location_id: string
+          partner_confirmed?: boolean
+          partner_id: string
+          partner_offer?: Json
+          status?: string
+          tax_percent?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          fail_reason?: string | null
+          id?: string
+          initiator_confirmed?: boolean
+          initiator_id?: string
+          initiator_offer?: Json
+          location_id?: string
+          partner_confirmed?: boolean
+          partner_id?: string
+          partner_offer?: Json
+          status?: string
+          tax_percent?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trade_sessions_initiator_id_fkey"
+            columns: ["initiator_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trade_sessions_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trade_sessions_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       travel_sessions: {
         Row: {
           arrives_at: string
@@ -2844,6 +2917,10 @@ export type Database = {
       }
       is_duel_participant: {
         Args: { _duel: string; _user: string }
+        Returns: boolean
+      }
+      is_trade_participant: {
+        Args: { _trade: string; _user: string }
         Returns: boolean
       }
       user_at_location: { Args: { _loc: string }; Returns: boolean }
