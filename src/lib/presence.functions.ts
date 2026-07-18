@@ -163,3 +163,17 @@ export const adminTeleportPlayer = createServerFn({ method: "POST" })
     });
     return { ok: true };
   });
+
+/** Lista pública de jogadores online (últimos 2 min). Retorna dados mínimos e não-sensíveis. */
+export const listOnlinePlayers = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const cutoff = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+    const { data: rows } = await context.supabase
+      .from("character_presence")
+      .select("character_id,status,last_seen,character:characters!character_presence_character_id_fkey(id,nickname,avatar_url,rank),location:locations!character_presence_current_location_id_fkey(id,name)")
+      .gte("last_seen", cutoff)
+      .order("last_seen", { ascending: false });
+    const players = (rows ?? []) as any[];
+    return { total: players.length, players };
+  });
