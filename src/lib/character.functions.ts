@@ -106,6 +106,17 @@ export const createCharacter = createServerFn({ method: "POST" })
 
     await context.supabase.from("inventory").insert({ character_id: char.id });
 
+    // Aplica o kit inicial configurado pelo servidor (se houver).
+    try {
+      const { supabaseAdmin: adminForKit } = await import("@/integrations/supabase/client.server");
+      const { data: cfgKit } = await adminForKit.from("server_config").select("starter_kit").eq("id", "main").maybeSingle();
+      const kit = (cfgKit as any)?.starter_kit;
+      if (kit && typeof kit === "object" && Object.keys(kit).length > 0) {
+        const { applyKitInternal } = await import("@/lib/admin.functions");
+        await applyKitInternal(adminForKit, char.id, kit);
+      }
+    } catch (e) { console.error("[starter_kit] apply failed:", e); }
+
     // Enqueue welcome — admin/service reads this queue via the bot.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("outbound_messages").insert({

@@ -722,6 +722,14 @@ export const issueGlobalReward = createServerFn({ method: "POST" })
     skill_id: z.string().uuid().optional(),
     item_id: z.string().uuid().optional(),
     note: z.string().max(200).optional(),
+    starts_at: z.string().datetime().nullable().optional(),
+    ends_at: z.string().datetime().nullable().optional(),
+    requirements: z.object({
+      min_rank: z.string().optional(),
+      min_xp: z.number().int().min(0).optional(),
+      clan_id: z.string().uuid().nullable().optional(),
+    }).partial().optional(),
+    schedule_only: z.boolean().optional(),
   }).parse(i))
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
@@ -744,9 +752,22 @@ export const issueGlobalReward = createServerFn({ method: "POST" })
         item_id: data.item_id ?? null,
         note: data.note ?? null,
         created_by: context.userId,
+        starts_at: data.starts_at ?? null,
+        ends_at: data.ends_at ?? null,
+        requirements: data.requirements ?? {},
+        active: true,
       }).select("id").single();
       if (cErr) throw new Error(cErr.message);
       rewardId = (created as any).id as string;
+    }
+
+    // Modo agendado: cria o registro mas não aplica agora — o heartbeat dos jogadores elegíveis fará o claim.
+    if (data.schedule_only) {
+      await supabaseAdmin.from("audit_log").insert({
+        admin_id: context.userId, action: "global_reward_scheduled", target: rewardId,
+        meta: { kind: data.kind, starts_at: data.starts_at, ends_at: data.ends_at, requirements: data.requirements },
+      });
+      return { ok: true, reward_id: rewardId, scheduled: true, applied: 0, skipped: 0, total_targets: 0 };
     }
 
     // Personagens que ainda não receberam.
@@ -901,3 +922,74 @@ export const deleteGlobalReward = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+/* ---------- STARTER KIT (kit inicial dado a novos personagens) ---------- */
+
+const starterKitSchema = z.object({
+  xp: z.number().int().min(0).max(1_000_000).optional(),
+  ryo: z.number().int().min(0).max(1_000_000_000).optional(),
+  items: z.array(z.object({ item_id: z.string().uuid(), qty: z.number().int().min(1).max(999) })).max(20).optional(),
+  skills: z.array(z.string().uuid()).max(20).optional(),
+});
+
+export const saveStarterKit = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ kit: starterKitSchema }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("server_config").update({
+      starter_kit: data.kit, updated_at: new Date().toISOString(),
+    }).eq("id", "main");
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/** Aplica o kit atual a um personagem específico (admin — usado no editor para retroativos). */
+export const applyStarterKitToPlayer = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ character_id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: cfg } = await supabaseAdmin.from("server_config").select("starter_kit").eq("id", "main").maybeSingle();
+    const kit = ((cfg as any)?.starter_kit ?? {}) as z.infer<typeof starterKitSchema>;
+    await applyKitInternal(supabaseAdmin, data.character_id, kit);
+    return { ok: true };
+  });
+
+// Util reutilizável (também importado por character.functions.ts).
+export async function applyKitInternal(admin: any, characterId: string, kit: any) {
+  if (!kit || typeof kit !== "object") return;
+  const patch: any = {};
+  if (typeof kit.xp === "number" && kit.xp > 0) {
+    const { data: c } = await admin.from("characters").select("xp,ryo").eq("id", characterId).maybeSingle();
+    patch.xp = ((c as any)?.xp ?? 0) + kit.xp;
+    if (typeof kit.ryo === "number" && kit.ryo > 0) patch.ryo = ((c as any)?.ryo ?? 0) + kit.ryo;
+  } else if (typeof kit.ryo === "number" && kit.ryo > 0) {
+    const { data: c } = await admin.from("characters").select("ryo").eq("id", characterId).maybeSingle();
+    patch.ryo = ((c as any)?.ryo ?? 0) + kit.ryo;
+  }
+  if (Object.keys(patch).length > 0) {
+    await admin.from("characters").update(patch).eq("id", characterId);
+  }
+  if (Array.isArray(kit.items) && kit.items.length > 0) {
+    const { data: inv } = await admin.from("inventory").select("ninja_bag").eq("character_id", characterId).maybeSingle();
+    let bag = (((inv as any)?.ninja_bag as any[]) ?? [])
+      .filter((e: any) => e && e.item_id)
+      .map((e: any) => ({ item_id: e.item_id, qty: typeof e.qty === "number" && e.qty > 0 ? e.qty : 1 }));
+    for (const it of kit.items) {
+      const idx = bag.findIndex((e: any) => e.item_id === it.item_id);
+      if (idx === -1) bag.push({ item_id: it.item_id, qty: it.qty });
+      else bag[idx].qty += it.qty;
+    }
+    await admin.from("inventory").update({ ninja_bag: bag }).eq("character_id", characterId);
+  }
+  if (Array.isArray(kit.skills) && kit.skills.length > 0) {
+    for (const sid of kit.skills) {
+      const { data: has } = await admin.from("character_skills")
+        .select("character_id").eq("character_id", characterId).eq("skill_id", sid).maybeSingle();
+      if (!has) await admin.from("character_skills").insert({ character_id: characterId, skill_id: sid });
+    }
+  }
+}
