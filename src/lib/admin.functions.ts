@@ -221,6 +221,23 @@ export const grantRole = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/** Admin: redefine a senha de qualquer jogador (para casos de esquecimento). */
+export const adminResetPassword = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({
+      user_id: z.string().uuid(),
+      new_password: z.string().min(6).max(72),
+    }).parse(input))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(data.user_id, { password: data.new_password });
+    if (error) throw new Error(error.message);
+    await supabaseAdmin.from("audit_log").insert({ admin_id: context.userId, action: "reset_password", target: data.user_id, meta: {} });
+    return { ok: true };
+  });
+
 /* ---------- PLAYER EDIT ---------- */
 
 export const updatePlayer = createServerFn({ method: "POST" })
