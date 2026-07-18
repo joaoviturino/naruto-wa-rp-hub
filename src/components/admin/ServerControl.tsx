@@ -6,9 +6,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Megaphone, Wrench, Trash2, Power, MessageSquareOff, MapPin } from "lucide-react";
+import { Megaphone, Wrench, Trash2, Power, MessageSquareOff, MapPin, Gift, RotateCw } from "lucide-react";
 import { ComboSelect } from "@/components/ui/combo-select";
-import { teleportAllPlayers, setChatLock } from "@/lib/admin.functions";
+import { teleportAllPlayers, setChatLock, issueGlobalReward, listGlobalRewards, reapplyGlobalReward, deleteGlobalReward } from "@/lib/admin.functions";
 import { useServerFn } from "@tanstack/react-start";
 
 type Config = {
@@ -37,6 +37,7 @@ export function ServerControl() {
       <MaintenanceCard />
       <BroadcastCard />
       <GlobalToolsCard />
+      <GlobalRewardsCard />
     </div>
   );
 }
