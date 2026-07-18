@@ -122,9 +122,7 @@ function ItemDialog({ open, onOpenChange, initial, missions, skills, adminUserId
           </Field>
           <Field label="Tamanho de slot"><Input type="number" min={1} max={20} value={f.slot_size ?? 1} onChange={(e) => up("slot_size", Number(e.target.value))} /></Field>
           <Field label="Durabilidade (vazio = infinita)"><Input type="number" min={0} value={f.durability ?? ""} onChange={(e) => up("durability", e.target.value === "" ? null : Number(e.target.value))} /></Field>
-          {(f.type === "consumable" || f.type === "material" || f.meta?.is_tool) && (
-            <>
-              <Field label="Empilhável">
+          <Field label="Empilhável">
                 <SimpleSelect
                   value={f.stackable === false ? "no" : "yes"}
                   onChange={(v: string) => up("stackable", v === "yes")}
@@ -140,8 +138,6 @@ function ItemDialog({ open, onOpenChange, initial, missions, skills, adminUserId
                   onChange={(e) => up("stack_limit", e.target.value === "" ? null : Number(e.target.value))}
                 />
               </Field>
-            </>
-          )}
           <Field label="Imagem">
             <div className="flex items-center gap-2">
               {f.image_url && <img src={f.image_url} alt="" className="w-12 h-12 rounded object-cover" />}
