@@ -6,9 +6,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Megaphone, Wrench, Trash2, Power, MessageSquareOff, MapPin } from "lucide-react";
+import { Megaphone, Wrench, Trash2, Power, MessageSquareOff, MapPin, Gift, RotateCw } from "lucide-react";
 import { ComboSelect } from "@/components/ui/combo-select";
-import { teleportAllPlayers, setChatLock } from "@/lib/admin.functions";
+import { teleportAllPlayers, setChatLock, issueGlobalReward, listGlobalRewards, reapplyGlobalReward, deleteGlobalReward } from "@/lib/admin.functions";
 import { useServerFn } from "@tanstack/react-start";
 
 type Config = {
@@ -37,6 +37,7 @@ export function ServerControl() {
       <MaintenanceCard />
       <BroadcastCard />
       <GlobalToolsCard />
+      <GlobalRewardsCard />
     </div>
   );
 }
@@ -360,6 +361,168 @@ function GlobalToolsCard() {
         <Button onClick={doTeleport} disabled={busy || !targetLoc} className="w-full sm:w-auto">
           {busy ? "Executando..." : "Teletransportar todos"}
         </Button>
+      </div>
+    </div>
+  );
+}
+
+type RewardKind = "xp" | "ryo" | "skill" | "item";
+type RewardRow = {
+  id: string;
+  kind: RewardKind;
+  amount: number | null;
+  skill_id: string | null;
+  item_id: string | null;
+  note: string | null;
+  created_at: string;
+  claim_count: number;
+};
+
+function GlobalRewardsCard() {
+  const [kind, setKind] = useState<RewardKind>("xp");
+  const [amount, setAmount] = useState<string>("100");
+  const [skillId, setSkillId] = useState<string>("");
+  const [itemId, setItemId] = useState<string>("");
+  const [note, setNote] = useState<string>("");
+  const [skills, setSkills] = useState<{ id: string; name: string }[]>([]);
+  const [items, setItems] = useState<{ id: string; name: string }[]>([]);
+  const [rewards, setRewards] = useState<RewardRow[]>([]);
+  const [busy, setBusy] = useState(false);
+
+  const issue = useServerFn(issueGlobalReward);
+  const listFn = useServerFn(listGlobalRewards);
+  const reapply = useServerFn(reapplyGlobalReward);
+  const removeFn = useServerFn(deleteGlobalReward);
+
+  async function load() {
+    try {
+      const res: any = await listFn({} as any);
+      setRewards((res?.rewards ?? []) as RewardRow[]);
+    } catch {}
+  }
+  useEffect(() => {
+    load();
+    supabase.from("skills").select("id,name").order("name").then(({ data }) =>
+      setSkills(((data ?? []) as any[]).map((s) => ({ id: s.id, name: s.name }))),
+    );
+    supabase.from("items").select("id,name").order("name").then(({ data }) =>
+      setItems(((data ?? []) as any[]).map((s) => ({ id: s.id, name: s.name }))),
+    );
+  }, []);
+
+  async function submit() {
+    setBusy(true);
+    try {
+      const payload: any = { kind, note: note || undefined };
+      if (kind === "xp" || kind === "ryo") payload.amount = Math.max(1, parseInt(amount || "0", 10));
+      if (kind === "skill") payload.skill_id = skillId || undefined;
+      if (kind === "item") payload.item_id = itemId || undefined;
+      const res: any = await issue({ data: payload });
+      toast.success(`Prêmio distribuído — aplicado a ${res?.applied ?? 0}, pulado ${res?.skipped ?? 0}.`);
+      setAmount("100"); setSkillId(""); setItemId(""); setNote("");
+      await load();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha ao emitir prêmio.");
+    } finally { setBusy(false); }
+  }
+
+  async function doReapply(id: string) {
+    setBusy(true);
+    try {
+      const res: any = await reapply({ data: { reward_id: id } });
+      toast.success(`Reaplicado — ${res?.applied ?? 0} novo(s), pulado ${res?.skipped ?? 0}.`);
+      await load();
+    } catch (e: any) { toast.error(e?.message ?? "Falha ao reaplicar."); }
+    finally { setBusy(false); }
+  }
+
+  async function doDelete(id: string) {
+    if (!confirm("Remover este prêmio do histórico? (não reverte aplicações)")) return;
+    setBusy(true);
+    try {
+      await removeFn({ data: { reward_id: id } });
+      await load();
+    } catch (e: any) { toast.error(e?.message ?? "Falha ao remover."); }
+    finally { setBusy(false); }
+  }
+
+  function describe(r: RewardRow): string {
+    if (r.kind === "xp") return `+${r.amount} XP`;
+    if (r.kind === "ryo") return `+${r.amount} Ryo`;
+    if (r.kind === "skill") return `Habilidade: ${skills.find((s) => s.id === r.skill_id)?.name ?? r.skill_id}`;
+    return `Item: ${items.find((i) => i.id === r.item_id)?.name ?? r.item_id}`;
+  }
+
+  return (
+    <div className="scroll-panel rounded-lg p-4 sm:p-6 space-y-5 lg:col-span-2">
+      <h3 className="font-display text-xl text-gold flex items-center gap-2"><Gift size={18} /> Prêmio Global</h3>
+      <p className="text-xs text-muted-foreground">Distribua um prêmio para todos os jogadores. Personagens que já receberam ou já possuem o item/habilidade são ignorados automaticamente — sem duplicação.</p>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label>Tipo</Label>
+          <ComboSelect
+            value={kind}
+            onChange={(v) => setKind(v as RewardKind)}
+            options={[
+              { value: "xp", label: "XP" },
+              { value: "ryo", label: "Ryo" },
+              { value: "skill", label: "Habilidade" },
+              { value: "item", label: "Item" },
+            ]}
+          />
+        </div>
+        {(kind === "xp" || kind === "ryo") && (
+          <div className="space-y-2">
+            <Label>Quantidade</Label>
+            <Input type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} />
+          </div>
+        )}
+        {kind === "skill" && (
+          <div className="space-y-2 sm:col-span-2">
+            <Label>Habilidade</Label>
+            <ComboSelect value={skillId} onChange={setSkillId}
+              options={[{ value: "", label: "— Selecione —" }, ...skills.map((s) => ({ value: s.id, label: s.name }))]} />
+          </div>
+        )}
+        {kind === "item" && (
+          <div className="space-y-2 sm:col-span-2">
+            <Label>Item</Label>
+            <ComboSelect value={itemId} onChange={setItemId}
+              options={[{ value: "", label: "— Selecione —" }, ...items.map((i) => ({ value: i.id, label: i.name }))]} />
+          </div>
+        )}
+        <div className="space-y-2 sm:col-span-2">
+          <Label>Nota (opcional)</Label>
+          <Input placeholder="Ex.: Evento de aniversário" value={note} onChange={(e) => setNote(e.target.value)} />
+        </div>
+      </div>
+
+      <Button onClick={submit} disabled={busy} className="w-full sm:w-auto">
+        {busy ? "Distribuindo..." : "Distribuir para todos"}
+      </Button>
+
+      <div className="space-y-2 pt-2">
+        <div className="text-sm text-gold font-display">Histórico</div>
+        {rewards.length === 0 && <div className="text-center text-muted-foreground text-sm py-3">Nenhum prêmio emitido.</div>}
+        {rewards.map((r) => (
+          <div key={r.id} className="rounded-lg border border-border p-3 flex items-center justify-between gap-3 flex-wrap">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold">{describe(r)}</div>
+              <div className="text-xs text-muted-foreground">
+                {r.claim_count} recebimento(s) · {new Date(r.created_at).toLocaleString()}{r.note ? ` · ${r.note}` : ""}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => doReapply(r.id)} disabled={busy}>
+                <RotateCw size={14} className="mr-1" /> Reaplicar
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => doDelete(r.id)} disabled={busy}>
+                <Trash2 size={14} />
+              </Button>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

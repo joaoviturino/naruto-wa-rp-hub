@@ -923,6 +923,87 @@ export type Database = {
         }
         Relationships: []
       }
+      global_reward_claims: {
+        Row: {
+          character_id: string
+          claimed_at: string
+          reward_id: string
+        }
+        Insert: {
+          character_id: string
+          claimed_at?: string
+          reward_id: string
+        }
+        Update: {
+          character_id?: string
+          claimed_at?: string
+          reward_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "global_reward_claims_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "global_reward_claims_reward_id_fkey"
+            columns: ["reward_id"]
+            isOneToOne: false
+            referencedRelation: "global_rewards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      global_rewards: {
+        Row: {
+          amount: number | null
+          created_at: string
+          created_by: string | null
+          id: string
+          item_id: string | null
+          kind: string
+          note: string | null
+          skill_id: string | null
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_id?: string | null
+          kind: string
+          note?: string | null
+          skill_id?: string | null
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_id?: string | null
+          kind?: string
+          note?: string | null
+          skill_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "global_rewards_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "global_rewards_skill_id_fkey"
+            columns: ["skill_id"]
+            isOneToOne: false
+            referencedRelation: "skills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory: {
         Row: {
           boots_id: string | null
