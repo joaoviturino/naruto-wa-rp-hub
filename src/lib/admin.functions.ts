@@ -707,3 +707,154 @@ export const setChatLock = createServerFn({ method: "POST" })
     });
     return { ok: true };
   });
+
+/**
+ * Emite um prêmio global para todos os personagens.
+ * kind = xp | ryo | skill | item. Cada personagem só recebe uma vez (idempotente).
+ * Reexecutar aplica apenas a personagens que ainda não receberam (útil para novos jogadores).
+ */
+export const issueGlobalReward = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    reward_id: z.string().uuid().optional(),
+    kind: z.enum(["xp","ryo","skill","item"]),
+    amount: z.number().int().min(1).max(1_000_000).optional(),
+    skill_id: z.string().uuid().optional(),
+    item_id: z.string().uuid().optional(),
+    note: z.string().max(200).optional(),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Validação por tipo.
+    if ((data.kind === "xp" || data.kind === "ryo") && (!data.amount || data.amount <= 0)) {
+      throw new Error("Informe uma quantidade válida.");
+    }
+    if (data.kind === "skill" && !data.skill_id) throw new Error("Selecione uma habilidade.");
+    if (data.kind === "item" && !data.item_id) throw new Error("Selecione um item.");
+
+    // Obtém/cria o registro do prêmio.
+    let rewardId = data.reward_id ?? "";
+    if (!rewardId) {
+      const { data: created, error: cErr } = await supabaseAdmin.from("global_rewards").insert({
+        kind: data.kind,
+        amount: data.amount ?? null,
+        skill_id: data.skill_id ?? null,
+        item_id: data.item_id ?? null,
+        note: data.note ?? null,
+        created_by: context.userId,
+      }).select("id").single();
+      if (cErr) throw new Error(cErr.message);
+      rewardId = (created as any).id as string;
+    }
+
+    // Personagens que ainda não receberam.
+    const { data: chars, error: chErr } = await supabaseAdmin
+      .from("characters").select("id, xp, ryo");
+    if (chErr) throw new Error(chErr.message);
+    const allChars = (chars ?? []) as { id: string; xp: number | null; ryo: number | null }[];
+
+    const { data: claimedRows } = await supabaseAdmin
+      .from("global_reward_claims").select("character_id").eq("reward_id", rewardId);
+    const claimed = new Set(((claimedRows ?? []) as any[]).map((r) => r.character_id as string));
+    const targets = allChars.filter((c) => !claimed.has(c.id));
+
+    let applied = 0;
+    let skipped = 0;
+
+    for (const ch of targets) {
+      try {
+        if (data.kind === "xp") {
+          const next = (ch.xp ?? 0) + (data.amount ?? 0);
+          const { error } = await supabaseAdmin.from("characters").update({ xp: next }).eq("id", ch.id);
+          if (error) throw error;
+        } else if (data.kind === "ryo") {
+          const next = (ch.ryo ?? 0) + (data.amount ?? 0);
+          const { error } = await supabaseAdmin.from("characters").update({ ryo: next }).eq("id", ch.id);
+          if (error) throw error;
+        } else if (data.kind === "skill") {
+          // Já possui? pula sem consumir claim (personagem ganha o registro do prêmio mesmo assim).
+          const { data: has } = await supabaseAdmin.from("character_skills")
+            .select("character_id").eq("character_id", ch.id).eq("skill_id", data.skill_id!).maybeSingle();
+          if (!has) {
+            const { error } = await supabaseAdmin.from("character_skills")
+              .insert({ character_id: ch.id, skill_id: data.skill_id });
+            if (error) throw error;
+          } else {
+            skipped++;
+          }
+        } else if (data.kind === "item") {
+          const { data: inv } = await supabaseAdmin.from("inventory")
+            .select("ninja_bag").eq("character_id", ch.id).maybeSingle();
+          if (!inv) { skipped++; continue; }
+          const bag = (((inv as any).ninja_bag as any[]) ?? [])
+            .filter((e: any) => e && e.item_id)
+            .map((e: any) => ({ item_id: e.item_id, qty: typeof e.qty === "number" && e.qty > 0 ? e.qty : 1 }));
+          const has = bag.some((e: any) => e.item_id === data.item_id);
+          if (has) { skipped++; }
+          else {
+            bag.push({ item_id: data.item_id, qty: 1 });
+            const { error } = await supabaseAdmin.from("inventory").update({ ninja_bag: bag }).eq("character_id", ch.id);
+            if (error) throw error;
+          }
+        }
+        // Marca como reivindicado (mesmo que "skipped" — o prêmio está registrado no histórico do personagem).
+        await supabaseAdmin.from("global_reward_claims").insert({ reward_id: rewardId, character_id: ch.id });
+        applied++;
+      } catch (_e) {
+        // Continua no próximo personagem.
+      }
+    }
+
+    await supabaseAdmin.from("audit_log").insert({
+      admin_id: context.userId, action: "global_reward", target: rewardId,
+      meta: { kind: data.kind, applied, skipped, note: data.note ?? null },
+    });
+    return { ok: true, reward_id: rewardId, applied, skipped, total_targets: targets.length };
+  });
+
+/** Lista prêmios globais emitidos (histórico). */
+export const listGlobalRewards = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rewards, error } = await supabaseAdmin
+      .from("global_rewards")
+      .select("id, kind, amount, skill_id, item_id, note, created_at")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (error) throw new Error(error.message);
+    const list = (rewards ?? []) as any[];
+    if (list.length === 0) return { rewards: [] };
+    const ids = list.map((r) => r.id);
+    const { data: claims } = await supabaseAdmin
+      .from("global_reward_claims").select("reward_id").in("reward_id", ids);
+    const counts: Record<string, number> = {};
+    for (const c of (claims ?? []) as any[]) counts[c.reward_id] = (counts[c.reward_id] ?? 0) + 1;
+    return { rewards: list.map((r) => ({ ...r, claim_count: counts[r.id] ?? 0 })) };
+  });
+
+/** Reaplica um prêmio já emitido a novos personagens (idempotente). */
+export const reapplyGlobalReward = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ reward_id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: r, error } = await supabaseAdmin
+      .from("global_rewards").select("*").eq("id", data.reward_id).maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!r) throw new Error("Prêmio não encontrado.");
+    const rr = r as any;
+    // Reusa issueGlobalReward diretamente é complexo; replica lógica mínima chamando via mesma via.
+    return await (issueGlobalReward as any).__handler({
+      data: {
+        reward_id: rr.id, kind: rr.kind, amount: rr.amount ?? undefined,
+        skill_id: rr.skill_id ?? undefined, item_id: rr.item_id ?? undefined,
+        note: rr.note ?? undefined,
+      },
+      context,
+    });
+  });
