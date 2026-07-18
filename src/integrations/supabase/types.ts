@@ -2486,6 +2486,7 @@ export type Database = {
         Row: {
           actions_hotkey_enabled: boolean
           id: string
+          initial_spawn_location_id: string | null
           maintenance_enabled: boolean
           maintenance_eta: string | null
           maintenance_image_url: string | null
@@ -2497,6 +2498,7 @@ export type Database = {
         Insert: {
           actions_hotkey_enabled?: boolean
           id?: string
+          initial_spawn_location_id?: string | null
           maintenance_enabled?: boolean
           maintenance_eta?: string | null
           maintenance_image_url?: string | null
@@ -2508,6 +2510,7 @@ export type Database = {
         Update: {
           actions_hotkey_enabled?: boolean
           id?: string
+          initial_spawn_location_id?: string | null
           maintenance_enabled?: boolean
           maintenance_eta?: string | null
           maintenance_image_url?: string | null
@@ -2516,7 +2519,15 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "server_config_initial_spawn_location_id_fkey"
+            columns: ["initial_spawn_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       skills: {
         Row: {
