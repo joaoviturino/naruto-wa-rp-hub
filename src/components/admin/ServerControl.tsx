@@ -389,8 +389,15 @@ function GlobalRewardsCard() {
   const [skillId, setSkillId] = useState<string>("");
   const [itemId, setItemId] = useState<string>("");
   const [note, setNote] = useState<string>("");
+  const [startsAt, setStartsAt] = useState<string>("");
+  const [endsAt, setEndsAt] = useState<string>("");
+  const [minRank, setMinRank] = useState<string>("");
+  const [minXp, setMinXp] = useState<string>("");
+  const [clanId, setClanId] = useState<string>("");
+  const [scheduleOnly, setScheduleOnly] = useState<boolean>(false);
   const [skills, setSkills] = useState<{ id: string; name: string }[]>([]);
   const [items, setItems] = useState<{ id: string; name: string }[]>([]);
+  const [clans, setClans] = useState<{ id: string; name: string }[]>([]);
   const [rewards, setRewards] = useState<RewardRow[]>([]);
   const [busy, setBusy] = useState(false);
 
@@ -413,6 +420,9 @@ function GlobalRewardsCard() {
     supabase.from("items").select("id,name").order("name").then(({ data }) =>
       setItems(((data ?? []) as any[]).map((s) => ({ id: s.id, name: s.name }))),
     );
+    supabase.from("clans").select("id,name").order("name").then(({ data }) =>
+      setClans(((data ?? []) as any[]).map((s) => ({ id: s.id, name: s.name }))),
+    );
   }, []);
 
   async function submit() {
@@ -422,9 +432,19 @@ function GlobalRewardsCard() {
       if (kind === "xp" || kind === "ryo") payload.amount = Math.max(1, parseInt(amount || "0", 10));
       if (kind === "skill") payload.skill_id = skillId || undefined;
       if (kind === "item") payload.item_id = itemId || undefined;
+      if (startsAt) payload.starts_at = new Date(startsAt).toISOString();
+      if (endsAt) payload.ends_at = new Date(endsAt).toISOString();
+      const req: any = {};
+      if (minRank) req.min_rank = minRank;
+      if (minXp) req.min_xp = Math.max(0, parseInt(minXp, 10));
+      if (clanId) req.clan_id = clanId;
+      if (Object.keys(req).length > 0) payload.requirements = req;
+      if (scheduleOnly) payload.schedule_only = true;
       const res: any = await issue({ data: payload });
-      toast.success(`Prêmio distribuído — aplicado a ${res?.applied ?? 0}, pulado ${res?.skipped ?? 0}.`);
+      if (res?.scheduled) toast.success("Prêmio agendado — jogadores elegíveis receberão automaticamente ao ficarem online.");
+      else toast.success(`Prêmio distribuído — aplicado a ${res?.applied ?? 0}, pulado ${res?.skipped ?? 0}.`);
       setAmount("100"); setSkillId(""); setItemId(""); setNote("");
+      setStartsAt(""); setEndsAt(""); setMinRank(""); setMinXp(""); setClanId(""); setScheduleOnly(false);
       await load();
     } catch (e: any) {
       toast.error(e?.message ?? "Falha ao emitir prêmio.");
@@ -501,6 +521,42 @@ function GlobalRewardsCard() {
           <Label>Nota (opcional)</Label>
           <Input placeholder="Ex.: Evento de aniversário" value={note} onChange={(e) => setNote(e.target.value)} />
         </div>
+
+        <div className="space-y-2">
+          <Label>Início (opcional)</Label>
+          <Input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
+        </div>
+        <div className="space-y-2">
+          <Label>Fim (opcional)</Label>
+          <Input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
+        </div>
+        <div className="space-y-2">
+          <Label>Rank mínimo</Label>
+          <ComboSelect value={minRank} onChange={setMinRank} options={[
+            { value: "", label: "— Sem restrição —" },
+            { value: "estudante", label: "Estudante" },
+            { value: "genin", label: "Genin" },
+            { value: "chunin", label: "Chunin" },
+            { value: "tokubetsu_jonin", label: "Tokubetsu Jonin" },
+            { value: "jonin", label: "Jonin" },
+            { value: "anbu", label: "ANBU" },
+            { value: "sannin", label: "Sannin" },
+            { value: "kage", label: "Kage" },
+          ]} />
+        </div>
+        <div className="space-y-2">
+          <Label>XP mínimo</Label>
+          <Input type="number" min={0} value={minXp} onChange={(e) => setMinXp(e.target.value)} placeholder="0" />
+        </div>
+        <div className="space-y-2 sm:col-span-2">
+          <Label>Clã (opcional)</Label>
+          <ComboSelect value={clanId} onChange={setClanId}
+            options={[{ value: "", label: "— Qualquer clã —" }, ...clans.map((c) => ({ value: c.id, label: c.name }))]} />
+        </div>
+        <label className="flex items-center gap-2 sm:col-span-2 text-sm">
+          <Switch checked={scheduleOnly} onCheckedChange={setScheduleOnly} />
+          <span>Somente agendar — jogadores elegíveis recebem automaticamente ao ficarem online (sem distribuir agora).</span>
+        </label>
       </div>
 
       <Button onClick={submit} disabled={busy} className="w-full sm:w-auto">
