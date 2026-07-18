@@ -9,6 +9,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useServerFn } from "@tanstack/react-start";
 import { updatePlayer, grantSkill, revokeSkill, grantItem, revokeItem, completeMission, uncompleteMission, giftRyo } from "@/lib/admin.functions";
 import { adminListPoses, adminUpsertPose, adminDeletePose } from "@/lib/pose.functions";
+import { adminSetJob } from "@/lib/jobs.functions";
 import { toast } from "sonner";
 import { NINJA_RANKS, SKILL_RANKS, VILLAGES, ELEMENTS, labelize, elementLimitForRank, countElementProficiencies } from "./shared";
 import { useProficiencies } from "@/hooks/useProficiencies";
@@ -27,6 +28,8 @@ export function PlayerEditor({ characterId, open, onOpenChange, onSaved }: {
   const [charSkills, setCharSkills] = useState<any[]>([]);
   const [charMissions, setCharMissions] = useState<any[]>([]);
   const [inv, setInv] = useState<any>(null);
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [charJobs, setCharJobs] = useState<any[]>([]);
 
   const save = useServerFn(updatePlayer);
   const gSkill = useServerFn(grantSkill);
@@ -36,11 +39,12 @@ export function PlayerEditor({ characterId, open, onOpenChange, onSaved }: {
   const cMission = useServerFn(completeMission);
   const uMission = useServerFn(uncompleteMission);
   const gift = useServerFn(giftRyo);
+  const setJobFn = useServerFn(adminSetJob);
   const [ryoDelta, setRyoDelta] = useState<number>(100);
 
   async function load() {
     if (!characterId) return;
-    const [c, cl, it, sk, mi, cs, cm, iv] = await Promise.all([
+    const [c, cl, it, sk, mi, cs, cm, iv, jb, cj] = await Promise.all([
       supabase.from("characters").select("*").eq("id", characterId).single(),
       supabase.from("clans").select("id,name,village"),
       supabase.from("items").select("id,name,type,rank"),
@@ -49,9 +53,12 @@ export function PlayerEditor({ characterId, open, onOpenChange, onSaved }: {
       supabase.from("character_skills").select("skill_id").eq("character_id", characterId),
       supabase.from("character_missions").select("mission_id").eq("character_id", characterId),
       supabase.from("inventory").select("*").eq("character_id", characterId).maybeSingle(),
+      supabase.from("jobs").select("id,name,salary_ryo,salary_xp,salary_interval_hours,active").order("name"),
+      supabase.from("character_jobs").select("job_id,status,hired_at").eq("character_id", characterId),
     ]);
     setChar(c.data); setClans(cl.data ?? []); setItems(it.data ?? []); setSkills(sk.data ?? []); setMissions(mi.data ?? []);
     setCharSkills(cs.data ?? []); setCharMissions(cm.data ?? []); setInv(iv.data);
+    setJobs(jb.data ?? []); setCharJobs(cj.data ?? []);
   }
   useEffect(() => { if (open) load(); }, [open, characterId]);
 
@@ -97,6 +104,7 @@ export function PlayerEditor({ characterId, open, onOpenChange, onSaved }: {
             <TabsTrigger value="skills">Habilidades</TabsTrigger>
             <TabsTrigger value="items">Itens</TabsTrigger>
             <TabsTrigger value="missions">Missões</TabsTrigger>
+            <TabsTrigger value="jobs">Empregos</TabsTrigger>
             <TabsTrigger value="poses">Poses</TabsTrigger>
           </TabsList>
 
@@ -291,6 +299,38 @@ export function PlayerEditor({ characterId, open, onOpenChange, onSaved }: {
 
           <TabsContent value="poses" className="mt-4">
             <PosesTab characterId={char.id} adminUserId={char.user_id} />
+          </TabsContent>
+
+          <TabsContent value="jobs" className="mt-4 space-y-2">
+            <p className="text-xs text-muted-foreground">Contrate ou demita o jogador de um emprego. Contratar reinicia o ciclo de salário.</p>
+            {jobs.length === 0 && <p className="text-xs text-muted-foreground">Nenhum emprego criado. Vá em Empregos.</p>}
+            {jobs.map((j) => {
+              const cur = charJobs.find((x) => x.job_id === j.id);
+              const active = cur?.status === "active";
+              return (
+                <div key={j.id} className="border border-border rounded p-3 flex flex-wrap items-center gap-2 justify-between">
+                  <div className="min-w-0">
+                    <div className="font-semibold truncate">{j.name} {!j.active && <span className="text-xs text-muted-foreground">(inativo)</span>}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {j.salary_ryo}₵ · {j.salary_xp} XP a cada {j.salary_interval_hours}h
+                      {cur && <span className="ml-2">· status: <b>{cur.status}</b></span>}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant={active ? "secondary" : "default"} disabled={active}
+                      onClick={async () => {
+                        try { await setJobFn({ data: { character_id: char.id, job_id: j.id, action: "hire" } } as any); toast.success("Contratado."); load(); }
+                        catch (e: any) { toast.error(e.message); }
+                      }}>Contratar</Button>
+                    <Button size="sm" variant="destructive" disabled={!active}
+                      onClick={async () => {
+                        try { await setJobFn({ data: { character_id: char.id, job_id: j.id, action: "fire" } } as any); toast.success("Demitido."); load(); }
+                        catch (e: any) { toast.error(e.message); }
+                      }}>Demitir</Button>
+                  </div>
+                </div>
+              );
+            })}
           </TabsContent>
         </Tabs>
       </DialogContent>
