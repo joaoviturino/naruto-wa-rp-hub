@@ -150,14 +150,17 @@ export const completeTravel = createServerFn({ method: "POST" })
       location_entered_at: new Date().toISOString(),
       last_spawn_roll_at: null,
     }).eq("id", char.id);
-    // Anuncia a chegada no chat local do destino.
+    // Anuncia a chegada no chat local do destino (via admin p/ contornar RLS de timing).
     try {
-      await context.supabase.from("location_messages").insert({
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await supabaseAdmin.from("location_messages").insert({
         location_id: (t as any).to_location_id,
         character_id: char.id,
         content: "*chegou ao local.*",
       });
-    } catch { /* não bloqueia a viagem se o anúncio falhar */ }
+    } catch (e) {
+      console.error("[travel] falha ao anunciar chegada", e);
+    }
     return { ok: true };
   });
 
