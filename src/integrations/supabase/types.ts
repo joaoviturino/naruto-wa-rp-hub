@@ -392,6 +392,48 @@ export type Database = {
           },
         ]
       }
+      character_presence: {
+        Row: {
+          character_id: string
+          current_location_id: string | null
+          last_seen: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          character_id: string
+          current_location_id?: string | null
+          last_seen?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          character_id?: string
+          current_location_id?: string | null
+          last_seen?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "character_presence_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: true
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "character_presence_current_location_id_fkey"
+            columns: ["current_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       character_skill_poses: {
         Row: {
           character_id: string
@@ -928,16 +970,19 @@ export type Database = {
           character_id: string
           claimed_at: string
           reward_id: string
+          seen: boolean
         }
         Insert: {
           character_id: string
           claimed_at?: string
           reward_id: string
+          seen?: boolean
         }
         Update: {
           character_id?: string
           claimed_at?: string
           reward_id?: string
+          seen?: boolean
         }
         Relationships: [
           {
@@ -958,34 +1003,46 @@ export type Database = {
       }
       global_rewards: {
         Row: {
+          active: boolean
           amount: number | null
           created_at: string
           created_by: string | null
+          ends_at: string | null
           id: string
           item_id: string | null
           kind: string
           note: string | null
+          requirements: Json
           skill_id: string | null
+          starts_at: string | null
         }
         Insert: {
+          active?: boolean
           amount?: number | null
           created_at?: string
           created_by?: string | null
+          ends_at?: string | null
           id?: string
           item_id?: string | null
           kind: string
           note?: string | null
+          requirements?: Json
           skill_id?: string | null
+          starts_at?: string | null
         }
         Update: {
+          active?: boolean
           amount?: number | null
           created_at?: string
           created_by?: string | null
+          ends_at?: string | null
           id?: string
           item_id?: string | null
           kind?: string
           note?: string | null
+          requirements?: Json
           skill_id?: string | null
+          starts_at?: string | null
         }
         Relationships: [
           {
@@ -2574,6 +2631,7 @@ export type Database = {
           maintenance_image_url: string | null
           maintenance_message: string
           maintenance_title: string
+          starter_kit: Json
           trade_tax_percent: number
           updated_at: string
           updated_by: string | null
@@ -2588,6 +2646,7 @@ export type Database = {
           maintenance_image_url?: string | null
           maintenance_message?: string
           maintenance_title?: string
+          starter_kit?: Json
           trade_tax_percent?: number
           updated_at?: string
           updated_by?: string | null
@@ -2602,6 +2661,7 @@ export type Database = {
           maintenance_image_url?: string | null
           maintenance_message?: string
           maintenance_title?: string
+          starter_kit?: Json
           trade_tax_percent?: number
           updated_at?: string
           updated_by?: string | null
