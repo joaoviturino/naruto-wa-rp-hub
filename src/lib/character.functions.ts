@@ -74,6 +74,14 @@ export const createCharacter = createServerFn({ method: "POST" })
       .from("characters").select("id").eq("user_id", context.userId).maybeSingle();
     if (existing) throw new Error("Você já criou um personagem.");
 
+    // Local inicial de spawn definido pelo admin (server_config).
+    let initialLocationId: string | null = null;
+    try {
+      const { data: cfg } = await context.supabase
+        .from("server_config").select("initial_spawn_location_id").eq("id", "main").maybeSingle();
+      initialLocationId = ((cfg as any)?.initial_spawn_location_id as string | null) ?? null;
+    } catch { /* ignora — segue sem spawn */ }
+
     const { data: char, error } = await context.supabase
       .from("characters")
       .insert({
@@ -89,6 +97,8 @@ export const createCharacter = createServerFn({ method: "POST" })
         history: data.history,
         bio: data.bio,
         clan_rerolls_used: data.clan_rerolls_used,
+        current_location_id: initialLocationId,
+        location_entered_at: initialLocationId ? new Date().toISOString() : null,
       })
       .select("id")
       .single();
