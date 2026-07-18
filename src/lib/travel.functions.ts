@@ -150,6 +150,14 @@ export const completeTravel = createServerFn({ method: "POST" })
       location_entered_at: new Date().toISOString(),
       last_spawn_roll_at: null,
     }).eq("id", char.id);
+    // Anuncia a chegada no chat local do destino.
+    try {
+      await context.supabase.from("location_messages").insert({
+        location_id: (t as any).to_location_id,
+        character_id: char.id,
+        content: "*chegou ao local.*",
+      });
+    } catch { /* não bloqueia a viagem se o anúncio falhar */ }
     return { ok: true };
   });
 
