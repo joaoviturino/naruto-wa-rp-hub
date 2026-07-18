@@ -19,13 +19,15 @@ import { DuelInvitesInline } from "@/components/chat/DuelInvitesInline";
 import { ChatHud } from "@/components/chat/ChatHud";
 import { MissionTracker } from "@/components/chat/MissionTracker";
 import { ActionHotkey } from "@/components/chat/ActionHotkey";
+import { Minimap } from "@/components/chat/Minimap";
 
 export const Route = createFileRoute("/_authenticated/chat")({ component: ChatPage });
 
 const HISTORY_LIMIT = 80;
 
 type Loc = { id: string; name: string; description: string | null; image_url: string | null;
-  is_danger_zone?: boolean; spawn_chance?: number; spawn_tick_seconds?: number };
+  is_danger_zone?: boolean; spawn_chance?: number; spawn_tick_seconds?: number;
+  map_x?: number; map_y?: number; parent_id?: string | null };
 type Conn = { a_id: string; b_id: string };
 type Character = { id: string; nickname: string; avatar_url: string | null; current_location_id: string | null };
 type Scene = { id: string; image_url: string; label: string | null };
@@ -69,7 +71,7 @@ function ChatPage() {
   async function loadCore() {
     const [{ data: c }, { data: l }, { data: cn }] = await Promise.all([
       supabase.from("characters").select("id,nickname,avatar_url,current_location_id").eq("user_id", user.id).maybeSingle(),
-      supabase.from("locations").select("id,name,description,image_url,is_danger_zone,spawn_chance,spawn_tick_seconds").order("name"),
+      supabase.from("locations").select("id,name,description,image_url,is_danger_zone,spawn_chance,spawn_tick_seconds,map_x,map_y,parent_id").order("name"),
       supabase.from("location_connections").select("a_id,b_id"),
     ]);
     setCharacter(c as Character | null);
