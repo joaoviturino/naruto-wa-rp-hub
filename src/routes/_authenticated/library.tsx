@@ -123,17 +123,26 @@ function BookReader({ book, alreadyRead, onClose, onCompleted }: {
 }) {
   const SKILL_CLASSES = useProficiencies();
   const complete = useServerFn(completeBookRead);
-  const [elapsed, setElapsed] = useState(0);
+  const [startedAt] = useState(() => Date.now());
+  const [now, setNow] = useState(() => Date.now());
   const [claiming, setClaiming] = useState(false);
   const [claimed, setClaimed] = useState(alreadyRead);
   const [reward, setReward] = useState<any>(null);
 
   useEffect(() => {
     if (alreadyRead) return;
-    const id = setInterval(() => setElapsed((e) => e + 1), 1000);
-    return () => clearInterval(id);
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    const onVis = () => setNow(Date.now());
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", onVis);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("focus", onVis);
+    };
   }, [alreadyRead]);
 
+  const elapsed = Math.floor((now - startedAt) / 1000);
   const remaining = Math.max(0, book.min_read_seconds - elapsed);
   const canClaim = !claimed && remaining <= 0;
 
