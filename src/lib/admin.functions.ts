@@ -836,7 +836,7 @@ export const listGlobalRewards = createServerFn({ method: "GET" })
     return { rewards: list.map((r) => ({ ...r, claim_count: counts[r.id] ?? 0 })) };
   });
 
-/** Reaplica um prêmio já emitido a novos personagens (idempotente). */
+/** Reaplica um prêmio já emitido a personagens que ainda não receberam (idempotente). */
 export const reapplyGlobalReward = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ reward_id: z.string().uuid() }).parse(i))
@@ -848,13 +848,56 @@ export const reapplyGlobalReward = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     if (!r) throw new Error("Prêmio não encontrado.");
     const rr = r as any;
-    // Reusa issueGlobalReward diretamente é complexo; replica lógica mínima chamando via mesma via.
-    return await (issueGlobalReward as any).__handler({
-      data: {
-        reward_id: rr.id, kind: rr.kind, amount: rr.amount ?? undefined,
-        skill_id: rr.skill_id ?? undefined, item_id: rr.item_id ?? undefined,
-        note: rr.note ?? undefined,
-      },
-      context,
+    const { data: chars } = await supabaseAdmin.from("characters").select("id, xp, ryo");
+    const allChars = (chars ?? []) as { id: string; xp: number | null; ryo: number | null }[];
+    const { data: claimedRows } = await supabaseAdmin
+      .from("global_reward_claims").select("character_id").eq("reward_id", rr.id);
+    const claimed = new Set(((claimedRows ?? []) as any[]).map((c) => c.character_id as string));
+    const targets = allChars.filter((c) => !claimed.has(c.id));
+    let applied = 0, skipped = 0;
+    for (const ch of targets) {
+      try {
+        if (rr.kind === "xp") {
+          await supabaseAdmin.from("characters").update({ xp: (ch.xp ?? 0) + (rr.amount ?? 0) }).eq("id", ch.id);
+        } else if (rr.kind === "ryo") {
+          await supabaseAdmin.from("characters").update({ ryo: (ch.ryo ?? 0) + (rr.amount ?? 0) }).eq("id", ch.id);
+        } else if (rr.kind === "skill") {
+          const { data: has } = await supabaseAdmin.from("character_skills")
+            .select("character_id").eq("character_id", ch.id).eq("skill_id", rr.skill_id).maybeSingle();
+          if (!has) await supabaseAdmin.from("character_skills").insert({ character_id: ch.id, skill_id: rr.skill_id });
+          else skipped++;
+        } else if (rr.kind === "item") {
+          const { data: inv } = await supabaseAdmin.from("inventory").select("ninja_bag").eq("character_id", ch.id).maybeSingle();
+          if (!inv) { skipped++; continue; }
+          const bag = (((inv as any).ninja_bag as any[]) ?? [])
+            .filter((e: any) => e && e.item_id)
+            .map((e: any) => ({ item_id: e.item_id, qty: typeof e.qty === "number" && e.qty > 0 ? e.qty : 1 }));
+          const has = bag.some((e: any) => e.item_id === rr.item_id);
+          if (has) skipped++;
+          else {
+            bag.push({ item_id: rr.item_id, qty: 1 });
+            await supabaseAdmin.from("inventory").update({ ninja_bag: bag }).eq("character_id", ch.id);
+          }
+        }
+        await supabaseAdmin.from("global_reward_claims").insert({ reward_id: rr.id, character_id: ch.id });
+        applied++;
+      } catch { /* segue */ }
+    }
+    await supabaseAdmin.from("audit_log").insert({
+      admin_id: context.userId, action: "global_reward_reapply", target: rr.id,
+      meta: { kind: rr.kind, applied, skipped },
     });
+    return { ok: true, reward_id: rr.id, applied, skipped, total_targets: targets.length };
+  });
+
+/** Apaga um prêmio global do histórico (não reverte aplicações). */
+export const deleteGlobalReward = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ reward_id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("global_rewards").delete().eq("id", data.reward_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
