@@ -529,3 +529,37 @@ function GlobalRewardsCard() {
     </div>
   );
 }
+
+function TradeTaxCard() {
+  const [pct, setPct] = useState<number>(0);
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    supabase.from("server_config").select("trade_tax_percent").eq("id", "main").maybeSingle()
+      .then(({ data }) => { setPct(((data as any)?.trade_tax_percent ?? 0)); setLoaded(true); });
+  }, []);
+  async function save() {
+    setSaving(true);
+    const v = Math.max(0, Math.min(50, Math.floor(pct)));
+    const { error } = await supabase.from("server_config").update({ trade_tax_percent: v }).eq("id", "main");
+    setSaving(false);
+    if (error) toast.error(error.message); else toast.success("Taxa atualizada.");
+  }
+  if (!loaded) return <div className="scroll-panel rounded-lg p-6">Carregando...</div>;
+  return (
+    <div className="scroll-panel rounded-lg p-4 sm:p-6 space-y-3">
+      <h3 className="font-display text-xl text-gold flex items-center gap-2">
+        <ArrowLeftRight size={18} /> Taxa de Troca
+      </h3>
+      <p className="text-xs text-muted-foreground">
+        Porcentagem descontada do ryo que cada lado <b>recebe</b> em uma troca entre jogadores. Serve como dreno de economia.
+      </p>
+      <div className="flex items-center gap-2">
+        <Input type="number" min={0} max={50} value={pct}
+          onChange={(e) => setPct(Math.max(0, Math.min(50, parseInt(e.target.value || "0", 10))))} className="w-24" />
+        <span className="text-sm text-muted-foreground">%</span>
+        <Button className="ml-auto" size="sm" disabled={saving} onClick={save}>Salvar</Button>
+      </div>
+    </div>
+  );
+}
