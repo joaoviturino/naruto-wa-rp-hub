@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { PvpInvitesWatcher } from "@/components/chat/PvpInvitesWatcher";
 import { MaintenanceGate } from "@/components/MaintenanceGate";
 import { GlobalBroadcasts } from "@/components/GlobalBroadcasts";
+import { PresenceHeartbeat } from "@/components/chat/PresenceHeartbeat";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -49,6 +50,7 @@ function AuthedLayout() {
       </header>
       <PvpInvitesWatcher />
       <GlobalBroadcasts />
+      <PresenceHeartbeat />
       <Outlet />
     </div>
     </MaintenanceGate>
