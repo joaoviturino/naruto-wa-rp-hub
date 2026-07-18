@@ -40,11 +40,13 @@ function AuthedLayout() {
             <Link to="/character" className="px-2 sm:px-3 py-1.5 rounded hover:bg-secondary [&.active]:text-gold" activeProps={{ className: "active" }}>Ficha</Link>
             <Link to="/chat" className="px-2 sm:px-3 py-1.5 rounded hover:bg-secondary [&.active]:text-gold" activeProps={{ className: "active" }}>Chat</Link>
             {isAdmin && (
-              <Link to="/admin" className="px-2 sm:px-3 py-1.5 rounded hover:bg-secondary [&.active]:text-gold" activeProps={{ className: "active" }}>
-                Admin
-              </Link>
+              <>
+                <Link to="/admin" className="px-2 sm:px-3 py-1.5 rounded hover:bg-secondary [&.active]:text-gold" activeProps={{ className: "active" }}>
+                  Admin
+                </Link>
+                <OnlinePlayersButton isAdmin={isAdmin} />
+              </>
             )}
-            <OnlinePlayersButton isAdmin={isAdmin} />
             <span className="mx-2 lg:mx-3 text-muted-foreground text-xs hidden lg:inline truncate max-w-[180px]">{user.email}</span>
             <Button variant="outline" size="sm" className="h-8 px-2 sm:px-3 shrink-0" onClick={signOut}>Sair</Button>
           </nav>
