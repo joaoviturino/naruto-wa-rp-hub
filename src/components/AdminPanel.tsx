@@ -296,18 +296,19 @@ function Players() {
   const [resetTarget, setResetTarget] = useState<{ id: string | null; name: string } | null>(null);
   const [resetXp, setResetXp] = useState(true);
   const [resetInv, setResetInv] = useState(true);
+  const [resetRyo, setResetRyo] = useState(false);
   const [resetting, setResetting] = useState(false);
 
   async function doReset() {
     if (!resetTarget) return;
-    if (!resetXp && !resetInv) { toast.error("Selecione ao menos XP ou Inventário."); return; }
+    if (!resetXp && !resetInv && !resetRyo) { toast.error("Selecione ao menos XP, Ryo ou Inventário."); return; }
     setResetting(true);
     try {
       if (resetTarget.id) {
-        await resetOne({ data: { character_id: resetTarget.id, resetXp, resetInventory: resetInv } });
+        await resetOne({ data: { character_id: resetTarget.id, resetXp, resetInventory: resetInv, resetRyo } });
         toast.success(`${resetTarget.name} zerado.`);
       } else {
-        const r: any = await resetAll({ data: { resetXp, resetInventory: resetInv } });
+        const r: any = await resetAll({ data: { resetXp, resetInventory: resetInv, resetRyo } });
         toast.success(`Zerado para todos os jogadores${r?.affected ? ` (${r.affected} linhas)` : ""}.`);
       }
       setResetTarget(null);
@@ -327,7 +328,7 @@ function Players() {
     <>
     <div className="flex justify-end mb-2">
       <Button size="sm" variant="destructive"
-        onClick={() => { setResetXp(true); setResetInv(true); setResetTarget({ id: null, name: "TODOS os jogadores" }); }}>
+        onClick={() => { setResetXp(true); setResetInv(true); setResetRyo(false); setResetTarget({ id: null, name: "TODOS os jogadores" }); }}>
         <AlertTriangle size={14} className="mr-1" /> Zerar TODOS
       </Button>
     </div>
@@ -375,7 +376,7 @@ function Players() {
                     <Eye size={14} /> Ver
                   </Button>
                   <Button size="sm" variant="outline" title="Zerar XP e/ou inventário"
-                    onClick={() => { setResetXp(true); setResetInv(true); setResetTarget({ id: c.id, name: c.nickname }); }}>
+                    onClick={() => { setResetXp(true); setResetInv(true); setResetRyo(false); setResetTarget({ id: c.id, name: c.nickname }); }}>
                     <RotateCcw size={14} /> Zerar
                   </Button>
                 </div>
@@ -404,6 +405,10 @@ function Players() {
           <label className="flex items-center gap-2 text-sm cursor-pointer">
             <input type="checkbox" checked={resetInv} onChange={(e) => setResetInv(e.target.checked)} />
             Zerar inventário (bolsa, secundários e itens equipados)
+          </label>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input type="checkbox" checked={resetRyo} onChange={(e) => setResetRyo(e.target.checked)} />
+            Zerar Ryo (define como 0)
           </label>
           <div className="flex justify-end gap-2">
             <Button variant="outline" disabled={resetting} onClick={() => setResetTarget(null)}>Cancelar</Button>
