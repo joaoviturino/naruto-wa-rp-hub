@@ -65,6 +65,15 @@ export const sendLocationMessage = createServerFn({ method: "POST" })
       .from("characters").select("id,current_location_id").eq("user_id", context.userId).maybeSingle();
     if (!char) throw new Error("Sem personagem.");
     if (char.current_location_id !== data.locationId) throw new Error("Você não está neste local.");
+    // Trava global do chat (admins ignoram).
+    try {
+      const { data: cfg } = await context.supabase.from("server_config").select("chat_locked").eq("id", "main").maybeSingle();
+      if ((cfg as any)?.chat_locked) {
+        const { data: roles } = await context.supabase.from("user_roles").select("role").eq("user_id", context.userId);
+        const isAdmin = (roles ?? []).some((r: any) => r.role === "admin");
+        if (!isAdmin) throw new Error("O chat foi trancado pelos administradores.");
+      }
+    } catch (e: any) { if (e?.message?.startsWith("O chat foi trancado")) throw e; }
     // Bloqueio durante viagem em andamento
     try {
       const { data: t } = await context.supabase
