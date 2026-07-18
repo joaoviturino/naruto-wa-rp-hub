@@ -18,6 +18,7 @@ type TradeRow = {
   partner_confirmed: boolean;
   status: string;
   tax_percent: number;
+  updated_at: string;
 };
 type CharMini = { id: string; nickname: string; avatar_url: string | null; ryo: number };
 type ItemMini = { id: string; name: string; icon_url: string | null; rank: string | null };
@@ -35,7 +36,7 @@ export function TradeWatcher({ myCharacterId }: { myCharacterId: string | null }
       .or(`initiator_id.eq.${myCharacterId},partner_id.eq.${myCharacterId}`)
       .order("created_at", { ascending: false })
       .limit(1);
-    setTrade(((data ?? [])[0] as TradeRow) ?? null);
+    setTrade((((data ?? [])[0] as unknown) as TradeRow) ?? null);
   }
 
   useEffect(() => {
