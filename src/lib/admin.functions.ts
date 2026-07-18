@@ -779,7 +779,7 @@ export const issueGlobalReward = createServerFn({ method: "POST" })
             .select("character_id").eq("character_id", ch.id).eq("skill_id", data.skill_id!).maybeSingle();
           if (!has) {
             const { error } = await supabaseAdmin.from("character_skills")
-              .insert({ character_id: ch.id, skill_id: data.skill_id });
+              .insert({ character_id: ch.id, skill_id: data.skill_id! });
             if (error) throw error;
           } else {
             skipped++;
