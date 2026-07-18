@@ -722,6 +722,14 @@ export const issueGlobalReward = createServerFn({ method: "POST" })
     skill_id: z.string().uuid().optional(),
     item_id: z.string().uuid().optional(),
     note: z.string().max(200).optional(),
+    starts_at: z.string().datetime().nullable().optional(),
+    ends_at: z.string().datetime().nullable().optional(),
+    requirements: z.object({
+      min_rank: z.string().optional(),
+      min_xp: z.number().int().min(0).optional(),
+      clan_id: z.string().uuid().nullable().optional(),
+    }).partial().optional(),
+    schedule_only: z.boolean().optional(),
   }).parse(i))
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
@@ -744,9 +752,22 @@ export const issueGlobalReward = createServerFn({ method: "POST" })
         item_id: data.item_id ?? null,
         note: data.note ?? null,
         created_by: context.userId,
+        starts_at: data.starts_at ?? null,
+        ends_at: data.ends_at ?? null,
+        requirements: data.requirements ?? {},
+        active: true,
       }).select("id").single();
       if (cErr) throw new Error(cErr.message);
       rewardId = (created as any).id as string;
+    }
+
+    // Modo agendado: cria o registro mas não aplica agora — o heartbeat dos jogadores elegíveis fará o claim.
+    if (data.schedule_only) {
+      await supabaseAdmin.from("audit_log").insert({
+        admin_id: context.userId, action: "global_reward_scheduled", target: rewardId,
+        meta: { kind: data.kind, starts_at: data.starts_at, ends_at: data.ends_at, requirements: data.requirements },
+      });
+      return { ok: true, reward_id: rewardId, scheduled: true, applied: 0, skipped: 0, total_targets: 0 };
     }
 
     // Personagens que ainda não receberam.
