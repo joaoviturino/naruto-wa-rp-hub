@@ -300,6 +300,14 @@ function ChatPage() {
 
   const sidebar = (
     <div className="space-y-3">
+      {currentLoc && (
+        <Minimap
+          locations={locs as any}
+          connections={conns}
+          currentLocationId={currentLoc.id}
+          onSelect={(id) => { if (neighbors.some((n) => n.id === id)) doMove(id); }}
+        />
+      )}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-1 sm:gap-3">
         <Button asChild variant="outline" size="sm" className="w-full justify-between h-auto py-2">
           <Link to="/party">
