@@ -566,3 +566,221 @@ function TradeTaxCard() {
     </div>
   );
 }
+/* ---------------- Starter Kit ---------------- */
+
+type KitItem = { item_id: string; qty: number };
+type Kit = { xp?: number; ryo?: number; items?: KitItem[]; skills?: string[] };
+
+function StarterKitCard() {
+  const [kit, setKit] = useState<Kit>({});
+  const [items, setItems] = useState<{ id: string; name: string }[]>([]);
+  const [skills, setSkills] = useState<{ id: string; name: string }[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const save = useServerFn(saveStarterKit);
+
+  useEffect(() => {
+    (async () => {
+      const [{ data: cfg }, { data: it }, { data: sk }] = await Promise.all([
+        supabase.from("server_config").select("starter_kit").eq("id", "main").maybeSingle(),
+        supabase.from("items").select("id,name").order("name"),
+        supabase.from("skills").select("id,name").order("name"),
+      ]);
+      setKit(((cfg as any)?.starter_kit ?? {}) as Kit);
+      setItems(((it ?? []) as any[]).map((r) => ({ id: r.id, name: r.name })));
+      setSkills(((sk ?? []) as any[]).map((r) => ({ id: r.id, name: r.name })));
+      setLoaded(true);
+    })();
+  }, []);
+
+  function set<K extends keyof Kit>(k: K, v: Kit[K]) { setKit((cur) => ({ ...cur, [k]: v })); }
+
+  async function persist() {
+    setBusy(true);
+    try {
+      await save({ data: { kit } as any });
+      toast.success("Kit inicial salvo.");
+    } catch (e: any) { toast.error(e?.message ?? "Falha ao salvar kit."); }
+    finally { setBusy(false); }
+  }
+
+  if (!loaded) return <div className="scroll-panel rounded-lg p-6">Carregando...</div>;
+
+  return (
+    <div className="scroll-panel rounded-lg p-4 sm:p-6 space-y-4">
+      <h3 className="font-display text-xl text-gold flex items-center gap-2"><Package size={18} /> Kit Inicial</h3>
+      <p className="text-xs text-muted-foreground">Recursos concedidos a cada novo personagem ao terminar a criação de ficha.</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label>XP inicial</Label>
+          <Input type="number" min={0} value={kit.xp ?? 0}
+            onChange={(e) => set("xp", Math.max(0, parseInt(e.target.value || "0", 10)))} />
+        </div>
+        <div className="space-y-2">
+          <Label>Ryo inicial</Label>
+          <Input type="number" min={0} value={kit.ryo ?? 0}
+            onChange={(e) => set("ryo", Math.max(0, parseInt(e.target.value || "0", 10)))} />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label>Itens</Label>
+          <Button size="sm" variant="outline" onClick={() => set("items", [...(kit.items ?? []), { item_id: "", qty: 1 }])}>+ Adicionar</Button>
+        </div>
+        {(kit.items ?? []).map((row, idx) => (
+          <div key={idx} className="flex items-center gap-2 flex-wrap">
+            <div className="flex-1 min-w-[200px]">
+              <ComboSelect value={row.item_id}
+                onChange={(v) => { const list = [...(kit.items ?? [])]; list[idx] = { ...row, item_id: v }; set("items", list); }}
+                options={[{ value: "", label: "— Item —" }, ...items.map((i) => ({ value: i.id, label: i.name }))]} />
+            </div>
+            <Input type="number" min={1} className="w-20" value={row.qty}
+              onChange={(e) => { const list = [...(kit.items ?? [])]; list[idx] = { ...row, qty: Math.max(1, parseInt(e.target.value || "1", 10)) }; set("items", list); }} />
+            <Button size="sm" variant="outline" onClick={() => set("items", (kit.items ?? []).filter((_, i) => i !== idx))}>
+              <Trash2 size={14} />
+            </Button>
+          </div>
+        ))}
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label>Habilidades</Label>
+          <Button size="sm" variant="outline" onClick={() => set("skills", [...(kit.skills ?? []), ""])}>+ Adicionar</Button>
+        </div>
+        {(kit.skills ?? []).map((sid, idx) => (
+          <div key={idx} className="flex items-center gap-2">
+            <div className="flex-1">
+              <ComboSelect value={sid}
+                onChange={(v) => { const list = [...(kit.skills ?? [])]; list[idx] = v; set("skills", list); }}
+                options={[{ value: "", label: "— Habilidade —" }, ...skills.map((s) => ({ value: s.id, label: s.name }))]} />
+            </div>
+            <Button size="sm" variant="outline" onClick={() => set("skills", (kit.skills ?? []).filter((_, i) => i !== idx))}>
+              <Trash2 size={14} />
+            </Button>
+          </div>
+        ))}
+      </div>
+
+      <Button onClick={persist} disabled={busy}>{busy ? "Salvando..." : "Salvar kit inicial"}</Button>
+    </div>
+  );
+}
+
+/* ---------------- Presence Monitor ---------------- */
+
+type PresenceOverview = {
+  total: number;
+  in_combat: number;
+  in_travel: number;
+  per_location: { location_id: string; name: string; count: number }[];
+  players: Array<{
+    character_id: string;
+    status: string;
+    last_seen: string;
+    character: { id: string; nickname: string; avatar_url: string | null; rank: string; village: string } | null;
+    location: { id: string; name: string; image_url: string | null } | null;
+  }>;
+};
+
+function PresenceMonitorCard() {
+  const [data, setData] = useState<PresenceOverview | null>(null);
+  const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
+  const [busy, setBusy] = useState<string>("");
+  const overview = useServerFn(adminPresenceOverview);
+  const tp = useServerFn(adminTeleportPlayer);
+
+  async function load() {
+    try {
+      const res: any = await overview({} as any);
+      setData(res as PresenceOverview);
+    } catch { /* ignora */ }
+  }
+  useEffect(() => {
+    load();
+    supabase.from("locations").select("id,name").order("name").then(({ data }) =>
+      setLocations(((data ?? []) as any[]).map((l) => ({ id: l.id, name: l.name }))));
+    const t = setInterval(load, 15_000);
+    return () => clearInterval(t);
+  }, []);
+
+  async function teleport(characterId: string) {
+    const locId = prompt("ID do local (ou digite parte do nome — busque na lista abaixo):");
+    if (!locId) return;
+    const loc = locations.find((l) => l.id === locId || l.name.toLowerCase().includes(locId.toLowerCase()));
+    if (!loc) { toast.error("Local não encontrado."); return; }
+    setBusy(characterId);
+    try {
+      await tp({ data: { character_id: characterId, location_id: loc.id } });
+      toast.success(`Teletransportado para ${loc.name}.`);
+      await load();
+    } catch (e: any) { toast.error(e?.message ?? "Falha."); }
+    finally { setBusy(""); }
+  }
+
+  return (
+    <div className="scroll-panel rounded-lg p-4 sm:p-6 space-y-4 lg:col-span-2">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="font-display text-xl text-gold flex items-center gap-2"><Activity size={18} /> Monitor em Tempo Real</h3>
+        <Button size="sm" variant="outline" onClick={load}><RotateCw size={14} className="mr-1" />Atualizar</Button>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-lg border border-border p-3">
+          <div className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1"><Users size={12} /> Online (2 min)</div>
+          <div className="font-display text-2xl text-gold">{data?.total ?? "—"}</div>
+        </div>
+        <div className="rounded-lg border border-border p-3">
+          <div className="text-xs uppercase tracking-widest text-muted-foreground">Em combate</div>
+          <div className="font-display text-2xl text-red-400">{data?.in_combat ?? 0}</div>
+        </div>
+        <div className="rounded-lg border border-border p-3">
+          <div className="text-xs uppercase tracking-widest text-muted-foreground">Em viagem</div>
+          <div className="font-display text-2xl text-sky-400">{data?.in_travel ?? 0}</div>
+        </div>
+      </div>
+
+      {data?.per_location?.length ? (
+        <div className="space-y-2">
+          <div className="text-sm font-display text-gold">Por local</div>
+          <div className="flex flex-wrap gap-2">
+            {data.per_location.map((l) => (
+              <span key={l.location_id} className="rounded-full border border-border bg-secondary/40 px-2.5 py-1 text-xs">
+                {l.name} · <b className="text-gold">{l.count}</b>
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="space-y-2">
+        <div className="text-sm font-display text-gold">Jogadores ativos</div>
+        {(!data || data.players.length === 0) && (
+          <div className="text-center text-muted-foreground text-sm py-3">Ninguém online no momento.</div>
+        )}
+        <div className="grid gap-2 sm:grid-cols-2">
+          {(data?.players ?? []).map((p) => (
+            <div key={p.character_id} className="rounded-lg border border-border p-2 flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-secondary/40 shrink-0 overflow-hidden">
+                {p.character?.avatar_url && <img src={p.character.avatar_url} alt="" className="h-full w-full object-cover" />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold truncate">{p.character?.nickname ?? "—"}</div>
+                <div className="text-[11px] text-muted-foreground truncate">
+                  {(p.character?.rank ?? "").toUpperCase()} · {p.location?.name ?? "sem local"} · <span className={
+                    p.status === "combat" ? "text-red-400" : p.status === "travel" ? "text-sky-400" : "text-emerald-400"
+                  }>{p.status}</span>
+                </div>
+              </div>
+              <Button size="sm" variant="outline" disabled={busy === p.character_id}
+                onClick={() => teleport(p.character_id)}>
+                <Send size={12} className="mr-1" />TP
+              </Button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
