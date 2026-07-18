@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Megaphone, Wrench, Trash2, Power, MessageSquareOff, MapPin, Gift, RotateCw } from "lucide-react";
+import { Megaphone, Wrench, Trash2, Power, MessageSquareOff, MapPin, Gift, RotateCw, ArrowLeftRight } from "lucide-react";
 import { ComboSelect } from "@/components/ui/combo-select";
 import { teleportAllPlayers, setChatLock, issueGlobalReward, listGlobalRewards, reapplyGlobalReward, deleteGlobalReward } from "@/lib/admin.functions";
 import { useServerFn } from "@tanstack/react-start";
@@ -20,6 +20,7 @@ type Config = {
   actions_hotkey_enabled: boolean;
   initial_spawn_location_id: string | null;
   chat_locked: boolean;
+  trade_tax_percent: number;
 };
 
 type Broadcast = {
@@ -38,6 +39,7 @@ export function ServerControl() {
       <BroadcastCard />
       <GlobalToolsCard />
       <GlobalRewardsCard />
+      <TradeTaxCard />
     </div>
   );
 }
