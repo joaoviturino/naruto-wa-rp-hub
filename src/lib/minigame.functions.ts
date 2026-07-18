@@ -251,13 +251,15 @@ export const startMinigameRun = createServerFn({ method: "POST" })
         throw new Error(`Requer o emprego: ${(j as any)?.name ?? "?"}.`);
       }
     }
-    // Verifica cooldown
-    const { data: last } = await context.supabase
-      .from("minigame_runs").select("completed_at").eq("character_id", char.id).eq("minigame_id", data.minigame_id)
-      .not("completed_at", "is", null).order("completed_at", { ascending: false }).limit(1).maybeSingle();
-    if (last?.completed_at && (game.cooldown_hours ?? 0) > 0) {
-      const next = new Date(last.completed_at).getTime() + (game.cooldown_hours * 3600 * 1000);
-      if (next > Date.now()) throw new Error("Missão em recarga. Volte mais tarde.");
+    // Verifica cooldown (mineração e lenhador não têm recarga — atividades contínuas).
+    if ((game.kind as string) !== "mining" && (game.kind as string) !== "logging") {
+      const { data: last } = await context.supabase
+        .from("minigame_runs").select("completed_at").eq("character_id", char.id).eq("minigame_id", data.minigame_id)
+        .not("completed_at", "is", null).order("completed_at", { ascending: false }).limit(1).maybeSingle();
+      if (last?.completed_at && (game.cooldown_hours ?? 0) > 0) {
+        const next = new Date(last.completed_at).getTime() + (game.cooldown_hours * 3600 * 1000);
+        if (next > Date.now()) throw new Error("Missão em recarga. Volte mais tarde.");
+      }
     }
     // Crafting (forge / tailoring): valida seleção do jogador + descobre item resultante
     let runContext: any = {};
