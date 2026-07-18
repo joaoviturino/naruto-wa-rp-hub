@@ -2485,6 +2485,7 @@ export type Database = {
       server_config: {
         Row: {
           actions_hotkey_enabled: boolean
+          chat_locked: boolean
           id: string
           initial_spawn_location_id: string | null
           maintenance_enabled: boolean
@@ -2497,6 +2498,7 @@ export type Database = {
         }
         Insert: {
           actions_hotkey_enabled?: boolean
+          chat_locked?: boolean
           id?: string
           initial_spawn_location_id?: string | null
           maintenance_enabled?: boolean
@@ -2509,6 +2511,7 @@ export type Database = {
         }
         Update: {
           actions_hotkey_enabled?: boolean
+          chat_locked?: boolean
           id?: string
           initial_spawn_location_id?: string | null
           maintenance_enabled?: boolean

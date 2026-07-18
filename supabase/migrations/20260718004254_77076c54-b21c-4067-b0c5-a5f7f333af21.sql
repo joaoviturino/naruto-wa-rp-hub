@@ -1,0 +1,1 @@
+ALTER TABLE public.server_config ADD COLUMN IF NOT EXISTS chat_locked boolean NOT NULL DEFAULT false;
