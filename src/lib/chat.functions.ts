@@ -44,6 +44,20 @@ export const moveCharacter = createServerFn({ method: "POST" })
         last_spawn_roll_at: null,
       }).eq("id", char.id);
     if (error) throw new Error(error.message);
+    // Anúncio público de chegada no chat local do destino.
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: c } = await supabaseAdmin
+        .from("characters").select("nickname").eq("id", char.id).maybeSingle();
+      const nick = (c as any)?.nickname ?? "Alguém";
+      await supabaseAdmin.from("location_messages").insert({
+        location_id: data.locationId,
+        character_id: char.id,
+        content: `❕️ ${nick} chegou aqui.`,
+      });
+    } catch (e) {
+      console.error("[move] falha ao anunciar chegada", e);
+    }
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { bumpMissionProgress } = await import("@/lib/missions.functions");
