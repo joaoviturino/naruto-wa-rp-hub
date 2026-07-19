@@ -139,8 +139,8 @@ function ChatPage() {
       .on("postgres_changes", { event: "*", schema: "public", table: "party_members" }, loadPartyMembers)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "characters" }, loadPartyMembers)
       .subscribe();
-    // Fallback de polling (caso realtime falhe por rede/RLS)
-    const poll = setInterval(() => { loadInvites(); loadPartyMembers(); checkCombat(); }, 3000);
+    // Fallback de polling (caso realtime falhe por rede/RLS) — realtime é o caminho principal.
+    const poll = setInterval(() => { loadInvites(); loadPartyMembers(); checkCombat(); }, 10000);
     return () => { supabase.removeChannel(ch); clearInterval(poll); };
   }, [character?.id]);
 
@@ -235,7 +235,7 @@ function ChatPage() {
       .subscribe();
     // Fallback: alguns celulares/webviews perdem realtime; isso garante que
     // o chat destrave assim que o duelo mudar para finished/fled.
-    const poll = window.setInterval(refreshPvp, 1500);
+    const poll = window.setInterval(refreshPvp, 6000);
     return () => { supabase.removeChannel(ch); window.clearInterval(poll); };
   }, [currentLoc?.id, character?.id]);
 

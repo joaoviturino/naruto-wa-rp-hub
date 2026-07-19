@@ -193,18 +193,27 @@ export const rollSpawn = createServerFn({ method: "POST" })
     const me = await loadMyChar(context);
     if (!me.current_location_id) return { session_id: null as string | null };
 
-    // Já tem combate ativo?
-    const { data: existing } = await context.supabase
-      .from("combat_participants")
-      .select("session_id, session:combat_sessions!inner(status)")
-      .eq("character_id", me.id);
-    const active = (existing as any[])?.find((e) => e.session?.status === "active");
-    if (active) return { session_id: active.session_id as string };
-
     const { data: loc } = await context.supabase
       .from("locations").select("id,is_danger_zone,spawn_chance,spawn_tick_seconds").eq("id", me.current_location_id).maybeSingle();
     if (!loc?.is_danger_zone) return { session_id: null };
     if (!loc.spawn_chance) return { session_id: null };
+
+    // Dwell-time gate PRIMEIRO (barato — 1 linha de characters) para descartar 99% das chamadas cedo.
+    const { data: charRow0 } = await context.supabase
+      .from("characters").select("last_spawn_roll_at,location_entered_at").eq("id", me.id).maybeSingle();
+    const now0 = Date.now();
+    const last0 = charRow0?.last_spawn_roll_at ? new Date(charRow0.last_spawn_roll_at).getTime() : (charRow0?.location_entered_at ? new Date(charRow0.location_entered_at).getTime() : 0);
+    if (now0 - last0 < loc.spawn_tick_seconds * 1000) return { session_id: null };
+
+    // Já tem combate ativo? (2 queries simples — evita o LATERAL JOIN caro do PostgREST)
+    const { data: parts } = await context.supabase
+      .from("combat_participants").select("session_id").eq("character_id", me.id);
+    const sessIds = ((parts as any[]) ?? []).map((p) => p.session_id).filter(Boolean);
+    if (sessIds.length) {
+      const { data: act } = await context.supabase
+        .from("combat_sessions").select("id").in("id", sessIds).eq("status", "active").limit(1).maybeSingle();
+      if (act) return { session_id: (act as any).id as string };
+    }
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -224,13 +233,6 @@ export const rollSpawn = createServerFn({ method: "POST" })
       const allHere = partyMembersEarly.every((c: any) => c.current_location_id === loc.id);
       if (!allHere) return { session_id: null };
     }
-
-    // Roll gated por dwell time: precisa ter passado spawn_tick_seconds desde a última rolagem
-    const { data: charRow } = await context.supabase
-      .from("characters").select("last_spawn_roll_at,location_entered_at").eq("id", me.id).maybeSingle();
-    const now = Date.now();
-    const last = charRow?.last_spawn_roll_at ? new Date(charRow.last_spawn_roll_at).getTime() : (charRow?.location_entered_at ? new Date(charRow.location_entered_at).getTime() : 0);
-    if (now - last < loc.spawn_tick_seconds * 1000) return { session_id: null };
 
     await supabaseAdmin.from("characters").update({ last_spawn_roll_at: new Date().toISOString() }).eq("id", me.id);
 
