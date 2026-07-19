@@ -433,6 +433,15 @@ function BotPanel() {
   const reset = useServerFn(resetBotSession);
   const askQr = useServerFn(requestBotQr);
   const [asking, setAsking] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 5000);
+    return () => clearInterval(id);
+  }, []);
+
+  const lastSeenMs = session?.last_seen_at ? new Date(session.last_seen_at).getTime() : 0;
+  const secondsSinceSeen = lastSeenMs ? Math.floor((now - lastSeenMs) / 1000) : Infinity;
+  const botOnline = lastSeenMs > 0 && secondsSinceSeen < 30;
 
   async function load() {
     const { data: s } = await supabase.from("bot_sessions").select("*").eq("id", "default").maybeSingle();
@@ -486,8 +495,29 @@ function BotPanel() {
     <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
       <div className="scroll-panel rounded-lg p-4 sm:p-6">
         <h3 className="font-display text-xl text-gold">Sessão do Bot</h3>
-        <div className="mt-2 text-sm">Status: <span className={statusColor[session?.status ?? "disconnected"]}>{session?.status ?? "—"}</span></div>
+        <div className="mt-2 text-sm flex items-center gap-2 flex-wrap">
+          <span>Status: <span className={statusColor[session?.status ?? "disconnected"]}>{session?.status ?? "—"}</span></span>
+          <span className={`inline-flex items-center gap-1 text-xs rounded px-2 py-0.5 border ${botOnline ? "border-emerald-500/40 text-emerald-400" : "border-red-500/40 text-red-400"}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${botOnline ? "bg-emerald-400" : "bg-red-400"}`} />
+            {botOnline ? `Serviço online (${secondsSinceSeen}s atrás)` : "Serviço offline"}
+          </span>
+        </div>
         {session?.phone && <div className="text-xs text-muted-foreground">Conectado como: {session.phone}</div>}
+        {!botOnline && (
+          <div className="mt-4 rounded-md border border-red-500/40 bg-red-500/5 p-4 text-sm">
+            <div className="font-semibold text-red-400">Bot Node não está rodando no seu VPS.</div>
+            <p className="mt-2 text-muted-foreground">
+              O QR só aparece aqui quando o serviço em <code className="rounded bg-secondary/40 px-1">bot/</code> está de pé. No seu VPS, rode:
+            </p>
+            <pre className="mt-2 overflow-x-auto rounded bg-black/40 p-3 text-xs text-emerald-300">{`cd bot
+export SUPABASE_URL="https://<seu-projeto>.supabase.co"
+export SUPABASE_SERVICE_ROLE_KEY="<service-role-key>"
+bash install.sh`}</pre>
+            <p className="mt-2 text-xs text-muted-foreground">
+              O <code>install.sh</code> deixa o bot vivo com PM2 (religa sozinho no boot). Depois disso, o selo acima fica verde e o botão "Gerar QR agora" funciona em ~2s.
+            </p>
+          </div>
+        )}
         {session?.status === "qr" && session?.qr && !String(session.qr).startsWith("__REQUEST_QR__") && (
           <div className="mt-4 flex flex-col items-center">
             {qrDataUrl ? (
