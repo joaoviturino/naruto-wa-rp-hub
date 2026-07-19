@@ -1130,6 +1130,7 @@ export const consumeInCombat = createServerFn({ method: "POST" })
       if (np.cooldowns) for (const k of Object.keys(np.cooldowns)) np.cooldowns[k] = Math.max(0, (np.cooldowns[k] ?? 0) - 1);
     }
 
+    tickStatusEndOfRound(state as any);
     await persistPools(supabaseAdmin, state);
     await supabaseAdmin.from("combat_sessions").update({ state, log, status, ended_at }).eq("id", sess.id);
     return { ok: true };
