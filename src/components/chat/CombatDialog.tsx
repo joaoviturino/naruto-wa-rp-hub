@@ -447,8 +447,9 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const poolColor: Record<string, string> = { ef: "oklch(0.55 0.22 25)", em: "oklch(0.6 0.15 220)", chakra: "oklch(0.78 0.15 80)" };
   const lastEntry = log[log.length - 1];
   const npcActive = session.status === "active" && lastEntry?.actor === "npc" && Object.keys(poses).length === 0;
-  // Preferimos cenário/música do LOCAL; caímos para os do NPC/grupo por retrocompatibilidade.
-  const bgUrl = ((state as any).location_bg_url as string | null) ?? (npc.battle_bg_url as string | null);
+  // Preferimos cenário do genjutsu ativo; depois LOCAL; depois NPC/grupo.
+  const genjutsuScene = (state as any)._scenery?.url as string | null | undefined;
+  const bgUrl = genjutsuScene ?? ((state as any).location_bg_url as string | null) ?? (npc.battle_bg_url as string | null);
   const battleMusic = ((state as any).location_music_url as string | null) ?? ((npc as any).music_url as string | null);
 
   return (

@@ -276,6 +276,13 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
               title="Restauração de energia (habilidade suplementar)"
             />
           )}
+          {(f.skill_class === "genjutsu" || f.req_class === "genjutsu") && (
+            <GenjutsuFields
+              value={f.meta?.genjutsu ?? null}
+              onChange={(g) => up("meta", { ...(f.meta ?? {}), genjutsu: g })}
+              adminUserId={adminUserId}
+            />
+          )}
           {f.classification === "suplementar" &&
             (f.skill_class === "ninjutsu_medico" || f.req_class === "ninjutsu_medico") && (
               <div className="sm:col-span-2 rounded-md border border-emerald-500/40 bg-emerald-500/5 p-3 space-y-2">
@@ -375,5 +382,83 @@ function NullableSelect({ value, onChange, options }: any) {
         {options.map((o: any) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
       </SelectContent>
     </Select>
+  );
+}
+
+type GenjutsuMeta = {
+  scenery_url?: string | null;
+  scenery_turns?: number;
+  accuracy_debuff?: number;
+  accuracy_turns?: number;
+  paralyze_turns?: number;
+};
+
+function GenjutsuFields({
+  value, onChange, adminUserId,
+}: {
+  value: GenjutsuMeta | null;
+  onChange: (g: GenjutsuMeta | null) => void;
+  adminUserId: string;
+}) {
+  const g: GenjutsuMeta = value ?? {};
+  function set<K extends keyof GenjutsuMeta>(k: K, v: GenjutsuMeta[K]) {
+    const next: GenjutsuMeta = { ...g, [k]: v };
+    // limpa se tudo zerado/vazio
+    const empty = !next.scenery_url
+      && !Number(next.scenery_turns ?? 0)
+      && !Number(next.accuracy_debuff ?? 0)
+      && !Number(next.accuracy_turns ?? 0)
+      && !Number(next.paralyze_turns ?? 0);
+    onChange(empty ? null : next);
+  }
+  return (
+    <div className="sm:col-span-2 rounded-md border border-fuchsia-500/40 bg-fuchsia-500/5 p-3 space-y-3">
+      <div className="text-xs font-display text-fuchsia-300">Genjutsu — efeitos de ilusão</div>
+      <p className="text-[11px] text-muted-foreground">
+        Combine livremente: trocar o cenário do combate, reduzir a precisão do alvo
+        e/ou paralisá-lo por N turnos. Deixe em 0 os campos que não deve usar.
+      </p>
+
+      <div className="grid gap-2 sm:grid-cols-2">
+        <div>
+          <Label>Cenário ilusório (imagem)</Label>
+          <div className="flex items-center gap-2 mt-1">
+            {g.scenery_url && (
+              <img src={g.scenery_url} alt="" className="w-14 h-10 rounded object-cover border border-border" />
+            )}
+            <ImageUpload label="Enviar" bucket="skills" userId={adminUserId}
+              onUploaded={(url) => set("scenery_url", url)} />
+            {g.scenery_url && (
+              <Button size="sm" variant="ghost" onClick={() => set("scenery_url", null)}>Remover</Button>
+            )}
+          </div>
+        </div>
+        <div>
+          <Label>Duração do cenário (turnos)</Label>
+          <Input type="number" min={0} max={20} value={g.scenery_turns ?? 0}
+            onChange={(e) => set("scenery_turns", Math.max(0, Math.min(20, Number(e.target.value))))} />
+          <div className="text-[10px] text-muted-foreground mt-1">0 = não troca o cenário.</div>
+        </div>
+        <div>
+          <Label>Redução de precisão do alvo (%)</Label>
+          <Input type="number" min={0} max={100} value={g.accuracy_debuff ?? 0}
+            onChange={(e) => set("accuracy_debuff", Math.max(0, Math.min(100, Number(e.target.value))))} />
+        </div>
+        <div>
+          <Label>Duração da redução (turnos)</Label>
+          <Input type="number" min={0} max={20} value={g.accuracy_turns ?? 0}
+            onChange={(e) => set("accuracy_turns", Math.max(0, Math.min(20, Number(e.target.value))))} />
+          <div className="text-[10px] text-muted-foreground mt-1">Precisa duração &gt; 0 para valer.</div>
+        </div>
+        <div className="sm:col-span-2">
+          <Label>Paralisar alvo por (turnos)</Label>
+          <Input type="number" min={0} max={20} value={g.paralyze_turns ?? 0}
+            onChange={(e) => set("paralyze_turns", Math.max(0, Math.min(20, Number(e.target.value))))} />
+          <div className="text-[10px] text-muted-foreground mt-1">
+            O alvo perde os N próximos turnos sem poder agir. 0 = sem paralisia.
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

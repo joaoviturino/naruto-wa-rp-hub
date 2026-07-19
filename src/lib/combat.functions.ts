@@ -77,6 +77,80 @@ function nextAliveNpcIdx(state: CombatState, from = 0): number {
   }
   return -1;
 }
+
+// ============================================================
+//  Genjutsu — efeitos aplicáveis por habilidades de ilusão:
+//    - trocar o cenário do palco por N turnos
+//    - reduzir a precisão do alvo por N turnos
+//    - paralisar o alvo por N turnos (perde a vez)
+//  A configuração vive em `skills.meta.genjutsu`.
+// ============================================================
+type GenjutsuMeta = {
+  scenery_url?: string | null;
+  scenery_turns?: number;
+  accuracy_debuff?: number; // 0-100 (%)
+  accuracy_turns?: number;
+  paralyze_turns?: number;
+};
+type StatusEntry = {
+  accuracy_debuff?: number;
+  accuracy_turns?: number;
+  paralyze_turns?: number;
+};
+
+function applyGenjutsu(
+  state: any, targetKey: string, meta: any, log: LogEntry[],
+  actorName: string, targetName: string,
+): void {
+  const g = (meta?.genjutsu ?? null) as GenjutsuMeta | null;
+  if (!g) return;
+  state._status = (state._status ?? {}) as Record<string, StatusEntry>;
+  const cur: StatusEntry = state._status[targetKey] ?? {};
+  const eff: string[] = [];
+  const sceneTurns = Math.max(0, Math.floor(Number(g.scenery_turns ?? 0)));
+  if (g.scenery_url && sceneTurns > 0) {
+    state._scenery = { url: String(g.scenery_url), turns_left: sceneTurns };
+    eff.push(`cenário alterado por ${sceneTurns}t`);
+  }
+  const accDeb = Math.max(0, Math.min(100, Math.floor(Number(g.accuracy_debuff ?? 0))));
+  const accTurns = Math.max(0, Math.floor(Number(g.accuracy_turns ?? 0)));
+  if (accDeb > 0 && accTurns > 0) {
+    cur.accuracy_debuff = accDeb;
+    cur.accuracy_turns = Math.max(cur.accuracy_turns ?? 0, accTurns);
+    eff.push(`−${accDeb}% de precisão por ${accTurns}t`);
+  }
+  const paraTurns = Math.max(0, Math.floor(Number(g.paralyze_turns ?? 0)));
+  if (paraTurns > 0) {
+    cur.paralyze_turns = Math.max(cur.paralyze_turns ?? 0, paraTurns);
+    eff.push(`paralisado por ${paraTurns}t`);
+  }
+  if (Object.keys(cur).length) state._status[targetKey] = cur;
+  if (eff.length) {
+    log.push({
+      seq: log.length + 1, actor: "player", actor_name: actorName, target_name: targetName,
+      skill_name: "Genjutsu", energy_type: "chakra", energy_used: 0,
+      effective: 0, damage: 0, speed: 0, crit_mul: 1,
+      msg: `Genjutsu: ${targetName} — ${eff.join(", ")}.`,
+    } as any);
+  }
+}
+
+function tickStatusEndOfRound(state: any): void {
+  if (state?._scenery) {
+    state._scenery.turns_left = Math.max(0, (state._scenery.turns_left ?? 0) - 1);
+    if (state._scenery.turns_left <= 0) delete state._scenery;
+  }
+  const status = state?._status as Record<string, StatusEntry> | undefined;
+  if (!status) return;
+  for (const k of Object.keys(status)) {
+    const s = status[k];
+    if ((s.accuracy_turns ?? 0) > 0) {
+      s.accuracy_turns = (s.accuracy_turns ?? 0) - 1;
+      if ((s.accuracy_turns ?? 0) <= 0) { delete s.accuracy_debuff; delete s.accuracy_turns; }
+    }
+    if (!s.accuracy_turns && !s.paralyze_turns && !s.accuracy_debuff) delete status[k];
+  }
+}
 type LogEntry = {
   seq: number;
   actor: "player" | "npc";
@@ -714,6 +788,11 @@ export const playerAttack = createServerFn({ method: "POST" })
     // Reflete mudança no array (state.npc é referência, mas garantimos)
     state.npcs[targetIdx] = state.npc;
 
+    // Genjutsu — aplica efeitos de ilusão ao alvo (ainda que o dano tenha errado).
+    if ((skill as any).meta?.genjutsu) {
+      applyGenjutsu(state as any, state.npc.id, (skill as any).meta, log, activePlayer.nickname, state.npc.name);
+    }
+
     let status = sess.status as string;
     let ended_at: string | null = null;
 
@@ -748,6 +827,9 @@ export const playerAttack = createServerFn({ method: "POST" })
         }
       }
     }
+
+    // Fim do "round": decrementa cenário + debuffs de precisão.
+    tickStatusEndOfRound(state as any);
 
     // Persistir pools atuais em characters
     await persistPools(supabaseAdmin, state);
@@ -831,6 +913,19 @@ async function applyRewards(supabaseAdmin: any, npcId: string | null, state: Com
 
 async function runSingleNpcAttack(supabaseAdmin: any, npcState: NpcState, state: CombatState, log: LogEntry[], incomingSpeed: number) {
   if (!npcState.alive) return;
+  // Paralisia por genjutsu — consome o turno do NPC sem agir.
+  const st = (state as any)._status?.[npcState.id] as StatusEntry | undefined;
+  if (st && (st.paralyze_turns ?? 0) > 0) {
+    st.paralyze_turns = (st.paralyze_turns ?? 1) - 1;
+    if ((st.paralyze_turns ?? 0) <= 0) delete st.paralyze_turns;
+    log.push({
+      seq: log.length + 1, actor: "npc", actor_name: npcState.name, target_name: npcState.name,
+      skill_name: "Genjutsu", energy_type: "chakra", energy_used: 0,
+      effective: 0, damage: 0, speed: 0, crit_mul: 1,
+      msg: `${npcState.name} está paralisado pelo genjutsu e perde o turno!`,
+    } as any);
+    return;
+  }
   const { data: npcCfg } = await supabaseAdmin
     .from("npcs").select("avg_damage,crit_chance,crit_multiplier").eq("id", npcState.id).maybeSingle();
   const avgDamage = Number(npcCfg?.avg_damage ?? 0);
@@ -870,7 +965,8 @@ async function runSingleNpcAttack(supabaseAdmin: any, npcState: NpcState, state:
   const target = alive[Math.floor(Math.random() * alive.length)];
 
   // Precisão do golpe do NPC: pode errar.
-  const accuracy = Math.max(1, Math.min(100, Number((skill as any).accuracy ?? 100)));
+  const debuffAcc = Math.max(0, Math.min(100, Number(st?.accuracy_debuff ?? 0)));
+  const accuracy = Math.max(1, Math.min(100, Number((skill as any).accuracy ?? 100) - debuffAcc));
   const missed = Math.random() * 100 >= accuracy;
 
   // Escudo defensivo do alvo (postura declarada pelo jogador na sua ação).
@@ -1034,6 +1130,7 @@ export const consumeInCombat = createServerFn({ method: "POST" })
       if (np.cooldowns) for (const k of Object.keys(np.cooldowns)) np.cooldowns[k] = Math.max(0, (np.cooldowns[k] ?? 0) - 1);
     }
 
+    tickStatusEndOfRound(state as any);
     await persistPools(supabaseAdmin, state);
     await supabaseAdmin.from("combat_sessions").update({ state, log, status, ended_at }).eq("id", sess.id);
     return { ok: true };
@@ -1292,9 +1389,30 @@ async function handlePvpAttack(
       pvp_actor_side: mySide, pvp_actor_idx: state.active_idx,
       pvp_target_side: enemySide, pvp_target_idx: tIdx,
     } as any);
+    if ((skill as any).meta?.genjutsu) {
+      applyGenjutsu(state as any, target.character_id, (skill as any).meta, log, activePlayer.nickname, target.nickname);
+    }
   }
 
-  const step = pvpAdvanceTurn(state);
+  let step = pvpAdvanceTurn(state);
+  // Paralisia por genjutsu — se o próximo a agir estiver paralisado, consome o turno.
+  for (let guard = 0; guard < 6 && !step.finished; guard++) {
+    const active = pvpSide(state, state.active_side)[state.active_idx];
+    const st = active ? ((state as any)._status?.[active.character_id] as StatusEntry | undefined) : undefined;
+    if (!active || !st || (st.paralyze_turns ?? 0) <= 0) break;
+    st.paralyze_turns = (st.paralyze_turns ?? 1) - 1;
+    if ((st.paralyze_turns ?? 0) <= 0) delete st.paralyze_turns;
+    log.push({
+      seq: log.length + 1, actor: "player", actor_name: active.nickname, target_name: active.nickname,
+      skill_name: "Genjutsu", energy_type: "chakra", energy_used: 0,
+      effective: 0, damage: 0, speed: 0, crit_mul: 1,
+      msg: `${active.nickname} está paralisado pelo genjutsu e perde o turno!`,
+      pvp_actor_side: state.active_side, pvp_actor_idx: state.active_idx,
+      pvp_target_side: state.active_side, pvp_target_idx: state.active_idx,
+    } as any);
+    step = pvpAdvanceTurn(state);
+  }
+  tickStatusEndOfRound(state as any);
   if (step.finished) {
     await finalizePvp(supabaseAdmin, sess.id, state, step.winnerSide ?? mySide);
     return { ok: true, status: "finished" };
