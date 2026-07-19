@@ -276,6 +276,13 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
               title="Restauração de energia (habilidade suplementar)"
             />
           )}
+          {(f.skill_class === "genjutsu" || f.req_class === "genjutsu") && (
+            <GenjutsuFields
+              value={f.meta?.genjutsu ?? null}
+              onChange={(g) => up("meta", { ...(f.meta ?? {}), genjutsu: g })}
+              adminUserId={adminUserId}
+            />
+          )}
           {f.classification === "suplementar" &&
             (f.skill_class === "ninjutsu_medico" || f.req_class === "ninjutsu_medico") && (
               <div className="sm:col-span-2 rounded-md border border-emerald-500/40 bg-emerald-500/5 p-3 space-y-2">
