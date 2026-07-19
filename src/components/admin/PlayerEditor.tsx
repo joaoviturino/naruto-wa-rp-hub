@@ -41,7 +41,10 @@ export function PlayerEditor({ characterId, open, onOpenChange, onSaved }: {
   const uMission = useServerFn(uncompleteMission);
   const gift = useServerFn(giftRyo);
   const setJobFn = useServerFn(adminSetJob);
+  const genTraits = useServerFn(generateTraits);
   const [ryoDelta, setRyoDelta] = useState<number>(100);
+  const [aiHint, setAiHint] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
 
   async function load() {
     if (!characterId) return;
