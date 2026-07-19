@@ -10,10 +10,11 @@ import { useServerFn } from "@tanstack/react-start";
 import { updatePlayer, grantSkill, revokeSkill, grantItem, revokeItem, completeMission, uncompleteMission, giftRyo } from "@/lib/admin.functions";
 import { adminListPoses, adminUpsertPose, adminDeletePose } from "@/lib/pose.functions";
 import { adminSetJob } from "@/lib/jobs.functions";
+import { generateTraits } from "@/lib/ai-traits.functions";
 import { toast } from "sonner";
 import { NINJA_RANKS, SKILL_RANKS, VILLAGES, ELEMENTS, labelize, elementLimitForRank, countElementProficiencies } from "./shared";
 import { useProficiencies } from "@/hooks/useProficiencies";
-import { X, Plus } from "lucide-react";
+import { X, Plus, Sparkles } from "lucide-react";
 import { ImageUpload } from "@/components/ImageUpload";
 
 export function PlayerEditor({ characterId, open, onOpenChange, onSaved }: {
