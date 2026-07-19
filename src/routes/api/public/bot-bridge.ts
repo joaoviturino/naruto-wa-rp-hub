@@ -118,7 +118,7 @@ export const Route = createFileRoute("/api/public/bot-bridge")({
           }
 
           case "auth-write": {
-            const { key, value, sessionId } = data as { key: string; value: unknown; sessionId?: string };
+            const { key, value, sessionId } = data as { key: string; value: import("@/integrations/supabase/types").Json | null; sessionId?: string };
             if (!key) return new Response("Missing key", { status: 400 });
             if (value === null || value === undefined) {
               const { error } = await supabaseAdmin
