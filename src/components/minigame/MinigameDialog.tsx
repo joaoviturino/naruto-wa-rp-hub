@@ -264,7 +264,7 @@ export function MinigameDialog({
               )}
               <div className="flex gap-2">
                 <Button onClick={begin} disabled={busy || (isCrafting && !forgeMatch) || (isGathering && miningMissing)}>
-                  {busy ? "…" : (isForge ? "Iniciar Forja" : isTailoring ? "Iniciar Confecção" : isMining ? "Começar a Minerar" : isLogging ? "Começar a Cortar" : "Aceitar missão")}
+                  {busy ? "…" : (isForge ? "Iniciar Forja" : isTailoring ? "Iniciar Confecção" : isMining ? "Começar a Minerar" : isLogging ? "Começar a Cortar" : minigame.kind === "kenjutsu" ? "Iniciar Kenjutsu" : "Aceitar missão")}
                 </Button>
                 <Button variant="outline" onClick={close}>Sair</Button>
               </div>
