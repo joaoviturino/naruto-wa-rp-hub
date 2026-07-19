@@ -195,6 +195,41 @@ export function PlayerEditor({ characterId, open, onOpenChange, onSaved }: {
                 <span className="text-xs text-muted-foreground self-center">Use valor negativo para descontar.</span>
               </div>
             </div>
+
+            <div className="sm:col-span-2 border-t border-border pt-3 space-y-2">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <Label className="text-gold">Arquétipo & Traços (IA)</Label>
+                <div className="flex items-center gap-2 flex-1 sm:flex-none min-w-0">
+                  <Input value={aiHint} onChange={(e) => setAiHint(e.target.value)} placeholder="Dica opcional (ex: sombrio, líder)" className="h-8 text-xs flex-1 sm:w-56" />
+                  <Button size="sm" variant="secondary" disabled={aiBusy} className="gap-1.5" onClick={async () => {
+                    setAiBusy(true);
+                    try {
+                      const t: any = await genTraits({ data: { character_id: char.id, hint: aiHint || undefined } } as any);
+                      up("archetype", t.archetype); up("qualities", t.qualities); up("flaws", t.flaws);
+                      toast.success("Traços gerados. Revise e clique em Salvar traços.");
+                    } catch (e: any) { toast.error(e.message); }
+                    finally { setAiBusy(false); }
+                  }}>
+                    <Sparkles className="h-3.5 w-3.5" />
+                    {aiBusy ? "Gerando..." : "Gerar com IA"}
+                  </Button>
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Arquétipo</Label>
+                <Input value={char.archetype ?? ""} onChange={(e) => up("archetype", e.target.value)} placeholder="Ex.: Protetor Silencioso" />
+              </div>
+              <ChipList label="Qualidades" list={char.qualities ?? []} onChange={(v) => up("qualities", v)} placeholder="+ qualidade" />
+              <ChipList label="Defeitos" list={char.flaws ?? []} onChange={(v) => up("flaws", v)} placeholder="+ defeito" />
+              <div className="flex justify-end">
+                <Button size="sm" onClick={async () => {
+                  try {
+                    await save({ data: { character_id: char.id, archetype: char.archetype ?? null, qualities: char.qualities ?? [], flaws: char.flaws ?? [] } } as any);
+                    toast.success("Traços salvos."); onSaved();
+                  } catch (e: any) { toast.error(e.message); }
+                }}>Salvar traços</Button>
+              </div>
+            </div>
           </TabsContent>
 
           <TabsContent value="prof" className="mt-4">
