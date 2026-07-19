@@ -84,7 +84,7 @@ export const Route = createFileRoute("/api/public/bot-bridge")({
             const fields = data as Record<string, unknown>;
             const { error } = await supabaseAdmin.from("bot_sessions").upsert({
               id: "default",
-              status: String(fields?.status ?? "connecting"),
+              status: (fields?.status as "disconnected" | "qr" | "connecting" | "connected") ?? "connecting",
               qr: fields?.qr === null ? null : fields?.qr ? String(fields.qr) : undefined,
               phone: fields?.phone === null ? null : fields?.phone ? String(fields.phone) : undefined,
               updated_at: now,
