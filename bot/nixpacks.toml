@@ -1,0 +1,10 @@
+# Config Nixpacks para Railway — roda direto o index.js.
+# Não usamos PM2 aqui porque o Railway já reinicia o container em caso de crash.
+[phases.setup]
+nixPkgs = ["nodejs_20"]
+
+[phases.install]
+cmds = ["npm install --omit=dev"]
+
+[start]
+cmd = "node index.js"
