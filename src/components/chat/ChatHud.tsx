@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { stats } from "@/lib/game";
-import { levelProgress, DEFAULT_LEVEL_CONFIG } from "@/lib/level";
 import { ImageUpload } from "@/components/ImageUpload";
 import { updateCharacter } from "@/lib/character.functions";
 import { useServerFn } from "@tanstack/react-start";
@@ -55,30 +54,6 @@ export function ChatHud({ characterId, variant = "floating" }: { characterId: st
   const efCur = c.ef_current == null ? s.ef : Math.min(s.ef, c.ef_current);
   const emCur = c.em_current == null ? s.em : Math.min(s.em, c.em_current);
   const ckCur = c.chakra_current == null ? s.chakra : Math.min(s.chakra, c.chakra_current);
-  const lvl = levelProgress(c.xp, DEFAULT_LEVEL_CONFIG);
-
-  const avatarWithBadge = (size: "sm" | "md" | "lg") => {
-    const dim = size === "sm" ? "h-8 w-8" : size === "md" ? "h-9 w-9" : "h-12 w-12";
-    const badge = size === "lg" ? "text-[10px] px-1.5 py-0.5" : "text-[9px] px-1 py-[1px]";
-    return (
-      <div className={`relative ${dim} shrink-0`}>
-        <div className={`${dim} rounded-full overflow-hidden ring-1 ring-gold/40 bg-secondary`}>
-          {c.eyes_frame_url ? (
-            <img src={c.eyes_frame_url} alt="" className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <ImagePlus className="w-3 h-3 text-muted-foreground" />
-            </div>
-          )}
-        </div>
-        <div
-          className={`absolute -bottom-0.5 -left-0.5 ${badge} rounded-full font-black tabular-nums text-black bg-gradient-to-b from-gold to-amber-500 ring-1 ring-black/60 shadow leading-none`}
-        >
-          {lvl.level}
-        </div>
-      </div>
-    );
-  };
 
   if (variant === "mobile-bar") {
     return (
@@ -88,10 +63,17 @@ export function ChatHud({ characterId, variant = "floating" }: { characterId: st
           onClick={() => setOpen((o) => !o)}
           className="w-full flex items-center gap-2 px-3 py-1.5"
         >
-          {avatarWithBadge("sm")}
+          <div className="relative h-8 w-8 shrink-0 rounded-full overflow-hidden ring-1 ring-gold/40 bg-secondary">
+            {c.eyes_frame_url ? (
+              <img src={c.eyes_frame_url} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <ImagePlus className="w-3 h-3 text-muted-foreground" />
+              </div>
+            )}
+          </div>
           <div className="flex-1 min-w-0 flex flex-col gap-1">
             <MiniBar cur={hpCur} max={hpMax} from="#10b981" to="#34d399" />
-            <MiniBar cur={lvl.into} max={lvl.span} from="#f59e0b" to="#fbbf24" tiny />
           </div>
           <ChevronDown
             size={14}
@@ -123,7 +105,6 @@ export function ChatHud({ characterId, variant = "floating" }: { characterId: st
             <Bar label="EF" cur={efCur} max={s.ef} from="#ef4444" to="#f87171" />
             <Bar label="EM" cur={emCur} max={s.em} from="#0ea5e9" to="#38bdf8" />
             <Bar label="CK" cur={ckCur} max={s.chakra} from="#f59e0b" to="#fbbf24" />
-            <Bar label="EXP" cur={lvl.into} max={lvl.span} from="#eab308" to="#fde047" suffix={`  ${lvl.pct.toFixed(0)}%`} />
           </div>
         </div>
       </div>
@@ -142,7 +123,15 @@ export function ChatHud({ characterId, variant = "floating" }: { characterId: st
           onClick={() => setOpen((o) => !o)}
           className="group flex items-center gap-2 rounded-full border border-white/10 bg-black/55 backdrop-blur-xl pl-1 pr-3 py-1 shadow-[0_6px_24px_-8px_rgba(0,0,0,0.7)] transition-all hover:border-gold/50"
         >
-          {avatarWithBadge("md")}
+          <div className="relative h-9 w-9 shrink-0 rounded-full overflow-hidden ring-1 ring-gold/40 bg-secondary">
+            {c.eyes_frame_url ? (
+              <img src={c.eyes_frame_url} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <ImagePlus className="w-3.5 h-3.5 text-muted-foreground" />
+              </div>
+            )}
+          </div>
           <MiniBar cur={hpCur} max={hpMax} from="#10b981" to="#34d399" />
           <ChevronDown
             size={14}
@@ -159,7 +148,15 @@ export function ChatHud({ characterId, variant = "floating" }: { characterId: st
           <div className="w-[260px] sm:w-[300px] rounded-2xl border border-white/10 bg-black/70 backdrop-blur-xl p-3 shadow-2xl">
             <div className="flex items-center gap-3 mb-3">
               <div className="relative">
-                {avatarWithBadge("lg")}
+                <div className="h-12 w-12 rounded-full overflow-hidden ring-2 ring-gold/50 bg-secondary">
+                  {c.eyes_frame_url ? (
+                    <img src={c.eyes_frame_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <ImagePlus className="w-4 h-4 text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
                 <div className="absolute -bottom-1 -right-1 scale-[0.7] origin-bottom-right">
                   <ImageUpload
                     label="+"
@@ -179,7 +176,6 @@ export function ChatHud({ characterId, variant = "floating" }: { characterId: st
               <div className="min-w-0 flex-1">
                 <div className="text-[10px] uppercase tracking-[0.2em] text-white/50">Shinobi</div>
                 <div className="font-display text-sm text-gold truncate">{c.nickname}</div>
-                <div className="text-[10px] text-white/50 tabular-nums">Nv. {lvl.level} · {lvl.pct.toFixed(0)}%</div>
               </div>
             </div>
 
@@ -188,7 +184,6 @@ export function ChatHud({ characterId, variant = "floating" }: { characterId: st
               <Bar label="EF" cur={efCur} max={s.ef} from="#ef4444" to="#f87171" />
               <Bar label="EM" cur={emCur} max={s.em} from="#0ea5e9" to="#38bdf8" />
               <Bar label="CK" cur={ckCur} max={s.chakra} from="#f59e0b" to="#fbbf24" />
-              <Bar label="EXP" cur={lvl.into} max={lvl.span} from="#eab308" to="#fde047" />
             </div>
           </div>
         </div>
@@ -197,13 +192,13 @@ export function ChatHud({ characterId, variant = "floating" }: { characterId: st
   );
 }
 
-function Bar({ label, cur, max, from, to, suffix }: { label: string; cur: number; max: number; from: string; to: string; suffix?: string }) {
+function Bar({ label, cur, max, from, to }: { label: string; cur: number; max: number; from: string; to: string }) {
   const pct = max > 0 ? Math.max(0, Math.min(100, (cur / max) * 100)) : 0;
   return (
     <div>
       <div className="flex justify-between text-[10px] leading-none mb-1">
         <span className="font-semibold tracking-[0.15em] text-white/80">{label}</span>
-        <span className="tabular-nums text-white/50">{cur.toLocaleString("pt-BR")} / {max.toLocaleString("pt-BR")}{suffix ?? ""}</span>
+        <span className="tabular-nums text-white/50">{cur.toLocaleString("pt-BR")} / {max.toLocaleString("pt-BR")}</span>
       </div>
       <div className="h-1.5 rounded-full overflow-hidden bg-white/5">
         <div
@@ -215,16 +210,14 @@ function Bar({ label, cur, max, from, to, suffix }: { label: string; cur: number
   );
 }
 
-function MiniBar({ cur, max, from, to, tiny }: { cur: number; max: number; from: string; to: string; tiny?: boolean }) {
+function MiniBar({ cur, max, from, to }: { cur: number; max: number; from: string; to: string }) {
   const pct = max > 0 ? Math.max(0, Math.min(100, (cur / max) * 100)) : 0;
   return (
     <div className="flex flex-col items-start gap-0.5 min-w-[70px] sm:min-w-[90px]">
-      {!tiny && (
-        <span className="text-[9px] tabular-nums text-white/70 leading-none">
-          {cur.toLocaleString("pt-BR")} / {max.toLocaleString("pt-BR")}
-        </span>
-      )}
-      <div className={`${tiny ? "h-1" : "h-1.5"} w-full rounded-full overflow-hidden bg-white/10`}>
+      <span className="text-[9px] tabular-nums text-white/70 leading-none">
+        {cur.toLocaleString("pt-BR")} / {max.toLocaleString("pt-BR")}
+      </span>
+      <div className="h-1.5 w-full rounded-full overflow-hidden bg-white/10">
         <div
           className="h-full rounded-full transition-all"
           style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${from}, ${to})` }}
