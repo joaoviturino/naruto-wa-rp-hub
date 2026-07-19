@@ -538,6 +538,7 @@ export type Database = {
         Row: {
           age: number | null
           appearance: string | null
+          archetype: string | null
           avatar_url: string | null
           banner_url: string | null
           bio: string | null
@@ -550,6 +551,7 @@ export type Database = {
           element_primary: Database["public"]["Enums"]["element"]
           em_current: number | null
           eyes_frame_url: string | null
+          flaws: string[]
           history: string | null
           hp_current: number | null
           id: string
@@ -560,6 +562,7 @@ export type Database = {
           personality: string | null
           phone_e164: string
           proficiencies: Json
+          qualities: string[]
           rank: Database["public"]["Enums"]["ninja_rank"]
           ryo: number
           updated_at: string
@@ -570,6 +573,7 @@ export type Database = {
         Insert: {
           age?: number | null
           appearance?: string | null
+          archetype?: string | null
           avatar_url?: string | null
           banner_url?: string | null
           bio?: string | null
@@ -582,6 +586,7 @@ export type Database = {
           element_primary: Database["public"]["Enums"]["element"]
           em_current?: number | null
           eyes_frame_url?: string | null
+          flaws?: string[]
           history?: string | null
           hp_current?: number | null
           id?: string
@@ -592,6 +597,7 @@ export type Database = {
           personality?: string | null
           phone_e164: string
           proficiencies?: Json
+          qualities?: string[]
           rank?: Database["public"]["Enums"]["ninja_rank"]
           ryo?: number
           updated_at?: string
@@ -602,6 +608,7 @@ export type Database = {
         Update: {
           age?: number | null
           appearance?: string | null
+          archetype?: string | null
           avatar_url?: string | null
           banner_url?: string | null
           bio?: string | null
@@ -614,6 +621,7 @@ export type Database = {
           element_primary?: Database["public"]["Enums"]["element"]
           em_current?: number | null
           eyes_frame_url?: string | null
+          flaws?: string[]
           history?: string | null
           hp_current?: number | null
           id?: string
@@ -624,6 +632,7 @@ export type Database = {
           personality?: string | null
           phone_e164?: string
           proficiencies?: Json
+          qualities?: string[]
           rank?: Database["public"]["Enums"]["ninja_rank"]
           ryo?: number
           updated_at?: string
