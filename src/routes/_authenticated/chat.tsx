@@ -381,6 +381,8 @@ function ChatPage() {
 
       {currentLoc && <NpcInteractPanel locationId={currentLoc.id} />}
 
+      {currentLoc && <NpcAiChat locationId={currentLoc.id} />}
+
       {currentLoc && hasLibraryHere && (
         <Link to="/library" search={{ location: currentLoc.id }}>
           <Button size="sm" variant="outline" className="w-full justify-start">
