@@ -66,6 +66,26 @@ const miningConfigSchema = z.object({
   })).default([]),
 }).default({ node_hp: 4, swing_cooldown_ms: 500, min_break_interval_ms: 800, xp_per_break: 1, required_items: [], drops: [] });
 
+const kenjutsuConfigSchema = z.object({
+  duration_seconds: z.number().int().min(15).max(600).default(60),
+  target_score: z.number().int().min(1).max(500).default(20),
+  max_missed: z.number().int().min(0).max(50).default(5),
+  spawn_interval_ms: z.number().int().min(200).max(5000).default(1000),
+  spawn_jitter_ms: z.number().int().min(0).max(3000).default(500),
+  min_slice_speed: z.number().min(1).max(60).default(12),
+  difficulty: z.number().int().min(1).max(5).default(2),
+  gravity: z.number().min(0.05).max(2).default(0.35),
+  bomb_chance: z.number().min(0).max(60).default(15),
+  log_image_url: z.string().nullish(),
+  bomb_image_url: z.string().nullish(),
+  slice_sound_url: z.string().nullish(),
+  bomb_sound_url: z.string().nullish(),
+}).default({
+  duration_seconds: 60, target_score: 20, max_missed: 5,
+  spawn_interval_ms: 1000, spawn_jitter_ms: 500, min_slice_speed: 12,
+  difficulty: 2, gravity: 0.35, bomb_chance: 15,
+});
+
 const configSchema = z.any();
 
 const ninjaRank = z.enum(["estudante","genin","chunin","tokubetsu_jonin","jonin","anbu","sannin","kage"]);
@@ -80,7 +100,7 @@ const rewardSkillsSchema = z.array(z.object({ skill_id: z.string().uuid() })).de
 const upsertSchema = z.object({
   id: z.string().uuid().optional(),
   slug: z.string().trim().min(2).max(40).regex(/^[a-z0-9_-]+$/, "slug inválido"),
-  kind: z.enum(["cleanup", "sequence", "forge", "tailoring", "mining", "logging"]).default("cleanup"),
+  kind: z.enum(["cleanup", "sequence", "forge", "tailoring", "mining", "logging", "kenjutsu"]).default("cleanup"),
   name: z.string().min(2).max(80),
   description: z.string().max(2000).nullish(),
   background_url: z.string().nullish(),
@@ -106,6 +126,7 @@ const upsertSchema = z.object({
     data.kind === "tailoring" ? tailoringConfigSchema :
     data.kind === "mining" ? miningConfigSchema :
     data.kind === "logging" ? miningConfigSchema :
+    data.kind === "kenjutsu" ? kenjutsuConfigSchema :
     cleanupConfigSchema;
   const r = parser.safeParse(data.config);
   if (!r.success) {

@@ -16,6 +16,7 @@ import { ForgeGame } from "@/components/minigame/ForgeGame";
 import { TailoringGame } from "@/components/minigame/TailoringGame";
 import { MiningGame } from "@/components/minigame/MiningGame";
 import { LoggingGame } from "@/components/minigame/LoggingGame";
+import { KenjutsuGame } from "@/components/minigame/KenjutsuGame";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ComboSelect } from "@/components/ui/combo-select";
@@ -145,6 +146,8 @@ export function MinigameManager() {
                       ? { duration_seconds: 90, difficulty: 2, hammer_hits: 8, heat_target: 70, temper_target: 40, recipe_item_id: "", source: "inventory" }
                       : (kind === "mining" || kind === "logging")
                       ? { node_hp: 4, swing_cooldown_ms: 500, min_break_interval_ms: 800, xp_per_break: 1, required_items: [], drops: [] }
+                      : kind === "kenjutsu"
+                      ? { duration_seconds: 60, target_score: 20, max_missed: 5, spawn_interval_ms: 1000, spawn_jitter_ms: 500, min_slice_speed: 12, difficulty: 2, gravity: 0.35, bomb_chance: 15 }
                       : { duration_seconds: 60, spots: 12, target_score: 8 };
                     setSelected({ ...selected, kind, config });
                   }}
@@ -155,6 +158,7 @@ export function MinigameManager() {
                     { value: "tailoring", label: "Confecção (costura)" },
                     { value: "mining", label: "Mineração (idle)" },
                     { value: "logging", label: "Coleta de Madeira (idle)" },
+                    { value: "kenjutsu", label: "Kenjutsu (corte)" },
                   ]}
                 />
               </div>
@@ -280,6 +284,8 @@ export function MinigameManager() {
             <ForgeConfigEditor selected={selected} setSelected={setSelected} items={items} kind={selected.kind} />
           ) : (selected.kind === "mining" || selected.kind === "logging") ? (
             <MiningConfigEditor selected={selected} setSelected={setSelected} items={items} />
+          ) : selected.kind === "kenjutsu" ? (
+            <KenjutsuConfigEditor selected={selected} setSelected={setSelected} />
           ) : (
             <div className="scroll-panel rounded-lg p-4 space-y-3">
               <h4 className="font-display text-lg text-gold">Configuração da limpeza</h4>
@@ -438,6 +444,8 @@ export function MinigameManager() {
                 })()}
                 onFinish={(r) => setTestResult(r)}
               />
+            ) : selected.kind === "kenjutsu" ? (
+              <KenjutsuGame background={selected.background_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
             ) : (
               <CleanupGame background={selected.background_url} tileset={selected.tileset_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
             )}
@@ -794,5 +802,65 @@ function JobPicker({ value, onChange }: { value: string | null; onChange: (v: st
       <option value="">— nenhum —</option>
       {jobs.map((j) => <option key={j.id} value={j.id}>{j.name}{j.active ? "" : " (inativo)"}</option>)}
     </select>
+  );
+}
+
+function KenjutsuConfigEditor({ selected, setSelected }: { selected: any; setSelected: (s: any) => void }) {
+  const cfg = selected.config ?? {};
+  function up(patch: any) { setSelected({ ...selected, config: { ...cfg, ...patch } }); }
+  async function upload(field: "log_image_url" | "bomb_image_url" | "slice_sound_url" | "bomb_sound_url", file: File) {
+    if (file.size > 10 * 1024 * 1024) return toast.error("Máx 10MB.");
+    const ext = file.name.split(".").pop() ?? "bin";
+    const path = `${selected.slug || "kenjutsu"}/${field}-${Date.now()}.${ext}`;
+    const up2 = await supabase.storage.from("minigames").upload(path, file, { upsert: true, contentType: file.type });
+    if (up2.error) return toast.error(up2.error.message);
+    const signed = await supabase.storage.from("minigames").createSignedUrl(path, 60 * 60 * 24 * 365);
+    if (signed.data?.signedUrl) up({ [field]: signed.data.signedUrl });
+  }
+  return (
+    <div className="scroll-panel rounded-lg p-4 space-y-3">
+      <h4 className="font-display text-lg text-gold">Configuração do Kenjutsu</h4>
+      <p className="text-xs text-muted-foreground">
+        Estilo Fruit Ninja: arraste rápido para cortar as toras. Se não configurar sons, o jogo usa efeitos sintéticos internos.
+      </p>
+      <div className="grid gap-3 md:grid-cols-3">
+        <div><Label>Duração (s)</Label><Input type="number" min={15} max={600} value={cfg.duration_seconds ?? 60} onChange={(e) => up({ duration_seconds: Number(e.target.value) })} /></div>
+        <div><Label>Alvo (cortes)</Label><Input type="number" min={1} max={500} value={cfg.target_score ?? 20} onChange={(e) => up({ target_score: Number(e.target.value) })} /></div>
+        <div><Label>Erros permitidos</Label><Input type="number" min={0} max={50} value={cfg.max_missed ?? 5} onChange={(e) => up({ max_missed: Number(e.target.value) })} /></div>
+        <div><Label>Dificuldade (1-5)</Label><Input type="number" min={1} max={5} value={cfg.difficulty ?? 2} onChange={(e) => up({ difficulty: Number(e.target.value) })} /></div>
+        <div><Label>Spawn (ms)</Label><Input type="number" min={200} max={5000} value={cfg.spawn_interval_ms ?? 1000} onChange={(e) => up({ spawn_interval_ms: Number(e.target.value) })} /></div>
+        <div><Label>Jitter spawn (ms)</Label><Input type="number" min={0} max={3000} value={cfg.spawn_jitter_ms ?? 500} onChange={(e) => up({ spawn_jitter_ms: Number(e.target.value) })} /></div>
+        <div><Label>Velocidade mín. do corte</Label><Input type="number" min={1} max={60} value={cfg.min_slice_speed ?? 12} onChange={(e) => up({ min_slice_speed: Number(e.target.value) })} /></div>
+        <div><Label>Gravidade</Label><Input type="number" step="0.05" min={0.05} max={2} value={cfg.gravity ?? 0.35} onChange={(e) => up({ gravity: Number(e.target.value) })} /></div>
+        <div><Label>Chance de bomba (%)</Label><Input type="number" min={0} max={60} value={cfg.bomb_chance ?? 15} onChange={(e) => up({ bomb_chance: Number(e.target.value) })} /></div>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2 pt-2">
+        {([
+          ["log_image_url", "Sprite da tora (PNG opcional)", "image/*"],
+          ["bomb_image_url", "Sprite da bomba (PNG opcional)", "image/*"],
+          ["slice_sound_url", "Som de corte (mp3/ogg opcional)", "audio/*"],
+          ["bomb_sound_url", "Som de explosão (mp3/ogg opcional)", "audio/*"],
+        ] as const).map(([k, label, accept]) => (
+          <div key={k} className="rounded border border-border p-2 space-y-1">
+            <Label className="text-xs">{label}</Label>
+            {cfg[k] ? (
+              <div className="text-[10px] text-muted-foreground truncate">{cfg[k]}</div>
+            ) : (
+              <div className="text-[10px] text-muted-foreground italic">Usando padrão sintético.</div>
+            )}
+            <div className="flex gap-2">
+              <label className="cursor-pointer inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-secondary hover:bg-secondary/70">
+                <Upload size={12} /> Enviar
+                <input type="file" accept={accept} className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(k as any, f); if (e.target) e.target.value = ""; }} />
+              </label>
+              {cfg[k] && (
+                <Button size="sm" variant="ghost" onClick={() => up({ [k]: null })}><Trash2 size={12} /></Button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
