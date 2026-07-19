@@ -471,18 +471,25 @@ function ChatPage() {
             <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3">
               {messages.length === 0 && <div className="text-center text-xs text-muted-foreground py-10">Silêncio. Seja o primeiro a agir.</div>}
               {messages.map((m) => {
-                const mine = m.character_id === character.id;
+                const mine = !!m.character_id && m.character_id === character.id;
+                const isNpc = !!m.npc_id;
+                const displayName = isNpc ? (m.npc?.name ?? "NPC") : (m.character?.nickname ?? "?");
+                const avatarUrl = isNpc ? m.npc?.image_url : m.character?.avatar_url;
                 return (
                   <div key={m.id} className={`flex gap-2 ${mine ? "flex-row-reverse" : ""}`}>
                     <button
-                      className="w-8 h-8 rounded-full bg-secondary overflow-hidden shrink-0 hover:ring-2 hover:ring-gold transition"
-                      title={mine ? "Você" : `Interagir com ${m.character?.nickname ?? ""}`}
-                      disabled={mine}
-                      onClick={() => { if (mine) return; setTarget({ id: m.character_id, nickname: m.character?.nickname ?? "?", avatar_url: m.character?.avatar_url ?? null }); setTargetOpen(true); }}>
-                      {m.character?.avatar_url && <img src={m.character.avatar_url} className="w-full h-full object-cover" alt="" />}
+                      className={`w-8 h-8 rounded-full bg-secondary overflow-hidden shrink-0 transition ${isNpc ? "ring-2 ring-emerald-500/60" : "hover:ring-2 hover:ring-gold"}`}
+                      title={mine ? "Você" : (isNpc ? `NPC: ${displayName}` : `Interagir com ${displayName}`)}
+                      disabled={mine || isNpc}
+                      onClick={() => {
+                        if (mine || isNpc || !m.character_id) return;
+                        setTarget({ id: m.character_id, nickname: m.character?.nickname ?? "?", avatar_url: m.character?.avatar_url ?? null });
+                        setTargetOpen(true);
+                      }}>
+                      {avatarUrl && <img src={avatarUrl} className="w-full h-full object-cover" alt="" />}
                     </button>
-                    <div className={`group max-w-[75%] rounded-lg p-2 ${mine ? "bg-primary text-primary-foreground" : "bg-secondary"} ${m.is_pinned ? "ring-2 ring-gold" : ""}`}>
-                      <div className={`text-[10px] font-display ${mine ? "text-primary-foreground/70" : "text-gold"}`}>{m.character?.nickname ?? "?"}</div>
+                    <div className={`group max-w-[75%] rounded-lg p-2 ${mine ? "bg-primary text-primary-foreground" : isNpc ? "bg-emerald-950/40 border border-emerald-500/30" : "bg-secondary"} ${m.is_pinned ? "ring-2 ring-gold" : ""}`}>
+                      <div className={`text-[10px] font-display ${mine ? "text-primary-foreground/70" : isNpc ? "text-emerald-300" : "text-gold"}`}>{displayName}{isNpc && " · NPC"}</div>
                       {m.image_url && <img src={m.image_url} className="mt-1 rounded max-h-64 object-cover" alt="" />}
                       {m.content && <div className="whitespace-pre-wrap text-sm mt-1">{m.content}</div>}
                       <div className={`text-[10px] mt-1 flex items-center gap-2 ${mine ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
