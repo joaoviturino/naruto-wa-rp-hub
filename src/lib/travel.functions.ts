@@ -153,10 +153,13 @@ export const completeTravel = createServerFn({ method: "POST" })
     // Anuncia a chegada no chat local do destino (via admin p/ contornar RLS de timing).
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: c } = await supabaseAdmin
+        .from("characters").select("nickname").eq("id", char.id).maybeSingle();
+      const nick = (c as any)?.nickname ?? "Alguém";
       await supabaseAdmin.from("location_messages").insert({
         location_id: (t as any).to_location_id,
         character_id: char.id,
-        content: "*chegou ao local.*",
+        content: `❕️ ${nick} chegou aqui.`,
       });
     } catch (e) {
       console.error("[travel] falha ao anunciar chegada", e);
