@@ -462,7 +462,7 @@ function ChatPage() {
                 <div className="text-[10px] uppercase tracking-widest text-gold flex items-center gap-1"><Pin size={11} /> Marcadas ({pinned.length})</div>
                 {pinned.map((m) => (
                   <div key={m.id} className="text-xs flex items-start gap-2 rounded p-1 hover:bg-secondary/50">
-                    <span className="text-gold font-display shrink-0">{m.character?.nickname ?? "?"}:</span>
+                    <span className={`font-display shrink-0 ${m.npc_id ? "text-emerald-300" : "text-gold"}`}>{m.npc_id ? (m.npc?.name ?? "NPC") : (m.character?.nickname ?? "?")}:</span>
                     <span className="truncate flex-1">{m.content || (m.image_url ? "[imagem]" : "")}</span>
                   </div>
                 ))}
