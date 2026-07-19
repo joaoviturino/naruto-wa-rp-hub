@@ -445,6 +445,34 @@ function GrantPicker({ placeholder, options, onPick }: { placeholder: string; op
   );
 }
 
+function ChipList({ label, list, onChange, placeholder }: { label: string; list: string[]; onChange: (v: string[]) => void; placeholder: string }) {
+  const [v, setV] = useState("");
+  return (
+    <div>
+      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <div className="mt-1 flex flex-wrap gap-1.5">
+        {list.map((item, i) => (
+          <span key={i} className="inline-flex items-center gap-1 rounded-full bg-input/60 border border-border px-2 py-0.5 text-xs">
+            {item}
+            <button type="button" onClick={() => onChange(list.filter((_, j) => j !== i))} className="opacity-60 hover:opacity-100">
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        ))}
+        <input
+          value={v}
+          onChange={(e) => setV(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && v.trim()) { e.preventDefault(); onChange([...list, v.trim()]); setV(""); }
+          }}
+          placeholder={placeholder}
+          className="h-6 px-2 text-xs rounded-full bg-input/40 border border-dashed border-border focus:outline-none focus:border-gold w-32"
+        />
+      </div>
+    </div>
+  );
+}
+
 function LetterRankSelect({ label, value, onChange }: { label: string; value: string | null; onChange: (v: string | null) => void }) {
   return (
     <div>
