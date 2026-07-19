@@ -9,6 +9,7 @@ import { ForgeGame } from "./ForgeGame";
 import { TailoringGame } from "./TailoringGame";
 import { MiningGame } from "./MiningGame";
 import { LoggingGame } from "./LoggingGame";
+import { KenjutsuGame } from "./KenjutsuGame";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -282,6 +283,8 @@ export function MinigameDialog({
             ? <MiningGame runId={runId} background={minigame.background_url} config={minigame.config ?? {}} onExit={exitMining} />
             : minigame.kind === "logging" && runId
             ? <LoggingGame runId={runId} background={minigame.background_url} config={minigame.config ?? {}} onExit={exitMining} />
+            : minigame.kind === "kenjutsu"
+            ? <KenjutsuGame background={minigame.background_url} config={minigame.config ?? {}} onFinish={onFinish} />
             : <CleanupGame background={minigame.background_url} tileset={minigame.tileset_url} config={minigame.config ?? {}} onFinish={onFinish} />
           )
         )}
