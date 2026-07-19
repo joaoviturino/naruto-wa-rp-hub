@@ -3,14 +3,13 @@
 import {
   makeWASocket,
   DisconnectReason,
-  useMultiFileAuthState,
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
 } from "@whiskeysockets/baileys";
 import { Boom } from "@hapi/boom";
 import { createClient } from "@supabase/supabase-js";
-import { rm } from "node:fs/promises";
 import pino from "pino";
+import { useSupabaseAuthState } from "./supabaseAuthState.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -25,7 +24,6 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 
 const logger = pino({ level: process.env.LOG_LEVEL || "info" });
 const waLogger = pino({ level: "silent" }); // silencia o ruído do Baileys
-const AUTH_DIR = process.env.BOT_AUTH_DIR || "auth_state";
 const QR_REQUEST_PREFIX = "__REQUEST_QR__";
 let currentSock = null;
 let drainInterval = null;
@@ -33,6 +31,7 @@ let keepAliveInterval = null;
 let starting = false;
 let lastHandledQrRequest = "";
 let reconnectAttempts = 0;
+let currentAuth = null; // { state, saveCreds, clearAll }
 
 async function updateSession(fields) {
   await supabase.from("bot_sessions").upsert({ id: "default", updated_at: new Date().toISOString(), ...fields });
@@ -47,7 +46,9 @@ async function startBot() {
   if (starting) return;
   starting = true;
   try {
-    const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+    const auth = await useSupabaseAuthState(supabase, logger);
+    currentAuth = auth;
+    const { state, saveCreds } = auth;
     const { version } = await fetchLatestBaileysVersion();
     const sock = makeWASocket({
       version,
@@ -91,8 +92,8 @@ async function startBot() {
         await updateSession({ status: "disconnected", qr: null });
         logger.warn({ code, loggedOut }, "Conexão caiu");
         if (loggedOut) {
-          // Sessão inválida — limpa auth para gerar novo QR na próxima
-          try { await rm(AUTH_DIR, { recursive: true, force: true }); } catch {}
+          // Sessão inválida — limpa auth no banco para gerar novo QR
+          try { await auth.clearAll(); } catch {}
           if (currentSock === sock) setTimeout(() => startBot().catch(logger.error), 1500);
         } else if (currentSock === sock) {
           // Backoff exponencial limitado (max 30s) — reconecta sozinho
@@ -154,6 +155,7 @@ async function startBot() {
 
 async function restartForFreshQr() {
   const oldSock = currentSock;
+  const oldAuth = currentAuth;
   currentSock = null;
   if (drainInterval) clearInterval(drainInterval);
   drainInterval = null;
@@ -161,12 +163,12 @@ async function restartForFreshQr() {
   keepAliveInterval = null;
 
   // Não chama logout() — é lento (chamada de rede) e frequentemente falha.
-  // Basta encerrar o socket local e apagar o auth_state.
+  // Basta encerrar o socket local e limpar o auth no banco.
   try { oldSock?.ev?.removeAllListeners?.(); } catch {}
   try { oldSock?.ws?.close?.(); } catch {}
   try { oldSock?.end?.(undefined); } catch {}
 
-  await rm(AUTH_DIR, { recursive: true, force: true });
+  try { await oldAuth?.clearAll?.(); } catch {}
   await updateSession({ status: "connecting", qr: null, phone: null });
   reconnectAttempts = 0;
   // Reinicia imediatamente — QR aparece em ~2s
