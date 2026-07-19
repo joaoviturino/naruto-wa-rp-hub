@@ -788,6 +788,11 @@ export const playerAttack = createServerFn({ method: "POST" })
     // Reflete mudança no array (state.npc é referência, mas garantimos)
     state.npcs[targetIdx] = state.npc;
 
+    // Genjutsu — aplica efeitos de ilusão ao alvo (ainda que o dano tenha errado).
+    if ((skill as any).meta?.genjutsu) {
+      applyGenjutsu(state as any, state.npc.id, (skill as any).meta, log, activePlayer.nickname, state.npc.name);
+    }
+
     let status = sess.status as string;
     let ended_at: string | null = null;
 
@@ -822,6 +827,9 @@ export const playerAttack = createServerFn({ method: "POST" })
         }
       }
     }
+
+    // Fim do "round": decrementa cenário + debuffs de precisão.
+    tickStatusEndOfRound(state as any);
 
     // Persistir pools atuais em characters
     await persistPools(supabaseAdmin, state);
