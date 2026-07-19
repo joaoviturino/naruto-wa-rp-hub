@@ -38,7 +38,7 @@ export const generateTraits = createServerFn({ method: "POST" })
 
     const c: any = char;
     const prompt = [
-      `Personagem de RPG ninja (Naruto). Gere um Arquétipo, 4 Qualidades e 4 Defeitos coerentes.`,
+      `Personagem de RPG ninja (Naruto). Gere um Arquétipo psicológico, 4 Qualidades e 4 Defeitos coerentes com a psique do personagem.`,
       `Nome: ${c.nickname}`,
       `Vila: ${c.village}`,
       `Clã: ${c.clan?.name ?? "—"}`,
@@ -53,8 +53,10 @@ export const generateTraits = createServerFn({ method: "POST" })
     const system = [
       "Você é um mestre de RPG. Responda APENAS com JSON válido no formato:",
       `{"archetype": string, "qualities": string[4], "flaws": string[4]}`,
-      "Arquétipo em 2-4 palavras (ex: 'Protetor Silencioso').",
-      "Qualidades e Defeitos em 1-3 palavras cada, em português.",
+      "Arquétipo: escolha UM dos 12 arquétipos junguianos e formate como 'O Herói', 'O Cuidador', 'O Governante', 'O Cara Comum', 'O Explorador', 'O Rebelde', 'O Criador', 'O Mago', 'O Bobo da Corte', 'O Amante', 'O Inocente' ou 'O Sábio'. Escolha o que melhor traduz a psique do personagem — não use termos genéricos ou inventados.",
+      "Qualidades: 4 traços psicológicos POSITIVOS em UMA palavra cada, em português, no masculino/neutro (ex: 'Empático', 'Resiliente', 'Perspicaz', 'Leal', 'Introspectivo', 'Determinado').",
+      "Defeitos: 4 traços psicológicos NEGATIVOS em UMA palavra cada, em português (ex: 'Ingênuo', 'Impulsivo', 'Arrogante', 'Cético', 'Rancoroso', 'Ansioso'). Nada de habilidades físicas, poderes ou clichês de anime.",
+      "Traços devem ser coerentes com o arquétipo escolhido, mostrando luz e sombra do mesmo perfil psicológico.",
       "Nada além do JSON. Sem markdown, sem texto extra.",
     ].join(" ");
 
