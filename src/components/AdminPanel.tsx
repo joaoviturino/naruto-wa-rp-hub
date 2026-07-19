@@ -534,12 +534,12 @@ bash install.sh`}</pre>
           </div>
         )}
         <div className="mt-6 flex gap-2">
-          <Button onClick={async () => {
+          <Button disabled={asking || !botOnline} onClick={async () => {
             setAsking(true);
             try { await askQr({}); toast.success("QR solicitado. Aguarde aparecer aqui."); load(); }
             catch (err: any) { toast.error(err.message); }
             finally { setAsking(false); }
-          }} disabled={asking}>
+          }}>
             {asking ? "Solicitando..." : "Gerar QR agora"}
           </Button>
           <Button variant="outline" onClick={async () => { await reset({}); toast.success("Sessão resetada."); load(); }}>
