@@ -34,8 +34,25 @@ let reconnectAttempts = 0;
 let currentAuth = null; // { state, saveCreds, clearAll }
 
 async function updateSession(fields) {
-  await supabase.from("bot_sessions").upsert({ id: "default", updated_at: new Date().toISOString(), ...fields });
+  await supabase.from("bot_sessions").upsert({
+    id: "default",
+    updated_at: new Date().toISOString(),
+    last_seen_at: new Date().toISOString(),
+    ...fields,
+  });
 }
+
+async function heartbeat() {
+  try {
+    await supabase.from("bot_sessions").update({ last_seen_at: new Date().toISOString() }).eq("id", "default");
+  } catch (err) {
+    logger.warn({ err: String(err) }, "heartbeat falhou");
+  }
+}
+
+// Heartbeat a cada 10s — o painel usa isso para saber se o bot está vivo.
+setInterval(heartbeat, 10_000);
+heartbeat();
 
 function jidFromPhone(phone) {
   const digits = String(phone).replace(/[^\d]/g, "");
