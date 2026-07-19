@@ -177,7 +177,7 @@ function ChatPage() {
   async function loadMessages(locId: string) {
     const { data } = await supabase
       .from("location_messages")
-      .select("id,content,image_url,created_at,character_id,is_pinned,character:characters(nickname,avatar_url)")
+      .select("id,content,image_url,created_at,character_id,npc_id,is_pinned,character:characters(nickname,avatar_url),npc:npcs(name,image_url)")
       .eq("location_id", locId)
       .order("created_at", { ascending: false })
       .limit(HISTORY_LIMIT);
@@ -193,8 +193,15 @@ function ChatPage() {
         { event: "INSERT", schema: "public", table: "location_messages", filter: `location_id=eq.${currentLoc.id}` },
         async (payload) => {
           const raw = payload.new as any;
-          const { data: c } = await supabase.from("characters").select("nickname,avatar_url").eq("id", raw.character_id).maybeSingle();
-          setMessages((prev) => (prev.some((m) => m.id === raw.id) ? prev : [...prev, { ...raw, character: c } as Msg]));
+          let character: any = null; let npc: any = null;
+          if (raw.npc_id) {
+            const { data: n } = await supabase.from("npcs").select("name,image_url").eq("id", raw.npc_id).maybeSingle();
+            npc = n;
+          } else if (raw.character_id) {
+            const { data: c } = await supabase.from("characters").select("nickname,avatar_url").eq("id", raw.character_id).maybeSingle();
+            character = c;
+          }
+          setMessages((prev) => (prev.some((m) => m.id === raw.id) ? prev : [...prev, { ...raw, character, npc } as Msg]));
           setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
         })
       .on("postgres_changes",
