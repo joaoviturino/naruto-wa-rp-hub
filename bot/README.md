@@ -8,8 +8,11 @@ e sockets persistentes (VPS, Railway, Fly.io, Render worker, etc.).
 
 1. Conecta ao WhatsApp via QR code (aparece no painel admin da web).
 2. Salva o status da sessão no banco (tabela `bot_sessions`).
-3. A cada 3s lê a fila `outbound_messages` (status = `pending`) e envia via WhatsApp.
-4. Recebe mensagens dos jogadores (base pronta para você plugar comandos do RPG).
+3. **Persiste as credenciais da sessão no banco** (tabela `bot_auth_state`) —
+   se o VPS reiniciar, redeploy acontecer ou o PM2 religar o processo, o bot
+   volta **já conectado**, sem precisar escanear QR de novo.
+4. A cada 3s lê a fila `outbound_messages` (status = `pending`) e envia via WhatsApp.
+5. Recebe mensagens dos jogadores (base pronta para você plugar comandos do RPG).
 
 ## Rodar localmente
 
@@ -27,7 +30,8 @@ npm start
 
 A primeira execução mostra um **QR code no terminal** e também publica o QR no banco. Abra o painel Admin → aba WhatsApp para escanear no celular.
 
-A sessão fica salva em `bot/auth_state/` — não commite essa pasta.
+A sessão fica salva no **Lovable Cloud** (tabela `bot_auth_state`). Não usa mais
+a pasta `bot/auth_state/`; pode apagar caso ainda exista de instalações antigas.
 
 ## Rodar 24/7 com PM2 (recomendado)
 
