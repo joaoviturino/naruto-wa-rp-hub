@@ -1389,9 +1389,30 @@ async function handlePvpAttack(
       pvp_actor_side: mySide, pvp_actor_idx: state.active_idx,
       pvp_target_side: enemySide, pvp_target_idx: tIdx,
     } as any);
+    if ((skill as any).meta?.genjutsu) {
+      applyGenjutsu(state as any, target.character_id, (skill as any).meta, log, activePlayer.nickname, target.nickname);
+    }
   }
 
-  const step = pvpAdvanceTurn(state);
+  let step = pvpAdvanceTurn(state);
+  // Paralisia por genjutsu — se o próximo a agir estiver paralisado, consome o turno.
+  for (let guard = 0; guard < 6 && !step.finished; guard++) {
+    const active = pvpSide(state, state.active_side)[state.active_idx];
+    const st = active ? ((state as any)._status?.[active.character_id] as StatusEntry | undefined) : undefined;
+    if (!active || !st || (st.paralyze_turns ?? 0) <= 0) break;
+    st.paralyze_turns = (st.paralyze_turns ?? 1) - 1;
+    if ((st.paralyze_turns ?? 0) <= 0) delete st.paralyze_turns;
+    log.push({
+      seq: log.length + 1, actor: "player", actor_name: active.nickname, target_name: active.nickname,
+      skill_name: "Genjutsu", energy_type: "chakra", energy_used: 0,
+      effective: 0, damage: 0, speed: 0, crit_mul: 1,
+      msg: `${active.nickname} está paralisado pelo genjutsu e perde o turno!`,
+      pvp_actor_side: state.active_side, pvp_actor_idx: state.active_idx,
+      pvp_target_side: state.active_side, pvp_target_idx: state.active_idx,
+    } as any);
+    step = pvpAdvanceTurn(state);
+  }
+  tickStatusEndOfRound(state as any);
   if (step.finished) {
     await finalizePvp(supabaseAdmin, sess.id, state, step.winnerSide ?? mySide);
     return { ok: true, status: "finished" };
