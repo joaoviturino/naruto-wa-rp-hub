@@ -788,6 +788,77 @@ export function NpcManager() {
             </div>
           </TabsContent>
           )}
+          <TabsContent value="ia" className="space-y-4 mt-0">
+            <div className="scroll-panel rounded-lg p-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h4 className="font-display text-lg text-gold flex items-center gap-2"><MessageCircle size={16} /> IA de roleplay</h4>
+                  <p className="text-xs text-muted-foreground">Quando ativa, o NPC responde no chat usando a persona abaixo (formato ❕️ ação / - fala).</p>
+                </div>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={!!sel.ai_enabled}
+                    onChange={async (e) => { await save({ data: { ...sel, ai_enabled: e.target.checked } } as any); load(); }}
+                  />
+                  Ativar IA
+                </label>
+              </div>
+              <div>
+                <Label>Modo de conversa</Label>
+                <ComboSelect
+                  value={sel.ai_mode ?? "both"}
+                  onChange={async (v) => { await save({ data: { ...sel, ai_mode: v as any } } as any); load(); }}
+                  options={[
+                    { value: "public", label: "Público (fala no chat do local)" },
+                    { value: "private", label: "Privado (só no popup 'Falar')" },
+                    { value: "both", label: "Ambos" },
+                  ]}
+                />
+              </div>
+              <div className="grid gap-3">
+                <div>
+                  <Label>Personalidade</Label>
+                  <Textarea rows={2} placeholder="Ex.: Rígido, sarcástico, orgulhoso, protetor com os alunos."
+                    defaultValue={sel.ai_personality ?? ""}
+                    onBlur={async (e) => { await save({ data: { ...sel, ai_personality: e.target.value || null } } as any); load(); }} />
+                </div>
+                <div>
+                  <Label>História / Background</Label>
+                  <Textarea rows={3} placeholder="Origem, clã, feitos importantes, cicatrizes emocionais…"
+                    defaultValue={sel.ai_background ?? ""}
+                    onBlur={async (e) => { await save({ data: { ...sel, ai_background: e.target.value || null } } as any); load(); }} />
+                </div>
+                <div>
+                  <Label>Objetivos e motivações</Label>
+                  <Textarea rows={2} placeholder="O que ele busca? O que o move? Quem odeia?"
+                    defaultValue={sel.ai_goals ?? ""}
+                    onBlur={async (e) => { await save({ data: { ...sel, ai_goals: e.target.value || null } } as any); load(); }} />
+                </div>
+                <div>
+                  <Label>Tom de fala</Label>
+                  <Input placeholder="Ex.: formal, curto, agressivo, doce…"
+                    defaultValue={sel.ai_tone ?? ""}
+                    onBlur={async (e) => { await save({ data: { ...sel, ai_tone: e.target.value || null } } as any); load(); }} />
+                </div>
+                <div>
+                  <Label>O que sabe / não sabe</Label>
+                  <Textarea rows={2} placeholder="Conhecimento do mundo, segredos que esconde, tópicos proibidos…"
+                    defaultValue={sel.ai_knowledge ?? ""}
+                    onBlur={async (e) => { await save({ data: { ...sel, ai_knowledge: e.target.value || null } } as any); load(); }} />
+                </div>
+                <div>
+                  <Label>Instruções extras (opcional)</Label>
+                  <Textarea rows={2} placeholder="Regras adicionais, gírias, quirks, coisas para nunca fazer…"
+                    defaultValue={sel.ai_extra ?? ""}
+                    onBlur={async (e) => { await save({ data: { ...sel, ai_extra: e.target.value || null } } as any); load(); }} />
+                </div>
+              </div>
+              <div className="rounded border border-emerald-500/30 bg-emerald-950/30 text-xs p-3 text-emerald-100/80">
+                <b>Formato de roleplay:</b> ❕️ para ação/narração, - para fala. A IA já é instruída a seguir esse padrão.
+              </div>
+            </div>
+          </TabsContent>
           </Tabs>
         </div>
       ) : (
