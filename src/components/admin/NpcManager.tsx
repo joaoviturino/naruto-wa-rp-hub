@@ -38,6 +38,14 @@ type Npc = {
   tutorial_blocks?: LearnBlock[];
   learning_min_read_seconds?: number;
   linked_minigame_id?: string | null;
+  ai_enabled?: boolean;
+  ai_mode?: "public" | "private" | "both";
+  ai_personality?: string | null;
+  ai_background?: string | null;
+  ai_goals?: string | null;
+  ai_tone?: string | null;
+  ai_knowledge?: string | null;
+  ai_extra?: string | null;
 };
 type Skill = { id: string; name: string; rank: string };
 type Item = { id: string; name: string; type: string };
