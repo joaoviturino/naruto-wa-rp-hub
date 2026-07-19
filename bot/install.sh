@@ -2,16 +2,18 @@
 # Instala o bot em modo 24/7 com PM2 (autorestart + boot da máquina)
 # Uso:
 #   cd bot
-#   export SUPABASE_URL="https://<projeto>.supabase.co"
-#   export SUPABASE_SERVICE_ROLE_KEY="<service-role>"
+#   export BOT_BRIDGE_URL="https://newerashinobirevolution.lovable.app"
+#   export BOT_WEBHOOK_SECRET="<mesmo-secret-do-Lovable>"
 #   bash install.sh
 
 set -euo pipefail
 
 cd "$(dirname "$0")"
 
-if [[ -z "${SUPABASE_URL:-}" || -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]]; then
-  echo "❌ Defina SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY antes de rodar."
+if [[ -z "${BOT_BRIDGE_URL:-}" || -z "${BOT_WEBHOOK_SECRET:-}" ]]; then
+  echo "❌ Defina BOT_BRIDGE_URL e BOT_WEBHOOK_SECRET antes de rodar."
+  echo "   BOT_BRIDGE_URL é a URL publicada do RPG (ex: https://newerashinobirevolution.lovable.app)"
+  echo "   BOT_WEBHOOK_SECRET deve ser o mesmo valor salvo em Lovable Secrets → BOT_WEBHOOK_SECRET."
   exit 1
 fi
 
@@ -21,8 +23,8 @@ npm install --no-audit --no-fund
 
 # 2) Persiste envs em .env (o pm2 herda do shell, mas o .env ajuda em reinícios manuais)
 cat > .env <<EOF
-SUPABASE_URL=${SUPABASE_URL}
-SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+BOT_BRIDGE_URL=${BOT_BRIDGE_URL}
+BOT_WEBHOOK_SECRET=${BOT_WEBHOOK_SECRET}
 EOF
 chmod 600 .env
 
@@ -50,7 +52,7 @@ if [[ "$(uname)" == "Linux" ]]; then
 fi
 
 echo ""
-echo "✅ Bot rodando 24/7 sob PM2."
+echo "✅ Bot rodando 24/7 sob PM2 no seu PC."
 echo "   Logs:      pm2 logs new-era-shinobi-bot"
 echo "   Status:    pm2 status"
 echo "   Restart:   pm2 restart new-era-shinobi-bot"

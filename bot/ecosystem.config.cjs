@@ -8,7 +8,7 @@ module.exports = {
       exec_mode: "fork",
       instances: 1,
       autorestart: true,
-      watch: ["index.js"],            // religa quando você edita o código
+      watch: ["index.js", "bridge-client.js", "supabaseAuthState.js"], // religa quando você edita o código
       ignore_watch: ["node_modules", "auth_state", "logs", ".env"],
       max_memory_restart: "512M",
       restart_delay: 2000,
