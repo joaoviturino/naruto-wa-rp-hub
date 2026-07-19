@@ -34,8 +34,9 @@ type Character = { id: string; nickname: string; avatar_url: string | null; curr
 type Scene = { id: string; image_url: string; label: string | null };
 type Msg = {
   id: string; content: string; image_url: string | null; created_at: string;
-  character_id: string; is_pinned?: boolean;
+  character_id: string | null; npc_id?: string | null; is_pinned?: boolean;
   character?: { nickname: string; avatar_url: string | null } | null;
+  npc?: { name: string; image_url: string | null } | null;
 };
 
 function ChatPage() {
