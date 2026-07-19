@@ -10,6 +10,7 @@ import { SceneImagesManager } from "@/components/SceneImagesManager";
 import { DailyMissionsPanel } from "@/components/DailyMissionsPanel";
 import { MissionHistoryPanel } from "@/components/MissionHistoryPanel";
 import { updateCharacter } from "@/lib/character.functions";
+import { generateTraits, saveTraits } from "@/lib/ai-traits.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { getLevelConfig } from "@/lib/level.functions";
@@ -18,6 +19,9 @@ import { listMyPoses, listMySkillPoses, setSkillPose } from "@/lib/pose.function
 import { MountsTab } from "@/components/MountsTab";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ComboSelect } from "@/components/ui/combo-select";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { X, Sparkles, Plus } from "lucide-react";
 
 type Character = {
   id: string; user_id: string; nickname: string; phone_e164: string;
@@ -26,6 +30,7 @@ type Character = {
   avatar_url: string | null; banner_url: string | null; inventory_bg_url: string | null;
   xp: number; ryo: number | null; hp_current: number | null;
   ef_current: number | null; em_current: number | null; chakra_current: number | null;
+  archetype: string | null; qualities: string[] | null; flaws: string[] | null;
   clan: { name: string; rarity: string; element_bonus: string | null } | null;
 };
 const VILLAGES_MAP = Object.fromEntries(VILLAGES.map((v) => [v.id, v]));
@@ -40,7 +45,7 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
   async function load() {
     const { data } = await supabase
       .from("characters")
-      .select("id,user_id,nickname,phone_e164,village,element_primary,age,appearance,personality,history,bio,avatar_url,banner_url,inventory_bg_url,xp,ryo,hp_current,ef_current,em_current,chakra_current,clan:clans(name,rarity,element_bonus)")
+      .select("id,user_id,nickname,phone_e164,village,element_primary,age,appearance,personality,history,bio,avatar_url,banner_url,inventory_bg_url,xp,ryo,hp_current,ef_current,em_current,chakra_current,archetype,qualities,flaws,clan:clans(name,rarity,element_bonus)")
       .eq("id", characterId).single();
     setChar(data as any);
   }
@@ -155,6 +160,7 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
             <FichaBlock title="Aparência" text={char.appearance} />
             <FichaBlock title="Personalidade" text={char.personality} />
             <FichaBlock title="História" text={char.history} />
+            <ArchetypeBlock char={char} onSaved={load} />
             <div className="text-xs text-muted-foreground break-words">Idade: {char.age ?? "—"} · WhatsApp: {char.phone_e164}</div>
           </div>
           <div className="mt-4"><DailyMissionsPanel characterId={characterId} /></div>
