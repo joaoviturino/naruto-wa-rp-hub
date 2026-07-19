@@ -419,32 +419,73 @@ function ChatPage() {
           <ChatHud characterId={character.id} variant="mobile-bar" />
         </div>
       )}
-      {/* Barra mobile */}
-      <div className="md:hidden sticky top-[54px] z-30 flex items-center gap-2 border-b border-border bg-card/95 backdrop-blur px-2 py-1.5">
+      {/* Faixa mobile — organização inspirada no HUD de referência: [Local] [Mapa] */}
+      <div className="md:hidden sticky top-[54px] z-30 border-b border-border bg-card/95 backdrop-blur px-2 py-2 space-y-2">
         <Sheet open={navOpen} onOpenChange={setNavOpen}>
-          <SheetTrigger asChild>
-            <Button variant="outline" size="icon" className="h-8 w-8"><Menu size={16} /></Button>
-          </SheetTrigger>
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 items-stretch">
+            {/* Card Local */}
+            <div className="min-w-0 rounded-lg border border-border bg-secondary/40 p-2 flex items-center gap-2">
+              <div className="w-9 h-9 rounded-md bg-secondary shrink-0 overflow-hidden ring-1 ring-border">
+                {currentLoc?.image_url
+                  ? <img src={currentLoc.image_url} className="w-full h-full object-cover" alt="" />
+                  : <div className="w-full h-full grid place-items-center"><MapPin size={14} className="text-muted-foreground" /></div>}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground leading-none">Local</div>
+                <div className="font-display text-sm text-gold truncate flex items-center gap-1 leading-tight">
+                  <span className="truncate">{currentLoc?.name ?? "— nenhum —"}</span>
+                  {currentLoc?.is_danger_zone && <Skull size={11} className="text-blood shrink-0" />}
+                </div>
+                <div className="text-[10px] text-muted-foreground flex items-center gap-1 leading-none mt-0.5">
+                  <Users size={10} /> {presentHere.length} no local
+                </div>
+              </div>
+            </div>
+            {/* Card Mapa (abre menu completo com minimapa e ações) */}
+            <SheetTrigger asChild>
+              <button
+                type="button"
+                className="relative w-16 rounded-lg border border-border bg-secondary/40 overflow-hidden grid place-items-center hover:border-gold/50 transition"
+                aria-label="Abrir mapa e ações"
+              >
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(234,179,8,0.15),transparent_60%)]" />
+                <Menu size={18} className="text-gold relative" />
+                <span className="absolute bottom-1 text-[9px] uppercase tracking-widest text-muted-foreground">Mapa</span>
+                {invites.length > 0 && (
+                  <span className="absolute top-1 right-1 text-[9px] bg-blood text-white rounded-full px-1">{invites.length}</span>
+                )}
+              </button>
+            </SheetTrigger>
+          </div>
+
+          {/* Chips de ação: Time + Duelo */}
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+            <Button asChild variant="outline" size="sm" className="h-7 px-2 shrink-0">
+              <Link to="/party">
+                <Users size={12} className="mr-1" />
+                <span>Time{partyMemberCount > 0 ? ` · ${partyMemberCount}` : ""}</span>
+              </Link>
+            </Button>
+            {currentLoc && availableMinigames.length > 0 && (
+              <SheetTrigger asChild>
+                <Button variant="outline" size="sm" className="h-7 px-2 shrink-0">
+                  <Gamepad2 size={12} className="mr-1 text-gold" /> Missões · {availableMinigames.length}
+                </Button>
+              </SheetTrigger>
+            )}
+            {currentLoc && hasLibraryHere && (
+              <Button asChild variant="outline" size="sm" className="h-7 px-2 shrink-0">
+                <Link to="/library" search={{ location: currentLoc.id }}>
+                  <BookOpen size={12} className="mr-1 text-gold" /> Biblioteca
+                </Link>
+              </Button>
+            )}
+          </div>
+
           <SheetContent side="left" className="w-[85vw] max-w-sm overflow-y-auto">
             <div className="pt-6">{sidebar}</div>
           </SheetContent>
         </Sheet>
-        <div className="min-w-0 flex-1">
-          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Local</div>
-          <div className="font-display text-sm text-gold truncate flex items-center gap-1">
-            <span className="truncate">{currentLoc?.name ?? "— nenhum —"}</span>
-            {currentLoc?.is_danger_zone && <Skull size={12} className="text-blood shrink-0" />}
-          </div>
-        </div>
-        <div className="shrink-0 text-[10px] text-muted-foreground flex items-center gap-1"><Users size={11} /> {presentHere.length}</div>
-        <Button asChild variant="outline" size="sm" className="h-8 px-2 shrink-0">
-          <Link to="/party">
-            <Users size={12} className="mr-1" />
-            <span className="hidden xs:inline">Time</span>
-            {partyMemberCount > 0 ? <span className="ml-0.5">{partyMemberCount}</span> : null}
-            {invites.length > 0 && <span className="ml-1 text-[10px] bg-blood text-white rounded-full px-1.5">{invites.length}</span>}
-          </Link>
-        </Button>
       </div>
 
       {/* Mapa lateral desktop */}
