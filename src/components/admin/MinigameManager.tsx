@@ -16,6 +16,7 @@ import { ForgeGame } from "@/components/minigame/ForgeGame";
 import { TailoringGame } from "@/components/minigame/TailoringGame";
 import { MiningGame } from "@/components/minigame/MiningGame";
 import { LoggingGame } from "@/components/minigame/LoggingGame";
+import { KenjutsuGame } from "@/components/minigame/KenjutsuGame";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ComboSelect } from "@/components/ui/combo-select";
@@ -145,6 +146,8 @@ export function MinigameManager() {
                       ? { duration_seconds: 90, difficulty: 2, hammer_hits: 8, heat_target: 70, temper_target: 40, recipe_item_id: "", source: "inventory" }
                       : (kind === "mining" || kind === "logging")
                       ? { node_hp: 4, swing_cooldown_ms: 500, min_break_interval_ms: 800, xp_per_break: 1, required_items: [], drops: [] }
+                      : kind === "kenjutsu"
+                      ? { duration_seconds: 60, target_score: 20, max_missed: 5, spawn_interval_ms: 1000, spawn_jitter_ms: 500, min_slice_speed: 12, difficulty: 2, gravity: 0.35, bomb_chance: 15 }
                       : { duration_seconds: 60, spots: 12, target_score: 8 };
                     setSelected({ ...selected, kind, config });
                   }}
@@ -155,6 +158,7 @@ export function MinigameManager() {
                     { value: "tailoring", label: "Confecção (costura)" },
                     { value: "mining", label: "Mineração (idle)" },
                     { value: "logging", label: "Coleta de Madeira (idle)" },
+                    { value: "kenjutsu", label: "Kenjutsu (corte)" },
                   ]}
                 />
               </div>
@@ -280,6 +284,8 @@ export function MinigameManager() {
             <ForgeConfigEditor selected={selected} setSelected={setSelected} items={items} kind={selected.kind} />
           ) : (selected.kind === "mining" || selected.kind === "logging") ? (
             <MiningConfigEditor selected={selected} setSelected={setSelected} items={items} />
+          ) : selected.kind === "kenjutsu" ? (
+            <KenjutsuConfigEditor selected={selected} setSelected={setSelected} />
           ) : (
             <div className="scroll-panel rounded-lg p-4 space-y-3">
               <h4 className="font-display text-lg text-gold">Configuração da limpeza</h4>
