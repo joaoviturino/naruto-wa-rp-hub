@@ -41,6 +41,27 @@ export type Database = {
         }
         Relationships: []
       }
+      bot_auth_state: {
+        Row: {
+          key: string
+          session_id: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          key: string
+          session_id?: string
+          updated_at?: string
+          value: Json
+        }
+        Update: {
+          key?: string
+          session_id?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
+      }
       bot_sessions: {
         Row: {
           id: string
