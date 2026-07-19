@@ -1,5 +1,5 @@
 // New Era Shinobi — WhatsApp bridge (Baileys da Itsuki)
-// Roda em VPS/Railway/Fly. Não é hospedado na web da Lovable.
+// Agora roda via ponte /api/public/bot-bridge, sem expor a service role key.
 import {
   makeWASocket,
   DisconnectReason,
@@ -7,20 +7,9 @@ import {
   makeCacheableSignalKeyStore,
 } from "@whiskeysockets/baileys";
 import { Boom } from "@hapi/boom";
-import { createClient } from "@supabase/supabase-js";
 import pino from "pino";
 import { useSupabaseAuthState } from "./supabaseAuthState.js";
-
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  console.error("Faltando SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY nas envs.");
-  process.exit(1);
-}
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false },
-});
+import { bridge } from "./bridge-client.js";
 
 const logger = pino({ level: process.env.LOG_LEVEL || "info" });
 const waLogger = pino({ level: "silent" }); // silencia o ruído do Baileys
@@ -34,17 +23,16 @@ let reconnectAttempts = 0;
 let currentAuth = null; // { state, saveCreds, clearAll }
 
 async function updateSession(fields) {
-  await supabase.from("bot_sessions").upsert({
-    id: "default",
-    updated_at: new Date().toISOString(),
-    last_seen_at: new Date().toISOString(),
+  await bridge.heartbeat({
+    status: "disconnected",
     ...fields,
+    last_seen_at: new Date().toISOString(),
   });
 }
 
 async function heartbeat() {
   try {
-    await supabase.from("bot_sessions").update({ last_seen_at: new Date().toISOString() }).eq("id", "default");
+    await bridge.heartbeat({ status: "connecting" });
   } catch (err) {
     logger.warn({ err: String(err) }, "heartbeat falhou");
   }
@@ -63,7 +51,7 @@ async function startBot() {
   if (starting) return;
   starting = true;
   try {
-    const auth = await useSupabaseAuthState(supabase, logger);
+    const auth = await useSupabaseAuthState(null, logger);
     currentAuth = auth;
     const { state, saveCreds } = auth;
     const { version } = await fetchLatestBaileysVersion();
@@ -124,22 +112,20 @@ async function startBot() {
 
   // Poll a fila a cada 3s
   async function drain() {
-    const { data: pending, error } = await supabase
-      .from("outbound_messages")
-      .select("*")
-      .eq("status", "pending")
-      .order("created_at", { ascending: true })
-      .limit(10);
-    if (error) return logger.error(error);
-    for (const m of pending ?? []) {
-      try {
-        await sock.sendMessage(jidFromPhone(m.to_phone), { text: m.body });
-        await supabase.from("outbound_messages").update({ status: "sent", sent_at: new Date().toISOString() }).eq("id", m.id);
-        logger.info({ id: m.id, to: m.to_phone }, "Enviado");
-      } catch (err) {
-        await supabase.from("outbound_messages").update({ status: "failed", error: String(err) }).eq("id", m.id);
-        logger.error({ id: m.id, err: String(err) }, "Falha ao enviar");
+    try {
+      const pending = await bridge.getOutboundMessages();
+      for (const m of pending ?? []) {
+        try {
+          await sock.sendMessage(jidFromPhone(m.to_phone), { text: m.body });
+          await bridge.updateMessageStatus(m.id, "sent", null);
+          logger.info({ id: m.id, to: m.to_phone }, "Enviado");
+        } catch (err) {
+          await bridge.updateMessageStatus(m.id, "failed", String(err));
+          logger.error({ id: m.id, err: String(err) }, "Falha ao enviar");
+        }
       }
+    } catch (err) {
+      logger.error({ err: String(err) }, "Falha ao drenar fila");
     }
   }
 
@@ -195,13 +181,7 @@ async function restartForFreshQr() {
 function watchQrRequests() {
   setInterval(async () => {
     try {
-      const { data, error } = await supabase
-        .from("bot_sessions")
-        .select("qr")
-        .eq("id", "default")
-        .maybeSingle();
-      if (error) throw error;
-      const requestId = typeof data?.qr === "string" && data.qr.startsWith(QR_REQUEST_PREFIX) ? data.qr : "";
+      const requestId = await bridge.getQrRequest();
       if (!requestId || requestId === lastHandledQrRequest) return;
       lastHandledQrRequest = requestId;
       logger.info("Pedido de QR recebido pelo painel admin");

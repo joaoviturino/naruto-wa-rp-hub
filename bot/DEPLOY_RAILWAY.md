@@ -2,6 +2,18 @@
 
 O Railway roda o bot 24/7 pra você. **Não precisa** de VPS, PM2 ou linha de comando no servidor.
 
+## Pré-requisito: ponte /api/public/bot-bridge
+
+A partir desta versão o bot **não usa mais a service role key**. Ele fala com o app através da ponte segura `/api/public/bot-bridge`. Você precisa configurar o mesmo segredo nos dois lados.
+
+No seu PC, gere uma senha forte:
+
+```bash
+openssl rand -hex 32
+```
+
+Copie esse valor.
+
 ## Passo a passo
 
 ### 1. Suba a pasta `bot/` para um repositório GitHub
@@ -23,13 +35,22 @@ Ainda no serviço, aba **Variables → New Variable**. Crie duas:
 
 | Nome | Valor |
 |---|---|
-| `SUPABASE_URL` | `https://zaktlzhkeydeqdiuitjq.supabase.co` |
-| `SUPABASE_SERVICE_ROLE_KEY` | (pegue no painel Cloud → Advanced settings → Service Role Key) |
+| `BOT_BRIDGE_URL` | URL publicada do RPG (ex: `https://newerashinobirevolution.lovable.app`) |
+| `BOT_WEBHOOK_SECRET` | (cole o mesmo valor do passo de pré-requisito) |
 
-### 5. Deploy
+### 5. Configure o segredo no Lovable
+No Lovable, vá em **Project Settings → Secrets** e adicione:
+
+| Nome | Valor |
+|---|---|
+| `BOT_WEBHOOK_SECRET` | (o mesmo valor usado no Railway) |
+
+Depois **republique** o app para a ponte usar o novo segredo.
+
+### 6. Deploy
 Clique em **Deploy**. Em ~1 minuto o Railway sobe o bot.
 
-### 6. Volte para o painel Admin do RPG
+### 7. Volte para o painel Admin do RPG
 - Aba **WhatsApp** → o selo vai virar 🟢 **"Serviço online"**.
 - Clique em **"Gerar QR agora"** → escaneie no WhatsApp → pronto.
 
@@ -44,5 +65,5 @@ O Railway dá US$ 5 de crédito grátis por mês. O bot consome muito menos que 
 - **Redeploy após mudar código**: já é automático — todo push no GitHub redeploya sozinho.
 
 ## Se algo der errado
-- Selo continua vermelho: veja os logs no Railway. Erro mais comum é `SUPABASE_SERVICE_ROLE_KEY` errada.
+- Selo continua vermelho: veja os logs no Railway. Erro mais comum é `BOT_WEBHOOK_SECRET` diferente do Lovable.
 - QR não aparece: no painel Admin, clique em **"Resetar sessão"** e depois em **"Gerar QR agora"**.

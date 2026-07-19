@@ -1,6 +1,7 @@
-// Persiste o auth state do Baileys no Supabase (tabela public.bot_auth_state).
-// Sobrevive a redeploy/reboot do VPS — não precisa mais da pasta auth_state/.
+// Persiste o auth state do Baileys na ponte /api/public/bot-bridge.
+// Sobrevive a redeploy/reboot do PC — não precisa mais da pasta auth_state/.
 import { initAuthCreds, BufferJSON, proto } from "@whiskeysockets/baileys";
+import { bridge } from "./bridge-client.js";
 
 const SESSION_ID = process.env.BOT_SESSION_ID || "default";
 
@@ -11,29 +12,28 @@ function decode(value) {
   return JSON.parse(JSON.stringify(value), BufferJSON.reviver);
 }
 
-export async function useSupabaseAuthState(supabase, logger) {
+export async function useSupabaseAuthState(_supabase, logger) {
   async function readKey(key) {
-    const { data, error } = await supabase
-      .from("bot_auth_state")
-      .select("value")
-      .eq("session_id", SESSION_ID)
-      .eq("key", key)
-      .maybeSingle();
-    if (error) { logger?.warn({ err: String(error), key }, "auth read falhou"); return null; }
-    return data ? decode(data.value) : null;
+    try {
+      const value = await bridge.authRead(key, SESSION_ID);
+      if (value === null || value === undefined) return null;
+      return decode(value);
+    } catch (err) {
+      logger?.warn({ err: String(err), key }, "auth read falhou");
+      return null;
+    }
   }
 
   async function writeKey(key, value) {
-    if (value === null || value === undefined) {
-      const { error } = await supabase.from("bot_auth_state")
-        .delete().eq("session_id", SESSION_ID).eq("key", key);
-      if (error) logger?.warn({ err: String(error), key }, "auth delete falhou");
-      return;
+    try {
+      if (value === null || value === undefined) {
+        await bridge.authWrite(key, null, SESSION_ID);
+      } else {
+        await bridge.authWrite(key, encode(value), SESSION_ID);
+      }
+    } catch (err) {
+      logger?.warn({ err: String(err), key }, "auth write falhou");
     }
-    const { error } = await supabase.from("bot_auth_state").upsert({
-      session_id: SESSION_ID, key, value: encode(value), updated_at: new Date().toISOString(),
-    });
-    if (error) logger?.warn({ err: String(error), key }, "auth write falhou");
   }
 
   const creds = (await readKey("creds")) || initAuthCreds();
@@ -64,8 +64,8 @@ export async function useSupabaseAuthState(supabase, logger) {
     },
     saveCreds: async () => { await writeKey("creds", creds); },
     clearAll: async () => {
-      const { error } = await supabase.from("bot_auth_state").delete().eq("session_id", SESSION_ID);
-      if (error) logger?.warn({ err: String(error) }, "auth clear falhou");
+      try { await bridge.authClear(SESSION_ID); }
+      catch (err) { logger?.warn({ err: String(err) }, "auth clear falhou"); }
     },
   };
 }

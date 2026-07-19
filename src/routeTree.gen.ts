@@ -19,6 +19,7 @@ import { Route as AuthenticatedClanTreeRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated/chat'
 import { Route as AuthenticatedCharacterRouteImport } from './routes/_authenticated/character'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as ApiPublicBotBridgeRouteImport } from './routes/api/public/bot-bridge'
 import { Route as AuthenticatedDuelIdRouteImport } from './routes/_authenticated/duel.$id'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -70,6 +71,11 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiPublicBotBridgeRoute = ApiPublicBotBridgeRouteImport.update({
+  id: '/api/public/bot-bridge',
+  path: '/api/public/bot-bridge',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedDuelIdRoute = AuthenticatedDuelIdRouteImport.update({
   id: '/duel/$id',
   path: '/duel/$id',
@@ -87,6 +93,7 @@ export interface FileRoutesByFullPath {
   '/library': typeof AuthenticatedLibraryRoute
   '/party': typeof AuthenticatedPartyRoute
   '/duel/$id': typeof AuthenticatedDuelIdRoute
+  '/api/public/bot-bridge': typeof ApiPublicBotBridgeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -99,6 +106,7 @@ export interface FileRoutesByTo {
   '/library': typeof AuthenticatedLibraryRoute
   '/party': typeof AuthenticatedPartyRoute
   '/duel/$id': typeof AuthenticatedDuelIdRoute
+  '/api/public/bot-bridge': typeof ApiPublicBotBridgeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -113,6 +121,7 @@ export interface FileRoutesById {
   '/_authenticated/library': typeof AuthenticatedLibraryRoute
   '/_authenticated/party': typeof AuthenticatedPartyRoute
   '/_authenticated/duel/$id': typeof AuthenticatedDuelIdRoute
+  '/api/public/bot-bridge': typeof ApiPublicBotBridgeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -127,6 +136,7 @@ export interface FileRouteTypes {
     | '/library'
     | '/party'
     | '/duel/$id'
+    | '/api/public/bot-bridge'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -139,6 +149,7 @@ export interface FileRouteTypes {
     | '/library'
     | '/party'
     | '/duel/$id'
+    | '/api/public/bot-bridge'
   id:
     | '__root__'
     | '/'
@@ -152,6 +163,7 @@ export interface FileRouteTypes {
     | '/_authenticated/library'
     | '/_authenticated/party'
     | '/_authenticated/duel/$id'
+    | '/api/public/bot-bridge'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -159,6 +171,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  ApiPublicBotBridgeRoute: typeof ApiPublicBotBridgeRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -233,6 +246,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/bot-bridge': {
+      id: '/api/public/bot-bridge'
+      path: '/api/public/bot-bridge'
+      fullPath: '/api/public/bot-bridge'
+      preLoaderRoute: typeof ApiPublicBotBridgeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/duel/$id': {
       id: '/_authenticated/duel/$id'
       path: '/duel/$id'
@@ -271,17 +291,8 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  ApiPublicBotBridgeRoute: ApiPublicBotBridgeRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
