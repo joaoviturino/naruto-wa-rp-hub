@@ -246,8 +246,25 @@ export const completeBookRead = createServerFn({ method: "POST" })
     if (grants.length) {
       const profs = { ...((char.proficiencies as any) ?? {}) } as Record<string, { nivel?: string | null; maestria?: string | null }>;
       const changed: any[] = [];
+      // Limite de elementos por patente — impede bypass via livros.
+      const ELEMENT_LIMIT: Record<string, number> = {
+        estudante: 1, genin: 1, chunin: 2, tokubetsu_jonin: 3,
+        jonin: 4, anbu: 5, sannin: 5, kage: 5,
+      };
+      const ELS = ["katon","suiton","fuuton","doton","raiton"] as const;
+      const rankKey = (char as any).rank as string | null | undefined;
+      const limit = ELEMENT_LIMIT[rankKey ?? "estudante"] ?? 1;
+      const skippedElements: string[] = [];
       for (const g of grants) {
         const cur = profs[g.skill_class] ?? {};
+        const isElement = (ELS as readonly string[]).includes(g.skill_class);
+        const wasActive = !!(cur.nivel || cur.maestria);
+        if (isElement && !wasActive) {
+          const activeCount = ELS.reduce((n, k) => {
+            const e = profs[k]; return n + (e && (e.nivel || e.maestria) ? 1 : 0);
+          }, 0);
+          if (activeCount >= limit) { skippedElements.push(g.skill_class); continue; }
+        }
         const nextNivel = rankIdx(g.nivel) > rankIdx(cur.nivel) ? g.nivel : cur.nivel;
         const nextMaestria = rankIdx(g.maestria) > rankIdx(cur.maestria) ? g.maestria : cur.maestria;
         if (nextNivel !== cur.nivel || nextMaestria !== cur.maestria) {
@@ -256,6 +273,7 @@ export const completeBookRead = createServerFn({ method: "POST" })
         }
       }
       if (changed.length) { patch.proficiencies = profs; applied.proficiencies = changed; }
+      if (skippedElements.length) applied.proficiencies_skipped = { elements: skippedElements, reason: `Limite de ${limit} elemento(s) para patente ${rankKey}` };
     }
 
     if (Object.keys(patch).length) {

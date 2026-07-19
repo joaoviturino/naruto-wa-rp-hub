@@ -118,7 +118,8 @@ export function MissionTracker({ characterId }: { characterId: string }) {
       className={cn(
         "fixed z-40 pointer-events-auto",
         // Positioned bottom-right on mobile, top-right (below HUD) on desktop.
-        "right-2 bottom-20 md:bottom-4 md:right-4",
+        "right-2 bottom-24 md:bottom-4 md:right-4",
+        "pb-[env(safe-area-inset-bottom)]",
         "w-[min(92vw,340px)]",
       )}
     >
