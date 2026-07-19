@@ -15,6 +15,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { listMinigamesForMyLocation } from "@/lib/minigame.functions";
 import { MinigameDialog } from "@/components/minigame/MinigameDialog";
 import { NpcInteractPanel } from "@/components/chat/NpcInteractPanel";
+import { NpcAiChat } from "@/components/chat/NpcAiChat";
 import { DuelInvitesInline } from "@/components/chat/DuelInvitesInline";
 import { ChatHud } from "@/components/chat/ChatHud";
 import { MissionTracker } from "@/components/chat/MissionTracker";
@@ -34,8 +35,9 @@ type Character = { id: string; nickname: string; avatar_url: string | null; curr
 type Scene = { id: string; image_url: string; label: string | null };
 type Msg = {
   id: string; content: string; image_url: string | null; created_at: string;
-  character_id: string; is_pinned?: boolean;
+  character_id: string | null; npc_id?: string | null; is_pinned?: boolean;
   character?: { nickname: string; avatar_url: string | null } | null;
+  npc?: { name: string; image_url: string | null } | null;
 };
 
 function ChatPage() {
@@ -176,7 +178,7 @@ function ChatPage() {
   async function loadMessages(locId: string) {
     const { data } = await supabase
       .from("location_messages")
-      .select("id,content,image_url,created_at,character_id,is_pinned,character:characters(nickname,avatar_url)")
+      .select("id,content,image_url,created_at,character_id,npc_id,is_pinned,character:characters(nickname,avatar_url),npc:npcs(name,image_url)")
       .eq("location_id", locId)
       .order("created_at", { ascending: false })
       .limit(HISTORY_LIMIT);
@@ -192,8 +194,15 @@ function ChatPage() {
         { event: "INSERT", schema: "public", table: "location_messages", filter: `location_id=eq.${currentLoc.id}` },
         async (payload) => {
           const raw = payload.new as any;
-          const { data: c } = await supabase.from("characters").select("nickname,avatar_url").eq("id", raw.character_id).maybeSingle();
-          setMessages((prev) => (prev.some((m) => m.id === raw.id) ? prev : [...prev, { ...raw, character: c } as Msg]));
+          let character: any = null; let npc: any = null;
+          if (raw.npc_id) {
+            const { data: n } = await supabase.from("npcs").select("name,image_url").eq("id", raw.npc_id).maybeSingle();
+            npc = n;
+          } else if (raw.character_id) {
+            const { data: c } = await supabase.from("characters").select("nickname,avatar_url").eq("id", raw.character_id).maybeSingle();
+            character = c;
+          }
+          setMessages((prev) => (prev.some((m) => m.id === raw.id) ? prev : [...prev, { ...raw, character, npc } as Msg]));
           setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
         })
       .on("postgres_changes",
@@ -372,6 +381,8 @@ function ChatPage() {
 
       {currentLoc && <NpcInteractPanel locationId={currentLoc.id} />}
 
+      {currentLoc && <NpcAiChat locationId={currentLoc.id} />}
+
       {currentLoc && hasLibraryHere && (
         <Link to="/library" search={{ location: currentLoc.id }}>
           <Button size="sm" variant="outline" className="w-full justify-start">
@@ -454,7 +465,7 @@ function ChatPage() {
                 <div className="text-[10px] uppercase tracking-widest text-gold flex items-center gap-1"><Pin size={11} /> Marcadas ({pinned.length})</div>
                 {pinned.map((m) => (
                   <div key={m.id} className="text-xs flex items-start gap-2 rounded p-1 hover:bg-secondary/50">
-                    <span className="text-gold font-display shrink-0">{m.character?.nickname ?? "?"}:</span>
+                    <span className={`font-display shrink-0 ${m.npc_id ? "text-emerald-300" : "text-gold"}`}>{m.npc_id ? (m.npc?.name ?? "NPC") : (m.character?.nickname ?? "?")}:</span>
                     <span className="truncate flex-1">{m.content || (m.image_url ? "[imagem]" : "")}</span>
                   </div>
                 ))}
@@ -463,18 +474,25 @@ function ChatPage() {
             <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3">
               {messages.length === 0 && <div className="text-center text-xs text-muted-foreground py-10">Silêncio. Seja o primeiro a agir.</div>}
               {messages.map((m) => {
-                const mine = m.character_id === character.id;
+                const mine = !!m.character_id && m.character_id === character.id;
+                const isNpc = !!m.npc_id;
+                const displayName = isNpc ? (m.npc?.name ?? "NPC") : (m.character?.nickname ?? "?");
+                const avatarUrl = isNpc ? m.npc?.image_url : m.character?.avatar_url;
                 return (
                   <div key={m.id} className={`flex gap-2 ${mine ? "flex-row-reverse" : ""}`}>
                     <button
-                      className="w-8 h-8 rounded-full bg-secondary overflow-hidden shrink-0 hover:ring-2 hover:ring-gold transition"
-                      title={mine ? "Você" : `Interagir com ${m.character?.nickname ?? ""}`}
-                      disabled={mine}
-                      onClick={() => { if (mine) return; setTarget({ id: m.character_id, nickname: m.character?.nickname ?? "?", avatar_url: m.character?.avatar_url ?? null }); setTargetOpen(true); }}>
-                      {m.character?.avatar_url && <img src={m.character.avatar_url} className="w-full h-full object-cover" alt="" />}
+                      className={`w-8 h-8 rounded-full bg-secondary overflow-hidden shrink-0 transition ${isNpc ? "ring-2 ring-emerald-500/60" : "hover:ring-2 hover:ring-gold"}`}
+                      title={mine ? "Você" : (isNpc ? `NPC: ${displayName}` : `Interagir com ${displayName}`)}
+                      disabled={mine || isNpc}
+                      onClick={() => {
+                        if (mine || isNpc || !m.character_id) return;
+                        setTarget({ id: m.character_id, nickname: m.character?.nickname ?? "?", avatar_url: m.character?.avatar_url ?? null });
+                        setTargetOpen(true);
+                      }}>
+                      {avatarUrl && <img src={avatarUrl} className="w-full h-full object-cover" alt="" />}
                     </button>
-                    <div className={`group max-w-[75%] rounded-lg p-2 ${mine ? "bg-primary text-primary-foreground" : "bg-secondary"} ${m.is_pinned ? "ring-2 ring-gold" : ""}`}>
-                      <div className={`text-[10px] font-display ${mine ? "text-primary-foreground/70" : "text-gold"}`}>{m.character?.nickname ?? "?"}</div>
+                    <div className={`group max-w-[75%] rounded-lg p-2 ${mine ? "bg-primary text-primary-foreground" : isNpc ? "bg-emerald-950/40 border border-emerald-500/30" : "bg-secondary"} ${m.is_pinned ? "ring-2 ring-gold" : ""}`}>
+                      <div className={`text-[10px] font-display ${mine ? "text-primary-foreground/70" : isNpc ? "text-emerald-300" : "text-gold"}`}>{displayName}{isNpc && " · NPC"}</div>
                       {m.image_url && <img src={m.image_url} className="mt-1 rounded max-h-64 object-cover" alt="" />}
                       {m.content && <div className="whitespace-pre-wrap text-sm mt-1">{m.content}</div>}
                       <div className={`text-[10px] mt-1 flex items-center gap-2 ${mine ? "text-primary-foreground/60" : "text-muted-foreground"}`}>

@@ -97,6 +97,13 @@ export const sendLocationMessage = createServerFn({ method: "POST" })
       .insert({ location_id: data.locationId, character_id: char.id, content: data.content.trim(), image_url: data.imageUrl ?? null })
       .select("id").single();
     if (error) throw new Error(error.message);
+    // Dispara respostas de NPCs de IA presentes no local (best-effort).
+    try {
+      const { respondNpcsInLocation } = await import("@/lib/npc-ai.functions");
+      await (respondNpcsInLocation as any)({ data: { locationId: data.locationId, triggerMessageId: msg.id } });
+    } catch (e) {
+      console.error("[npc-ai trigger]", e);
+    }
     return { id: msg.id };
   });
 

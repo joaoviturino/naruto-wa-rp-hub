@@ -1532,31 +1532,34 @@ export type Database = {
       }
       location_messages: {
         Row: {
-          character_id: string
+          character_id: string | null
           content: string
           created_at: string
           id: string
           image_url: string | null
           is_pinned: boolean
           location_id: string
+          npc_id: string | null
         }
         Insert: {
-          character_id: string
+          character_id?: string | null
           content?: string
           created_at?: string
           id?: string
           image_url?: string | null
           is_pinned?: boolean
           location_id: string
+          npc_id?: string | null
         }
         Update: {
-          character_id?: string
+          character_id?: string | null
           content?: string
           created_at?: string
           id?: string
           image_url?: string | null
           is_pinned?: boolean
           location_id?: string
+          npc_id?: string | null
         }
         Relationships: [
           {
@@ -1571,6 +1574,13 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_messages_npc_id_fkey"
+            columns: ["npc_id"]
+            isOneToOne: false
+            referencedRelation: "npcs"
             referencedColumns: ["id"]
           },
         ]
@@ -1934,6 +1944,39 @@ export type Database = {
         }
         Relationships: []
       }
+      npc_ai_response_locks: {
+        Row: {
+          created_at: string
+          npc_id: string
+          trigger_message_id: string
+        }
+        Insert: {
+          created_at?: string
+          npc_id: string
+          trigger_message_id: string
+        }
+        Update: {
+          created_at?: string
+          npc_id?: string
+          trigger_message_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "npc_ai_response_locks_npc_id_fkey"
+            columns: ["npc_id"]
+            isOneToOne: false
+            referencedRelation: "npcs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "npc_ai_response_locks_trigger_message_id_fkey"
+            columns: ["trigger_message_id"]
+            isOneToOne: false
+            referencedRelation: "location_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       npc_chests: {
         Row: {
           capacity: number
@@ -2074,6 +2117,48 @@ export type Database = {
           },
         ]
       }
+      npc_private_messages: {
+        Row: {
+          character_id: string
+          content: string
+          created_at: string
+          id: string
+          npc_id: string
+          role: string
+        }
+        Insert: {
+          character_id: string
+          content: string
+          created_at?: string
+          id?: string
+          npc_id: string
+          role: string
+        }
+        Update: {
+          character_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          npc_id?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "npc_private_messages_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "npc_private_messages_npc_id_fkey"
+            columns: ["npc_id"]
+            isOneToOne: false
+            referencedRelation: "npcs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       npc_skills: {
         Row: {
           npc_id: string
@@ -2106,6 +2191,14 @@ export type Database = {
       }
       npcs: {
         Row: {
+          ai_background: string | null
+          ai_enabled: boolean
+          ai_extra: string | null
+          ai_goals: string | null
+          ai_knowledge: string | null
+          ai_mode: string
+          ai_personality: string | null
+          ai_tone: string | null
           avg_damage: number
           battle_bg_url: string | null
           buy_items: Json
@@ -2140,6 +2233,14 @@ export type Database = {
           xp: number
         }
         Insert: {
+          ai_background?: string | null
+          ai_enabled?: boolean
+          ai_extra?: string | null
+          ai_goals?: string | null
+          ai_knowledge?: string | null
+          ai_mode?: string
+          ai_personality?: string | null
+          ai_tone?: string | null
           avg_damage?: number
           battle_bg_url?: string | null
           buy_items?: Json
@@ -2174,6 +2275,14 @@ export type Database = {
           xp?: number
         }
         Update: {
+          ai_background?: string | null
+          ai_enabled?: boolean
+          ai_extra?: string | null
+          ai_goals?: string | null
+          ai_knowledge?: string | null
+          ai_mode?: string
+          ai_personality?: string | null
+          ai_tone?: string | null
           avg_damage?: number
           battle_bg_url?: string | null
           buy_items?: Json
