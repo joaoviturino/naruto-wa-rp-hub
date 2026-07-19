@@ -444,6 +444,8 @@ export function MinigameManager() {
                 })()}
                 onFinish={(r) => setTestResult(r)}
               />
+            ) : selected.kind === "kenjutsu" ? (
+              <KenjutsuGame background={selected.background_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
             ) : (
               <CleanupGame background={selected.background_url} tileset={selected.tileset_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
             )}
