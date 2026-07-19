@@ -58,6 +58,14 @@ const npcPayload = z.object({
   })).optional(),
   learning_min_read_seconds: z.number().int().min(5).max(3600).optional(),
   linked_minigame_id: z.string().uuid().nullish(),
+  ai_enabled: z.boolean().optional(),
+  ai_mode: z.enum(["public","private","both"]).optional(),
+  ai_personality: z.string().max(4000).nullish(),
+  ai_background: z.string().max(4000).nullish(),
+  ai_goals: z.string().max(4000).nullish(),
+  ai_tone: z.string().max(1000).nullish(),
+  ai_knowledge: z.string().max(4000).nullish(),
+  ai_extra: z.string().max(4000).nullish(),
 });
 
 export const upsertNpc = createServerFn({ method: "POST" })
