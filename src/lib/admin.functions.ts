@@ -72,6 +72,8 @@ export const resetBotSession = createServerFn({ method: "POST" })
     if (!isAdmin) throw new Error("Forbidden");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("bot_sessions").upsert({ id: "default", status: "disconnected", qr: null, phone: null });
+    // Limpa também as credenciais persistidas para forçar novo QR na próxima conexão.
+    await supabaseAdmin.from("bot_auth_state").delete().eq("session_id", "default");
     return { ok: true };
   });
 

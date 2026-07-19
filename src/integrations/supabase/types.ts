@@ -65,6 +65,7 @@ export type Database = {
       bot_sessions: {
         Row: {
           id: string
+          last_seen_at: string | null
           phone: string | null
           qr: string | null
           status: Database["public"]["Enums"]["bot_status"]
@@ -72,6 +73,7 @@ export type Database = {
         }
         Insert: {
           id?: string
+          last_seen_at?: string | null
           phone?: string | null
           qr?: string | null
           status?: Database["public"]["Enums"]["bot_status"]
@@ -79,6 +81,7 @@ export type Database = {
         }
         Update: {
           id?: string
+          last_seen_at?: string | null
           phone?: string | null
           qr?: string | null
           status?: Database["public"]["Enums"]["bot_status"]
