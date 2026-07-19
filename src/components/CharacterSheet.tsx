@@ -289,3 +289,101 @@ function FichaBlock({ title, text }: { title: string; text: string | null }) {
     </div>
   );
 }
+
+function ArchetypeBlock({ char, onSaved }: { char: Character; onSaved: () => void }) {
+  const gen = useServerFn(generateTraits);
+  const save = useServerFn(saveTraits);
+  const [archetype, setArchetype] = useState(char.archetype ?? "");
+  const [qualities, setQualities] = useState<string[]>(char.qualities ?? []);
+  const [flaws, setFlaws] = useState<string[]>(char.flaws ?? []);
+  const [hint, setHint] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function doGenerate() {
+    setBusy(true);
+    try {
+      const t = await gen({ data: { hint: hint || undefined } } as any);
+      setArchetype(t.archetype);
+      setQualities(t.qualities);
+      setFlaws(t.flaws);
+      toast.success("Traços gerados. Revise e salve.");
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBusy(false); }
+  }
+
+  async function doSave() {
+    try {
+      await save({ data: { archetype, qualities, flaws } } as any);
+      toast.success("Ficha atualizada.");
+      onSaved();
+    } catch (e: any) { toast.error(e.message); }
+  }
+
+  const editList = (list: string[], setList: (v: string[]) => void, placeholder: string) => (
+    <div className="flex flex-wrap gap-1.5">
+      {list.map((v, i) => (
+        <span key={i} className="inline-flex items-center gap-1 rounded-full bg-input/60 border border-border px-2 py-0.5 text-xs">
+          {v}
+          <button type="button" onClick={() => setList(list.filter((_, j) => j !== i))} className="opacity-60 hover:opacity-100">
+            <X className="h-3 w-3" />
+          </button>
+        </span>
+      ))}
+      <AddChip onAdd={(v) => setList([...list, v])} placeholder={placeholder} />
+    </div>
+  );
+
+  return (
+    <div className="border border-gold/30 rounded-lg p-3 space-y-3 bg-black/20">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <h3 className="font-display text-lg text-gold">Arquétipo & Traços</h3>
+        <div className="flex items-center gap-2 flex-1 sm:flex-none min-w-0">
+          <Input value={hint} onChange={(e) => setHint(e.target.value)} placeholder="Dica opcional (ex: sombrio, líder)" className="h-8 text-xs flex-1 sm:w-56" />
+          <Button size="sm" variant="secondary" onClick={doGenerate} disabled={busy} className="gap-1.5">
+            <Sparkles className="h-3.5 w-3.5" />
+            {busy ? "Gerando..." : "Gerar com IA"}
+          </Button>
+        </div>
+      </div>
+
+      <div>
+        <label className="text-xs text-muted-foreground">Arquétipo</label>
+        <Input value={archetype} onChange={(e) => setArchetype(e.target.value)} placeholder="Ex.: Protetor Silencioso" className="h-9 mt-1" />
+      </div>
+      <div>
+        <label className="text-xs text-muted-foreground">Qualidades</label>
+        <div className="mt-1">{editList(qualities, setQualities, "+ qualidade")}</div>
+      </div>
+      <div>
+        <label className="text-xs text-muted-foreground">Defeitos</label>
+        <div className="mt-1">{editList(flaws, setFlaws, "+ defeito")}</div>
+      </div>
+
+      <div className="flex justify-end">
+        <Button size="sm" onClick={doSave}>Salvar</Button>
+      </div>
+    </div>
+  );
+}
+
+function AddChip({ onAdd, placeholder }: { onAdd: (v: string) => void; placeholder: string }) {
+  const [v, setV] = useState("");
+  return (
+    <span className="inline-flex items-center gap-1">
+      <input
+        value={v}
+        onChange={(e) => setV(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && v.trim()) { e.preventDefault(); onAdd(v.trim()); setV(""); }
+        }}
+        placeholder={placeholder}
+        className="h-6 px-2 text-xs rounded-full bg-input/40 border border-dashed border-border focus:outline-none focus:border-gold w-28"
+      />
+      {v.trim() && (
+        <button type="button" onClick={() => { onAdd(v.trim()); setV(""); }} className="text-gold">
+          <Plus className="h-3.5 w-3.5" />
+        </button>
+      )}
+    </span>
+  );
+}
