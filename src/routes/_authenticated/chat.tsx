@@ -398,7 +398,7 @@ function ChatPage() {
   );
 
   return (
-    <div className="mx-auto max-w-6xl md:grid md:gap-4 md:grid-cols-[280px_1fr] md:p-4">
+    <div className="mx-auto max-w-6xl md:grid md:gap-4 md:grid-cols-[280px_1fr] md:p-4 pb-[env(safe-area-inset-bottom)]">
       {character && <ChatHud characterId={character.id} />}
       {character && <MissionTracker characterId={character.id} />}
       {character && <TradeWatcher myCharacterId={character.id} />}
@@ -409,7 +409,7 @@ function ChatPage() {
         </div>
       )}
       {/* Barra mobile */}
-      <div className="md:hidden sticky top-[44px] z-30 flex items-center gap-2 border-b border-border bg-card/95 backdrop-blur px-3 py-2">
+      <div className="md:hidden sticky top-[54px] z-30 flex items-center gap-2 border-b border-border bg-card/95 backdrop-blur px-2 py-1.5">
         <Sheet open={navOpen} onOpenChange={setNavOpen}>
           <SheetTrigger asChild>
             <Button variant="outline" size="icon" className="h-8 w-8"><Menu size={16} /></Button>
@@ -426,9 +426,11 @@ function ChatPage() {
           </div>
         </div>
         <div className="shrink-0 text-[10px] text-muted-foreground flex items-center gap-1"><Users size={11} /> {presentHere.length}</div>
-        <Button asChild variant="outline" size="sm" className="h-8">
+        <Button asChild variant="outline" size="sm" className="h-8 px-2 shrink-0">
           <Link to="/party">
-            <Users size={12} className="mr-1" /> Time{partyMemberCount > 0 ? ` ${partyMemberCount}` : ""}
+            <Users size={12} className="mr-1" />
+            <span className="hidden xs:inline">Time</span>
+            {partyMemberCount > 0 ? <span className="ml-0.5">{partyMemberCount}</span> : null}
             {invites.length > 0 && <span className="ml-1 text-[10px] bg-blood text-white rounded-full px-1.5">{invites.length}</span>}
           </Link>
         </Button>
@@ -440,7 +442,7 @@ function ChatPage() {
       </aside>
 
       {/* Chat */}
-      <section className="scroll-panel md:rounded-lg flex flex-col h-[calc(100dvh-8rem)] md:h-[calc(100vh-8rem)]">
+      <section className="scroll-panel md:rounded-lg flex flex-col h-[calc(100dvh-9rem)] md:h-[calc(100vh-8rem)]">
         {!currentLoc ? (
           <div className="flex-1 flex items-center justify-center text-muted-foreground p-10 text-center">
             Escolha um local ao lado para começar a interagir.
