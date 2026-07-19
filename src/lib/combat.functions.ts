@@ -913,6 +913,19 @@ async function applyRewards(supabaseAdmin: any, npcId: string | null, state: Com
 
 async function runSingleNpcAttack(supabaseAdmin: any, npcState: NpcState, state: CombatState, log: LogEntry[], incomingSpeed: number) {
   if (!npcState.alive) return;
+  // Paralisia por genjutsu — consome o turno do NPC sem agir.
+  const st = (state as any)._status?.[npcState.id] as StatusEntry | undefined;
+  if (st && (st.paralyze_turns ?? 0) > 0) {
+    st.paralyze_turns = (st.paralyze_turns ?? 1) - 1;
+    if ((st.paralyze_turns ?? 0) <= 0) delete st.paralyze_turns;
+    log.push({
+      seq: log.length + 1, actor: "npc", actor_name: npcState.name, target_name: npcState.name,
+      skill_name: "Genjutsu", energy_type: "chakra", energy_used: 0,
+      effective: 0, damage: 0, speed: 0, crit_mul: 1,
+      msg: `${npcState.name} está paralisado pelo genjutsu e perde o turno!`,
+    } as any);
+    return;
+  }
   const { data: npcCfg } = await supabaseAdmin
     .from("npcs").select("avg_damage,crit_chance,crit_multiplier").eq("id", npcState.id).maybeSingle();
   const avgDamage = Number(npcCfg?.avg_damage ?? 0);
@@ -952,7 +965,8 @@ async function runSingleNpcAttack(supabaseAdmin: any, npcState: NpcState, state:
   const target = alive[Math.floor(Math.random() * alive.length)];
 
   // Precisão do golpe do NPC: pode errar.
-  const accuracy = Math.max(1, Math.min(100, Number((skill as any).accuracy ?? 100)));
+  const debuffAcc = Math.max(0, Math.min(100, Number(st?.accuracy_debuff ?? 0)));
+  const accuracy = Math.max(1, Math.min(100, Number((skill as any).accuracy ?? 100) - debuffAcc));
   const missed = Math.random() * 100 >= accuracy;
 
   // Escudo defensivo do alvo (postura declarada pelo jogador na sua ação).
