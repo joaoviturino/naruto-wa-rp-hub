@@ -95,9 +95,9 @@ export const Route = createFileRoute("/api/public/bot-bridge")({
           }
 
           case "message-status": {
-            const { id, status, error: errText } = data as { id: string; status: string; error?: string | null };
+            const { id, status, error: errText } = data as { id: string; status: "pending" | "sent" | "failed"; error?: string | null };
             if (!id || !status) return new Response("Missing id/status", { status: 400 });
-            const update: Record<string, unknown> = { status, sent_at: status === "sent" ? now : undefined };
+            const update: { status: "pending" | "sent" | "failed"; sent_at?: string | null; error?: string | null } = { status, sent_at: status === "sent" ? now : null };
             if (errText) update.error = errText;
             const { error } = await supabaseAdmin.from("outbound_messages").update(update).eq("id", id);
             if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500 });
