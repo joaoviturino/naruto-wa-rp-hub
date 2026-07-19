@@ -10,6 +10,7 @@ import { SceneImagesManager } from "@/components/SceneImagesManager";
 import { DailyMissionsPanel } from "@/components/DailyMissionsPanel";
 import { MissionHistoryPanel } from "@/components/MissionHistoryPanel";
 import { updateCharacter } from "@/lib/character.functions";
+import { generateTraits, saveTraits } from "@/lib/ai-traits.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { getLevelConfig } from "@/lib/level.functions";
@@ -18,6 +19,9 @@ import { listMyPoses, listMySkillPoses, setSkillPose } from "@/lib/pose.function
 import { MountsTab } from "@/components/MountsTab";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ComboSelect } from "@/components/ui/combo-select";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { X, Sparkles, Plus } from "lucide-react";
 
 type Character = {
   id: string; user_id: string; nickname: string; phone_e164: string;
@@ -26,6 +30,7 @@ type Character = {
   avatar_url: string | null; banner_url: string | null; inventory_bg_url: string | null;
   xp: number; ryo: number | null; hp_current: number | null;
   ef_current: number | null; em_current: number | null; chakra_current: number | null;
+  archetype: string | null; qualities: string[] | null; flaws: string[] | null;
   clan: { name: string; rarity: string; element_bonus: string | null } | null;
 };
 const VILLAGES_MAP = Object.fromEntries(VILLAGES.map((v) => [v.id, v]));
@@ -40,7 +45,7 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
   async function load() {
     const { data } = await supabase
       .from("characters")
-      .select("id,user_id,nickname,phone_e164,village,element_primary,age,appearance,personality,history,bio,avatar_url,banner_url,inventory_bg_url,xp,ryo,hp_current,ef_current,em_current,chakra_current,clan:clans(name,rarity,element_bonus)")
+      .select("id,user_id,nickname,phone_e164,village,element_primary,age,appearance,personality,history,bio,avatar_url,banner_url,inventory_bg_url,xp,ryo,hp_current,ef_current,em_current,chakra_current,archetype,qualities,flaws,clan:clans(name,rarity,element_bonus)")
       .eq("id", characterId).single();
     setChar(data as any);
   }
@@ -155,6 +160,7 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
             <FichaBlock title="Aparência" text={char.appearance} />
             <FichaBlock title="Personalidade" text={char.personality} />
             <FichaBlock title="História" text={char.history} />
+            <ArchetypeBlock char={char} onSaved={load} />
             <div className="text-xs text-muted-foreground break-words">Idade: {char.age ?? "—"} · WhatsApp: {char.phone_e164}</div>
           </div>
           <div className="mt-4"><DailyMissionsPanel characterId={characterId} /></div>
@@ -281,5 +287,103 @@ function FichaBlock({ title, text }: { title: string; text: string | null }) {
       <h3 className="font-display text-lg text-gold">{title}</h3>
       <p className="mt-1 text-sm whitespace-pre-wrap text-muted-foreground">{text || "—"}</p>
     </div>
+  );
+}
+
+function ArchetypeBlock({ char, onSaved }: { char: Character; onSaved: () => void }) {
+  const gen = useServerFn(generateTraits);
+  const save = useServerFn(saveTraits);
+  const [archetype, setArchetype] = useState(char.archetype ?? "");
+  const [qualities, setQualities] = useState<string[]>(char.qualities ?? []);
+  const [flaws, setFlaws] = useState<string[]>(char.flaws ?? []);
+  const [hint, setHint] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function doGenerate() {
+    setBusy(true);
+    try {
+      const t = await gen({ data: { hint: hint || undefined } } as any);
+      setArchetype(t.archetype);
+      setQualities(t.qualities);
+      setFlaws(t.flaws);
+      toast.success("Traços gerados. Revise e salve.");
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBusy(false); }
+  }
+
+  async function doSave() {
+    try {
+      await save({ data: { archetype, qualities, flaws } } as any);
+      toast.success("Ficha atualizada.");
+      onSaved();
+    } catch (e: any) { toast.error(e.message); }
+  }
+
+  const editList = (list: string[], setList: (v: string[]) => void, placeholder: string) => (
+    <div className="flex flex-wrap gap-1.5">
+      {list.map((v, i) => (
+        <span key={i} className="inline-flex items-center gap-1 rounded-full bg-input/60 border border-border px-2 py-0.5 text-xs">
+          {v}
+          <button type="button" onClick={() => setList(list.filter((_, j) => j !== i))} className="opacity-60 hover:opacity-100">
+            <X className="h-3 w-3" />
+          </button>
+        </span>
+      ))}
+      <AddChip onAdd={(v) => setList([...list, v])} placeholder={placeholder} />
+    </div>
+  );
+
+  return (
+    <div className="border border-gold/30 rounded-lg p-3 space-y-3 bg-black/20">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <h3 className="font-display text-lg text-gold">Arquétipo & Traços</h3>
+        <div className="flex items-center gap-2 flex-1 sm:flex-none min-w-0">
+          <Input value={hint} onChange={(e) => setHint(e.target.value)} placeholder="Dica opcional (ex: sombrio, líder)" className="h-8 text-xs flex-1 sm:w-56" />
+          <Button size="sm" variant="secondary" onClick={doGenerate} disabled={busy} className="gap-1.5">
+            <Sparkles className="h-3.5 w-3.5" />
+            {busy ? "Gerando..." : "Gerar com IA"}
+          </Button>
+        </div>
+      </div>
+
+      <div>
+        <label className="text-xs text-muted-foreground">Arquétipo</label>
+        <Input value={archetype} onChange={(e) => setArchetype(e.target.value)} placeholder="Ex.: Protetor Silencioso" className="h-9 mt-1" />
+      </div>
+      <div>
+        <label className="text-xs text-muted-foreground">Qualidades</label>
+        <div className="mt-1">{editList(qualities, setQualities, "+ qualidade")}</div>
+      </div>
+      <div>
+        <label className="text-xs text-muted-foreground">Defeitos</label>
+        <div className="mt-1">{editList(flaws, setFlaws, "+ defeito")}</div>
+      </div>
+
+      <div className="flex justify-end">
+        <Button size="sm" onClick={doSave}>Salvar</Button>
+      </div>
+    </div>
+  );
+}
+
+function AddChip({ onAdd, placeholder }: { onAdd: (v: string) => void; placeholder: string }) {
+  const [v, setV] = useState("");
+  return (
+    <span className="inline-flex items-center gap-1">
+      <input
+        value={v}
+        onChange={(e) => setV(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && v.trim()) { e.preventDefault(); onAdd(v.trim()); setV(""); }
+        }}
+        placeholder={placeholder}
+        className="h-6 px-2 text-xs rounded-full bg-input/40 border border-dashed border-border focus:outline-none focus:border-gold w-28"
+      />
+      {v.trim() && (
+        <button type="button" onClick={() => { onAdd(v.trim()); setV(""); }} className="text-gold">
+          <Plus className="h-3.5 w-3.5" />
+        </button>
+      )}
+    </span>
   );
 }
