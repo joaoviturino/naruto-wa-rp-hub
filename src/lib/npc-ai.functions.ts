@@ -163,12 +163,12 @@ export const listNpcPrivateHistory = createServerFn({ method: "POST" })
     const { data: char } = await context.supabase
       .from("characters").select("id").eq("user_id", context.userId).maybeSingle();
     if (!char) return [];
-    const { data } = await context.supabase
+    const { data: rows } = await context.supabase
       .from("npc_private_messages")
       .select("id,role,content,created_at")
       .eq("npc_id", data.npcId).eq("character_id", (char as any).id)
       .order("created_at", { ascending: true }).limit(200);
-    return data ?? [];
+    return rows ?? [];
   });
 
 export const clearNpcPrivateHistory = createServerFn({ method: "POST" })
