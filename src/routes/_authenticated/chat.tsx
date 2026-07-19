@@ -178,7 +178,7 @@ function ChatPage() {
   async function loadMessages(locId: string) {
     const { data } = await supabase
       .from("location_messages")
-      .select("id,content,image_url,created_at,character_id,npc_id,is_pinned,character:characters(nickname,avatar_url),npc:npcs(name,image_url)")
+      .select("id,content,image_url,created_at,character_id,npc_id,is_pinned,character:characters(nickname,avatar_url),npc:npcs!location_messages_npc_id_fkey(name,image_url)")
       .eq("location_id", locId)
       .order("created_at", { ascending: false })
       .limit(HISTORY_LIMIT);
