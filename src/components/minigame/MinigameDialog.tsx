@@ -10,6 +10,8 @@ import { TailoringGame } from "./TailoringGame";
 import { MiningGame } from "./MiningGame";
 import { LoggingGame } from "./LoggingGame";
 import { KenjutsuGame } from "./KenjutsuGame";
+import { KenjutsuDefenseGame } from "./KenjutsuDefenseGame";
+import { KenjutsuKataGame } from "./KenjutsuKataGame";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -264,7 +266,7 @@ export function MinigameDialog({
               )}
               <div className="flex gap-2">
                 <Button onClick={begin} disabled={busy || (isCrafting && !forgeMatch) || (isGathering && miningMissing)}>
-                  {busy ? "…" : (isForge ? "Iniciar Forja" : isTailoring ? "Iniciar Confecção" : isMining ? "Começar a Minerar" : isLogging ? "Começar a Cortar" : minigame.kind === "kenjutsu" ? "Iniciar Kenjutsu" : "Aceitar missão")}
+                  {busy ? "…" : (isForge ? "Iniciar Forja" : isTailoring ? "Iniciar Confecção" : isMining ? "Começar a Minerar" : isLogging ? "Começar a Cortar" : minigame.kind === "kenjutsu" ? "Iniciar Kenjutsu" : minigame.kind === "kenjutsu_defense" ? "Treinar Defesa" : minigame.kind === "kenjutsu_kata" ? "Iniciar Kata" : "Aceitar missão")}
                 </Button>
                 <Button variant="outline" onClick={close}>Sair</Button>
               </div>
@@ -285,6 +287,10 @@ export function MinigameDialog({
             ? <LoggingGame runId={runId} background={minigame.background_url} config={minigame.config ?? {}} onExit={exitMining} />
             : minigame.kind === "kenjutsu"
             ? <KenjutsuGame background={minigame.background_url} config={minigame.config ?? {}} onFinish={onFinish} />
+            : minigame.kind === "kenjutsu_defense"
+            ? <KenjutsuDefenseGame background={minigame.background_url} config={minigame.config ?? {}} onFinish={onFinish} />
+            : minigame.kind === "kenjutsu_kata"
+            ? <KenjutsuKataGame background={minigame.background_url} config={minigame.config ?? {}} onFinish={onFinish} />
             : <CleanupGame background={minigame.background_url} tileset={minigame.tileset_url} config={minigame.config ?? {}} onFinish={onFinish} />
           )
         )}
