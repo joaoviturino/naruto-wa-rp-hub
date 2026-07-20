@@ -1,5 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import neImg from "@/assets/handseals/ne.png";
+import ushiImg from "@/assets/handseals/ushi.png";
+import toraImg from "@/assets/handseals/tora.png";
+import uImg from "@/assets/handseals/u.png";
+import tatsuImg from "@/assets/handseals/tatsu.png";
+import miImg from "@/assets/handseals/mi.png";
+import umaImg from "@/assets/handseals/uma.png";
+import hitsujiImg from "@/assets/handseals/hitsuji.png";
+import saruImg from "@/assets/handseals/saru.png";
+import toriImg from "@/assets/handseals/tori.png";
+import inuImg from "@/assets/handseals/inu.png";
+import iImg from "@/assets/handseals/i.png";
+
+export const DEFAULT_SEAL_IMAGES: Record<string, string> = {
+  ne: neImg, ushi: ushiImg, tora: toraImg, u: uImg,
+  tatsu: tatsuImg, mi: miImg, uma: umaImg, hitsuji: hitsujiImg,
+  saru: saruImg, tori: toriImg, inu: inuImg, i: iImg,
+};
+
 export const HAND_SEALS: Array<{ key: string; jp: string; pt: string; emoji: string }> = [
   { key: "ne", jp: "Ne", pt: "Rato", emoji: "🐀" },
   { key: "ushi", jp: "Ushi", pt: "Boi", emoji: "🐂" },
@@ -46,7 +65,8 @@ export function HandSealsGame({
     () => (Array.isArray(config.sequence) ? config.sequence.filter((k) => HAND_SEALS.some((s) => s.key === k)) : []),
     [config.sequence],
   );
-  const images = config.seal_images ?? {};
+  const custom = config.seal_images ?? {};
+  const images: Record<string, string> = { ...DEFAULT_SEAL_IMAGES, ...custom };
   const bg = config.background_url ?? background ?? null;
 
   const [idx, setIdx] = useState(0);
