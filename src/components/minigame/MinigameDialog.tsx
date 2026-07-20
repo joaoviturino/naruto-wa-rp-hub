@@ -12,6 +12,7 @@ import { LoggingGame } from "./LoggingGame";
 import { KenjutsuGame } from "./KenjutsuGame";
 import { KenjutsuDefenseGame } from "./KenjutsuDefenseGame";
 import { KenjutsuKataGame } from "./KenjutsuKataGame";
+import { HandSealsGame } from "./HandSealsGame";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -266,7 +267,7 @@ export function MinigameDialog({
               )}
               <div className="flex gap-2">
                 <Button onClick={begin} disabled={busy || (isCrafting && !forgeMatch) || (isGathering && miningMissing)}>
-                  {busy ? "…" : (isForge ? "Iniciar Forja" : isTailoring ? "Iniciar Confecção" : isMining ? "Começar a Minerar" : isLogging ? "Começar a Cortar" : minigame.kind === "kenjutsu" ? "Iniciar Kenjutsu" : minigame.kind === "kenjutsu_defense" ? "Treinar Defesa" : minigame.kind === "kenjutsu_kata" ? "Iniciar Kata" : "Aceitar missão")}
+                  {busy ? "…" : (isForge ? "Iniciar Forja" : isTailoring ? "Iniciar Confecção" : isMining ? "Começar a Minerar" : isLogging ? "Começar a Cortar" : minigame.kind === "kenjutsu" ? "Iniciar Kenjutsu" : minigame.kind === "kenjutsu_defense" ? "Treinar Defesa" : minigame.kind === "kenjutsu_kata" ? "Iniciar Kata" : minigame.kind === "hand_seals" ? "Iniciar Selos" : "Aceitar missão")}
                 </Button>
                 <Button variant="outline" onClick={close}>Sair</Button>
               </div>
@@ -291,6 +292,8 @@ export function MinigameDialog({
             ? <KenjutsuDefenseGame background={minigame.background_url} config={minigame.config ?? {}} onFinish={onFinish} />
             : minigame.kind === "kenjutsu_kata"
             ? <KenjutsuKataGame background={minigame.background_url} config={minigame.config ?? {}} onFinish={onFinish} />
+            : minigame.kind === "hand_seals"
+            ? <HandSealsGame background={minigame.background_url} config={minigame.config ?? {}} onFinish={onFinish} />
             : <CleanupGame background={minigame.background_url} tileset={minigame.tileset_url} config={minigame.config ?? {}} onFinish={onFinish} />
           )
         )}

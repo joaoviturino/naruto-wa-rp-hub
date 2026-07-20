@@ -131,6 +131,23 @@ const kenjutsuKataConfigSchema = z.object({
   demo_step_ms: 650, input_time_ms: 6000, max_mistakes: 2, allow_diagonals: true,
 });
 
+const HAND_SEAL_KEYS = ["ne","ushi","tora","u","tatsu","mi","uma","hitsuji","saru","tori","inu","i"] as const;
+const handSealKeyZ = z.enum(HAND_SEAL_KEYS);
+const handSealsConfigSchema = z.object({
+  seal_time_ms: z.number().int().min(400).max(10000).default(1600),
+  max_mistakes: z.number().int().min(0).max(10).default(2),
+  show_hint: z.boolean().default(true),
+  sequence: z.array(handSealKeyZ).min(1).max(24).default(["tora","mi","tatsu"]),
+  seal_images: z.record(handSealKeyZ, z.string()).default({}),
+  background_url: z.string().nullish(),
+  correct_sound_url: z.string().nullish(),
+  wrong_sound_url: z.string().nullish(),
+  success_sound_url: z.string().nullish(),
+}).default({
+  seal_time_ms: 1600, max_mistakes: 2, show_hint: true,
+  sequence: ["tora","mi","tatsu"], seal_images: {},
+});
+
 const configSchema = z.any();
 
 const ninjaRank = z.enum(["estudante","genin","chunin","tokubetsu_jonin","jonin","anbu","sannin","kage"]);
@@ -145,7 +162,7 @@ const rewardSkillsSchema = z.array(z.object({ skill_id: z.string().uuid() })).de
 const upsertSchema = z.object({
   id: z.string().uuid().optional(),
   slug: z.string().trim().min(2).max(40).regex(/^[a-z0-9_-]+$/, "slug inválido"),
-  kind: z.enum(["cleanup", "sequence", "forge", "tailoring", "mining", "logging", "kenjutsu", "kenjutsu_defense", "kenjutsu_kata"]).default("cleanup"),
+  kind: z.enum(["cleanup", "sequence", "forge", "tailoring", "mining", "logging", "kenjutsu", "kenjutsu_defense", "kenjutsu_kata", "hand_seals"]).default("cleanup"),
   name: z.string().min(2).max(80),
   description: z.string().max(2000).nullish(),
   background_url: z.string().nullish(),
@@ -174,6 +191,7 @@ const upsertSchema = z.object({
     data.kind === "kenjutsu" ? kenjutsuConfigSchema :
     data.kind === "kenjutsu_defense" ? kenjutsuDefenseConfigSchema :
     data.kind === "kenjutsu_kata" ? kenjutsuKataConfigSchema :
+    data.kind === "hand_seals" ? handSealsConfigSchema :
     cleanupConfigSchema;
   const r = parser.safeParse(data.config);
   if (!r.success) {
@@ -253,7 +271,7 @@ export const listMinigamesForMyLocation = createServerFn({ method: "POST" })
     const minigames = (games ?? []).flatMap((g: any) => {
       if (g.one_time && successByGame.has(g.id)) return [];
       const last = lastByGame.get(g.id);
-      const noCooldown = g.kind === "mining" || g.kind === "logging" || g.kind === "forge" || g.kind === "tailoring" || g.kind === "kenjutsu" || g.kind === "kenjutsu_defense" || g.kind === "kenjutsu_kata";
+      const noCooldown = g.kind === "mining" || g.kind === "logging" || g.kind === "forge" || g.kind === "tailoring" || g.kind === "kenjutsu" || g.kind === "kenjutsu_defense" || g.kind === "kenjutsu_kata" || g.kind === "hand_seals";
       const cdMs = noCooldown ? 0 : (g.cooldown_hours ?? 0) * 3600 * 1000;
       const next = last ? new Date(last).getTime() + cdMs : 0;
       const remaining = last && !noCooldown ? Math.max(0, next - now) : 0;
@@ -322,7 +340,7 @@ export const startMinigameRun = createServerFn({ method: "POST" })
     }
     // Verifica cooldown (mineração, lenhador, forja, confecção e kenjutsu não têm recarga — atividades contínuas/treino).
     const kind = game.kind as string;
-    if (kind !== "mining" && kind !== "logging" && kind !== "forge" && kind !== "tailoring" && kind !== "kenjutsu" && kind !== "kenjutsu_defense" && kind !== "kenjutsu_kata") {
+    if (kind !== "mining" && kind !== "logging" && kind !== "forge" && kind !== "tailoring" && kind !== "kenjutsu" && kind !== "kenjutsu_defense" && kind !== "kenjutsu_kata" && kind !== "hand_seals") {
       const { data: last } = await context.supabase
         .from("minigame_runs").select("completed_at").eq("character_id", char.id).eq("minigame_id", data.minigame_id)
         .not("completed_at", "is", null).order("completed_at", { ascending: false }).limit(1).maybeSingle();
