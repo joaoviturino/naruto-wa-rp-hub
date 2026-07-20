@@ -15,6 +15,10 @@ const rewardsSchema = z.object({
   em: z.number().int().min(0).max(100_000).optional(),
   chakra: z.number().int().min(0).max(100_000).optional(),
   items: z.array(z.object({ item_id: z.string().uuid(), qty: z.number().int().min(1).max(99).default(1) })).optional(),
+  proficiencies: z.array(z.object({
+    skill_class: z.string().min(1).max(64),
+    nivel: z.enum(["E", "D", "C", "B", "A", "S"]),
+  })).optional(),
 }).default({});
 
 const cleanupConfigSchema = z.object({
