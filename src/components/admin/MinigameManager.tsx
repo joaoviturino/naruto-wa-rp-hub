@@ -468,6 +468,8 @@ export function MinigameManager() {
               <KenjutsuDefenseGame background={selected.background_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
             ) : selected.kind === "kenjutsu_kata" ? (
               <KenjutsuKataGame background={selected.background_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
+            ) : selected.kind === "hand_seals" ? (
+              <HandSealsGame background={selected.background_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
             ) : (
               <CleanupGame background={selected.background_url} tileset={selected.tileset_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
             )}
@@ -957,6 +959,115 @@ function KenjutsuDefenseConfigEditor({ selected, setSelected }: { selected: any;
         ["shuriken_image_url", "Sprite do shuriken (PNG opcional)", "image/*"],
         ["clang_sound_url", "Som de clang (audio opcional)", "audio/*"],
         ["hit_sound_url", "Som de dano (audio opcional)", "audio/*"],
+      ]} />
+    </div>
+  );
+}
+
+function HandSealsConfigEditor({ selected, setSelected }: { selected: any; setSelected: (s: any) => void }) {
+  const cfg = selected.config ?? {};
+  const up = (patch: any) => setSelected({ ...selected, config: { ...cfg, ...patch } });
+  const sequence: string[] = Array.isArray(cfg.sequence) ? cfg.sequence : [];
+  const images: Record<string, string> = cfg.seal_images ?? {};
+  const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  function setSeq(next: string[]) { up({ sequence: next }); }
+  function addSeal(k: string) { setSeq([...sequence, k]); }
+  function removeAt(i: number) { const n = [...sequence]; n.splice(i, 1); setSeq(n); }
+  function moveAt(i: number, dir: -1 | 1) {
+    const j = i + dir; if (j < 0 || j >= sequence.length) return;
+    const n = [...sequence]; [n[i], n[j]] = [n[j], n[i]]; setSeq(n);
+  }
+
+  async function uploadSealImage(sealKey: string, file: File) {
+    if (file.size > 5 * 1024 * 1024) return toast.error("Máx 5MB.");
+    const ext = file.name.split(".").pop() ?? "png";
+    const path = `${selected.slug || "seals"}/seal-${sealKey}-${Date.now()}.${ext}`;
+    const upRes = await supabase.storage.from("minigames").upload(path, file, { upsert: true, contentType: file.type });
+    if (upRes.error) return toast.error(upRes.error.message);
+    const signed = await supabase.storage.from("minigames").createSignedUrl(path, 60 * 60 * 24 * 365);
+    if (signed.data?.signedUrl) up({ seal_images: { ...images, [sealKey]: signed.data.signedUrl } });
+  }
+
+  return (
+    <div className="scroll-panel rounded-lg p-4 space-y-4">
+      <h4 className="font-display text-lg text-gold">Selos de Mão — Aprender Jutsu</h4>
+      <p className="text-xs text-muted-foreground">
+        Monte a sequência de selos que o jogador precisa executar para aprender o jutsu.
+        A habilidade concedida ao final é definida no bloco <b>Habilidades concedidas</b> acima.
+      </p>
+
+      <div className="grid gap-3 md:grid-cols-3">
+        <div><Label>Tempo por selo (ms)</Label>
+          <Input type="number" min={400} max={10000} value={cfg.seal_time_ms ?? 1600}
+            onChange={(e) => up({ seal_time_ms: Math.max(400, Number(e.target.value) || 1600) })} />
+        </div>
+        <div><Label>Erros permitidos</Label>
+          <Input type="number" min={0} max={10} value={cfg.max_mistakes ?? 2}
+            onChange={(e) => up({ max_mistakes: Math.max(0, Number(e.target.value) || 0) })} />
+        </div>
+        <label className="flex items-center gap-2 pt-6 text-sm">
+          <input type="checkbox" checked={cfg.show_hint !== false} onChange={(e) => up({ show_hint: e.target.checked })} />
+          Mostrar dica (nome do selo)
+        </label>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Sequência de selos ({sequence.length})</Label>
+        <div className="flex flex-wrap gap-2 rounded border border-border p-2 bg-secondary/30 min-h-[64px]">
+          {sequence.length === 0 && <span className="text-xs text-muted-foreground italic">Adicione selos clicando na paleta abaixo.</span>}
+          {sequence.map((k, i) => {
+            const s = HAND_SEALS.find((x) => x.key === k);
+            return (
+              <div key={i} className="flex items-center gap-1 rounded bg-black/40 border border-gold/40 px-2 py-1">
+                <span className="text-lg">{s?.emoji ?? "?"}</span>
+                <span className="text-[10px] text-gold">{i + 1}. {s?.jp}</span>
+                <button type="button" className="text-xs px-1" onClick={() => moveAt(i, -1)}>◀</button>
+                <button type="button" className="text-xs px-1" onClick={() => moveAt(i, 1)}>▶</button>
+                <button type="button" className="text-xs px-1 text-red-400" onClick={() => removeAt(i)}>×</button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div>
+        <Label>Paleta de selos (clique para adicionar; envie imagem custom opcional)</Label>
+        <div className="grid grid-cols-4 md:grid-cols-6 gap-2 mt-1">
+          {HAND_SEALS.map((s) => (
+            <div key={s.key} className="rounded border border-border bg-secondary/40 p-2 flex flex-col items-center gap-1">
+              <button type="button" onClick={() => addSeal(s.key)}
+                className="w-full aspect-square rounded bg-black/40 hover:bg-black/30 flex items-center justify-center">
+                {images[s.key]
+                  ? <img src={images[s.key]} alt={s.jp} className="w-10 h-10 object-contain" />
+                  : <span className="text-3xl">{s.emoji}</span>}
+              </button>
+              <div className="text-[10px] text-center text-gold">{s.jp}</div>
+              <div className="text-[9px] text-muted-foreground -mt-1">{s.pt}</div>
+              <input
+                ref={(el) => { fileRefs.current[s.key] = el; }}
+                type="file" accept="image/*" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadSealImage(s.key, f); if (e.target) e.target.value = ""; }} />
+              <div className="flex gap-1 w-full">
+                <Button size="sm" variant="outline" className="flex-1 text-[10px] h-6 px-1"
+                  onClick={() => fileRefs.current[s.key]?.click()}>img</Button>
+                {images[s.key] && (
+                  <Button size="sm" variant="ghost" className="h-6 px-1"
+                    onClick={() => { const next = { ...images }; delete next[s.key]; up({ seal_images: next }); }}>
+                    <Trash2 size={10} />
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <AssetSlots slug={selected.slug} cfg={cfg} up={up} fields={[
+        ["background_url", "Fundo da tela (opcional)", "image/*"],
+        ["correct_sound_url", "Som de acerto (opcional)", "audio/*"],
+        ["wrong_sound_url", "Som de erro (opcional)", "audio/*"],
+        ["success_sound_url", "Som de conclusão (opcional)", "audio/*"],
       ]} />
     </div>
   );
