@@ -450,6 +450,30 @@ export const completeMinigameRun = createServerFn({ method: "POST" })
         }
       }
 
+      // Proficiência: concede/eleva o rank do jogador na classe informada (só sobe, nunca desce).
+      const profRewards = (rewards.proficiencies as Array<{ skill_class: string; nivel: string }>) ?? [];
+      if (profRewards.length) {
+        const ORDER = ["E", "D", "C", "B", "A", "S"];
+        const curProf = ((run.characters.proficiencies as any) ?? {}) as Record<string, any>;
+        const nextProf = { ...curProf };
+        const grantedProf: Array<{ skill_class: string; nivel: string }> = [];
+        for (const p of profRewards) {
+          const entry = nextProf[p.skill_class];
+          const curRank: string | null =
+            entry && typeof entry === "object" && typeof entry.nivel === "string" ? entry.nivel : null;
+          const curIdx = curRank ? ORDER.indexOf(curRank) : -1;
+          const newIdx = ORDER.indexOf(p.nivel);
+          if (newIdx > curIdx) {
+            nextProf[p.skill_class] = { nivel: p.nivel, maestria: entry?.maestria ?? null };
+            grantedProf.push(p);
+          }
+        }
+        if (grantedProf.length) {
+          await supabaseAdmin.from("characters").update({ proficiencies: nextProf }).eq("id", run.character_id);
+          applied.proficiencies = grantedProf;
+        }
+      }
+
       // Crafting: consome materiais e entrega o item resultante
       const crafKind = run.minigames.kind as string;
       if (crafKind === "forge" || crafKind === "tailoring") {
