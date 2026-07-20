@@ -17,6 +17,8 @@ import { TailoringGame } from "@/components/minigame/TailoringGame";
 import { MiningGame } from "@/components/minigame/MiningGame";
 import { LoggingGame } from "@/components/minigame/LoggingGame";
 import { KenjutsuGame } from "@/components/minigame/KenjutsuGame";
+import { KenjutsuDefenseGame } from "@/components/minigame/KenjutsuDefenseGame";
+import { KenjutsuKataGame } from "@/components/minigame/KenjutsuKataGame";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ComboSelect } from "@/components/ui/combo-select";
@@ -148,6 +150,10 @@ export function MinigameManager() {
                       ? { node_hp: 4, swing_cooldown_ms: 500, min_break_interval_ms: 800, xp_per_break: 1, required_items: [], drops: [] }
                       : kind === "kenjutsu"
                       ? { duration_seconds: 60, target_score: 20, max_missed: 5, spawn_interval_ms: 1000, spawn_jitter_ms: 500, min_slice_speed: 12, difficulty: 2, gravity: 0.35, bomb_chance: 15 }
+                      : kind === "kenjutsu_defense"
+                      ? { duration_seconds: 60, target_score: 15, max_missed: 5, spawn_interval_ms: 1400, spawn_jitter_ms: 400, reaction_window_ms: 1200, difficulty: 2, double_chance: 15, feint_chance: 10, projectile_chance: 15 }
+                      : kind === "kenjutsu_kata"
+                      ? { rounds: 5, base_length: 3, grow_per_round: 1, demo_step_ms: 650, input_time_ms: 6000, max_mistakes: 2, allow_diagonals: true }
                       : { duration_seconds: 60, spots: 12, target_score: 8 };
                     setSelected({ ...selected, kind, config });
                   }}
@@ -159,6 +165,8 @@ export function MinigameManager() {
                     { value: "mining", label: "Mineração (idle)" },
                     { value: "logging", label: "Coleta de Madeira (idle)" },
                     { value: "kenjutsu", label: "Kenjutsu (corte)" },
+                    { value: "kenjutsu_defense", label: "Kenjutsu — Defesa (swipe)" },
+                    { value: "kenjutsu_kata", label: "Kenjutsu — Kata (memória)" },
                   ]}
                 />
               </div>
@@ -286,6 +294,10 @@ export function MinigameManager() {
             <MiningConfigEditor selected={selected} setSelected={setSelected} items={items} />
           ) : selected.kind === "kenjutsu" ? (
             <KenjutsuConfigEditor selected={selected} setSelected={setSelected} />
+          ) : selected.kind === "kenjutsu_defense" ? (
+            <KenjutsuDefenseConfigEditor selected={selected} setSelected={setSelected} />
+          ) : selected.kind === "kenjutsu_kata" ? (
+            <KenjutsuKataConfigEditor selected={selected} setSelected={setSelected} />
           ) : (
             <div className="scroll-panel rounded-lg p-4 space-y-3">
               <h4 className="font-display text-lg text-gold">Configuração da limpeza</h4>
@@ -446,6 +458,10 @@ export function MinigameManager() {
               />
             ) : selected.kind === "kenjutsu" ? (
               <KenjutsuGame background={selected.background_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
+            ) : selected.kind === "kenjutsu_defense" ? (
+              <KenjutsuDefenseGame background={selected.background_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
+            ) : selected.kind === "kenjutsu_kata" ? (
+              <KenjutsuKataGame background={selected.background_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
             ) : (
               <CleanupGame background={selected.background_url} tileset={selected.tileset_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
             )}
@@ -861,6 +877,113 @@ function KenjutsuConfigEditor({ selected, setSelected }: { selected: any; setSel
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function AssetSlots({ slug, cfg, up, fields }: {
+  slug: string;
+  cfg: any;
+  up: (patch: any) => void;
+  fields: Array<[string, string, string]>;
+}) {
+  async function upload(field: string, file: File) {
+    if (file.size > 10 * 1024 * 1024) return toast.error("Máx 10MB.");
+    const ext = file.name.split(".").pop() ?? "bin";
+    const path = `${slug || "kenjutsu"}/${field}-${Date.now()}.${ext}`;
+    const up2 = await supabase.storage.from("minigames").upload(path, file, { upsert: true, contentType: file.type });
+    if (up2.error) return toast.error(up2.error.message);
+    const signed = await supabase.storage.from("minigames").createSignedUrl(path, 60 * 60 * 24 * 365);
+    if (signed.data?.signedUrl) up({ [field]: signed.data.signedUrl });
+  }
+  return (
+    <div className="grid gap-3 md:grid-cols-2 pt-2">
+      {fields.map(([k, label, accept]) => (
+        <div key={k} className="rounded border border-border p-2 space-y-1">
+          <Label className="text-xs">{label}</Label>
+          {cfg[k] ? (
+            <div className="text-[10px] text-muted-foreground truncate">{cfg[k]}</div>
+          ) : (
+            <div className="text-[10px] text-muted-foreground italic">Usando padrão sintético.</div>
+          )}
+          <div className="flex gap-2">
+            <label className="cursor-pointer inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-secondary hover:bg-secondary/70">
+              <Upload size={12} /> Enviar
+              <input type="file" accept={accept} className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(k, f); if (e.target) e.target.value = ""; }} />
+            </label>
+            {cfg[k] && (
+              <Button size="sm" variant="ghost" onClick={() => up({ [k]: null })}><Trash2 size={12} /></Button>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function KenjutsuDefenseConfigEditor({ selected, setSelected }: { selected: any; setSelected: (s: any) => void }) {
+  const cfg = selected.config ?? {};
+  const up = (patch: any) => setSelected({ ...selected, config: { ...cfg, ...patch } });
+  return (
+    <div className="scroll-panel rounded-lg p-4 space-y-3">
+      <h4 className="font-display text-lg text-gold">Reflexo do Espadachim (Defesa)</h4>
+      <p className="text-xs text-muted-foreground">
+        Bonecos atacam em 4 direções — o jogador desliza para o lado do golpe. Ataques rápidos, duplos, fintas, kunais e shurikens ensinam timing.
+      </p>
+      <div className="grid gap-3 md:grid-cols-3">
+        <div><Label>Duração (s)</Label><Input type="number" min={15} max={600} value={cfg.duration_seconds ?? 60} onChange={(e) => up({ duration_seconds: Number(e.target.value) })} /></div>
+        <div><Label>Alvo (bloqueios)</Label><Input type="number" min={1} max={500} value={cfg.target_score ?? 15} onChange={(e) => up({ target_score: Number(e.target.value) })} /></div>
+        <div><Label>Falhas permitidas</Label><Input type="number" min={0} max={50} value={cfg.max_missed ?? 5} onChange={(e) => up({ max_missed: Number(e.target.value) })} /></div>
+        <div><Label>Dificuldade (1-5)</Label><Input type="number" min={1} max={5} value={cfg.difficulty ?? 2} onChange={(e) => up({ difficulty: Number(e.target.value) })} /></div>
+        <div><Label>Intervalo entre ataques (ms)</Label><Input type="number" min={300} max={5000} value={cfg.spawn_interval_ms ?? 1400} onChange={(e) => up({ spawn_interval_ms: Number(e.target.value) })} /></div>
+        <div><Label>Jitter (ms)</Label><Input type="number" min={0} max={3000} value={cfg.spawn_jitter_ms ?? 400} onChange={(e) => up({ spawn_jitter_ms: Number(e.target.value) })} /></div>
+        <div><Label>Janela de reação (ms)</Label><Input type="number" min={300} max={5000} value={cfg.reaction_window_ms ?? 1200} onChange={(e) => up({ reaction_window_ms: Number(e.target.value) })} /></div>
+        <div><Label>Chance de ataque duplo (%)</Label><Input type="number" min={0} max={100} value={cfg.double_chance ?? 15} onChange={(e) => up({ double_chance: Number(e.target.value) })} /></div>
+        <div><Label>Chance de finta (%)</Label><Input type="number" min={0} max={100} value={cfg.feint_chance ?? 10} onChange={(e) => up({ feint_chance: Number(e.target.value) })} /></div>
+        <div><Label>Chance de projétil (%)</Label><Input type="number" min={0} max={100} value={cfg.projectile_chance ?? 15} onChange={(e) => up({ projectile_chance: Number(e.target.value) })} /></div>
+      </div>
+      <AssetSlots slug={selected.slug} cfg={cfg} up={up} fields={[
+        ["background_url", "Fundo do treino (opcional)", "image/*"],
+        ["hero_image_url", "Sprite do herói (PNG opcional)", "image/*"],
+        ["dummy_image_url", "Sprite do boneco (PNG opcional)", "image/*"],
+        ["kunai_image_url", "Sprite da kunai (PNG opcional)", "image/*"],
+        ["shuriken_image_url", "Sprite do shuriken (PNG opcional)", "image/*"],
+        ["clang_sound_url", "Som de clang (audio opcional)", "audio/*"],
+        ["hit_sound_url", "Som de dano (audio opcional)", "audio/*"],
+      ]} />
+    </div>
+  );
+}
+
+function KenjutsuKataConfigEditor({ selected, setSelected }: { selected: any; setSelected: (s: any) => void }) {
+  const cfg = selected.config ?? {};
+  const up = (patch: any) => setSelected({ ...selected, config: { ...cfg, ...patch } });
+  return (
+    <div className="scroll-panel rounded-lg p-4 space-y-3">
+      <h4 className="font-display text-lg text-gold">Kata do Kenjutsu (Memória + Execução)</h4>
+      <p className="text-xs text-muted-foreground">
+        O sensei mostra uma sequência de direções; o jogador repete exatamente. Guitar Hero das espadas.
+      </p>
+      <div className="grid gap-3 md:grid-cols-3">
+        <div><Label>Rodadas</Label><Input type="number" min={1} max={20} value={cfg.rounds ?? 5} onChange={(e) => up({ rounds: Number(e.target.value) })} /></div>
+        <div><Label>Tamanho base</Label><Input type="number" min={2} max={20} value={cfg.base_length ?? 3} onChange={(e) => up({ base_length: Number(e.target.value) })} /></div>
+        <div><Label>Crescimento por rodada</Label><Input type="number" min={0} max={5} value={cfg.grow_per_round ?? 1} onChange={(e) => up({ grow_per_round: Number(e.target.value) })} /></div>
+        <div><Label>Tempo por passo (demo, ms)</Label><Input type="number" min={200} max={3000} value={cfg.demo_step_ms ?? 650} onChange={(e) => up({ demo_step_ms: Number(e.target.value) })} /></div>
+        <div><Label>Tempo de input (ms)</Label><Input type="number" min={500} max={20000} value={cfg.input_time_ms ?? 6000} onChange={(e) => up({ input_time_ms: Number(e.target.value) })} /></div>
+        <div><Label>Erros permitidos</Label><Input type="number" min={0} max={10} value={cfg.max_mistakes ?? 2} onChange={(e) => up({ max_mistakes: Number(e.target.value) })} /></div>
+        <div className="flex items-center gap-2 pt-6">
+          <input id="allow_diag" type="checkbox" checked={cfg.allow_diagonals ?? true}
+            onChange={(e) => up({ allow_diagonals: e.target.checked })} />
+          <Label htmlFor="allow_diag">Permitir diagonais</Label>
+        </div>
+      </div>
+      <AssetSlots slug={selected.slug} cfg={cfg} up={up} fields={[
+        ["background_url", "Fundo do dojô (opcional)", "image/*"],
+        ["sensei_image_url", "Sprite do sensei (PNG opcional)", "image/*"],
+        ["correct_sound_url", "Som de acerto (audio opcional)", "audio/*"],
+        ["wrong_sound_url", "Som de erro (audio opcional)", "audio/*"],
+      ]} />
     </div>
   );
 }

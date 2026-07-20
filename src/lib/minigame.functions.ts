@@ -86,6 +86,47 @@ const kenjutsuConfigSchema = z.object({
   difficulty: 2, gravity: 0.35, bomb_chance: 15,
 });
 
+const kenjutsuDefenseConfigSchema = z.object({
+  duration_seconds: z.number().int().min(15).max(600).default(60),
+  target_score: z.number().int().min(1).max(500).default(15),
+  max_missed: z.number().int().min(0).max(50).default(5),
+  spawn_interval_ms: z.number().int().min(300).max(5000).default(1400),
+  spawn_jitter_ms: z.number().int().min(0).max(3000).default(400),
+  reaction_window_ms: z.number().int().min(300).max(5000).default(1200),
+  difficulty: z.number().int().min(1).max(5).default(2),
+  double_chance: z.number().min(0).max(100).default(15),
+  feint_chance: z.number().min(0).max(100).default(10),
+  projectile_chance: z.number().min(0).max(100).default(15),
+  background_url: z.string().nullish(),
+  hero_image_url: z.string().nullish(),
+  dummy_image_url: z.string().nullish(),
+  kunai_image_url: z.string().nullish(),
+  shuriken_image_url: z.string().nullish(),
+  clang_sound_url: z.string().nullish(),
+  hit_sound_url: z.string().nullish(),
+}).default({
+  duration_seconds: 60, target_score: 15, max_missed: 5,
+  spawn_interval_ms: 1400, spawn_jitter_ms: 400, reaction_window_ms: 1200,
+  difficulty: 2, double_chance: 15, feint_chance: 10, projectile_chance: 15,
+});
+
+const kenjutsuKataConfigSchema = z.object({
+  rounds: z.number().int().min(1).max(20).default(5),
+  base_length: z.number().int().min(2).max(20).default(3),
+  grow_per_round: z.number().int().min(0).max(5).default(1),
+  demo_step_ms: z.number().int().min(200).max(3000).default(650),
+  input_time_ms: z.number().int().min(500).max(20000).default(6000),
+  max_mistakes: z.number().int().min(0).max(10).default(2),
+  allow_diagonals: z.boolean().default(true),
+  background_url: z.string().nullish(),
+  sensei_image_url: z.string().nullish(),
+  correct_sound_url: z.string().nullish(),
+  wrong_sound_url: z.string().nullish(),
+}).default({
+  rounds: 5, base_length: 3, grow_per_round: 1,
+  demo_step_ms: 650, input_time_ms: 6000, max_mistakes: 2, allow_diagonals: true,
+});
+
 const configSchema = z.any();
 
 const ninjaRank = z.enum(["estudante","genin","chunin","tokubetsu_jonin","jonin","anbu","sannin","kage"]);
@@ -100,7 +141,7 @@ const rewardSkillsSchema = z.array(z.object({ skill_id: z.string().uuid() })).de
 const upsertSchema = z.object({
   id: z.string().uuid().optional(),
   slug: z.string().trim().min(2).max(40).regex(/^[a-z0-9_-]+$/, "slug inválido"),
-  kind: z.enum(["cleanup", "sequence", "forge", "tailoring", "mining", "logging", "kenjutsu"]).default("cleanup"),
+  kind: z.enum(["cleanup", "sequence", "forge", "tailoring", "mining", "logging", "kenjutsu", "kenjutsu_defense", "kenjutsu_kata"]).default("cleanup"),
   name: z.string().min(2).max(80),
   description: z.string().max(2000).nullish(),
   background_url: z.string().nullish(),
@@ -127,6 +168,8 @@ const upsertSchema = z.object({
     data.kind === "mining" ? miningConfigSchema :
     data.kind === "logging" ? miningConfigSchema :
     data.kind === "kenjutsu" ? kenjutsuConfigSchema :
+    data.kind === "kenjutsu_defense" ? kenjutsuDefenseConfigSchema :
+    data.kind === "kenjutsu_kata" ? kenjutsuKataConfigSchema :
     cleanupConfigSchema;
   const r = parser.safeParse(data.config);
   if (!r.success) {
