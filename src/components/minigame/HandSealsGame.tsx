@@ -146,25 +146,25 @@ export function HandSealsGame({
         <span>Erros: <b className={mistakes > maxMistakes ? "text-red-400" : "text-gold"}>{mistakes}/{maxMistakes}</b></span>
       </div>
 
-      <div className="relative rounded-lg overflow-hidden border border-border p-4 flex flex-col items-center gap-3"
-        style={{ aspectRatio: "16/10", background: bg ? `url(${bg}) center/cover no-repeat` : "linear-gradient(180deg,#0b1220,#131a2a)" }}>
+      <div className="relative rounded-lg overflow-hidden border border-border p-2 sm:p-4 flex flex-col items-center gap-2 sm:gap-3 min-h-[360px] sm:min-h-0 sm:aspect-[16/10]"
+        style={{ background: bg ? `url(${bg}) center/cover no-repeat` : "linear-gradient(180deg,#0b1220,#131a2a)" }}>
         <div className="absolute inset-0 bg-black/40 pointer-events-none" />
         <div className="relative z-10 flex flex-col items-center gap-1">
           <div className="text-[10px] uppercase tracking-widest text-gold/80">Próximo selo</div>
-          <div className={`w-28 h-28 md:w-32 md:h-32 rounded-2xl border-2 flex flex-col items-center justify-center bg-black/60 ${flash?.ok ? "border-emerald-400 shadow-[0_0_30px_rgba(52,211,153,0.6)]" : flash && !flash.ok ? "border-red-500 shadow-[0_0_30px_rgba(239,68,68,0.6)]" : "border-gold"}`}>
+          <div className={`w-20 h-20 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-2xl border-2 flex flex-col items-center justify-center bg-black/60 ${flash?.ok ? "border-emerald-400 shadow-[0_0_30px_rgba(52,211,153,0.6)]" : flash && !flash.ok ? "border-red-500 shadow-[0_0_30px_rgba(239,68,68,0.6)]" : "border-gold"}`}>
             {expectedSeal && (
               images[expectedSeal.key]
-                ? <img src={images[expectedSeal.key]} alt={expectedSeal.jp} className="w-20 h-20 object-contain" />
-                : <span className="text-5xl md:text-6xl leading-none">{expectedSeal.emoji}</span>
+                ? <img src={images[expectedSeal.key]} alt={expectedSeal.jp} className="w-14 h-14 sm:w-20 sm:h-20 object-contain" />
+                : <span className="text-4xl sm:text-5xl md:text-6xl leading-none">{expectedSeal.emoji}</span>
             )}
             {showHint && expectedSeal && <div className="text-[10px] text-gold mt-1">{expectedSeal.jp}</div>}
           </div>
-          <div className="w-40 h-1.5 rounded bg-white/10 overflow-hidden mt-1">
+          <div className="w-32 sm:w-40 h-1.5 rounded bg-white/10 overflow-hidden mt-1">
             <div className="h-full bg-gold transition-[width] duration-75" style={{ width: `${pct}%` }} />
           </div>
         </div>
 
-        <div className="relative z-10 mt-auto grid grid-cols-4 md:grid-cols-6 gap-2 w-full max-w-2xl">
+        <div className="relative z-10 mt-auto grid grid-cols-6 sm:grid-cols-6 gap-1.5 sm:gap-2 w-full max-w-2xl">
           {HAND_SEALS.map((s) => {
             const isFlash = flash?.key === s.key;
             return (
@@ -172,22 +172,22 @@ export function HandSealsGame({
                 className={`aspect-square rounded-xl border bg-black/50 hover:bg-black/40 active:scale-95 transition flex flex-col items-center justify-center gap-0.5
                   ${isFlash && flash.ok ? "border-emerald-400 bg-emerald-500/20" : isFlash ? "border-red-500 bg-red-500/20" : "border-white/15"}`}>
                 {images[s.key]
-                  ? <img src={images[s.key]} alt={s.jp} className="w-8 h-8 md:w-10 md:h-10 object-contain" />
-                  : <span className="text-2xl md:text-3xl leading-none">{s.emoji}</span>}
-                <span className="text-[9px] md:text-[10px] uppercase tracking-wider text-white/70">{s.jp}</span>
+                  ? <img src={images[s.key]} alt={s.jp} className="w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10 object-contain" />
+                  : <span className="text-xl sm:text-2xl md:text-3xl leading-none">{s.emoji}</span>}
+                <span className="text-[8px] sm:text-[9px] md:text-[10px] uppercase tracking-wider text-white/70 truncate w-full text-center">{s.jp}</span>
               </button>
             );
           })}
         </div>
       </div>
 
-      <div className="flex items-center gap-1 flex-wrap">
+      <div className="flex items-center gap-1 flex-wrap justify-center">
         {sequence.map((k, i) => {
           const seal = HAND_SEALS.find((s) => s.key === k);
           const state = i < idx ? "done" : i === idx ? "current" : "todo";
           return (
             <div key={i}
-              className={`w-7 h-7 rounded flex items-center justify-center text-sm border ${state === "done" ? "bg-emerald-500/30 border-emerald-400" : state === "current" ? "bg-gold/20 border-gold" : "bg-black/30 border-white/10"}`}
+              className={`w-6 h-6 sm:w-7 sm:h-7 rounded flex items-center justify-center text-xs sm:text-sm border ${state === "done" ? "bg-emerald-500/30 border-emerald-400" : state === "current" ? "bg-gold/20 border-gold" : "bg-black/30 border-white/10"}`}
               title={seal?.pt}>
               {seal?.emoji}
             </div>
