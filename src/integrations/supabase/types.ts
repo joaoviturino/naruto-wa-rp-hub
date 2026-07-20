@@ -3159,6 +3159,9 @@ export type Database = {
         | "tailoring"
         | "mining"
         | "logging"
+        | "kenjutsu"
+        | "kenjutsu_defense"
+        | "kenjutsu_kata"
       msg_status: "pending" | "sent" | "failed"
       ninja_rank:
         | "estudante"
@@ -3407,6 +3410,9 @@ export const Constants = {
         "tailoring",
         "mining",
         "logging",
+        "kenjutsu",
+        "kenjutsu_defense",
+        "kenjutsu_kata",
       ],
       msg_status: ["pending", "sent", "failed"],
       ninja_rank: [
