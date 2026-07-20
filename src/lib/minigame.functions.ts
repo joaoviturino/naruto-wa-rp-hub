@@ -15,6 +15,10 @@ const rewardsSchema = z.object({
   em: z.number().int().min(0).max(100_000).optional(),
   chakra: z.number().int().min(0).max(100_000).optional(),
   items: z.array(z.object({ item_id: z.string().uuid(), qty: z.number().int().min(1).max(99).default(1) })).optional(),
+  proficiencies: z.array(z.object({
+    skill_class: z.string().min(1).max(64),
+    nivel: z.enum(["E", "D", "C", "B", "A", "S"]),
+  })).optional(),
 }).default({});
 
 const cleanupConfigSchema = z.object({
@@ -443,6 +447,30 @@ export const completeMinigameRun = createServerFn({ method: "POST" })
           const rows = skillIds.map((sid: string) => ({ character_id: run.character_id, skill_id: sid }));
           await supabaseAdmin.from("character_skills").upsert(rows, { onConflict: "character_id,skill_id" });
           applied.skills = skillIds;
+        }
+      }
+
+      // Proficiência: concede/eleva o rank do jogador na classe informada (só sobe, nunca desce).
+      const profRewards = (rewards.proficiencies as Array<{ skill_class: string; nivel: string }>) ?? [];
+      if (profRewards.length) {
+        const ORDER = ["E", "D", "C", "B", "A", "S"];
+        const curProf = ((run.characters.proficiencies as any) ?? {}) as Record<string, any>;
+        const nextProf = { ...curProf };
+        const grantedProf: Array<{ skill_class: string; nivel: string }> = [];
+        for (const p of profRewards) {
+          const entry = nextProf[p.skill_class];
+          const curRank: string | null =
+            entry && typeof entry === "object" && typeof entry.nivel === "string" ? entry.nivel : null;
+          const curIdx = curRank ? ORDER.indexOf(curRank) : -1;
+          const newIdx = ORDER.indexOf(p.nivel);
+          if (newIdx > curIdx) {
+            nextProf[p.skill_class] = { nivel: p.nivel, maestria: entry?.maestria ?? null };
+            grantedProf.push(p);
+          }
+        }
+        if (grantedProf.length) {
+          await supabaseAdmin.from("characters").update({ proficiencies: nextProf }).eq("id", run.character_id);
+          applied.proficiencies = grantedProf;
         }
       }
 
