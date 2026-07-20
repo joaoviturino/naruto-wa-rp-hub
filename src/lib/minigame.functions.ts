@@ -320,9 +320,9 @@ export const startMinigameRun = createServerFn({ method: "POST" })
         throw new Error(`Requer o emprego: ${(j as any)?.name ?? "?"}.`);
       }
     }
-    // Verifica cooldown (mineração, lenhador, forja e confecção não têm recarga — atividades contínuas).
+    // Verifica cooldown (mineração, lenhador, forja, confecção e kenjutsu não têm recarga — atividades contínuas/treino).
     const kind = game.kind as string;
-    if (kind !== "mining" && kind !== "logging" && kind !== "forge" && kind !== "tailoring") {
+    if (kind !== "mining" && kind !== "logging" && kind !== "forge" && kind !== "tailoring" && kind !== "kenjutsu" && kind !== "kenjutsu_defense" && kind !== "kenjutsu_kata") {
       const { data: last } = await context.supabase
         .from("minigame_runs").select("completed_at").eq("character_id", char.id).eq("minigame_id", data.minigame_id)
         .not("completed_at", "is", null).order("completed_at", { ascending: false }).limit(1).maybeSingle();
