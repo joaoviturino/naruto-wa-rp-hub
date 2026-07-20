@@ -1,0 +1,1 @@
+ALTER TYPE public.minigame_kind ADD VALUE IF NOT EXISTS 'hand_seals';
