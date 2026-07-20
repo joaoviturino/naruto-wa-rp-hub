@@ -253,7 +253,7 @@ export const listMinigamesForMyLocation = createServerFn({ method: "POST" })
     const minigames = (games ?? []).flatMap((g: any) => {
       if (g.one_time && successByGame.has(g.id)) return [];
       const last = lastByGame.get(g.id);
-      const noCooldown = g.kind === "mining" || g.kind === "logging" || g.kind === "forge" || g.kind === "tailoring";
+      const noCooldown = g.kind === "mining" || g.kind === "logging" || g.kind === "forge" || g.kind === "tailoring" || g.kind === "kenjutsu" || g.kind === "kenjutsu_defense" || g.kind === "kenjutsu_kata";
       const cdMs = noCooldown ? 0 : (g.cooldown_hours ?? 0) * 3600 * 1000;
       const next = last ? new Date(last).getTime() + cdMs : 0;
       const remaining = last && !noCooldown ? Math.max(0, next - now) : 0;
