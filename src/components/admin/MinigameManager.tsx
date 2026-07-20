@@ -17,6 +17,8 @@ import { TailoringGame } from "@/components/minigame/TailoringGame";
 import { MiningGame } from "@/components/minigame/MiningGame";
 import { LoggingGame } from "@/components/minigame/LoggingGame";
 import { KenjutsuGame } from "@/components/minigame/KenjutsuGame";
+import { KenjutsuDefenseGame } from "@/components/minigame/KenjutsuDefenseGame";
+import { KenjutsuKataGame } from "@/components/minigame/KenjutsuKataGame";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ComboSelect } from "@/components/ui/combo-select";
@@ -148,6 +150,10 @@ export function MinigameManager() {
                       ? { node_hp: 4, swing_cooldown_ms: 500, min_break_interval_ms: 800, xp_per_break: 1, required_items: [], drops: [] }
                       : kind === "kenjutsu"
                       ? { duration_seconds: 60, target_score: 20, max_missed: 5, spawn_interval_ms: 1000, spawn_jitter_ms: 500, min_slice_speed: 12, difficulty: 2, gravity: 0.35, bomb_chance: 15 }
+                      : kind === "kenjutsu_defense"
+                      ? { duration_seconds: 60, target_score: 15, max_missed: 5, spawn_interval_ms: 1400, spawn_jitter_ms: 400, reaction_window_ms: 1200, difficulty: 2, double_chance: 15, feint_chance: 10, projectile_chance: 15 }
+                      : kind === "kenjutsu_kata"
+                      ? { rounds: 5, base_length: 3, grow_per_round: 1, demo_step_ms: 650, input_time_ms: 6000, max_mistakes: 2, allow_diagonals: true }
                       : { duration_seconds: 60, spots: 12, target_score: 8 };
                     setSelected({ ...selected, kind, config });
                   }}
@@ -159,6 +165,8 @@ export function MinigameManager() {
                     { value: "mining", label: "Mineração (idle)" },
                     { value: "logging", label: "Coleta de Madeira (idle)" },
                     { value: "kenjutsu", label: "Kenjutsu (corte)" },
+                    { value: "kenjutsu_defense", label: "Kenjutsu — Defesa (swipe)" },
+                    { value: "kenjutsu_kata", label: "Kenjutsu — Kata (memória)" },
                   ]}
                 />
               </div>
@@ -286,6 +294,10 @@ export function MinigameManager() {
             <MiningConfigEditor selected={selected} setSelected={setSelected} items={items} />
           ) : selected.kind === "kenjutsu" ? (
             <KenjutsuConfigEditor selected={selected} setSelected={setSelected} />
+          ) : selected.kind === "kenjutsu_defense" ? (
+            <KenjutsuDefenseConfigEditor selected={selected} setSelected={setSelected} />
+          ) : selected.kind === "kenjutsu_kata" ? (
+            <KenjutsuKataConfigEditor selected={selected} setSelected={setSelected} />
           ) : (
             <div className="scroll-panel rounded-lg p-4 space-y-3">
               <h4 className="font-display text-lg text-gold">Configuração da limpeza</h4>
@@ -446,6 +458,10 @@ export function MinigameManager() {
               />
             ) : selected.kind === "kenjutsu" ? (
               <KenjutsuGame background={selected.background_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
+            ) : selected.kind === "kenjutsu_defense" ? (
+              <KenjutsuDefenseGame background={selected.background_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
+            ) : selected.kind === "kenjutsu_kata" ? (
+              <KenjutsuKataGame background={selected.background_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
             ) : (
               <CleanupGame background={selected.background_url} tileset={selected.tileset_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
             )}
