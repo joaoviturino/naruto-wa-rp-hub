@@ -167,6 +167,7 @@ export function AdminPanel() {
             {active === "minigames" && <MinigameManager />}
             {active === "library" && <LibraryManager />}
             {active === "levels" && <LevelManager />}
+            {active === "todos" && <TodoManager />}
             {active === "parties" && <PartyManager />}
             {active === "admins" && <AdminUsers />}
             {active === "server" && <ServerControl />}
