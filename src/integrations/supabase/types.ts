@@ -2159,6 +2159,44 @@ export type Database = {
           },
         ]
       }
+      npc_poses: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string
+          name: string
+          npc_id: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url: string
+          name: string
+          npc_id: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string
+          name?: string
+          npc_id?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "npc_poses_npc_id_fkey"
+            columns: ["npc_id"]
+            isOneToOne: false
+            referencedRelation: "npcs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       npc_private_messages: {
         Row: {
           character_id: string
@@ -2197,6 +2235,49 @@ export type Database = {
             columns: ["npc_id"]
             isOneToOne: false
             referencedRelation: "npcs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      npc_skill_poses: {
+        Row: {
+          created_at: string
+          npc_id: string
+          pose_id: string
+          skill_id: string
+        }
+        Insert: {
+          created_at?: string
+          npc_id: string
+          pose_id: string
+          skill_id: string
+        }
+        Update: {
+          created_at?: string
+          npc_id?: string
+          pose_id?: string
+          skill_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "npc_skill_poses_npc_id_fkey"
+            columns: ["npc_id"]
+            isOneToOne: false
+            referencedRelation: "npcs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "npc_skill_poses_pose_id_fkey"
+            columns: ["pose_id"]
+            isOneToOne: false
+            referencedRelation: "npc_poses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "npc_skill_poses_skill_id_fkey"
+            columns: ["skill_id"]
+            isOneToOne: false
+            referencedRelation: "skills"
             referencedColumns: ["id"]
           },
         ]
