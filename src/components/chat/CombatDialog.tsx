@@ -315,6 +315,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
       const soundUrl: string | undefined = entry.sound_url;
       const animUrl: string | undefined = entry.animation_url;
       const animMode: "projectile" | "front" | "overlay" = entry.animation_mode ?? "overlay";
+      const isDash: boolean = !!entry.is_dash;
       const MAX_WAIT = 5000;
       const POSE_MS = 1400;
 
@@ -358,6 +359,55 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
         audioDuration = Number.isFinite(a2.duration) ? a2.duration * 1000 : 0;
       }
 
+      // Resolve origem/alvo (usado para dash e FX)
+      let fromEl: HTMLElement | null = null;
+      if (entry.actor === "player" && entry.actor_char_id) fromEl = playerRefs.current[entry.actor_char_id] ?? null;
+      else if (entry.actor === "npc") {
+        const idx = npcs.findIndex((n: any) => n.name === entry.actor_name);
+        if (idx >= 0) fromEl = npcRefs.current[idx] ?? null;
+      }
+      let toEl: HTMLElement | null = null;
+      if (entry.actor === "player") {
+        const idx = typeof entry.target_npc_idx === "number"
+          ? entry.target_npc_idx
+          : npcs.findIndex((n: any) => n.name === entry.target_name);
+        if (idx >= 0) toEl = npcRefs.current[idx] ?? null;
+      } else if (entry.actor === "npc") {
+        const cid = entry.target_char_id
+          ?? players.find((p: any) => p.nickname === entry.target_name)?.character_id;
+        if (cid) toEl = playerRefs.current[cid] ?? null;
+      }
+
+      // Dash: desloca o sprite do atacante para a frente do alvo antes da pose.
+      const DASH_MS = 260;
+      let dashApplied = false;
+      let dashPrevTransform = "";
+      let dashPrevTransition = "";
+      if (isDash && fromEl && toEl) {
+        const fr = fromEl.getBoundingClientRect();
+        const tr = toEl.getBoundingClientRect();
+        const fromCx = fr.left + fr.width / 2;
+        const fromCy = fr.top + fr.height / 2;
+        const toCx = tr.left + tr.width / 2;
+        const toCy = tr.top + tr.height / 2;
+        // Para próximo do alvo, deixando ~40px de folga do lado do atacante.
+        const dir = fromCx <= toCx ? -1 : 1; // se atacante está à esquerda, para à esquerda do alvo
+        const gap = 40 + tr.width / 2;
+        const dx = (toCx + dir * gap) - fromCx;
+        const dy = toCy - fromCy;
+        dashPrevTransition = fromEl.style.transition;
+        dashPrevTransform = fromEl.style.transform;
+        fromEl.style.transition = `transform ${DASH_MS}ms cubic-bezier(0.2,0.7,0.2,1)`;
+        fromEl.style.transform = `${dashPrevTransform ? dashPrevTransform + " " : ""}translate(${dx}px, ${dy}px)`;
+        // Leve rastro visual
+        const prevFilter = fromEl.style.filter;
+        fromEl.style.filter = `${prevFilter || ""} drop-shadow(0 0 12px rgba(255,220,120,0.85))`;
+        dashApplied = true;
+        await new Promise((r) => setTimeout(r, DASH_MS));
+        // guarda o filter anterior no dataset para restaurar depois
+        (fromEl as any)._prevFilter = prevFilter;
+      }
+
       // Troca de pose para o jogador que agiu
       if (poseUrl && imgOk && actorCharId) {
         setPoses((p) => ({ ...p, [actorCharId]: poseUrl }));
@@ -366,26 +416,6 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
       // Renderiza a animação (gif/vídeo) no palco, se houver
       if (animUrl && stageRef.current) {
         const stageRect = stageRef.current.getBoundingClientRect();
-        // origem = quem agiu
-        let fromEl: HTMLElement | null = null;
-        if (entry.actor === "player" && entry.actor_char_id) fromEl = playerRefs.current[entry.actor_char_id] ?? null;
-        else if (entry.actor === "npc") {
-          // achamos por nome como fallback
-          const idx = npcs.findIndex((n: any) => n.name === entry.actor_name);
-          if (idx >= 0) fromEl = npcRefs.current[idx] ?? null;
-        }
-        // alvo
-        let toEl: HTMLElement | null = null;
-        if (entry.actor === "player") {
-          const idx = typeof entry.target_npc_idx === "number"
-            ? entry.target_npc_idx
-            : npcs.findIndex((n: any) => n.name === entry.target_name);
-          if (idx >= 0) toEl = npcRefs.current[idx] ?? null;
-        } else if (entry.actor === "npc") {
-          const cid = entry.target_char_id
-            ?? players.find((p: any) => p.nickname === entry.target_name)?.character_id;
-          if (cid) toEl = playerRefs.current[cid] ?? null;
-        }
         const rectCenter = (el: HTMLElement | null) => {
           if (!el) return null;
           const r = el.getBoundingClientRect();
@@ -409,6 +439,15 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
       // Aguarda o maior entre duração do áudio e a pose (mínimo 1.2s, máximo 6s)
       const wait = Math.max(1200, Math.min(6000, Math.max(audioDuration || 0, poseUrl && imgOk ? POSE_MS : 0)));
       await new Promise((r) => setTimeout(r, wait));
+
+      // Reset do dash (volta o atacante para a posição original)
+      if (dashApplied && fromEl) {
+        fromEl.style.transition = `transform ${DASH_MS}ms cubic-bezier(0.4,0,0.2,1)`;
+        fromEl.style.transform = dashPrevTransform;
+        await new Promise((r) => setTimeout(r, DASH_MS));
+        fromEl.style.transition = dashPrevTransition;
+        fromEl.style.filter = (fromEl as any)._prevFilter ?? "";
+      }
       if (poseUrl && imgOk && actorCharId) {
         setPoses((p) => { const { [actorCharId]: _drop, ...rest } = p; return rest; });
       }
