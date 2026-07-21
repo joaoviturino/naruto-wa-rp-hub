@@ -26,11 +26,12 @@ import { MountManager } from "@/components/admin/MountManager";
 import { JobManager } from "@/components/admin/JobManager";
 import { TodoManager } from "@/components/admin/TodoManager";
 import { TodoAlertsBell } from "@/components/admin/TodoAlertsBell";
+import { SubmissionsManager } from "@/components/admin/SubmissionsManager";
 import { NINJA_RANKS } from "@/components/admin/shared";
 import {
   Pencil, BatteryCharging, Eye, LayoutDashboard, Users, Package, Sparkles,
   ScrollText, GitBranch, MapPin, Ghost, Gamepad2, BookOpen, TrendingUp,
-  ShieldCheck, Server, MessageSquare, Award, UsersRound, Menu, X, Rabbit, RotateCcw, AlertTriangle, Briefcase, CheckSquare,
+  ShieldCheck, Server, MessageSquare, Award, UsersRound, Menu, X, Rabbit, RotateCcw, AlertTriangle, Briefcase, CheckSquare, Hammer,
 } from "lucide-react";
 
 type NavItem = { id: string; label: string; icon: React.ComponentType<{ size?: number; className?: string }>; group: string };
@@ -40,6 +41,7 @@ const NAV: NavItem[] = [
   { id: "parties",   label: "Parties",   icon: UsersRound,      group: "Comunidade" },
   { id: "admins",    label: "Admins",    icon: ShieldCheck,     group: "Comunidade" },
   { id: "items",     label: "Itens",     icon: Package,         group: "Conteúdo" },
+  { id: "submissions", label: "Submissões", icon: Hammer,       group: "Conteúdo" },
   { id: "skills",    label: "Habilidades", icon: Sparkles,      group: "Conteúdo" },
   { id: "profs",     label: "Proficiências", icon: Award,       group: "Conteúdo" },
   { id: "missions",  label: "Missões",   icon: ScrollText,      group: "Conteúdo" },
@@ -160,6 +162,7 @@ export function AdminPanel() {
             {active === "dashboard" && <Dashboard onNavigate={setActive} />}
             {active === "players" && <Players />}
             {active === "items" && adminUserId && <ItemManager adminUserId={adminUserId} />}
+            {active === "submissions" && <SubmissionsManager />}
             {active === "skills" && adminUserId && <SkillManager adminUserId={adminUserId} />}
             {active === "profs" && <ProficiencyManager />}
             {active === "missions" && <MissionManager />}
