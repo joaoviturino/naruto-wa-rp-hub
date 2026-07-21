@@ -27,11 +27,12 @@ import { JobManager } from "@/components/admin/JobManager";
 import { TodoManager } from "@/components/admin/TodoManager";
 import { TodoAlertsBell } from "@/components/admin/TodoAlertsBell";
 import { SubmissionsManager } from "@/components/admin/SubmissionsManager";
+import { BattlePassManager } from "@/components/admin/BattlePassManager";
 import { NINJA_RANKS } from "@/components/admin/shared";
 import {
   Pencil, BatteryCharging, Eye, LayoutDashboard, Users, Package, Sparkles,
   ScrollText, GitBranch, MapPin, Ghost, Gamepad2, BookOpen, TrendingUp,
-  ShieldCheck, Server, MessageSquare, Award, UsersRound, Menu, X, Rabbit, RotateCcw, AlertTriangle, Briefcase, CheckSquare, Hammer,
+  ShieldCheck, Server, MessageSquare, Award, UsersRound, Menu, X, Rabbit, RotateCcw, AlertTriangle, Briefcase, CheckSquare, Hammer, Trophy,
 } from "lucide-react";
 
 type NavItem = { id: string; label: string; icon: React.ComponentType<{ size?: number; className?: string }>; group: string };
@@ -53,6 +54,7 @@ const NAV: NavItem[] = [
   { id: "minigames", label: "Minigames", icon: Gamepad2,        group: "Mundo" },
   { id: "library",   label: "Biblioteca", icon: BookOpen,       group: "Mundo" },
   { id: "levels",    label: "Níveis",    icon: TrendingUp,      group: "Sistema" },
+  { id: "battlepass", label: "Passe de Batalha", icon: Trophy,  group: "Sistema" },
   { id: "todos",     label: "Tarefas",   icon: CheckSquare,     group: "Sistema" },
   { id: "server",    label: "Servidor",  icon: Server,          group: "Sistema" },
   { id: "whatsapp",  label: "WhatsApp",  icon: MessageSquare,   group: "Sistema" },
@@ -174,6 +176,7 @@ export function AdminPanel() {
             {active === "minigames" && <MinigameManager />}
             {active === "library" && <LibraryManager />}
             {active === "levels" && <LevelManager />}
+            {active === "battlepass" && <BattlePassManager />}
             {active === "todos" && <TodoManager />}
             {active === "parties" && <PartyManager />}
             {active === "admins" && <AdminUsers />}
