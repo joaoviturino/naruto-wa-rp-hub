@@ -165,6 +165,16 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
               Define como o GIF/vídeo aparece no combate. Sem animação carregada, o valor é ignorado.
             </div>
           </Field>
+          <div className="sm:col-span-2 rounded-md border border-amber-500/40 bg-amber-500/5 p-3 space-y-1">
+            <label className="inline-flex items-center gap-2 text-xs">
+              <input type="checkbox" checked={!!f.is_dash}
+                onChange={(e) => up("is_dash", e.target.checked)} />
+              <span className="font-display text-amber-300">Dash / Teletransporte</span>
+            </label>
+            <p className="text-[11px] text-muted-foreground">
+              Quando ativo, o personagem se desloca rapidamente até a frente do inimigo antes de trocar de pose e aplicar o golpe. Ideal para técnicas físicas de investida.
+            </p>
+          </div>
           <Field label="Clã (opcional, define técnica de clã)">
             <NullableSelect value={f.clan_id} onChange={(v: any) => up("clan_id", v)} options={clans.map((c: any) => ({ value: c.id, label: `${c.name} (${c.village})` }))} />
           </Field>
