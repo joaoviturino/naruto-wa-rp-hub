@@ -196,7 +196,7 @@ function RewardsGrid({ season, userId }: { season: any; userId: string }) {
   );
 }
 
-function RewardCell({ reward, premium, onEdit, onEditExisting, onDelete }: any) {
+function RewardCell({ reward, premium, onEdit, onEditExisting, onDelete }: { reward?: any; premium?: boolean; onEdit: () => void; onEditExisting: (r: any) => void; onDelete: (id: string) => void }) {
   if (!reward) {
     return <Button size="sm" variant="ghost" className={premium ? "text-gold" : "text-muted-foreground"} onClick={onEdit}><Plus size={12} /> Adicionar</Button>;
   }
