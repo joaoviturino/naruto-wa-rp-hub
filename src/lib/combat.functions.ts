@@ -169,6 +169,7 @@ type LogEntry = {
   sound_url?: string | null;
   pose_url?: string | null;
   actor_char_id?: string | null;
+  is_dash?: boolean | null;
   target_char_id?: string | null;
   target_npc_idx?: number | null;
   raw_damage?: number;
