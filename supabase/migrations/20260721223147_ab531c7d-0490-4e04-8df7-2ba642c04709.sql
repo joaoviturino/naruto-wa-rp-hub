@@ -1,0 +1,2 @@
+ALTER TABLE public.proficiencies ADD COLUMN IF NOT EXISTS is_element boolean NOT NULL DEFAULT false;
+UPDATE public.proficiencies SET is_element = true WHERE value IN ('katon','suiton','fuuton','doton','raiton');
