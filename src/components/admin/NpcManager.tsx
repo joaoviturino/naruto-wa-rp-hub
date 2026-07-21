@@ -9,6 +9,9 @@ import { Trash2, Upload, Plus, Search, Swords, Store, ShoppingBag, Gift, Graduat
 import { useServerFn } from "@tanstack/react-start";
 import { upsertNpc, deleteNpc, setNpcSkills, setNpcLocations } from "@/lib/npc.functions";
 import { setNpcLearningSteps } from "@/lib/minigame.functions";
+import { adminListNpcPoses, adminUpsertNpcPose, adminDeleteNpcPose, adminListNpcSkillPoses, adminSetNpcSkillPose } from "@/lib/npc-pose.functions";
+import { ImageUpload } from "@/components/ImageUpload";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { NpcGroupManager } from "./NpcGroupManager";
 import { ComboSelect } from "@/components/ui/combo-select";
@@ -324,6 +327,7 @@ export function NpcManager() {
               <TabsTrigger value="identidade">Identidade</TabsTrigger>
               {sel.kind === "aggressive" && <TabsTrigger value="combate">Combate</TabsTrigger>}
               {sel.kind === "aggressive" && <TabsTrigger value="drops">Drops & Skills</TabsTrigger>}
+              {sel.kind === "aggressive" && <TabsTrigger value="poses">Poses</TabsTrigger>}
               {sel.kind !== "aggressive" && sel.kind !== "object" && <TabsTrigger value="dialogo">Diálogo & Missão</TabsTrigger>}
               {sel.kind === "shop" && <TabsTrigger value="loja">Loja</TabsTrigger>}
               {sel.kind === "buyer" && <TabsTrigger value="compra">Compra</TabsTrigger>}
@@ -773,6 +777,14 @@ export function NpcManager() {
           </div>
           </TabsContent>
           )}
+          {sel.kind === "aggressive" && (
+          <TabsContent value="poses" className="space-y-4 mt-0">
+            <NpcPosesTab
+              npcId={sel.id}
+              assignedSkills={skills.filter((s) => selSkills.has(s.id))}
+            />
+          </TabsContent>
+          )}
           {sel.kind === "employer" && (
           <TabsContent value="emprego" className="space-y-4 mt-0">
             <div className="scroll-panel rounded-lg p-4 space-y-3">
@@ -1132,6 +1144,114 @@ function ChestAdminSection({ npcId }: { npcId: string }) {
               }} />
               {p.nickname}
             </label>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NpcPosesTab({ npcId, assignedSkills }: { npcId: string; assignedSkills: { id: string; name: string; rank: string }[] }) {
+  const listPoses = useServerFn(adminListNpcPoses);
+  const upPose = useServerFn(adminUpsertNpcPose);
+  const delPose = useServerFn(adminDeleteNpcPose);
+  const listMap = useServerFn(adminListNpcSkillPoses);
+  const setMap = useServerFn(adminSetNpcSkillPose);
+  const [poses, setPoses] = useState<Array<{ id: string; name: string; image_url: string; sort_order: number }>>([]);
+  const [mapping, setMapping] = useState<Record<string, string | null>>({});
+  const [name, setName] = useState("");
+
+  async function load() {
+    try {
+      const rows = await listPoses({ data: { npc_id: npcId } } as any) as any[];
+      setPoses(rows);
+      const m = await listMap({ data: { npc_id: npcId } } as any) as any[];
+      const dict: Record<string, string | null> = {};
+      for (const r of m) dict[r.skill_id] = r.pose_id;
+      setMapping(dict);
+    } catch (e: any) { toast.error(e.message); }
+  }
+  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [npcId]);
+
+  return (
+    <div className="space-y-4">
+      <div className="scroll-panel rounded-lg p-4 space-y-3">
+        <h4 className="font-display text-lg text-gold">Poses do NPC</h4>
+        <p className="text-xs text-muted-foreground">
+          Cada pose é uma imagem PNG do NPC. Durante o golpe, o sprite dele troca para a pose atribuída à habilidade por ~1,4s.
+        </p>
+        <div className="border border-border rounded p-3 space-y-2 bg-secondary/20">
+          <Label>Nova pose</Label>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Input placeholder="Nome (ex: Ataque frontal)" value={name} onChange={(e) => setName(e.target.value)} className="sm:flex-1" />
+            <ImageUpload label="Enviar imagem" bucket="npcs" userId={npcId}
+              accept="image/png,image/webp" maxMb={5}
+              onUploaded={async (url) => {
+                const nm = name.trim() || "Pose";
+                try {
+                  await upPose({ data: { npc_id: npcId, name: nm, image_url: url, sort_order: poses.length } } as any);
+                  toast.success("Pose adicionada."); setName(""); load();
+                } catch (e: any) { toast.error(e.message); }
+              }} />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          {poses.map((p) => (
+            <div key={p.id} className="border border-border rounded p-2 space-y-2 bg-input/40">
+              <div className="h-28 bg-black/30 rounded flex items-center justify-center overflow-hidden">
+                <img src={p.image_url} alt={p.name} className="max-h-full max-w-full object-contain" />
+              </div>
+              <Input value={p.name}
+                onChange={(e) => setPoses((rs) => rs.map((r) => r.id === p.id ? { ...r, name: e.target.value } : r))}
+                onBlur={async () => {
+                  try { await upPose({ data: { id: p.id, npc_id: npcId, name: p.name, image_url: p.image_url } } as any); }
+                  catch (e: any) { toast.error(e.message); }
+                }} className="h-7 text-xs" />
+              <Button size="sm" variant="ghost" className="w-full text-red-400 hover:text-red-300" onClick={async () => {
+                if (!confirm(`Remover pose "${p.name}"?`)) return;
+                try { await delPose({ data: { id: p.id } } as any); toast.success("Removida."); load(); }
+                catch (e: any) { toast.error(e.message); }
+              }}>Remover</Button>
+            </div>
+          ))}
+          {poses.length === 0 && <p className="text-xs text-muted-foreground col-span-full">Nenhuma pose ainda.</p>}
+        </div>
+      </div>
+
+      <div className="scroll-panel rounded-lg p-4 space-y-3">
+        <h4 className="font-display text-lg text-gold">Mapear pose por habilidade</h4>
+        <p className="text-xs text-muted-foreground">
+          Escolha qual pose o NPC exibe ao usar cada habilidade dele. Somente habilidades marcadas na aba "Drops & Skills" aparecem aqui.
+        </p>
+        {assignedSkills.length === 0 && (
+          <p className="text-xs text-muted-foreground">Nenhuma habilidade atribuída a este NPC.</p>
+        )}
+        <div className="grid gap-2">
+          {assignedSkills.map((s) => (
+            <div key={s.id} className="flex items-center gap-2">
+              <div className="flex-1">
+                <div className="text-sm">{s.name}</div>
+                <div className="text-[11px] text-muted-foreground">Rank {s.rank}</div>
+              </div>
+              <Select
+                value={mapping[s.id] ?? "__none__"}
+                onValueChange={async (v) => {
+                  const poseId = v === "__none__" ? null : v;
+                  try {
+                    await setMap({ data: { npc_id: npcId, skill_id: s.id, pose_id: poseId } } as any);
+                    setMapping((m) => ({ ...m, [s.id]: poseId }));
+                  } catch (e: any) { toast.error(e.message); }
+                }}
+              >
+                <SelectTrigger className="w-[220px]"><SelectValue placeholder="— Nenhuma —" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Nenhuma —</SelectItem>
+                  {poses.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           ))}
         </div>
       </div>
