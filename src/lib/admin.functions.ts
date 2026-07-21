@@ -451,6 +451,7 @@ const skillPayload = z.object({
   is_defensive: z.boolean().default(false),
   defense_percent: z.number().int().min(0).max(100).default(50),
   accuracy: z.number().int().min(1).max(100).default(100),
+  is_dash: z.boolean().default(false),
   meta: metaSchema,
 });
 
