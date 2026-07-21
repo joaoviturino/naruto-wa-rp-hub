@@ -249,7 +249,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
     if (!fresh.length) return;
     lastLogSeq.current = fresh[fresh.length - 1].seq;
     for (const entry of fresh) {
-      if (entry.pose_url || entry.sound_url || entry.animation_url) animQueue.current.push(entry);
+      if (entry.pose_url || entry.sound_url || entry.animation_url || entry.is_dash) animQueue.current.push(entry);
       // MISS: mostra um "flutuante" cinza no alvo para deixar claro que errou.
       if (entry.missed) {
         const missId = `${entry.seq}-miss`;
