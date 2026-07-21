@@ -1237,6 +1237,90 @@ export type Database = {
           },
         ]
       }
+      item_submissions: {
+        Row: {
+          approved_item_id: string | null
+          created_at: string
+          description: string | null
+          durability: number | null
+          id: string
+          image_url: string | null
+          meta: Json | null
+          name: string
+          rank: string
+          req_class: string | null
+          req_maestria: string | null
+          req_mission_id: string | null
+          req_nivel: string | null
+          req_rank: string | null
+          req_skill_id: string | null
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          slot_size: number | null
+          stack_limit: number | null
+          stackable: boolean | null
+          status: string
+          submitted_by: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          approved_item_id?: string | null
+          created_at?: string
+          description?: string | null
+          durability?: number | null
+          id?: string
+          image_url?: string | null
+          meta?: Json | null
+          name: string
+          rank: string
+          req_class?: string | null
+          req_maestria?: string | null
+          req_mission_id?: string | null
+          req_nivel?: string | null
+          req_rank?: string | null
+          req_skill_id?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          slot_size?: number | null
+          stack_limit?: number | null
+          stackable?: boolean | null
+          status?: string
+          submitted_by: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          approved_item_id?: string | null
+          created_at?: string
+          description?: string | null
+          durability?: number | null
+          id?: string
+          image_url?: string | null
+          meta?: Json | null
+          name?: string
+          rank?: string
+          req_class?: string | null
+          req_maestria?: string | null
+          req_mission_id?: string | null
+          req_nivel?: string | null
+          req_rank?: string | null
+          req_skill_id?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          slot_size?: number | null
+          stack_limit?: number | null
+          stackable?: boolean | null
+          status?: string
+          submitted_by?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       items: {
         Row: {
           description: string | null
