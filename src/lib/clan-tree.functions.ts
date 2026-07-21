@@ -159,6 +159,22 @@ export const unlockClanNode = createServerFn({ method: "POST" })
     const { error } = await context.supabase.from("character_clan_progress")
       .insert({ character_id: me.id, node_id: node.id });
     if (error) throw new Error(error.message);
+
+    // Se for nó de habilidade, concede a skill ao personagem (permite uso em combate).
+    if (node.kind === "skill") {
+      const { data: full } = await context.supabase.from("clan_tree_nodes")
+        .select("skill_id").eq("id", node.id).maybeSingle();
+      const skillId = (full as any)?.skill_id;
+      if (skillId) {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { data: has } = await supabaseAdmin.from("character_skills")
+          .select("skill_id").eq("character_id", me.id).eq("skill_id", skillId).maybeSingle();
+        if (!has) {
+          await supabaseAdmin.from("character_skills")
+            .insert({ character_id: me.id, skill_id: skillId });
+        }
+      }
+    }
     return { ok: true, already: false };
   });
 
