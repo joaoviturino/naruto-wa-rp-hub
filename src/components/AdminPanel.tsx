@@ -151,6 +151,9 @@ export function AdminPanel() {
               <h1 className="font-display text-2xl font-black leading-none admin-shimmer-text">{current.label}</h1>
               <p className="mt-1 text-xs uppercase tracking-widest text-muted-foreground">{current.group}</p>
             </div>
+            <div className="ml-auto">
+              <TodoAlertsBell onOpenTodos={() => setActive("todos")} />
+            </div>
           </header>
 
           <div key={active} className="animate-admin-rise">
