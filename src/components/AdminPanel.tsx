@@ -25,6 +25,7 @@ import { ServerControl } from "@/components/admin/ServerControl";
 import { MountManager } from "@/components/admin/MountManager";
 import { JobManager } from "@/components/admin/JobManager";
 import { TodoManager } from "@/components/admin/TodoManager";
+import { TodoAlertsBell } from "@/components/admin/TodoAlertsBell";
 import { NINJA_RANKS } from "@/components/admin/shared";
 import {
   Pencil, BatteryCharging, Eye, LayoutDashboard, Users, Package, Sparkles,
