@@ -1006,6 +1006,7 @@ async function runSingleNpcAttack(supabaseAdmin: any, npcState: NpcState, state:
     animation_mode: ((skill as any).animation_mode ?? "overlay") as any,
     target_char_id: target.character_id,
     actor_char_id: npcState.id,
+    pose_url: npcPoseUrl,
     sound_url: (skill as any).sound_url ?? null,
     missed,
     ...(shieldInfo ? { shield_reduced_by: shieldInfo.percent, shield_name: shieldInfo.name } : {}),
