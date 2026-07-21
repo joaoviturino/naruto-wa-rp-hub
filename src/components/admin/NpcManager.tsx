@@ -9,6 +9,9 @@ import { Trash2, Upload, Plus, Search, Swords, Store, ShoppingBag, Gift, Graduat
 import { useServerFn } from "@tanstack/react-start";
 import { upsertNpc, deleteNpc, setNpcSkills, setNpcLocations } from "@/lib/npc.functions";
 import { setNpcLearningSteps } from "@/lib/minigame.functions";
+import { adminListNpcPoses, adminUpsertNpcPose, adminDeleteNpcPose, adminListNpcSkillPoses, adminSetNpcSkillPose } from "@/lib/npc-pose.functions";
+import { ImageUpload } from "@/components/ImageUpload";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { NpcGroupManager } from "./NpcGroupManager";
 import { ComboSelect } from "@/components/ui/combo-select";
@@ -324,6 +327,7 @@ export function NpcManager() {
               <TabsTrigger value="identidade">Identidade</TabsTrigger>
               {sel.kind === "aggressive" && <TabsTrigger value="combate">Combate</TabsTrigger>}
               {sel.kind === "aggressive" && <TabsTrigger value="drops">Drops & Skills</TabsTrigger>}
+              {sel.kind === "aggressive" && <TabsTrigger value="poses">Poses</TabsTrigger>}
               {sel.kind !== "aggressive" && sel.kind !== "object" && <TabsTrigger value="dialogo">Diálogo & Missão</TabsTrigger>}
               {sel.kind === "shop" && <TabsTrigger value="loja">Loja</TabsTrigger>}
               {sel.kind === "buyer" && <TabsTrigger value="compra">Compra</TabsTrigger>}
