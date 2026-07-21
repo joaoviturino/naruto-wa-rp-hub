@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Plus, Save, Trash2, X, CheckCircle2, Clock, AlertTriangle, Flame, ListTodo, PlayCircle, Ban } from "lucide-react";
+import { Plus, Save, Trash2, X, CheckCircle2, Clock, AlertTriangle, Flame, ListTodo, PlayCircle, Ban, LayoutList, CalendarDays, CalendarRange } from "lucide-react";
+import { TodoCalendar } from "@/components/admin/TodoCalendar";
 
 type Urgency = "low" | "medium" | "high" | "critical";
 type Status = "todo" | "in_progress" | "blocked" | "done";
@@ -62,6 +63,7 @@ export function TodoManager() {
   const [filterStatus, setFilterStatus] = useState<Status | "all">("all");
   const [filterUrgency, setFilterUrgency] = useState<Urgency | "all">("all");
   const [loading, setLoading] = useState(false);
+  const [view, setView] = useState<"list" | "month" | "week">("list");
 
   async function load() {
     setLoading(true);
@@ -142,7 +144,23 @@ export function TodoManager() {
           <h3 className="font-display text-xl text-gold">Tarefas Admin</h3>
           <p className="text-xs text-muted-foreground">Organize prazos, urgências e status das pendências da equipe.</p>
         </div>
-        <Button onClick={() => setSel({ ...EMPTY })}><Plus size={14} className="mr-1" /> Nova tarefa</Button>
+        <div className="flex items-center gap-2">
+          <div className="inline-flex rounded-md border border-border overflow-hidden">
+            <button onClick={() => setView("list")}
+              className={`px-2 py-1 text-[11px] flex items-center gap-1 ${view === "list" ? "bg-gold/20 text-gold" : "text-muted-foreground hover:bg-secondary/60"}`}>
+              <LayoutList size={12} /> Lista
+            </button>
+            <button onClick={() => setView("month")}
+              className={`px-2 py-1 text-[11px] flex items-center gap-1 border-l border-border ${view === "month" ? "bg-gold/20 text-gold" : "text-muted-foreground hover:bg-secondary/60"}`}>
+              <CalendarDays size={12} /> Mês
+            </button>
+            <button onClick={() => setView("week")}
+              className={`px-2 py-1 text-[11px] flex items-center gap-1 border-l border-border ${view === "week" ? "bg-gold/20 text-gold" : "text-muted-foreground hover:bg-secondary/60"}`}>
+              <CalendarRange size={12} /> Semana
+            </button>
+          </div>
+          <Button onClick={() => setSel({ ...EMPTY })}><Plus size={14} className="mr-1" /> Nova tarefa</Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
@@ -188,6 +206,9 @@ export function TodoManager() {
         </div>
       </div>
 
+      {view !== "list" ? (
+        <TodoCalendar rows={filtered as any} mode={view} onSelect={(t) => setSel({ ...(t as any) })} />
+      ) : (
       <div className="scroll-panel rounded-lg overflow-x-auto">
         <table className="w-full text-sm min-w-[820px]">
           <thead className="bg-secondary/50">
@@ -233,6 +254,7 @@ export function TodoManager() {
           </tbody>
         </table>
       </div>
+      )}
 
       {sel && (
         <div className="scroll-panel rounded-lg p-4 space-y-3">
