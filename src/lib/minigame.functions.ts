@@ -148,6 +148,55 @@ const handSealsConfigSchema = z.object({
   sequence: ["tora","mi","tatsu"], seal_images: {},
 });
 
+const shurikenTargetConfigSchema = z.object({
+  duration_seconds: z.number().int().min(15).max(240).default(45),
+  throws: z.number().int().min(3).max(30).default(6),
+  target_score: z.number().int().min(1).max(9999).default(240),
+  ring_scores: z.array(z.number().int().min(0).max(500)).length(4).default([100, 60, 30, 10]),
+  wind_amp: z.number().min(0).max(300).default(80),
+  wind_speed: z.number().min(0.2).max(6).default(1.6),
+  crosshair_size: z.number().int().min(28).max(120).default(56),
+  difficulty: z.number().int().min(1).max(5).default(2),
+  background_url: z.string().nullish(),
+  target_image_url: z.string().nullish(),
+  shuriken_image_url: z.string().nullish(),
+  throw_sound_url: z.string().nullish(),
+  hit_sound_url: z.string().nullish(),
+  miss_sound_url: z.string().nullish(),
+}).default({} as any);
+
+const shurikenMovingConfigSchema = z.object({
+  duration_seconds: z.number().int().min(15).max(240).default(60),
+  target_score: z.number().int().min(1).max(999).default(12),
+  max_missed: z.number().int().min(0).max(50).default(5),
+  spawn_interval_ms: z.number().int().min(300).max(5000).default(1000),
+  spawn_jitter_ms: z.number().int().min(0).max(3000).default(400),
+  target_speed: z.number().min(1).max(20).default(3),
+  target_size: z.number().int().min(28).max(120).default(60),
+  difficulty: z.number().int().min(1).max(5).default(2),
+  background_url: z.string().nullish(),
+  target_image_url: z.string().nullish(),
+  shuriken_image_url: z.string().nullish(),
+  hit_sound_url: z.string().nullish(),
+  miss_sound_url: z.string().nullish(),
+}).default({} as any);
+
+const shurikenMultiConfigSchema = z.object({
+  rounds: z.number().int().min(1).max(20).default(5),
+  base_targets: z.number().int().min(2).max(12).default(3),
+  grow_per_round: z.number().int().min(0).max(4).default(1),
+  round_time_ms: z.number().int().min(800).max(15000).default(2500),
+  target_size: z.number().int().min(28).max(120).default(56),
+  max_mistakes: z.number().int().min(0).max(10).default(2),
+  difficulty: z.number().int().min(1).max(5).default(2),
+  background_url: z.string().nullish(),
+  target_image_url: z.string().nullish(),
+  shuriken_image_url: z.string().nullish(),
+  hit_sound_url: z.string().nullish(),
+  success_sound_url: z.string().nullish(),
+  fail_sound_url: z.string().nullish(),
+}).default({} as any);
+
 const configSchema = z.any();
 
 const ninjaRank = z.enum(["estudante","genin","chunin","tokubetsu_jonin","jonin","anbu","sannin","kage"]);
@@ -162,7 +211,7 @@ const rewardSkillsSchema = z.array(z.object({ skill_id: z.string().uuid() })).de
 const upsertSchema = z.object({
   id: z.string().uuid().optional(),
   slug: z.string().trim().min(2).max(40).regex(/^[a-z0-9_-]+$/, "slug inválido"),
-  kind: z.enum(["cleanup", "sequence", "forge", "tailoring", "mining", "logging", "kenjutsu", "kenjutsu_defense", "kenjutsu_kata", "hand_seals"]).default("cleanup"),
+  kind: z.enum(["cleanup", "sequence", "forge", "tailoring", "mining", "logging", "kenjutsu", "kenjutsu_defense", "kenjutsu_kata", "hand_seals", "shuriken_target", "shuriken_moving", "shuriken_multi"]).default("cleanup"),
   name: z.string().min(2).max(80),
   description: z.string().max(2000).nullish(),
   background_url: z.string().nullish(),
@@ -192,6 +241,9 @@ const upsertSchema = z.object({
     data.kind === "kenjutsu_defense" ? kenjutsuDefenseConfigSchema :
     data.kind === "kenjutsu_kata" ? kenjutsuKataConfigSchema :
     data.kind === "hand_seals" ? handSealsConfigSchema :
+    data.kind === "shuriken_target" ? shurikenTargetConfigSchema :
+    data.kind === "shuriken_moving" ? shurikenMovingConfigSchema :
+    data.kind === "shuriken_multi" ? shurikenMultiConfigSchema :
     cleanupConfigSchema;
   const r = parser.safeParse(data.config);
   if (!r.success) {
