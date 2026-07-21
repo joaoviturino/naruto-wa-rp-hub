@@ -560,7 +560,7 @@ export const listUsers = createServerFn({ method: "GET" })
 
 export const revokeRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ user_id: z.string().uuid(), role: z.enum(["admin","user"]) }).parse(i))
+  .inputValidator((i: unknown) => z.object({ user_id: z.string().uuid(), role: z.enum(["admin","user","blacksmith"]) }).parse(i))
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     if (data.user_id === context.userId && data.role === "admin") {
