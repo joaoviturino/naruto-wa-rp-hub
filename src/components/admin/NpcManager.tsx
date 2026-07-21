@@ -777,6 +777,14 @@ export function NpcManager() {
           </div>
           </TabsContent>
           )}
+          {sel.kind === "aggressive" && (
+          <TabsContent value="poses" className="space-y-4 mt-0">
+            <NpcPosesTab
+              npcId={sel.id}
+              assignedSkills={skills.filter((s) => selSkills.has(s.id))}
+            />
+          </TabsContent>
+          )}
           {sel.kind === "employer" && (
           <TabsContent value="emprego" className="space-y-4 mt-0">
             <div className="scroll-panel rounded-lg p-4 space-y-3">
