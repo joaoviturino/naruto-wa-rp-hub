@@ -13,6 +13,7 @@ import { adminSetJob } from "@/lib/jobs.functions";
 import { generateTraits } from "@/lib/ai-traits.functions";
 import { toast } from "sonner";
 import { NINJA_RANKS, SKILL_RANKS, VILLAGES, ELEMENTS, labelize, elementLimitForRank, countElementProficiencies } from "./shared";
+import { getElementValuesSync } from "@/hooks/useProficiencies";
 import { useProficiencies } from "@/hooks/useProficiencies";
 import { X, Plus, Sparkles } from "lucide-react";
 import { ImageUpload } from "@/components/ImageUpload";
@@ -76,7 +77,7 @@ export function PlayerEditor({ characterId, open, onOpenChange, onSaved }: {
       const profs = { ...(p.proficiencies ?? {}) };
       const current = { ...(profs[k] ?? {}), [field]: v };
       // Se for elemento e estamos ativando (não limpando), respeita o limite por patente.
-      if (v && (ELEMENTS as readonly string[]).includes(k)) {
+      if (v && getElementValuesSync().includes(k)) {
         const prev = profs[k] ?? {};
         const wasActive = !!(prev.nivel || prev.maestria);
         if (!wasActive) {

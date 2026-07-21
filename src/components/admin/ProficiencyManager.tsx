@@ -12,10 +12,10 @@ export function ProficiencyManager() {
   const rows = useProficiencies({ includeInactive: true });
   const [editing, setEditing] = useState<Proficiency | null>(null);
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState<{ value: string; label: string; description: string; sort_order: number }>({ value: "", label: "", description: "", sort_order: 999 });
+  const [form, setForm] = useState<{ value: string; label: string; description: string; sort_order: number; is_element: boolean }>({ value: "", label: "", description: "", sort_order: 999, is_element: false });
 
-  function startCreate() { setCreating(true); setEditing(null); setForm({ value: "", label: "", description: "", sort_order: (rows.length + 1) * 10 }); }
-  function startEdit(r: Proficiency) { setEditing(r); setCreating(false); setForm({ value: r.value, label: r.label, description: (r.description ?? "") as string, sort_order: r.sort_order }); }
+  function startCreate() { setCreating(true); setEditing(null); setForm({ value: "", label: "", description: "", sort_order: (rows.length + 1) * 10, is_element: false }); }
+  function startEdit(r: Proficiency) { setEditing(r); setCreating(false); setForm({ value: r.value, label: r.label, description: (r.description ?? "") as string, sort_order: r.sort_order, is_element: !!r.is_element }); }
   function cancel() { setEditing(null); setCreating(false); }
 
   async function saveCreate() {
@@ -24,13 +24,17 @@ export function ProficiencyManager() {
       _value: form.value, _label: form.label, _desc: form.description || undefined, _sort: form.sort_order,
     } as any);
     if (error) { toast.error(error.message); return; }
+    // Após criar o valor via RPC, aplicamos o flag "é elemento".
+    if (form.is_element) {
+      await supabase.from("proficiencies").update({ is_element: true }).eq("value", form.value);
+    }
     toast.success("Proficiência criada.");
     cancel(); refreshProficiencies();
   }
   async function saveEdit() {
     if (!editing) return;
     const { error } = await supabase.from("proficiencies").update({
-      label: form.label, description: form.description || null, sort_order: form.sort_order,
+      label: form.label, description: form.description || null, sort_order: form.sort_order, is_element: form.is_element,
     }).eq("value", editing.value);
     if (error) { toast.error(error.message); return; }
     toast.success("Proficiência atualizada.");
@@ -72,6 +76,12 @@ export function ProficiencyManager() {
             <Label>Ordem</Label>
             <Input type="number" value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: Number(e.target.value) || 0 })} />
           </div>
+          <div className="flex items-end">
+            <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+              <input type="checkbox" checked={form.is_element} onChange={(e) => setForm({ ...form, is_element: e.target.checked })} />
+              <span>É elemento (sujeito ao limite por patente)</span>
+            </label>
+          </div>
           <div className="sm:col-span-2 flex gap-2 justify-end">
             <Button variant="outline" onClick={cancel}><X size={14} /> Cancelar</Button>
             <Button onClick={creating ? saveCreate : saveEdit}><Save size={14} /> {creating ? "Criar" : "Salvar"}</Button>
@@ -87,6 +97,7 @@ export function ProficiencyManager() {
               <th className="text-left p-3">Rótulo</th>
               <th className="text-left p-3">Valor</th>
               <th className="text-left p-3">Descrição</th>
+              <th className="text-left p-3">Elemento?</th>
               <th className="text-left p-3">Status</th>
               <th></th>
             </tr>
@@ -98,6 +109,7 @@ export function ProficiencyManager() {
                 <td className="p-3 font-semibold">{r.label}</td>
                 <td className="p-3 text-xs text-muted-foreground">{r.value}</td>
                 <td className="p-3 text-xs max-w-md">{r.description ?? "—"}</td>
+                <td className="p-3 text-xs">{r.is_element ? <span className="text-gold">sim</span> : <span className="text-muted-foreground">—</span>}</td>
                 <td className="p-3 text-xs">{r.active ? <span className="text-emerald-400">ativa</span> : <span className="text-red-400">desativada</span>}</td>
                 <td className="p-3 text-right whitespace-nowrap">
                   <Button size="sm" variant="outline" onClick={() => startEdit(r)}><Pencil size={12} /></Button>{" "}
@@ -107,7 +119,7 @@ export function ProficiencyManager() {
                 </td>
               </tr>
             ))}
-            {rows.length === 0 && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">Nenhuma proficiência.</td></tr>}
+            {rows.length === 0 && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">Nenhuma proficiência.</td></tr>}
           </tbody>
         </table>
       </div>

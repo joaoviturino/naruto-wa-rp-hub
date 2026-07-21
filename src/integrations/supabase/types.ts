@@ -2613,6 +2613,7 @@ export type Database = {
           active: boolean
           created_at: string
           description: string | null
+          is_element: boolean
           label: string
           sort_order: number
           updated_at: string
@@ -2622,6 +2623,7 @@ export type Database = {
           active?: boolean
           created_at?: string
           description?: string | null
+          is_element?: boolean
           label: string
           sort_order?: number
           updated_at?: string
@@ -2631,6 +2633,7 @@ export type Database = {
           active?: boolean
           created_at?: string
           description?: string | null
+          is_element?: boolean
           label?: string
           sort_order?: number
           updated_at?: string

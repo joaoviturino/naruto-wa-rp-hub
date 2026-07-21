@@ -26,6 +26,11 @@ export const VILLAGES = [
   "konoha","suna","kiri","kumo","iwa","ame","kusa","taki","oto","yuki","hoshi","nomad",
 ] as const;
 
+import { getElementValuesSync } from "@/hooks/useProficiencies";
+
+// Lista legada dos 5 elementos base — usada como fallback quando o catálogo
+// dinâmico de proficiências ainda não carregou. A verificação real de
+// "é elemento?" vem do banco (proficiencies.is_element).
 export const ELEMENTS = ["katon","suiton","fuuton","doton","raiton"] as const;
 
 // Limite de proficiências elementais permitidas por patente ninja.
@@ -49,7 +54,8 @@ export function elementLimitForRank(rank: string | null | undefined): number {
 export function countElementProficiencies(profs: any): number {
   if (!profs || typeof profs !== "object") return 0;
   let n = 0;
-  for (const el of ELEMENTS) {
+  const elements = getElementValuesSync();
+  for (const el of elements) {
     const e = profs[el];
     if (e && (e.nivel || e.maestria)) n++;
   }
