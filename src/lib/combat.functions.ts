@@ -480,7 +480,7 @@ export const playerAttack = createServerFn({ method: "POST" })
       .from("character_skills").select("skill_id").eq("character_id", me.id).eq("skill_id", data.skill_id).maybeSingle();
     if (!owned) throw new Error("Você não conhece essa habilidade.");
     const { data: skill } = await context.supabase.from("skills")
-      .select("id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class,skill_class,classification,meta,animation_url,animation_mode,sound_url,accuracy").eq("id", data.skill_id).maybeSingle();
+      .select("id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class,skill_class,classification,meta,animation_url,animation_mode,sound_url,accuracy,required_item_id").eq("id", data.skill_id).maybeSingle();
     if (!skill) throw new Error("Habilidade inexistente.");
     const combatClass = String((skill as any).skill_class ?? skill.req_class ?? "").toLowerCase();
     const healCfg = (skill as any).meta?.heal as { target?: "single" | "team" } | undefined;
@@ -597,6 +597,7 @@ export const playerAttack = createServerFn({ method: "POST" })
     let toolQtyConsumed = 0;
     if (combatClass === "shurikenjutsu") {
       const toolQtyNeeded = Math.max(1, Number((skill as any).meta?.tool_qty ?? 1));
+      const requiredItemId = (skill as any).required_item_id as string | null | undefined;
       const { data: inv } = await supabaseAdmin.from("inventory")
         .select("ninja_bag,secondary_slots").eq("character_id", me.id).maybeSingle();
       const bag: any[] = Array.isArray(inv?.ninja_bag) ? inv!.ninja_bag.map((e: any) => ({ ...e })) : [];
@@ -605,11 +606,17 @@ export const playerAttack = createServerFn({ method: "POST" })
       const { data: itemRows } = ids.length
         ? await supabaseAdmin.from("items").select("id,name,meta").in("id", ids)
         : { data: [] as any[] };
-      const toolIds = new Set((itemRows ?? []).filter((r: any) => r?.meta?.is_tool).map((r: any) => r.id));
+      const toolIds = requiredItemId
+        ? new Set([requiredItemId])
+        : new Set((itemRows ?? []).filter((r: any) => r?.meta?.is_tool).map((r: any) => r.id));
       const totalAvailable = (arr: any[]) =>
         arr.filter((e: any) => toolIds.has(e?.item_id)).reduce((s: number, e: any) => s + Number(e.qty ?? 1), 0);
       const available = totalAvailable(bag) + totalAvailable(sec);
       if (available < toolQtyNeeded) {
+        if (requiredItemId) {
+          const req = (itemRows ?? []).find((r: any) => r.id === requiredItemId);
+          throw new Error(`Item necessário insuficiente${req?.name ? ` (${req.name})` : ""} — precisa ${toolQtyNeeded}, você tem ${available}.`);
+        }
         throw new Error(`Ferramentas insuficientes — necessário ${toolQtyNeeded}, você tem ${available}.`);
       }
       let remaining = toolQtyNeeded;

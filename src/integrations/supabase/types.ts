@@ -2892,6 +2892,7 @@ export type Database = {
           req_nivel: Database["public"]["Enums"]["skill_rank"] | null
           req_prereq_skill_id: string | null
           req_rank: Database["public"]["Enums"]["ninja_rank"] | null
+          required_item_id: string | null
           skill_class: string | null
           sound_url: string | null
           type: string | null
@@ -2927,6 +2928,7 @@ export type Database = {
           req_nivel?: Database["public"]["Enums"]["skill_rank"] | null
           req_prereq_skill_id?: string | null
           req_rank?: Database["public"]["Enums"]["ninja_rank"] | null
+          required_item_id?: string | null
           skill_class?: string | null
           sound_url?: string | null
           type?: string | null
@@ -2962,6 +2964,7 @@ export type Database = {
           req_nivel?: Database["public"]["Enums"]["skill_rank"] | null
           req_prereq_skill_id?: string | null
           req_rank?: Database["public"]["Enums"]["ninja_rank"] | null
+          required_item_id?: string | null
           skill_class?: string | null
           sound_url?: string | null
           type?: string | null
@@ -2986,6 +2989,13 @@ export type Database = {
             columns: ["req_prereq_skill_id"]
             isOneToOne: false
             referencedRelation: "skills"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "skills_required_item_id_fkey"
+            columns: ["required_item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
             referencedColumns: ["id"]
           },
         ]
