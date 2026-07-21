@@ -32,12 +32,13 @@ export function AdminUsers() {
           <tbody>
             {filtered.map((r) => {
               const isAdmin = r.roles.includes("admin");
+              const isBlacksmith = r.roles.includes("blacksmith");
               return (
                 <tr key={r.id} className="border-t border-border">
                   <td className="p-2 font-mono text-xs">{r.email}</td>
                   <td className="p-2">
                     {r.roles.map((role: string) => (
-                      <span key={role} className={`inline-block rounded-full px-2 py-0.5 text-xs mr-1 ${role === "admin" ? "bg-gold/20 text-gold" : "bg-secondary"}`}>{role}</span>
+                      <span key={role} className={`inline-block rounded-full px-2 py-0.5 text-xs mr-1 ${role === "admin" ? "bg-gold/20 text-gold" : role === "blacksmith" ? "bg-blood/20 text-blood" : "bg-secondary"}`}>{role}</span>
                     ))}
                   </td>
                   <td className="p-2 text-xs text-muted-foreground">{new Date(r.created_at).toLocaleDateString()}</td>
@@ -61,6 +62,18 @@ export function AdminUsers() {
                         try { await grant({ data: { user_id: r.id, role: "admin" } } as any); toast.success("Promovido a admin."); load(); }
                         catch (e: any) { toast.error(e.message); }
                       }}>Tornar admin</Button>
+                    )}
+                    {isBlacksmith ? (
+                      <Button size="sm" variant="outline" onClick={async () => {
+                        if (!confirm(`Remover cargo de Ferreiro de ${r.email}?`)) return;
+                        try { await revoke({ data: { user_id: r.id, role: "blacksmith" } } as any); toast.success("Removido."); load(); }
+                        catch (e: any) { toast.error(e.message); }
+                      }}>Remover ferreiro</Button>
+                    ) : (
+                      <Button size="sm" variant="secondary" onClick={async () => {
+                        try { await grant({ data: { user_id: r.id, role: "blacksmith" } } as any); toast.success("Promovido a ferreiro."); load(); }
+                        catch (e: any) { toast.error(e.message); }
+                      }}>Tornar ferreiro</Button>
                     )}
                     </div>
                   </td>

@@ -18,6 +18,7 @@ import { Route as AuthenticatedLibraryRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedClanTreeRouteImport } from './routes/_authenticated/clan-tree'
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated/chat'
 import { Route as AuthenticatedCharacterRouteImport } from './routes/_authenticated/character'
+import { Route as AuthenticatedBlacksmithRouteImport } from './routes/_authenticated/blacksmith'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as ApiPublicBotBridgeRouteImport } from './routes/api/public/bot-bridge'
 import { Route as AuthenticatedDuelIdRouteImport } from './routes/_authenticated/duel.$id'
@@ -66,6 +67,11 @@ const AuthenticatedCharacterRoute = AuthenticatedCharacterRouteImport.update({
   path: '/character',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedBlacksmithRoute = AuthenticatedBlacksmithRouteImport.update({
+  id: '/blacksmith',
+  path: '/blacksmith',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -87,6 +93,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/admin': typeof AuthenticatedAdminRoute
+  '/blacksmith': typeof AuthenticatedBlacksmithRoute
   '/character': typeof AuthenticatedCharacterRoute
   '/chat': typeof AuthenticatedChatRoute
   '/clan-tree': typeof AuthenticatedClanTreeRoute
@@ -100,6 +107,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/admin': typeof AuthenticatedAdminRoute
+  '/blacksmith': typeof AuthenticatedBlacksmithRoute
   '/character': typeof AuthenticatedCharacterRoute
   '/chat': typeof AuthenticatedChatRoute
   '/clan-tree': typeof AuthenticatedClanTreeRoute
@@ -115,6 +123,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
+  '/_authenticated/blacksmith': typeof AuthenticatedBlacksmithRoute
   '/_authenticated/character': typeof AuthenticatedCharacterRoute
   '/_authenticated/chat': typeof AuthenticatedChatRoute
   '/_authenticated/clan-tree': typeof AuthenticatedClanTreeRoute
@@ -130,6 +139,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/sitemap.xml'
     | '/admin'
+    | '/blacksmith'
     | '/character'
     | '/chat'
     | '/clan-tree'
@@ -143,6 +153,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/sitemap.xml'
     | '/admin'
+    | '/blacksmith'
     | '/character'
     | '/chat'
     | '/clan-tree'
@@ -157,6 +168,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/sitemap.xml'
     | '/_authenticated/admin'
+    | '/_authenticated/blacksmith'
     | '/_authenticated/character'
     | '/_authenticated/chat'
     | '/_authenticated/clan-tree'
@@ -239,6 +251,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCharacterRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/blacksmith': {
+      id: '/_authenticated/blacksmith'
+      path: '/blacksmith'
+      fullPath: '/blacksmith'
+      preLoaderRoute: typeof AuthenticatedBlacksmithRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/admin': {
       id: '/_authenticated/admin'
       path: '/admin'
@@ -265,6 +284,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
+  AuthenticatedBlacksmithRoute: typeof AuthenticatedBlacksmithRoute
   AuthenticatedCharacterRoute: typeof AuthenticatedCharacterRoute
   AuthenticatedChatRoute: typeof AuthenticatedChatRoute
   AuthenticatedClanTreeRoute: typeof AuthenticatedClanTreeRoute
@@ -275,6 +295,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
+  AuthenticatedBlacksmithRoute: AuthenticatedBlacksmithRoute,
   AuthenticatedCharacterRoute: AuthenticatedCharacterRoute,
   AuthenticatedChatRoute: AuthenticatedChatRoute,
   AuthenticatedClanTreeRoute: AuthenticatedClanTreeRoute,
