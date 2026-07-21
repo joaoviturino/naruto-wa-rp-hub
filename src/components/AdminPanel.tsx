@@ -79,7 +79,7 @@ export function AdminPanel() {
           <span className="text-gold">影</span>
           <span className="admin-shimmer-text">{current.label}</span>
         </div>
-        <div className="w-9" />
+        <TodoAlertsBell onOpenTodos={() => setActive("todos")} />
       </div>
 
       <div className="mx-auto grid max-w-[1400px] gap-4 p-3 sm:p-6 lg:grid-cols-[260px_minmax(0,1fr)]">
