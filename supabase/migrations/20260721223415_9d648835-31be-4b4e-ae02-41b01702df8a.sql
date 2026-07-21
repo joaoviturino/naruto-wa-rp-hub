@@ -1,0 +1,1 @@
+ALTER TABLE public.skills ADD COLUMN IF NOT EXISTS is_dash boolean NOT NULL DEFAULT false;
