@@ -20,16 +20,18 @@ export function SkillManager({ adminUserId }: { adminUserId: string }) {
   const [skills, setSkills] = useState<any[]>([]);
   const [missions, setMissions] = useState<any[]>([]);
   const [clans, setClans] = useState<any[]>([]);
+  const [items, setItems] = useState<any[]>([]);
   const [editing, setEditing] = useState<any | null>(null);
   const [open, setOpen] = useState(false);
 
   async function load() {
-    const [s, m, c] = await Promise.all([
+    const [s, m, c, it] = await Promise.all([
       supabase.from("skills").select("*").order("rank"),
       supabase.from("missions").select("id,name"),
       supabase.from("clans").select("id,name,village"),
+      supabase.from("items").select("id,name,category,rank").order("name"),
     ]);
-    setSkills(s.data ?? []); setMissions(m.data ?? []); setClans(c.data ?? []);
+    setSkills(s.data ?? []); setMissions(m.data ?? []); setClans(c.data ?? []); setItems(it.data ?? []);
   }
   useEffect(() => { load(); }, []);
 
@@ -77,7 +79,7 @@ export function SkillManager({ adminUserId }: { adminUserId: string }) {
         </table>
       </div>
 
-      <SkillDialog open={open} onOpenChange={setOpen} initial={editing} missions={missions} clans={clans} allSkills={skills}
+      <SkillDialog open={open} onOpenChange={setOpen} initial={editing} missions={missions} clans={clans} allSkills={skills} items={items}
         adminUserId={adminUserId} onSaved={() => { setOpen(false); load(); }} />
     </div>
   );
