@@ -2965,6 +2965,7 @@ export type Database = {
           energy_type: string
           id: string
           image_url: string | null
+          is_dash: boolean
           is_defensive: boolean
           meta: Json
           name: string
@@ -3001,6 +3002,7 @@ export type Database = {
           energy_type?: string
           id?: string
           image_url?: string | null
+          is_dash?: boolean
           is_defensive?: boolean
           meta?: Json
           name: string
@@ -3037,6 +3039,7 @@ export type Database = {
           energy_type?: string
           id?: string
           image_url?: string | null
+          is_dash?: boolean
           is_defensive?: boolean
           meta?: Json
           name?: string

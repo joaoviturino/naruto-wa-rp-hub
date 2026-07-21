@@ -169,6 +169,7 @@ type LogEntry = {
   sound_url?: string | null;
   pose_url?: string | null;
   actor_char_id?: string | null;
+  is_dash?: boolean | null;
   target_char_id?: string | null;
   target_npc_idx?: number | null;
   raw_damage?: number;
@@ -211,7 +212,7 @@ async function consumeDefensiveSkill(
     .eq("character_id", activePlayer.character_id).eq("skill_id", defensiveSkillId).maybeSingle();
   if (!owned) throw new Error("Você não conhece essa habilidade de defesa.");
   const { data: sk } = await supabaseUser.from("skills")
-    .select("id,name,energy_type,cost_percent,cooldown_turns,is_defensive,defense_percent,animation_url,animation_mode,sound_url")
+    .select("id,name,energy_type,cost_percent,cooldown_turns,is_defensive,defense_percent,animation_url,animation_mode,sound_url,is_dash")
     .eq("id", defensiveSkillId).maybeSingle();
   if (!sk) throw new Error("Habilidade inexistente.");
   if (!(sk as any).is_defensive) throw new Error("Essa habilidade não é defensiva.");
@@ -231,6 +232,7 @@ async function consumeDefensiveSkill(
     skill_name: (sk as any).name, energy_type: pool, energy_used: cost, effective: 0, damage: 0, speed: 0, crit_mul: 1,
     actor_char_id: activePlayer.character_id, target_char_id: activePlayer.character_id,
     animation_url: (sk as any).animation_url ?? null,
+      is_dash: (sk as any).is_dash ?? false,
     animation_mode: ((sk as any).animation_mode ?? "overlay") as any,
     sound_url: (sk as any).sound_url ?? null,
     msg: `${activePlayer.nickname} assume postura defensiva com ${(sk as any).name} (−${percent}% no próximo golpe).`,
@@ -480,7 +482,7 @@ export const playerAttack = createServerFn({ method: "POST" })
       .from("character_skills").select("skill_id").eq("character_id", me.id).eq("skill_id", data.skill_id).maybeSingle();
     if (!owned) throw new Error("Você não conhece essa habilidade.");
     const { data: skill } = await context.supabase.from("skills")
-      .select("id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class,skill_class,classification,meta,animation_url,animation_mode,sound_url,accuracy,required_item_id").eq("id", data.skill_id).maybeSingle();
+      .select("id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class,skill_class,classification,meta,animation_url,animation_mode,sound_url,is_dash,accuracy,required_item_id").eq("id", data.skill_id).maybeSingle();
     if (!skill) throw new Error("Habilidade inexistente.");
     const combatClass = String((skill as any).skill_class ?? skill.req_class ?? "").toLowerCase();
     const healCfg = (skill as any).meta?.heal as { target?: "single" | "team" } | undefined;
@@ -559,6 +561,7 @@ export const playerAttack = createServerFn({ method: "POST" })
         pose_url: poseUrl,
         actor_char_id: activePlayer.character_id,
         animation_url: (skill as any).animation_url ?? null,
+      is_dash: (skill as any).is_dash ?? false,
         animation_mode: ((skill as any).animation_mode ?? "overlay") as any,
         sound_url: (skill as any).sound_url ?? null,
         msg: `${activePlayer.nickname} usa ${skill.name} (cura ${pool.toUpperCase()} ${data.energy_used}) → ${healCfg!.target === "team" ? "time" : names[0]} +${healAmount} HP${masteryMul > 1 ? ` [Maestria ×${masteryMul.toFixed(1)}]` : ""}.`,
@@ -774,6 +777,7 @@ export const playerAttack = createServerFn({ method: "POST" })
       actor_char_id: activePlayer.character_id,
       target_npc_idx: targetIdx,
       animation_url: (skill as any).animation_url ?? null,
+      is_dash: (skill as any).is_dash ?? false,
       animation_mode: ((skill as any).animation_mode ?? "overlay") as any,
       sound_url: (skill as any).sound_url ?? null,
       missed,
@@ -939,7 +943,7 @@ async function runSingleNpcAttack(supabaseAdmin: any, npcState: NpcState, state:
   const critChance = Math.max(0, Math.min(100, Number(npcCfg?.crit_chance ?? 10)));
   const critMul = Math.max(1, Number(npcCfg?.crit_multiplier ?? 1.5));
   const { data: skills } = await supabaseAdmin
-    .from("npc_skills").select("skill:skills(id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic,animation_url,animation_mode,sound_url,accuracy)").eq("npc_id", npcState.id);
+    .from("npc_skills").select("skill:skills(id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic,animation_url,animation_mode,sound_url,is_dash,accuracy)").eq("npc_id", npcState.id);
   const pool = ((skills as any[]) ?? []).map((r: any) => r.skill).filter(Boolean);
   if (pool.length === 0) return;
   const affordable = pool.filter((s: any) => npcState.energy >= s.base_cost);
@@ -1003,6 +1007,7 @@ async function runSingleNpcAttack(supabaseAdmin: any, npcState: NpcState, state:
     skill_name: skill.name, energy_type: skill.energy_type as Pool, energy_used: energy,
     effective, damage: missed ? 0 : finalDamage, speed, crit_mul: isCrit ? critMul : Number(skill.bonus_critical),
     animation_url: (skill as any).animation_url ?? null,
+      is_dash: (skill as any).is_dash ?? false,
     animation_mode: ((skill as any).animation_mode ?? "overlay") as any,
     target_char_id: target.character_id,
     actor_char_id: npcState.id,
@@ -1274,7 +1279,7 @@ async function handlePvpAttack(
     .from("character_skills").select("skill_id").eq("character_id", myId).eq("skill_id", data.skill_id).maybeSingle();
   if (!owned) throw new Error("Você não conhece essa habilidade.");
   const { data: skill } = await supabaseUser.from("skills")
-    .select("id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class,skill_class,meta,animation_url,animation_mode,sound_url,accuracy")
+    .select("id,name,energy_type,base_cost,cost_percent,bonus_speed,bonus_critical,bonus_energetic,cooldown_turns,req_class,skill_class,meta,animation_url,animation_mode,sound_url,is_dash,accuracy")
     .eq("id", data.skill_id).maybeSingle();
   if (!skill) throw new Error("Habilidade inexistente.");
 
@@ -1351,6 +1356,7 @@ async function handlePvpAttack(
       actor_char_id: activePlayer.character_id,
       target_char_id: healCfg!.target === "team" ? null : (targets[0]?.character_id ?? null),
       animation_url: (skill as any).animation_url ?? null,
+      is_dash: (skill as any).is_dash ?? false,
       animation_mode: ((skill as any).animation_mode ?? "overlay") as any,
       sound_url: (skill as any).sound_url ?? null,
       msg: `${activePlayer.nickname} usa ${skill.name} → ${healCfg!.target === "team" ? "time" : names[0]} +${healAmount} HP.`,
@@ -1400,6 +1406,7 @@ async function handlePvpAttack(
       actor_char_id: activePlayer.character_id,
       target_char_id: target.character_id,
       animation_url: (skill as any).animation_url ?? null,
+      is_dash: (skill as any).is_dash ?? false,
       animation_mode: ((skill as any).animation_mode ?? "overlay") as any,
       sound_url: (skill as any).sound_url ?? null,
       missed,
