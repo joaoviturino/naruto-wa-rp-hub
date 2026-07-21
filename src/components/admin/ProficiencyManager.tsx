@@ -12,10 +12,10 @@ export function ProficiencyManager() {
   const rows = useProficiencies({ includeInactive: true });
   const [editing, setEditing] = useState<Proficiency | null>(null);
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState<{ value: string; label: string; description: string; sort_order: number }>({ value: "", label: "", description: "", sort_order: 999 });
+  const [form, setForm] = useState<{ value: string; label: string; description: string; sort_order: number; is_element: boolean }>({ value: "", label: "", description: "", sort_order: 999, is_element: false });
 
-  function startCreate() { setCreating(true); setEditing(null); setForm({ value: "", label: "", description: "", sort_order: (rows.length + 1) * 10 }); }
-  function startEdit(r: Proficiency) { setEditing(r); setCreating(false); setForm({ value: r.value, label: r.label, description: (r.description ?? "") as string, sort_order: r.sort_order }); }
+  function startCreate() { setCreating(true); setEditing(null); setForm({ value: "", label: "", description: "", sort_order: (rows.length + 1) * 10, is_element: false }); }
+  function startEdit(r: Proficiency) { setEditing(r); setCreating(false); setForm({ value: r.value, label: r.label, description: (r.description ?? "") as string, sort_order: r.sort_order, is_element: !!r.is_element }); }
   function cancel() { setEditing(null); setCreating(false); }
 
   async function saveCreate() {
@@ -24,13 +24,17 @@ export function ProficiencyManager() {
       _value: form.value, _label: form.label, _desc: form.description || undefined, _sort: form.sort_order,
     } as any);
     if (error) { toast.error(error.message); return; }
+    // Após criar o valor via RPC, aplicamos o flag "é elemento".
+    if (form.is_element) {
+      await supabase.from("proficiencies").update({ is_element: true }).eq("value", form.value);
+    }
     toast.success("Proficiência criada.");
     cancel(); refreshProficiencies();
   }
   async function saveEdit() {
     if (!editing) return;
     const { error } = await supabase.from("proficiencies").update({
-      label: form.label, description: form.description || null, sort_order: form.sort_order,
+      label: form.label, description: form.description || null, sort_order: form.sort_order, is_element: form.is_element,
     }).eq("value", editing.value);
     if (error) { toast.error(error.message); return; }
     toast.success("Proficiência atualizada.");
