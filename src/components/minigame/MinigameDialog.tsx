@@ -13,6 +13,9 @@ import { KenjutsuGame } from "./KenjutsuGame";
 import { KenjutsuDefenseGame } from "./KenjutsuDefenseGame";
 import { KenjutsuKataGame } from "./KenjutsuKataGame";
 import { HandSealsGame } from "./HandSealsGame";
+import { ShurikenTargetGame } from "./ShurikenTargetGame";
+import { ShurikenMovingGame } from "./ShurikenMovingGame";
+import { ShurikenMultiGame } from "./ShurikenMultiGame";
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -267,7 +270,7 @@ export function MinigameDialog({
               )}
               <div className="flex gap-2">
                 <Button onClick={begin} disabled={busy || (isCrafting && !forgeMatch) || (isGathering && miningMissing)}>
-                  {busy ? "…" : (isForge ? "Iniciar Forja" : isTailoring ? "Iniciar Confecção" : isMining ? "Começar a Minerar" : isLogging ? "Começar a Cortar" : minigame.kind === "kenjutsu" ? "Iniciar Kenjutsu" : minigame.kind === "kenjutsu_defense" ? "Treinar Defesa" : minigame.kind === "kenjutsu_kata" ? "Iniciar Kata" : minigame.kind === "hand_seals" ? "Iniciar Selos" : "Aceitar missão")}
+                  {busy ? "…" : (isForge ? "Iniciar Forja" : isTailoring ? "Iniciar Confecção" : isMining ? "Começar a Minerar" : isLogging ? "Começar a Cortar" : minigame.kind === "kenjutsu" ? "Iniciar Kenjutsu" : minigame.kind === "kenjutsu_defense" ? "Treinar Defesa" : minigame.kind === "kenjutsu_kata" ? "Iniciar Kata" : minigame.kind === "hand_seals" ? "Iniciar Selos" : minigame.kind === "shuriken_target" ? "Mirar no Alvo" : minigame.kind === "shuriken_moving" ? "Iniciar Galeria" : minigame.kind === "shuriken_multi" ? "Kage Shuriken" : "Aceitar missão")}
                 </Button>
                 <Button variant="outline" onClick={close}>Sair</Button>
               </div>
@@ -294,6 +297,12 @@ export function MinigameDialog({
             ? <KenjutsuKataGame background={minigame.background_url} config={minigame.config ?? {}} onFinish={onFinish} />
             : minigame.kind === "hand_seals"
             ? <HandSealsGame background={minigame.background_url} config={minigame.config ?? {}} onFinish={onFinish} />
+            : minigame.kind === "shuriken_target"
+            ? <ShurikenTargetGame background={minigame.background_url} config={minigame.config ?? {}} onFinish={onFinish} />
+            : minigame.kind === "shuriken_moving"
+            ? <ShurikenMovingGame background={minigame.background_url} config={minigame.config ?? {}} onFinish={onFinish} />
+            : minigame.kind === "shuriken_multi"
+            ? <ShurikenMultiGame background={minigame.background_url} config={minigame.config ?? {}} onFinish={onFinish} />
             : <CleanupGame background={minigame.background_url} tileset={minigame.tileset_url} config={minigame.config ?? {}} onFinish={onFinish} />
           )
         )}

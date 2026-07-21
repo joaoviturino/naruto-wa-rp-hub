@@ -20,6 +20,9 @@ import { KenjutsuGame } from "@/components/minigame/KenjutsuGame";
 import { KenjutsuDefenseGame } from "@/components/minigame/KenjutsuDefenseGame";
 import { KenjutsuKataGame } from "@/components/minigame/KenjutsuKataGame";
 import { HandSealsGame, HAND_SEALS } from "@/components/minigame/HandSealsGame";
+import { ShurikenTargetGame } from "@/components/minigame/ShurikenTargetGame";
+import { ShurikenMovingGame } from "@/components/minigame/ShurikenMovingGame";
+import { ShurikenMultiGame } from "@/components/minigame/ShurikenMultiGame";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ComboSelect } from "@/components/ui/combo-select";
@@ -157,6 +160,12 @@ export function MinigameManager() {
                       ? { rounds: 5, base_length: 3, grow_per_round: 1, demo_step_ms: 650, input_time_ms: 6000, max_mistakes: 2, allow_diagonals: true }
                       : kind === "hand_seals"
                       ? { seal_time_ms: 1600, max_mistakes: 2, show_hint: true, sequence: ["tora","mi","tatsu"], seal_images: {} }
+                      : kind === "shuriken_target"
+                      ? { duration_seconds: 45, throws: 6, target_score: 240, ring_scores: [100, 60, 30, 10], wind_amp: 80, wind_speed: 1.6, crosshair_size: 56, difficulty: 2 }
+                      : kind === "shuriken_moving"
+                      ? { duration_seconds: 60, target_score: 12, max_missed: 5, spawn_interval_ms: 1000, spawn_jitter_ms: 400, target_speed: 3, target_size: 60, difficulty: 2 }
+                      : kind === "shuriken_multi"
+                      ? { rounds: 5, base_targets: 3, grow_per_round: 1, round_time_ms: 2500, target_size: 56, max_mistakes: 2, difficulty: 2 }
                       : { duration_seconds: 60, spots: 12, target_score: 8 };
                     setSelected({ ...selected, kind, config });
                   }}
@@ -171,6 +180,9 @@ export function MinigameManager() {
                     { value: "kenjutsu_defense", label: "Kenjutsu — Defesa (swipe)" },
                     { value: "kenjutsu_kata", label: "Kenjutsu — Kata (memória)" },
                     { value: "hand_seals", label: "Selos de Mão (aprender jutsu)" },
+                    { value: "shuriken_target", label: "Shurikenjutsu — Alvo (precisão)" },
+                    { value: "shuriken_moving", label: "Shurikenjutsu — Galeria (reação)" },
+                    { value: "shuriken_multi", label: "Shurikenjutsu — Kage Shuriken (rajada)" },
                   ]}
                 />
               </div>
@@ -304,6 +316,12 @@ export function MinigameManager() {
             <KenjutsuKataConfigEditor selected={selected} setSelected={setSelected} />
           ) : selected.kind === "hand_seals" ? (
             <HandSealsConfigEditor selected={selected} setSelected={setSelected} />
+          ) : selected.kind === "shuriken_target" ? (
+            <ShurikenTargetConfigEditor selected={selected} setSelected={setSelected} />
+          ) : selected.kind === "shuriken_moving" ? (
+            <ShurikenMovingConfigEditor selected={selected} setSelected={setSelected} />
+          ) : selected.kind === "shuriken_multi" ? (
+            <ShurikenMultiConfigEditor selected={selected} setSelected={setSelected} />
           ) : (
             <div className="scroll-panel rounded-lg p-4 space-y-3">
               <h4 className="font-display text-lg text-gold">Configuração da limpeza</h4>
@@ -470,6 +488,12 @@ export function MinigameManager() {
               <KenjutsuKataGame background={selected.background_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
             ) : selected.kind === "hand_seals" ? (
               <HandSealsGame background={selected.background_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
+            ) : selected.kind === "shuriken_target" ? (
+              <ShurikenTargetGame background={selected.background_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
+            ) : selected.kind === "shuriken_moving" ? (
+              <ShurikenMovingGame background={selected.background_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
+            ) : selected.kind === "shuriken_multi" ? (
+              <ShurikenMultiGame background={selected.background_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
             ) : (
               <CleanupGame background={selected.background_url} tileset={selected.tileset_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
             )}
@@ -959,6 +983,106 @@ function KenjutsuDefenseConfigEditor({ selected, setSelected }: { selected: any;
         ["shuriken_image_url", "Sprite do shuriken (PNG opcional)", "image/*"],
         ["clang_sound_url", "Som de clang (audio opcional)", "audio/*"],
         ["hit_sound_url", "Som de dano (audio opcional)", "audio/*"],
+      ]} />
+    </div>
+  );
+}
+
+function ShurikenTargetConfigEditor({ selected, setSelected }: { selected: any; setSelected: (s: any) => void }) {
+  const cfg = selected.config ?? {};
+  const up = (patch: any) => setSelected({ ...selected, config: { ...cfg, ...patch } });
+  const rings: number[] = Array.isArray(cfg.ring_scores) && cfg.ring_scores.length === 4 ? cfg.ring_scores : [100, 60, 30, 10];
+  return (
+    <div className="scroll-panel rounded-lg p-4 space-y-3">
+      <h4 className="font-display text-lg text-gold">Alvo do Shuriken (Precisão)</h4>
+      <p className="text-xs text-muted-foreground">
+        A mira oscila com o vento — o jogador solta o shuriken no timing certo. Pontuação por anéis do alvo.
+      </p>
+      <div className="grid gap-3 md:grid-cols-3">
+        <div><Label>Duração (s)</Label><Input type="number" min={15} max={240} value={cfg.duration_seconds ?? 45} onChange={(e) => up({ duration_seconds: Number(e.target.value) })} /></div>
+        <div><Label>Nº de arremessos</Label><Input type="number" min={3} max={30} value={cfg.throws ?? 6} onChange={(e) => up({ throws: Number(e.target.value) })} /></div>
+        <div><Label>Pontuação alvo</Label><Input type="number" min={1} max={9999} value={cfg.target_score ?? 240} onChange={(e) => up({ target_score: Number(e.target.value) })} /></div>
+        <div><Label>Intensidade do vento</Label><Input type="number" min={0} max={300} value={cfg.wind_amp ?? 80} onChange={(e) => up({ wind_amp: Number(e.target.value) })} /></div>
+        <div><Label>Velocidade do vento</Label><Input type="number" step={0.1} min={0.2} max={6} value={cfg.wind_speed ?? 1.6} onChange={(e) => up({ wind_speed: Number(e.target.value) })} /></div>
+        <div><Label>Tamanho da mira (px)</Label><Input type="number" min={28} max={120} value={cfg.crosshair_size ?? 56} onChange={(e) => up({ crosshair_size: Number(e.target.value) })} /></div>
+        <div><Label>Dificuldade (1-5)</Label><Input type="number" min={1} max={5} value={cfg.difficulty ?? 2} onChange={(e) => up({ difficulty: Number(e.target.value) })} /></div>
+      </div>
+      <div className="grid gap-3 md:grid-cols-4">
+        {(["Bullseye", "Amarelo", "Vermelho", "Externo"] as const).map((label, i) => (
+          <div key={label}>
+            <Label>Anel {label}</Label>
+            <Input type="number" min={0} max={500} value={rings[i] ?? 0}
+              onChange={(e) => { const n = rings.slice(); n[i] = Number(e.target.value); up({ ring_scores: n }); }} />
+          </div>
+        ))}
+      </div>
+      <AssetSlots slug={selected.slug} cfg={cfg} up={up} fields={[
+        ["background_url", "Fundo do campo de treino (opcional)", "image/*"],
+        ["target_image_url", "Sprite do alvo (PNG opcional)", "image/*"],
+        ["shuriken_image_url", "Sprite do shuriken cravado (PNG opcional)", "image/*"],
+        ["throw_sound_url", "Som de arremesso (audio opcional)", "audio/*"],
+        ["hit_sound_url", "Som de acerto (audio opcional)", "audio/*"],
+        ["miss_sound_url", "Som de erro (audio opcional)", "audio/*"],
+      ]} />
+    </div>
+  );
+}
+
+function ShurikenMovingConfigEditor({ selected, setSelected }: { selected: any; setSelected: (s: any) => void }) {
+  const cfg = selected.config ?? {};
+  const up = (patch: any) => setSelected({ ...selected, config: { ...cfg, ...patch } });
+  return (
+    <div className="scroll-panel rounded-lg p-4 space-y-3">
+      <h4 className="font-display text-lg text-gold">Galeria de Tiro (Reação)</h4>
+      <p className="text-xs text-muted-foreground">
+        Alvos de madeira atravessam a arena em diferentes velocidades e alturas. Toque para acertar antes que escapem.
+      </p>
+      <div className="grid gap-3 md:grid-cols-3">
+        <div><Label>Duração (s)</Label><Input type="number" min={15} max={240} value={cfg.duration_seconds ?? 60} onChange={(e) => up({ duration_seconds: Number(e.target.value) })} /></div>
+        <div><Label>Alvo (acertos)</Label><Input type="number" min={1} max={999} value={cfg.target_score ?? 12} onChange={(e) => up({ target_score: Number(e.target.value) })} /></div>
+        <div><Label>Fugas permitidas</Label><Input type="number" min={0} max={50} value={cfg.max_missed ?? 5} onChange={(e) => up({ max_missed: Number(e.target.value) })} /></div>
+        <div><Label>Intervalo entre spawns (ms)</Label><Input type="number" min={300} max={5000} value={cfg.spawn_interval_ms ?? 1000} onChange={(e) => up({ spawn_interval_ms: Number(e.target.value) })} /></div>
+        <div><Label>Jitter (ms)</Label><Input type="number" min={0} max={3000} value={cfg.spawn_jitter_ms ?? 400} onChange={(e) => up({ spawn_jitter_ms: Number(e.target.value) })} /></div>
+        <div><Label>Velocidade do alvo</Label><Input type="number" step={0.1} min={1} max={20} value={cfg.target_speed ?? 3} onChange={(e) => up({ target_speed: Number(e.target.value) })} /></div>
+        <div><Label>Tamanho do alvo (px)</Label><Input type="number" min={28} max={120} value={cfg.target_size ?? 60} onChange={(e) => up({ target_size: Number(e.target.value) })} /></div>
+        <div><Label>Dificuldade (1-5)</Label><Input type="number" min={1} max={5} value={cfg.difficulty ?? 2} onChange={(e) => up({ difficulty: Number(e.target.value) })} /></div>
+      </div>
+      <AssetSlots slug={selected.slug} cfg={cfg} up={up} fields={[
+        ["background_url", "Fundo (opcional)", "image/*"],
+        ["target_image_url", "Sprite do alvo (PNG opcional)", "image/*"],
+        ["shuriken_image_url", "Sprite do shuriken (PNG opcional)", "image/*"],
+        ["hit_sound_url", "Som de acerto (audio opcional)", "audio/*"],
+        ["miss_sound_url", "Som de erro (audio opcional)", "audio/*"],
+      ]} />
+    </div>
+  );
+}
+
+function ShurikenMultiConfigEditor({ selected, setSelected }: { selected: any; setSelected: (s: any) => void }) {
+  const cfg = selected.config ?? {};
+  const up = (patch: any) => setSelected({ ...selected, config: { ...cfg, ...patch } });
+  return (
+    <div className="scroll-panel rounded-lg p-4 space-y-3">
+      <h4 className="font-display text-lg text-gold">Kage Shuriken (Rajada — agilidade)</h4>
+      <p className="text-xs text-muted-foreground">
+        Vários alvos aparecem simultaneamente e devem ser acertados antes do tempo da rodada acabar — imitando o Kage Shuriken no Jutsu.
+      </p>
+      <div className="grid gap-3 md:grid-cols-3">
+        <div><Label>Rodadas</Label><Input type="number" min={1} max={20} value={cfg.rounds ?? 5} onChange={(e) => up({ rounds: Number(e.target.value) })} /></div>
+        <div><Label>Alvos base</Label><Input type="number" min={2} max={12} value={cfg.base_targets ?? 3} onChange={(e) => up({ base_targets: Number(e.target.value) })} /></div>
+        <div><Label>Crescimento por rodada</Label><Input type="number" min={0} max={4} value={cfg.grow_per_round ?? 1} onChange={(e) => up({ grow_per_round: Number(e.target.value) })} /></div>
+        <div><Label>Tempo por rodada (ms)</Label><Input type="number" min={800} max={15000} value={cfg.round_time_ms ?? 2500} onChange={(e) => up({ round_time_ms: Number(e.target.value) })} /></div>
+        <div><Label>Tamanho do alvo (px)</Label><Input type="number" min={28} max={120} value={cfg.target_size ?? 56} onChange={(e) => up({ target_size: Number(e.target.value) })} /></div>
+        <div><Label>Rodadas falhas permitidas</Label><Input type="number" min={0} max={10} value={cfg.max_mistakes ?? 2} onChange={(e) => up({ max_mistakes: Number(e.target.value) })} /></div>
+        <div><Label>Dificuldade (1-5)</Label><Input type="number" min={1} max={5} value={cfg.difficulty ?? 2} onChange={(e) => up({ difficulty: Number(e.target.value) })} /></div>
+      </div>
+      <AssetSlots slug={selected.slug} cfg={cfg} up={up} fields={[
+        ["background_url", "Fundo (opcional)", "image/*"],
+        ["target_image_url", "Sprite do alvo (PNG opcional)", "image/*"],
+        ["shuriken_image_url", "Sprite do shuriken (PNG opcional)", "image/*"],
+        ["hit_sound_url", "Som de acerto (audio opcional)", "audio/*"],
+        ["success_sound_url", "Som de rodada limpa (audio opcional)", "audio/*"],
+        ["fail_sound_url", "Som de rodada perdida (audio opcional)", "audio/*"],
       ]} />
     </div>
   );
