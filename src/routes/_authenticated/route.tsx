@@ -15,13 +15,14 @@ export const Route = createFileRoute("/_authenticated")({
     if (error || !data.user) throw redirect({ to: "/auth" });
     const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", data.user.id);
     const isAdmin = (roles ?? []).some((r) => r.role === "admin");
-    return { user: data.user, isAdmin };
+    const isBlacksmith = (roles ?? []).some((r) => r.role === "blacksmith");
+    return { user: data.user, isAdmin, isBlacksmith };
   },
   component: AuthedLayout,
 });
 
 function AuthedLayout() {
-  const { user, isAdmin } = Route.useRouteContext();
+  const { user, isAdmin, isBlacksmith } = Route.useRouteContext();
   const navigate = useNavigate();
   async function signOut() {
     await supabase.auth.signOut();
@@ -39,6 +40,9 @@ function AuthedLayout() {
           <nav className="flex items-center gap-0.5 sm:gap-2 text-xs sm:text-sm min-w-0">
             <Link to="/character" className="px-2 sm:px-3 py-1.5 rounded hover:bg-secondary [&.active]:text-gold" activeProps={{ className: "active" }}>Ficha</Link>
             <Link to="/chat" className="px-2 sm:px-3 py-1.5 rounded hover:bg-secondary [&.active]:text-gold" activeProps={{ className: "active" }}>Chat</Link>
+            {(isBlacksmith || isAdmin) && (
+              <Link to="/blacksmith" className="px-2 sm:px-3 py-1.5 rounded hover:bg-secondary [&.active]:text-gold" activeProps={{ className: "active" }}>Forja</Link>
+            )}
             {isAdmin && (
               <>
                 <Link to="/admin" className="px-2 sm:px-3 py-1.5 rounded hover:bg-secondary [&.active]:text-gold" activeProps={{ className: "active" }}>
