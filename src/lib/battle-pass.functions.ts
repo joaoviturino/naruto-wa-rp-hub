@@ -194,10 +194,10 @@ export const claimBattlePassReward = createServerFn({ method: "POST" })
       await supabaseAdmin.from("characters").update({ xp: (char.xp ?? 0) + (reward.quantity ?? 0) }).eq("id", char.id);
     } else if (reward.reward_type === "item" && reward.item_id) {
       // Insert into inventory
-      await supabaseAdmin.from("inventory").insert({ character_id: char.id, item_id: reward.item_id, quantity: reward.quantity ?? 1 });
+      await supabaseAdmin.from("inventory").insert({ character_id: char.id, item_id: reward.item_id, quantity: reward.quantity ?? 1 } as any);
     }
     // title reward: store in claims as-is (client can render)
-    await supabaseAdmin.from("battle_pass_claims").insert({ character_id: char.id, season_id: season.id, tier: data.tier, track: data.track });
+    await supabaseAdmin.from("battle_pass_claims").insert({ character_id: char.id, season_id: season.id, tier: data.tier, track: data.track } as any);
     return { ok: true };
   });
 
