@@ -83,6 +83,189 @@ export type Database = {
         }
         Relationships: []
       }
+      battle_pass_claims: {
+        Row: {
+          character_id: string
+          claimed_at: string
+          season_id: string
+          tier: number
+          track: string
+        }
+        Insert: {
+          character_id: string
+          claimed_at?: string
+          season_id: string
+          tier: number
+          track: string
+        }
+        Update: {
+          character_id?: string
+          claimed_at?: string
+          season_id?: string
+          tier?: number
+          track?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battle_pass_claims_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "battle_pass_claims_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "battle_pass_seasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      battle_pass_progress: {
+        Row: {
+          character_id: string
+          created_at: string
+          id: string
+          is_premium: boolean
+          season_id: string
+          updated_at: string
+          xp: number
+        }
+        Insert: {
+          character_id: string
+          created_at?: string
+          id?: string
+          is_premium?: boolean
+          season_id: string
+          updated_at?: string
+          xp?: number
+        }
+        Update: {
+          character_id?: string
+          created_at?: string
+          id?: string
+          is_premium?: boolean
+          season_id?: string
+          updated_at?: string
+          xp?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battle_pass_progress_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "battle_pass_progress_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "battle_pass_seasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      battle_pass_rewards: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string | null
+          item_id: string | null
+          quantity: number
+          reward_type: string
+          season_id: string
+          tier: number
+          title: string | null
+          track: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          item_id?: string | null
+          quantity?: number
+          reward_type: string
+          season_id: string
+          tier: number
+          title?: string | null
+          track: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          item_id?: string | null
+          quantity?: number
+          reward_type?: string
+          season_id?: string
+          tier?: number
+          title?: string | null
+          track?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battle_pass_rewards_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "battle_pass_rewards_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "battle_pass_seasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      battle_pass_seasons: {
+        Row: {
+          active: boolean
+          banner_url: string | null
+          created_at: string
+          description: string | null
+          ends_at: string | null
+          id: string
+          name: string
+          premium_cost: number
+          starts_at: string
+          tiers_count: number
+          updated_at: string
+          xp_per_tier: number
+        }
+        Insert: {
+          active?: boolean
+          banner_url?: string | null
+          created_at?: string
+          description?: string | null
+          ends_at?: string | null
+          id?: string
+          name: string
+          premium_cost?: number
+          starts_at?: string
+          tiers_count?: number
+          updated_at?: string
+          xp_per_tier?: number
+        }
+        Update: {
+          active?: boolean
+          banner_url?: string | null
+          created_at?: string
+          description?: string | null
+          ends_at?: string | null
+          id?: string
+          name?: string
+          premium_cost?: number
+          starts_at?: string
+          tiers_count?: number
+          updated_at?: string
+          xp_per_tier?: number
+        }
+        Relationships: []
+      }
       bot_auth_state: {
         Row: {
           key: string
