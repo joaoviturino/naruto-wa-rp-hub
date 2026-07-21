@@ -947,6 +947,19 @@ async function runSingleNpcAttack(supabaseAdmin: any, npcState: NpcState, state:
 
   const skill = affordable[Math.floor(Math.random() * affordable.length)];
   const energy = Math.min(npcState.energy, Math.max(skill.base_cost, Math.floor(npcState.energy_max / 4)));
+
+  // Pose configurada para o NPC nesta habilidade (troca de sprite durante o golpe).
+  let npcPoseUrl: string | null = null;
+  {
+    const { data: nsp } = await supabaseAdmin
+      .from("npc_skill_poses")
+      .select("pose:npc_poses(image_url)")
+      .eq("npc_id", npcState.id)
+      .eq("skill_id", (skill as any).id)
+      .maybeSingle();
+    npcPoseUrl = ((nsp as any)?.pose?.image_url as string | undefined) ?? null;
+  }
+
   const effective = energy * Number(skill.bonus_energetic);
   const speed = effective * Number(skill.bonus_speed);
   // Base do dano: dano_medio configurado (variação ±20%) ou fórmula por energia.
