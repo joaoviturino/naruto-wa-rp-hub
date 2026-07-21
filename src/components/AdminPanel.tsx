@@ -25,6 +25,7 @@ import { ServerControl } from "@/components/admin/ServerControl";
 import { MountManager } from "@/components/admin/MountManager";
 import { JobManager } from "@/components/admin/JobManager";
 import { TodoManager } from "@/components/admin/TodoManager";
+import { TodoAlertsBell } from "@/components/admin/TodoAlertsBell";
 import { NINJA_RANKS } from "@/components/admin/shared";
 import {
   Pencil, BatteryCharging, Eye, LayoutDashboard, Users, Package, Sparkles,
@@ -78,7 +79,7 @@ export function AdminPanel() {
           <span className="text-gold">影</span>
           <span className="admin-shimmer-text">{current.label}</span>
         </div>
-        <div className="w-9" />
+        <TodoAlertsBell onOpenTodos={() => setActive("todos")} />
       </div>
 
       <div className="mx-auto grid max-w-[1400px] gap-4 p-3 sm:p-6 lg:grid-cols-[260px_minmax(0,1fr)]">
@@ -149,6 +150,9 @@ export function AdminPanel() {
             <div>
               <h1 className="font-display text-2xl font-black leading-none admin-shimmer-text">{current.label}</h1>
               <p className="mt-1 text-xs uppercase tracking-widest text-muted-foreground">{current.group}</p>
+            </div>
+            <div className="ml-auto">
+              <TodoAlertsBell onOpenTodos={() => setActive("todos")} />
             </div>
           </header>
 
