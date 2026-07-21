@@ -191,7 +191,7 @@ function RewardsGrid({ season, userId }: { season: any; userId: string }) {
           </tbody>
         </table>
       </div>
-      <RewardDialog open={!!editing} onOpenChange={(v) => !v && setEditing(null)} initial={editing} userId={userId} onSaved={() => { setEditing(null); load(); }} />
+      <RewardDialog open={!!editing} onOpenChange={(v: boolean) => !v && setEditing(null)} initial={editing} userId={userId} onSaved={() => { setEditing(null); load(); }} />
     </div>
   );
 }
