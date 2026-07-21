@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Plus, Save, Trash2, X, CheckCircle2, Clock, AlertTriangle, Flame, ListTodo, PlayCircle, Ban } from "lucide-react";
+import { Plus, Save, Trash2, X, CheckCircle2, Clock, AlertTriangle, Flame, ListTodo, PlayCircle, Ban, LayoutList, CalendarDays, CalendarRange } from "lucide-react";
+import { TodoCalendar } from "@/components/admin/TodoCalendar";
 
 type Urgency = "low" | "medium" | "high" | "critical";
 type Status = "todo" | "in_progress" | "blocked" | "done";
@@ -62,6 +63,7 @@ export function TodoManager() {
   const [filterStatus, setFilterStatus] = useState<Status | "all">("all");
   const [filterUrgency, setFilterUrgency] = useState<Urgency | "all">("all");
   const [loading, setLoading] = useState(false);
+  const [view, setView] = useState<"list" | "month" | "week">("list");
 
   async function load() {
     setLoading(true);
