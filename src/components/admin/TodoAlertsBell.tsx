@@ -51,7 +51,7 @@ export function TodoAlertsBell({ onOpenTodos }: { onOpenTodos: () => void }) {
     const iv = setInterval(load, 60_000);
     const ivClock = setInterval(() => setTick((t) => (t + 1) % 1e6), 30_000);
     const ch = supabase
-      .channel("admin-todos-alerts")
+      .channel(`admin-todos-alerts-${Math.random().toString(36).slice(2)}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "admin_todos" }, () => load())
       .subscribe();
     return () => { clearInterval(iv); clearInterval(ivClock); supabase.removeChannel(ch); };
