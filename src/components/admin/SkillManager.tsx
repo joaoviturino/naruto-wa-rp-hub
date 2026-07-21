@@ -85,7 +85,7 @@ export function SkillManager({ adminUserId }: { adminUserId: string }) {
   );
 }
 
-function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, adminUserId, onSaved }: any) {
+function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, items, adminUserId, onSaved }: any) {
   const SKILL_CLASSES = useProficiencies();
   const save = useServerFn(upsertSkill);
   const [f, setF] = useState<any>(initial ?? {});
@@ -250,6 +250,28 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
             )}
           </div>
           {(f.req_class === "shurikenjutsu" || f.skill_class === "shurikenjutsu") && (
+            <>
+            <Field label="Item de shurikenjutsu utilizado">
+              <Select
+                value={f.required_item_id ?? "__none__"}
+                onValueChange={(v: string) => up("required_item_id", v === "__none__" ? null : v)}
+              >
+                <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Nenhum (consome qualquer shuriken/kunai) —</SelectItem>
+                  {(items ?? [])
+                    .filter((it: any) => ["shuriken","kunai","tool","weapon","consumable","material"].includes(it.category ?? "") || true)
+                    .map((it: any) => (
+                      <SelectItem key={it.id} value={it.id}>
+                        {it.name}{it.rank ? ` · ${it.rank}` : ""}{it.category ? ` · ${it.category}` : ""}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <div className="text-[10px] text-muted-foreground mt-1">
+                Se definido, a técnica só pode ser executada quando o jogador possuir este item na bolsa, e ele será consumido no lugar do padrão.
+              </div>
+            </Field>
             <Field label="Qtd. de ferramentas consumidas por uso">
               <Input type="number" min={1} max={999}
                 value={f.meta?.tool_qty ?? 1}
@@ -259,6 +281,7 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
                 Ex.: 1 (shuriken simples), 5 (grande chuva de shurikens). Consome de kunais/shurikens da bolsa.
               </div>
             </Field>
+            </>
           )}
           {(f.req_class === "kenjutsu" || f.skill_class === "kenjutsu") && (
             <Field label="Desgaste da espada por golpe (% da durabilidade máx.)">
@@ -352,6 +375,7 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
                 animation_mode: f.animation_mode ?? "overlay",
                 sound_url: f.sound_url || null,
                 skill_class: f.skill_class || null,
+                required_item_id: f.required_item_id || null,
                 energy_type: f.energy_type ?? "chakra",
                 base_cost: 0,
                 cost_percent: Math.max(1, Math.min(100, Number(f.cost_percent ?? 20))),
