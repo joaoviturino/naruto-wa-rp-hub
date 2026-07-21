@@ -215,7 +215,7 @@ export const grantBattlePassXp = createServerFn({ method: "POST" })
     if (prog) {
       await supabaseAdmin.from("battle_pass_progress").update({ xp: Math.max(0, (prog.xp ?? 0) + data.amount) }).eq("id", prog.id);
     } else {
-      await supabaseAdmin.from("battle_pass_progress").insert({ character_id: data.character_id, season_id: season.id, xp: Math.max(0, data.amount) });
+      await supabaseAdmin.from("battle_pass_progress").insert({ character_id: data.character_id, season_id: season.id, xp: Math.max(0, data.amount) } as any);
     }
     return { ok: true };
   });
