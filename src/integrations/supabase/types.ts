@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_todos: {
+        Row: {
+          assignee: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          due_date: string | null
+          id: string
+          status: string
+          title: string
+          updated_at: string
+          urgency: string
+        }
+        Insert: {
+          assignee?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          status?: string
+          title: string
+          updated_at?: string
+          urgency?: string
+        }
+        Update: {
+          assignee?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          urgency?: string
+        }
+        Relationships: []
+      }
       audit_log: {
         Row: {
           action: string
