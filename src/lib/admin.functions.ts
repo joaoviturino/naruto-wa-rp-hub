@@ -440,6 +440,7 @@ const skillPayload = z.object({
   req_maestria: skillRank.nullable().optional(),
   req_mission_id: z.string().uuid().nullable().optional(),
   req_prereq_skill_id: z.string().uuid().nullable().optional(),
+  required_item_id: z.string().uuid().nullable().optional(),
   energy_type: z.enum(["ef","em","chakra"]).default("chakra"),
   base_cost: z.number().int().min(0).max(100000).default(0),
   cost_percent: z.number().int().min(1).max(100).default(20),
