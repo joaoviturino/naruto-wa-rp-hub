@@ -20,6 +20,9 @@ import { KenjutsuGame } from "@/components/minigame/KenjutsuGame";
 import { KenjutsuDefenseGame } from "@/components/minigame/KenjutsuDefenseGame";
 import { KenjutsuKataGame } from "@/components/minigame/KenjutsuKataGame";
 import { HandSealsGame, HAND_SEALS } from "@/components/minigame/HandSealsGame";
+import { ShurikenTargetGame } from "@/components/minigame/ShurikenTargetGame";
+import { ShurikenMovingGame } from "@/components/minigame/ShurikenMovingGame";
+import { ShurikenMultiGame } from "@/components/minigame/ShurikenMultiGame";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ComboSelect } from "@/components/ui/combo-select";
@@ -157,6 +160,12 @@ export function MinigameManager() {
                       ? { rounds: 5, base_length: 3, grow_per_round: 1, demo_step_ms: 650, input_time_ms: 6000, max_mistakes: 2, allow_diagonals: true }
                       : kind === "hand_seals"
                       ? { seal_time_ms: 1600, max_mistakes: 2, show_hint: true, sequence: ["tora","mi","tatsu"], seal_images: {} }
+                      : kind === "shuriken_target"
+                      ? { duration_seconds: 45, throws: 6, target_score: 240, ring_scores: [100, 60, 30, 10], wind_amp: 80, wind_speed: 1.6, crosshair_size: 56, difficulty: 2 }
+                      : kind === "shuriken_moving"
+                      ? { duration_seconds: 60, target_score: 12, max_missed: 5, spawn_interval_ms: 1000, spawn_jitter_ms: 400, target_speed: 3, target_size: 60, difficulty: 2 }
+                      : kind === "shuriken_multi"
+                      ? { rounds: 5, base_targets: 3, grow_per_round: 1, round_time_ms: 2500, target_size: 56, max_mistakes: 2, difficulty: 2 }
                       : { duration_seconds: 60, spots: 12, target_score: 8 };
                     setSelected({ ...selected, kind, config });
                   }}
@@ -171,6 +180,9 @@ export function MinigameManager() {
                     { value: "kenjutsu_defense", label: "Kenjutsu — Defesa (swipe)" },
                     { value: "kenjutsu_kata", label: "Kenjutsu — Kata (memória)" },
                     { value: "hand_seals", label: "Selos de Mão (aprender jutsu)" },
+                    { value: "shuriken_target", label: "Shurikenjutsu — Alvo (precisão)" },
+                    { value: "shuriken_moving", label: "Shurikenjutsu — Galeria (reação)" },
+                    { value: "shuriken_multi", label: "Shurikenjutsu — Kage Shuriken (rajada)" },
                   ]}
                 />
               </div>
@@ -304,6 +316,12 @@ export function MinigameManager() {
             <KenjutsuKataConfigEditor selected={selected} setSelected={setSelected} />
           ) : selected.kind === "hand_seals" ? (
             <HandSealsConfigEditor selected={selected} setSelected={setSelected} />
+          ) : selected.kind === "shuriken_target" ? (
+            <ShurikenTargetConfigEditor selected={selected} setSelected={setSelected} />
+          ) : selected.kind === "shuriken_moving" ? (
+            <ShurikenMovingConfigEditor selected={selected} setSelected={setSelected} />
+          ) : selected.kind === "shuriken_multi" ? (
+            <ShurikenMultiConfigEditor selected={selected} setSelected={setSelected} />
           ) : (
             <div className="scroll-panel rounded-lg p-4 space-y-3">
               <h4 className="font-display text-lg text-gold">Configuração da limpeza</h4>
@@ -470,6 +488,12 @@ export function MinigameManager() {
               <KenjutsuKataGame background={selected.background_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
             ) : selected.kind === "hand_seals" ? (
               <HandSealsGame background={selected.background_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
+            ) : selected.kind === "shuriken_target" ? (
+              <ShurikenTargetGame background={selected.background_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
+            ) : selected.kind === "shuriken_moving" ? (
+              <ShurikenMovingGame background={selected.background_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
+            ) : selected.kind === "shuriken_multi" ? (
+              <ShurikenMultiGame background={selected.background_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
             ) : (
               <CleanupGame background={selected.background_url} tileset={selected.tileset_url} config={selected.config ?? {}} onFinish={(r) => setTestResult(r)} />
             )}
