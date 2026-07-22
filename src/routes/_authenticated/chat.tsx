@@ -570,7 +570,7 @@ function ChatPage() {
                             : "bg-secondary/80 border border-border/50 rounded-tl-sm"
                         } ${m.is_pinned ? "ring-2 ring-gold/70" : ""}`}>
                         {m.image_url && <img src={m.image_url} className="mb-1 rounded-lg max-h-64 object-cover" alt="" />}
-                        {m.content && <div className="whitespace-pre-wrap text-sm leading-relaxed break-words">{m.content}</div>}
+                        {m.content && <RpFormatted text={m.content} mine={mine} isNpc={isNpc} />}
                         {(mine || m.is_pinned) && (
                           <div className={`absolute -bottom-1 ${mine ? "left-2" : "right-2"} flex items-center gap-1 opacity-0 group-hover:opacity-100 transition`}>
                             {mine && (
