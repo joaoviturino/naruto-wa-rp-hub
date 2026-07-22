@@ -29,7 +29,7 @@ const HISTORY_LIMIT = 80;
 /** Formata linhas de RP: "❕️ ..." = ação (itálico, mutado), "- ..." = fala (destaque). */
 function RpFormatted({ text, mine, isNpc }: { text: string; mine: boolean; isNpc: boolean }) {
   const lines = text.split(/\r?\n/);
-  const speechColor = mine ? "text-white" : isNpc ? "text-emerald-100" : "text-foreground";
+  const speechColor = mine ? "text-white" : "text-foreground";
   const actionColor = mine ? "text-white/70" : "text-muted-foreground";
   // Se o texto tem múltiplos marcadores "❕️" ou "- " colados na mesma linha, quebra também por eles.
   const parts: { kind: "action" | "speech" | "plain"; content: string }[] = [];
@@ -54,7 +54,7 @@ function RpFormatted({ text, mine, isNpc }: { text: string; mine: boolean; isNpc
         );
         if (p.kind === "speech") return (
           <div key={i} className={`${speechColor} flex gap-1.5`}>
-            <span className={`shrink-0 font-bold ${mine ? "text-white/80" : isNpc ? "text-emerald-300" : "text-gold"}`}>—</span>
+            <span className="shrink-0 opacity-60">—</span>
             <span>{p.content}</span>
           </div>
         );
