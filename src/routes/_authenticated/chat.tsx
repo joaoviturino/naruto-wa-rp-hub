@@ -308,98 +308,129 @@ function ChatPage() {
 
   if (!character) return <div className="p-10 text-center text-muted-foreground">Você precisa criar um personagem primeiro.</div>;
 
+  const SectionLabel = ({ children, icon: Icon }: { children: React.ReactNode; icon?: any }) => (
+    <div className="flex items-center gap-2 mb-2">
+      <div className="text-[10px] font-display uppercase tracking-[0.2em] text-gold/80 flex items-center gap-1.5">
+        {Icon && <Icon size={11} />} {children}
+      </div>
+      <div className="h-px flex-1 bg-gradient-to-r from-blood/40 to-transparent" />
+    </div>
+  );
+
   const sidebar = (
-    <div className="space-y-3">
+    <div className="space-y-5">
+      {/* Localização atual */}
+      <div className="relative rounded-xl border border-blood/30 bg-gradient-to-b from-blood/10 to-transparent p-4 overflow-hidden">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-1.5 h-1.5 rounded-full bg-gold animate-pulse shadow-[0_0_8px_var(--gold)]" />
+          <span className="text-[10px] uppercase tracking-[0.2em] text-gold/80 font-bold">Localização Atual</span>
+        </div>
+        <div className="font-display text-lg text-gold flex items-center gap-2 min-w-0 leading-tight">
+          <span className="truncate">{currentLoc?.name ?? "— sem local —"}</span>
+          {currentLoc?.is_danger_zone && <Skull size={14} className="text-blood shrink-0" />}
+        </div>
+        {currentLoc?.description && <p className="text-[11px] text-muted-foreground mt-1.5 line-clamp-2">{currentLoc.description}</p>}
+      </div>
+
+      {/* Minimapa */}
       {currentLoc && (
-        <Minimap
-          locations={locs as any}
-          connections={conns}
-          currentLocationId={currentLoc.id}
-          onSelect={(id) => { if (neighbors.some((n) => n.id === id)) doMove(id); }}
-        />
+        <div>
+          <SectionLabel icon={Compass}>Minimapa</SectionLabel>
+          <div className="rounded-xl border border-border/60 bg-black/40 overflow-hidden">
+            <Minimap
+              locations={locs as any}
+              connections={conns}
+              currentLocationId={currentLoc.id}
+              onSelect={(id) => { if (neighbors.some((n) => n.id === id)) doMove(id); }}
+            />
+          </div>
+        </div>
       )}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-1 sm:gap-3">
-        <Button asChild variant="outline" size="sm" className="w-full justify-between h-auto py-2">
+
+      {/* Ações rápidas */}
+      <div className="grid grid-cols-2 gap-2">
+        <Button asChild variant="outline" size="sm" className="justify-between h-9 border-blood/40 bg-blood/10 hover:bg-blood/20 text-blood hover:text-blood">
           <Link to="/party">
-            <span className="flex items-center gap-1 min-w-0"><Users size={14} className="shrink-0" /> <span className="truncate">Meu time{partyMemberCount > 0 ? ` (${partyMemberCount})` : ""}</span></span>
+            <span className="flex items-center gap-1.5 min-w-0"><Users size={13} className="shrink-0" /> <span className="truncate text-[11px] font-bold uppercase tracking-wide">Time{partyMemberCount > 0 ? ` ${partyMemberCount}` : ""}</span></span>
             {invites.length > 0 && <span className="text-[10px] bg-blood text-white rounded-full px-1.5 shrink-0">{invites.length}</span>}
           </Link>
         </Button>
-        <DuelInvitesInline />
-      </div>
-      <div>
-        <div className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1"><MapPin size={12} /> Você está em</div>
-        <div className="font-display text-xl text-gold flex items-center gap-2 min-w-0">
-          <span className="truncate">{currentLoc?.name ?? "— nenhum local —"}</span>
-          {currentLoc?.is_danger_zone && <span title="Zona de perigo — NPCs podem aparecer" className="shrink-0"><Skull size={16} className="text-blood" /></span>}
+        <div className="[&>*]:h-9 [&>*]:w-full">
+          <DuelInvitesInline />
         </div>
-        {currentLoc?.description && <p className="text-xs text-muted-foreground mt-1">{currentLoc.description}</p>}
       </div>
 
+      {/* Pessoas presentes */}
       {currentLoc && (
-        <div className="border border-border rounded p-2 space-y-1">
-          <div className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1">
-            <Users size={11} /> {presentHere.length} {presentHere.length === 1 ? "pessoa" : "pessoas"} no local
-          </div>
-          <div className="flex flex-wrap gap-1">
-            {presentHere.slice(0, 5).map((p) => (
-              <div key={p.id} title={p.nickname} className="w-6 h-6 rounded-full bg-secondary overflow-hidden ring-1 ring-border">
-                {p.avatar_url && <img src={p.avatar_url} className="w-full h-full object-cover" alt={p.nickname} />}
-              </div>
-            ))}
-            {presentHere.length > 5 && (
-              <div className="w-6 h-6 rounded-full bg-secondary ring-1 ring-border flex items-center justify-center text-[10px] text-muted-foreground">
-                +{presentHere.length - 5}
+        <div>
+          <SectionLabel icon={Users}>{presentHere.length} {presentHere.length === 1 ? "shinobi" : "shinobis"} no local</SectionLabel>
+          <div className="rounded-xl border border-border/60 bg-card/40 p-2.5">
+            {presentHere.length === 0 ? (
+              <p className="text-[11px] text-muted-foreground italic px-1">Ninguém por aqui além de você.</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {presentHere.slice(0, 8).map((p) => (
+                  <div key={p.id} title={p.nickname} className="w-7 h-7 rounded-full bg-secondary overflow-hidden ring-1 ring-border hover:ring-gold transition">
+                    {p.avatar_url && <img src={p.avatar_url} className="w-full h-full object-cover" alt={p.nickname} />}
+                  </div>
+                ))}
+                {presentHere.length > 8 && (
+                  <div className="w-7 h-7 rounded-full bg-secondary ring-1 ring-border flex items-center justify-center text-[10px] text-muted-foreground">
+                    +{presentHere.length - 8}
+                  </div>
+                )}
               </div>
             )}
           </div>
         </div>
       )}
 
+      {/* Missões */}
       {currentLoc && availableMinigames.length > 0 && (
-        <div className="border border-border rounded p-2 space-y-2">
-          <div className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1">
-            <Gamepad2 size={11} /> Missões neste local
-          </div>
-          <div className="space-y-1">
+        <div>
+          <SectionLabel icon={Gamepad2}>Missões neste local</SectionLabel>
+          <div className="space-y-1.5">
             {availableMinigames.map((m: any) => {
               const ready = (m.cooldown_remaining_ms ?? 0) <= 0;
               const remH = Math.ceil((m.cooldown_remaining_ms ?? 0) / 3600000);
               const remM = Math.ceil((m.cooldown_remaining_ms ?? 0) / 60000);
               return (
-                <Button key={m.id} size="sm" variant={ready ? "default" : "outline"} className="w-full justify-start"
-                  disabled={!ready} onClick={() => setActiveMinigame(m)}>
-                  <Gamepad2 size={12} className="mr-1" />
-                  <span className="truncate flex-1 text-left">{m.name}</span>
-                  {!ready && <span className="text-[10px] text-muted-foreground ml-1">{remH >= 1 ? `${remH}h` : `${remM}m`}</span>}
-                </Button>
+                <button key={m.id} disabled={!ready} onClick={() => setActiveMinigame(m)}
+                  className={`group w-full flex items-center gap-2 p-2.5 rounded-lg border transition text-left ${ready ? "border-gold/30 bg-gold/5 hover:bg-gold/10 hover:border-gold/60" : "border-border/40 bg-card/30 opacity-60 cursor-not-allowed"}`}>
+                  <div className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${ready ? "bg-gold/20 text-gold" : "bg-secondary text-muted-foreground"}`}><Gamepad2 size={13} /></div>
+                  <span className="flex-1 truncate text-xs font-medium">{m.name}</span>
+                  <span className={`text-[10px] shrink-0 ${ready ? "text-gold" : "text-muted-foreground"}`}>{ready ? "PRONTO" : (remH >= 1 ? `${remH}h` : `${remM}m`)}</span>
+                </button>
               );
             })}
           </div>
         </div>
       )}
 
+      {/* NPCs */}
       {currentLoc && <NpcInteractPanel locationId={currentLoc.id} />}
-
       {currentLoc && <NpcAiChat locationId={currentLoc.id} />}
 
       {currentLoc && hasLibraryHere && (
-        <Link to="/library" search={{ location: currentLoc.id }}>
-          <Button size="sm" variant="outline" className="w-full justify-start">
-            <BookOpen size={12} className="mr-1 text-gold" /> Biblioteca deste local
-          </Button>
+        <Link to="/library" search={{ location: currentLoc.id }}
+          className="flex items-center gap-2 p-2.5 rounded-lg border border-gold/30 bg-gold/5 hover:bg-gold/10 transition">
+          <BookOpen size={14} className="text-gold shrink-0" />
+          <span className="text-xs font-medium flex-1">Biblioteca deste local</span>
         </Link>
       )}
 
+      {/* Movimento */}
       <div>
-        <div className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1 mb-2"><Compass size={12} /> {character.current_location_id ? "Locais próximos" : "Escolha onde iniciar"}</div>
+        <SectionLabel icon={Compass}>{character.current_location_id ? "Locais próximos" : "Escolha onde iniciar"}</SectionLabel>
         <div className="space-y-1">
-          {availableToMove.length === 0 && <div className="text-xs text-muted-foreground">Sem locais acessíveis daqui.</div>}
+          {availableToMove.length === 0 && <div className="text-xs text-muted-foreground italic px-1">Sem locais acessíveis daqui.</div>}
           {availableToMove.map((l) => (
             <button key={l.id} onClick={() => { doMove(l.id); setNavOpen(false); }}
-              className="w-full text-left p-2 rounded hover:bg-secondary text-sm flex items-center gap-2 min-w-0">
-              {l.image_url && <img src={l.image_url} className="w-8 h-8 rounded object-cover shrink-0" alt="" />}
-              <span className="flex-1 truncate">{l.name}</span>
+              className="w-full text-left p-2 rounded-lg border border-transparent hover:border-blood/40 hover:bg-blood/5 transition text-sm flex items-center gap-2.5 min-w-0 group">
+              {l.image_url
+                ? <img src={l.image_url} className="w-8 h-8 rounded-md object-cover shrink-0 ring-1 ring-border" alt="" />
+                : <div className="w-8 h-8 rounded-md bg-secondary shrink-0 flex items-center justify-center text-muted-foreground group-hover:text-gold transition"><MapPin size={13} /></div>}
+              <span className="flex-1 truncate text-xs">{l.name}</span>
               {l.is_danger_zone && <Skull size={12} className="text-blood shrink-0" />}
             </button>
           ))}
@@ -409,7 +440,7 @@ function ChatPage() {
   );
 
   return (
-    <div className="mx-auto max-w-6xl md:grid md:gap-4 md:grid-cols-[280px_1fr] md:p-4 pb-[env(safe-area-inset-bottom)]">
+    <div className="mx-auto max-w-7xl md:grid md:gap-4 md:grid-cols-[300px_1fr] md:p-4 pb-[env(safe-area-inset-bottom)]">
       {character && <ChatHud characterId={character.id} />}
       {character && <MissionTracker characterId={character.id} />}
       {character && <TradeWatcher myCharacterId={character.id} />}
