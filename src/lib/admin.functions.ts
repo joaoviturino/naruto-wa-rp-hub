@@ -219,7 +219,7 @@ export const resetAllParties = createServerFn({ method: "POST" })
 export const grantRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ user_id: z.string().uuid(), role: z.enum(["admin","user","blacksmith"]) }).parse(input))
+    z.object({ user_id: z.string().uuid(), role: z.enum(["admin","user","blacksmith","moderator"]) }).parse(input))
   .handler(async ({ data, context }) => {
     const { data: isAdmin, error: roleError } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
     if (roleError) throw new Error(roleError.message);
@@ -566,7 +566,7 @@ export const listUsers = createServerFn({ method: "GET" })
 
 export const revokeRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i: unknown) => z.object({ user_id: z.string().uuid(), role: z.enum(["admin","user","blacksmith"]) }).parse(i))
+  .inputValidator((i: unknown) => z.object({ user_id: z.string().uuid(), role: z.enum(["admin","user","blacksmith","moderator"]) }).parse(i))
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     if (data.user_id === context.userId && data.role === "admin") {
