@@ -36,7 +36,7 @@ export const updateLevelConfig = createServerFn({ method: "POST" })
     }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertAdminOrMod(context);
     const { error } = await context.supabase
       .from("level_config")
       .upsert({ id: true, ...data }, { onConflict: "id" });

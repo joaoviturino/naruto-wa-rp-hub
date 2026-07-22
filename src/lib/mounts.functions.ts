@@ -28,7 +28,7 @@ export const upsertMount = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => MountInput.parse(input))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context.supabase, context.userId);
+    await assertAdminOrMod(context.supabase, context.userId);
     const payload = {
       name: data.name,
       image_url: data.image_url ?? null,

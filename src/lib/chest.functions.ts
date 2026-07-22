@@ -8,6 +8,12 @@ async function assertAdmin(context: { supabase: any; userId: string }) {
   if (!data) throw new Error("Forbidden");
 }
 
+async function assertAdminOrMod(context: { supabase: any; userId: string }) {
+  const { data, error } = await context.supabase.rpc("has_admin_or_mod", { _user_id: context.userId });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Forbidden");
+}
+
 async function loadMyChar(context: { supabase: any; userId: string }) {
   const { data, error } = await context.supabase
     .from("characters").select("id,current_location_id").eq("user_id", context.userId).maybeSingle();
@@ -24,7 +30,7 @@ export const upsertNpcChest = createServerFn({ method: "POST" })
     capacity: z.number().int().min(1).max(10_000).default(100),
   }).parse(i))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertAdminOrMod(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: npc } = await supabaseAdmin.from("npcs").select("kind").eq("id", data.npc_id).maybeSingle();
     if (!npc || (npc as any).kind !== "buyer") throw new Error("Baús só são vinculados a NPCs compradores.");
@@ -60,7 +66,7 @@ export const setChestPermissions = createServerFn({ method: "POST" })
     authorized_character_ids: z.array(z.string().uuid()).default([]),
   }).parse(i))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertAdminOrMod(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("chest_permissions").delete().eq("chest_id", data.chest_id);
     const rows: any[] = [];
@@ -80,7 +86,7 @@ export const setChestPermissions = createServerFn({ method: "POST" })
 export const adminListChests = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await assertAdmin(context);
+    await assertAdminOrMod(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: chests } = await supabaseAdmin.from("npc_chests")
       .select("id,npc_id,capacity,contents,npc:npcs(id,name,kind)");
