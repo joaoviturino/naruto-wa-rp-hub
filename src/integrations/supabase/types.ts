@@ -1960,6 +1960,52 @@ export type Database = {
           },
         ]
       }
+      location_permissions: {
+        Row: {
+          character_id: string
+          created_at: string
+          granted_by: string | null
+          id: string
+          location_id: string
+        }
+        Insert: {
+          character_id: string
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          location_id: string
+        }
+        Update: {
+          character_id?: string
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          location_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_permissions_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_permissions_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_permissions_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       locations: {
         Row: {
           battle_bg_url: string | null
@@ -1968,11 +2014,15 @@ export type Database = {
           id: string
           image_url: string | null
           is_danger_zone: boolean
+          is_for_sale: boolean
+          is_private: boolean
           map_x: number
           map_y: number
           music_url: string | null
           name: string
+          owner_character_id: string | null
           parent_id: string | null
+          sale_price: number
           spawn_chance: number
           spawn_group_ids: string[]
           spawn_tick_seconds: number
@@ -1985,11 +2035,15 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_danger_zone?: boolean
+          is_for_sale?: boolean
+          is_private?: boolean
           map_x?: number
           map_y?: number
           music_url?: string | null
           name: string
+          owner_character_id?: string | null
           parent_id?: string | null
+          sale_price?: number
           spawn_chance?: number
           spawn_group_ids?: string[]
           spawn_tick_seconds?: number
@@ -2002,17 +2056,28 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_danger_zone?: boolean
+          is_for_sale?: boolean
+          is_private?: boolean
           map_x?: number
           map_y?: number
           music_url?: string | null
           name?: string
+          owner_character_id?: string | null
           parent_id?: string | null
+          sale_price?: number
           spawn_chance?: number
           spawn_group_ids?: string[]
           spawn_tick_seconds?: number
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "locations_owner_character_id_fkey"
+            columns: ["owner_character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "locations_parent_id_fkey"
             columns: ["parent_id"]
@@ -3515,6 +3580,10 @@ export type Database = {
       add_proficiency: {
         Args: { _desc?: string; _label: string; _sort?: number; _value: string }
         Returns: undefined
+      }
+      can_access_location: {
+        Args: { _location_id: string; _user_id: string }
+        Returns: boolean
       }
       has_role: {
         Args: {
