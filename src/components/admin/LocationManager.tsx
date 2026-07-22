@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Trash2, Upload, Link2, Plus, Skull, Gamepad2, Store, Gift, BookOpen, GraduationCap, Box } from "lucide-react";
+import { Trash2, Upload, Link2, Plus, Skull, Gamepad2, Store, Gift, BookOpen, GraduationCap, Box, Lock, Tag, UserPlus, Crown } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { updateLocationDangerZone, setLocationNpcs } from "@/lib/npc.functions";
@@ -13,13 +13,20 @@ import { setLocationMinigames } from "@/lib/minigame.functions";
 import { setLocationLibraries } from "@/lib/library.functions";
 import { LocationMapEditor } from "./LocationMapEditor";
 import { ComboSelect } from "@/components/ui/combo-select";
+import { Switch } from "@/components/ui/switch";
+import {
+  adminSetLocationOwner, setLocationOwnership,
+  listLocationPermissions, grantLocationAccess, revokeLocationAccess,
+} from "@/lib/location-ownership.functions";
 
 type Loc = { id: string; name: string; description: string | null; image_url: string | null;
   map_x?: number; map_y?: number;
   parent_id?: string | null;
   is_danger_zone?: boolean; spawn_chance?: number; spawn_tick_seconds?: number;
   spawn_group_ids?: string[];
-  battle_bg_url?: string | null; music_url?: string | null };
+  battle_bg_url?: string | null; music_url?: string | null;
+  is_private?: boolean; is_for_sale?: boolean; sale_price?: number;
+  owner_character_id?: string | null };
 type Conn = { id: string; a_id: string; b_id: string };
 type Npc = { id: string; name: string; kind: "aggressive" | "shop" | "reward" | "learning" | "object" };
 type NpcGroup = { id: string; name: string };
@@ -47,10 +54,20 @@ export function LocationManager() {
   const setLocGroupsFn = useServerFn(setLocationSpawnGroups);
   const setLocMgFn = useServerFn(setLocationMinigames);
   const setLocLibFn = useServerFn(setLocationLibraries);
+  const setOwnerFn = useServerFn(adminSetLocationOwner);
+  const setOwnershipFn = useServerFn(setLocationOwnership);
+  const listPermsFn = useServerFn(listLocationPermissions);
+  const grantFn = useServerFn(grantLocationAccess);
+  const revokeFn = useServerFn(revokeLocationAccess);
+  const [ownerNick, setOwnerNick] = useState<string>("");
+  const [ownerNickInput, setOwnerNickInput] = useState<string>("");
+  const [perms, setPerms] = useState<Array<{ id: string; character_id: string; nickname: string }>>([]);
+  const [grantNick, setGrantNick] = useState<string>("");
+  const [salePrice, setSalePrice] = useState<number>(0);
 
   async function load() {
     const [l, c, n, ln, mg, lmg, ls, llb, gr] = await Promise.all([
-      supabase.from("locations").select("id,name,description,image_url,map_x,map_y,parent_id,is_danger_zone,spawn_chance,spawn_tick_seconds,spawn_group_ids,battle_bg_url,music_url").order("name"),
+      supabase.from("locations").select("id,name,description,image_url,map_x,map_y,parent_id,is_danger_zone,spawn_chance,spawn_tick_seconds,spawn_group_ids,battle_bg_url,music_url,is_private,is_for_sale,sale_price,owner_character_id").order("name"),
       supabase.from("location_connections").select("id,a_id,b_id"),
       supabase.from("npcs").select("id,name,kind").order("name"),
       supabase.from("location_npcs").select("location_id,npc_id"),
@@ -86,6 +103,23 @@ export function LocationManager() {
     setLocLibs(map3);
   }
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    (async () => {
+      if (!selected) { setPerms([]); setOwnerNick(""); setOwnerNickInput(""); return; }
+      const s = locs.find((l) => l.id === selected);
+      setSalePrice(s?.sale_price ?? 0);
+      try {
+        const rows = await listPermsFn({ data: { location_id: selected } } as any);
+        setPerms(rows as any);
+      } catch { setPerms([]); }
+      if (s?.owner_character_id) {
+        const { data: ch } = await supabase.from("characters").select("nickname").eq("id", s.owner_character_id).maybeSingle();
+        const nk = (ch as any)?.nickname ?? "";
+        setOwnerNick(nk); setOwnerNickInput(nk);
+      } else { setOwnerNick(""); setOwnerNickInput(""); }
+    })();
+  }, [selected, locs]);
 
   async function create() {
     if (!name.trim()) return;
@@ -127,6 +161,45 @@ export function LocationManager() {
   }
 
   const sel = locs.find((l) => l.id === selected);
+
+  async function saveOwner() {
+    if (!sel) return;
+    try {
+      await setOwnerFn({ data: { location_id: sel.id, nickname: ownerNickInput.trim() || null } } as any);
+      toast.success(ownerNickInput.trim() ? "Dono definido." : "Local sem dono.");
+      load();
+    } catch (e: any) { toast.error(e.message); }
+  }
+  async function togglePrivate(v: boolean) {
+    if (!sel) return;
+    try { await setOwnershipFn({ data: { location_id: sel.id, is_private: v } } as any); toast.success(v ? "Local privado." : "Local público."); load(); }
+    catch (e: any) { toast.error(e.message); }
+  }
+  async function toggleForSale(v: boolean) {
+    if (!sel) return;
+    try { await setOwnershipFn({ data: { location_id: sel.id, is_for_sale: v, sale_price: salePrice } } as any); toast.success(v ? "À venda." : "Fora do mercado."); load(); }
+    catch (e: any) { toast.error(e.message); }
+  }
+  async function saveSalePrice() {
+    if (!sel) return;
+    try { await setOwnershipFn({ data: { location_id: sel.id, sale_price: salePrice } } as any); toast.success("Preço atualizado."); load(); }
+    catch (e: any) { toast.error(e.message); }
+  }
+  async function refreshPerms() {
+    if (!sel) return;
+    try { const rows = await listPermsFn({ data: { location_id: sel.id } } as any); setPerms(rows as any); } catch {}
+  }
+  async function doGrant() {
+    if (!sel || !grantNick.trim()) return;
+    try { await grantFn({ data: { location_id: sel.id, nickname: grantNick.trim() } } as any); toast.success("Acesso concedido."); setGrantNick(""); refreshPerms(); }
+    catch (e: any) { toast.error(e.message); }
+  }
+  async function doRevoke(cid: string) {
+    if (!sel) return;
+    try { await revokeFn({ data: { location_id: sel.id, character_id: cid } } as any); toast.info("Acesso removido."); refreshPerms(); }
+    catch (e: any) { toast.error(e.message); }
+  }
+
   const neighborIds = new Set(conns.filter((c) => c.a_id === selected || c.b_id === selected).map((c) => c.a_id === selected ? c.b_id : c.a_id));
   const availableToLink = locs.filter((l) => l.id !== selected && !neighborIds.has(l.id));
   const selNpcs = selected ? locNpcs[selected] ?? new Set<string>() : new Set<string>();
@@ -260,6 +333,64 @@ export function LocationManager() {
                   const { error } = await supabase.from("locations").update({ music_url: v }).eq("id", sel.id);
                   if (error) toast.error(error.message); else { toast.success("Música atualizada."); load(); }
                 }} />
+            </div>
+          </div>
+
+          <div className="scroll-panel rounded-lg p-4 space-y-3">
+            <h4 className="font-display text-lg text-gold flex items-center gap-2"><Lock size={16} /> Propriedade & Acesso</h4>
+            <p className="text-xs text-muted-foreground">Defina o dono, se o local é privado e/ou está à venda. Locais privados só podem ser acessados pelo dono e por personagens autorizados.</p>
+
+            <div className="space-y-2">
+              <Label className="text-xs flex items-center gap-1"><Crown size={12} /> Dono (nickname do personagem)</Label>
+              <div className="flex gap-2">
+                <Input placeholder="— sem dono —" value={ownerNickInput} onChange={(e) => setOwnerNickInput(e.target.value)} />
+                <Button size="sm" onClick={saveOwner}>Salvar</Button>
+              </div>
+              {ownerNick && <p className="text-[11px] text-muted-foreground">Dono atual: <span className="text-gold">{ownerNick}</span></p>}
+            </div>
+
+            <div className="flex items-center justify-between rounded border border-border p-2">
+              <div>
+                <Label className="text-sm">Privado</Label>
+                <p className="text-[11px] text-muted-foreground">Apenas dono e permitidos podem entrar.</p>
+              </div>
+              <Switch checked={!!sel.is_private} onCheckedChange={togglePrivate} />
+            </div>
+
+            <div className="flex items-center justify-between rounded border border-border p-2">
+              <div>
+                <Label className="text-sm flex items-center gap-1"><Tag size={12} /> À venda</Label>
+                <p className="text-[11px] text-muted-foreground">Aparece no mercado por Ryō. Torna o local privado automaticamente.</p>
+              </div>
+              <Switch checked={!!sel.is_for_sale} onCheckedChange={toggleForSale} />
+            </div>
+
+            {sel.is_for_sale && (
+              <div className="flex items-center gap-2">
+                <Label className="text-xs w-24">Preço (ryō)</Label>
+                <Input type="number" min={0} value={salePrice}
+                  onChange={(e) => setSalePrice(Math.max(0, Number(e.target.value) || 0))} />
+                <Button size="sm" onClick={saveSalePrice}>Salvar</Button>
+              </div>
+            )}
+
+            <div className="rounded border border-border p-2 space-y-2">
+              <Label className="text-sm">Personagens com acesso ({perms.length})</Label>
+              <div className="flex gap-2">
+                <Input placeholder="Nickname do personagem…" value={grantNick} onChange={(e) => setGrantNick(e.target.value)} />
+                <Button size="sm" onClick={doGrant}><UserPlus size={14} className="mr-1" />Conceder</Button>
+              </div>
+              <ul className="divide-y divide-border max-h-40 overflow-auto">
+                {perms.map((r) => (
+                  <li key={r.id} className="flex items-center justify-between py-1.5 text-sm">
+                    <span>{r.nickname}</span>
+                    <Button size="sm" variant="ghost" onClick={() => doRevoke(r.character_id)}>
+                      <Trash2 size={14} className="text-blood" />
+                    </Button>
+                  </li>
+                ))}
+                {perms.length === 0 && <li className="py-2 text-xs text-muted-foreground italic">Ninguém autorizado além do dono.</li>}
+              </ul>
             </div>
           </div>
 
