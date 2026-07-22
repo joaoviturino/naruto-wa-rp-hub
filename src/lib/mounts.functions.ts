@@ -7,6 +7,11 @@ async function assertAdmin(supabase: any, userId: string) {
   if (!data) throw new Error("Somente admins.");
 }
 
+async function assertAdminOrMod(supabase: any, userId: string) {
+  const { data } = await supabase.rpc("has_admin_or_mod", { _user_id: userId });
+  if (!data) throw new Error("Somente admins ou moderadores.");
+}
+
 const MountInput = z.object({
   id: z.string().uuid().optional(),
   name: z.string().min(1),
