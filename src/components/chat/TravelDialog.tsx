@@ -4,11 +4,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { useServerFn } from "@tanstack/react-start";
 import { travelTo, getMyTravel, completeTravel, cancelTravel, listMyMounts } from "@/lib/travel.functions";
+import { buyLocation } from "@/lib/location-ownership.functions";
 import { shortestPathDistance } from "@/lib/location-graph";
 import { toast } from "sonner";
-import { Compass, Footprints, MapPin, X, Sparkles } from "lucide-react";
+import { Compass, Footprints, MapPin, X, Sparkles, Lock, Tag, Settings2 } from "lucide-react";
+import { LocationAccessDialog } from "./LocationAccessDialog";
 
-type Loc = { id: string; name: string; image_url: string | null; map_x: number; map_y: number; parent_id: string | null };
+type Loc = {
+  id: string; name: string; image_url: string | null; map_x: number; map_y: number; parent_id: string | null;
+  is_private: boolean; is_for_sale: boolean; sale_price: number; owner_character_id: string | null;
+};
 type Conn = { a_id: string; b_id: string };
 type Mount = {
   id: string; name: string; image_url: string | null; travel_gif_url: string | null;
@@ -30,26 +35,33 @@ export function TravelDialog({ open, onOpenChange, currentLocationId, onArrived 
   const [chosenMount, setChosenMount] = useState<string | null>(null);
   const [travel, setTravel] = useState<any | null>(null);
   const [now, setNow] = useState(Date.now());
+  const [myCharId, setMyCharId] = useState<string | null>(null);
+  const [accessOpen, setAccessOpen] = useState(false);
 
   const start = useServerFn(travelTo);
   const getT = useServerFn(getMyTravel);
   const finish = useServerFn(completeTravel);
   const cancel = useServerFn(cancelTravel);
   const listMounts = useServerFn(listMyMounts);
+  const buy = useServerFn(buyLocation);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     (async () => {
-      const [{ data: l }, { data: cn }, m, t] = await Promise.all([
-        supabase.from("locations").select("id,name,image_url,map_x,map_y,parent_id").order("name"),
+      const { data: userRes } = await supabase.auth.getUser();
+      const uid = userRes.user?.id;
+      const [{ data: l }, { data: cn }, m, t, meRow] = await Promise.all([
+        supabase.from("locations").select("id,name,image_url,map_x,map_y,parent_id,is_private,is_for_sale,sale_price,owner_character_id").order("name"),
         supabase.from("location_connections").select("a_id,b_id"),
         listMounts({}), getT({}),
+        uid ? supabase.from("characters").select("id").eq("user_id", uid).maybeSingle() : Promise.resolve({ data: null }),
       ]);
       setLocs((l as Loc[]) ?? []);
       setConns((cn as Conn[]) ?? []);
       setMounts(m.mounts ?? []);
       setTravel(t.travel ?? null);
+      setMyCharId((meRow as any)?.data?.id ?? null);
       setSelected(null); setChosenMount(null);
     })();
   }, [open]);
@@ -84,6 +96,8 @@ export function TravelDialog({ open, onOpenChange, currentLocationId, onArrived 
 
   const selectedLoc = selected ? locs.find((l) => l.id === selected) ?? null : null;
   const currentLoc = currentLocationId ? locs.find((l) => l.id === currentLocationId) ?? null : null;
+  const iOwnSelected = !!(selectedLoc && myCharId && selectedLoc.owner_character_id === myCharId);
+  const selectedForSaleByOther = !!(selectedLoc && selectedLoc.is_for_sale && selectedLoc.owner_character_id !== myCharId);
 
   const isSubMove = (() => {
     if (!currentLoc || !selectedLoc) return false;
@@ -112,6 +126,23 @@ export function TravelDialog({ open, onOpenChange, currentLocationId, onArrived 
       setTravel(null);
       toast.info("Viagem cancelada.");
     } catch (e: any) { toast.error(e.message); }
+  }
+
+  async function doBuy() {
+    if (!selectedLoc) return;
+    if (!confirm(`Comprar "${selectedLoc.name}" por ${selectedLoc.sale_price} ryō?`)) return;
+    try {
+      const r = await buy({ data: { location_id: selectedLoc.id } } as any);
+      toast.success(`Você adquiriu "${r.name}" por ${r.price} ryō.`);
+      // Refetch locations
+      const { data: l } = await supabase.from("locations").select("id,name,image_url,map_x,map_y,parent_id,is_private,is_for_sale,sale_price,owner_character_id").order("name");
+      setLocs((l as Loc[]) ?? []);
+    } catch (e: any) { toast.error(e.message); }
+  }
+
+  async function refreshLocs() {
+    const { data: l } = await supabase.from("locations").select("id,name,image_url,map_x,map_y,parent_id,is_private,is_for_sale,sale_price,owner_character_id").order("name");
+    setLocs((l as Loc[]) ?? []);
   }
 
   // Bounding box para caber o mapa
@@ -206,6 +237,10 @@ export function TravelDialog({ open, onOpenChange, currentLocationId, onArrived 
                       {l.image_url && <img src={l.image_url} className="w-full h-full object-cover" alt="" />}
                     </div>
                     <div className="text-xs font-semibold flex-1 truncate">{l.name}</div>
+                    <div className="flex flex-col gap-0.5 shrink-0">
+                      {l.is_private && <Lock size={10} className="text-blood" />}
+                      {l.is_for_sale && <Tag size={10} className="text-gold" />}
+                    </div>
                   </button>
                 );
               })}
@@ -225,6 +260,21 @@ export function TravelDialog({ open, onOpenChange, currentLocationId, onArrived 
                   <div className="font-display text-lg text-gold">{selectedLoc.name}</div>
                 </div>
                 {selectedLoc.image_url && <img src={selectedLoc.image_url} className="w-full h-28 object-cover rounded" alt="" />}
+                <div className="flex flex-wrap gap-1 text-[10px]">
+                  {selectedLoc.is_private && <span className="rounded bg-blood/20 text-blood px-2 py-0.5 flex items-center gap-1"><Lock size={10} /> Privado</span>}
+                  {selectedLoc.is_for_sale && <span className="rounded bg-gold/20 text-gold px-2 py-0.5 flex items-center gap-1"><Tag size={10} /> À venda · {selectedLoc.sale_price} ryō</span>}
+                  {iOwnSelected && <span className="rounded bg-emerald-500/20 text-emerald-300 px-2 py-0.5">Você é o dono</span>}
+                </div>
+                {iOwnSelected && (
+                  <Button size="sm" variant="outline" className="w-full" onClick={() => setAccessOpen(true)}>
+                    <Settings2 size={14} className="mr-1" /> Gerenciar acesso / venda
+                  </Button>
+                )}
+                {selectedForSaleByOther && !iOwnSelected && (
+                  <Button size="sm" variant="secondary" className="w-full" onClick={doBuy}>
+                    <Tag size={14} className="mr-1" /> Comprar por {selectedLoc.sale_price} ryō
+                  </Button>
+                )}
                 {selected === currentLocationId ? (
                   <p className="text-xs text-muted-foreground">Você já está aqui.</p>
                 ) : dist < 0 ? (
@@ -267,6 +317,15 @@ export function TravelDialog({ open, onOpenChange, currentLocationId, onArrived 
             )}
           </aside>
         </div>
+        <LocationAccessDialog
+          open={accessOpen}
+          onOpenChange={setAccessOpen}
+          location={selectedLoc && iOwnSelected ? {
+            id: selectedLoc.id, name: selectedLoc.name,
+            is_private: selectedLoc.is_private, is_for_sale: selectedLoc.is_for_sale, sale_price: selectedLoc.sale_price,
+          } : null}
+          onChanged={refreshLocs}
+        />
       </DialogContent>
     </Dialog>
   );

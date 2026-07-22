@@ -71,6 +71,13 @@ export const travelTo = createServerFn({ method: "POST" })
     if (!char.current_location_id) throw new Error("Escolha um local inicial pelo mapa antes de viajar.");
     if (char.current_location_id === data.toLocationId) throw new Error("Você já está neste local.");
 
+    // Bloqueio de acesso a locais privados.
+    const { data: accessOk, error: accessErr } = await context.supabase.rpc("can_access_location", {
+      _user_id: context.userId, _location_id: data.toLocationId,
+    });
+    if (accessErr) throw new Error(accessErr.message);
+    if (!accessOk) throw new Error("Este local é privado. Peça acesso ao dono.");
+
     const { data: existing } = await context.supabase
       .from("travel_sessions").select("id").eq("character_id", char.id).eq("status", "traveling").maybeSingle();
     if (existing) throw new Error("Você já está viajando.");
