@@ -64,8 +64,7 @@ export const respondNpcsInLocation = createServerFn({ method: "POST" })
       .from("npcs")
       .select("*")
       .in("id", npcIds)
-      .eq("ai_enabled", true)
-      .in("ai_mode", ["public", "both"]);
+      .eq("ai_enabled", true);
     if (!npcs || npcs.length === 0) return { replied: 0 };
 
     // Última mensagem (gatilho) + histórico curto do local

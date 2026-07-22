@@ -15,7 +15,6 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { listMinigamesForMyLocation } from "@/lib/minigame.functions";
 import { MinigameDialog } from "@/components/minigame/MinigameDialog";
 import { NpcInteractPanel } from "@/components/chat/NpcInteractPanel";
-import { NpcAiChat } from "@/components/chat/NpcAiChat";
 import { DuelInvitesInline } from "@/components/chat/DuelInvitesInline";
 import { ChatHud } from "@/components/chat/ChatHud";
 import { MissionTracker } from "@/components/chat/MissionTracker";
@@ -409,7 +408,6 @@ function ChatPage() {
 
       {/* NPCs */}
       {currentLoc && <NpcInteractPanel locationId={currentLoc.id} />}
-      {currentLoc && <NpcAiChat locationId={currentLoc.id} />}
 
       {currentLoc && hasLibraryHere && (
         <Link to="/library" search={{ location: currentLoc.id }}
