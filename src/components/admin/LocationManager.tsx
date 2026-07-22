@@ -337,6 +337,64 @@ export function LocationManager() {
           </div>
 
           <div className="scroll-panel rounded-lg p-4 space-y-3">
+            <h4 className="font-display text-lg text-gold flex items-center gap-2"><Lock size={16} /> Propriedade & Acesso</h4>
+            <p className="text-xs text-muted-foreground">Defina o dono, se o local é privado e/ou está à venda. Locais privados só podem ser acessados pelo dono e por personagens autorizados.</p>
+
+            <div className="space-y-2">
+              <Label className="text-xs flex items-center gap-1"><Crown size={12} /> Dono (nickname do personagem)</Label>
+              <div className="flex gap-2">
+                <Input placeholder="— sem dono —" value={ownerNickInput} onChange={(e) => setOwnerNickInput(e.target.value)} />
+                <Button size="sm" onClick={saveOwner}>Salvar</Button>
+              </div>
+              {ownerNick && <p className="text-[11px] text-muted-foreground">Dono atual: <span className="text-gold">{ownerNick}</span></p>}
+            </div>
+
+            <div className="flex items-center justify-between rounded border border-border p-2">
+              <div>
+                <Label className="text-sm">Privado</Label>
+                <p className="text-[11px] text-muted-foreground">Apenas dono e permitidos podem entrar.</p>
+              </div>
+              <Switch checked={!!sel.is_private} onCheckedChange={togglePrivate} />
+            </div>
+
+            <div className="flex items-center justify-between rounded border border-border p-2">
+              <div>
+                <Label className="text-sm flex items-center gap-1"><Tag size={12} /> À venda</Label>
+                <p className="text-[11px] text-muted-foreground">Aparece no mercado por Ryō. Torna o local privado automaticamente.</p>
+              </div>
+              <Switch checked={!!sel.is_for_sale} onCheckedChange={toggleForSale} />
+            </div>
+
+            {sel.is_for_sale && (
+              <div className="flex items-center gap-2">
+                <Label className="text-xs w-24">Preço (ryō)</Label>
+                <Input type="number" min={0} value={salePrice}
+                  onChange={(e) => setSalePrice(Math.max(0, Number(e.target.value) || 0))} />
+                <Button size="sm" onClick={saveSalePrice}>Salvar</Button>
+              </div>
+            )}
+
+            <div className="rounded border border-border p-2 space-y-2">
+              <Label className="text-sm">Personagens com acesso ({perms.length})</Label>
+              <div className="flex gap-2">
+                <Input placeholder="Nickname do personagem…" value={grantNick} onChange={(e) => setGrantNick(e.target.value)} />
+                <Button size="sm" onClick={doGrant}><UserPlus size={14} className="mr-1" />Conceder</Button>
+              </div>
+              <ul className="divide-y divide-border max-h-40 overflow-auto">
+                {perms.map((r) => (
+                  <li key={r.id} className="flex items-center justify-between py-1.5 text-sm">
+                    <span>{r.nickname}</span>
+                    <Button size="sm" variant="ghost" onClick={() => doRevoke(r.character_id)}>
+                      <Trash2 size={14} className="text-blood" />
+                    </Button>
+                  </li>
+                ))}
+                {perms.length === 0 && <li className="py-2 text-xs text-muted-foreground italic">Ninguém autorizado além do dono.</li>}
+              </ul>
+            </div>
+          </div>
+
+          <div className="scroll-panel rounded-lg p-4 space-y-3">
             <h4 className="font-display text-lg text-gold flex items-center gap-2"><Link2 size={16} /> Conexões</h4>
             <div className="flex flex-wrap gap-2">
               {conns.filter((c) => c.a_id === sel.id || c.b_id === sel.id).map((c) => {
