@@ -4,11 +4,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { useServerFn } from "@tanstack/react-start";
 import { travelTo, getMyTravel, completeTravel, cancelTravel, listMyMounts } from "@/lib/travel.functions";
+import { buyLocation } from "@/lib/location-ownership.functions";
 import { shortestPathDistance } from "@/lib/location-graph";
 import { toast } from "sonner";
-import { Compass, Footprints, MapPin, X, Sparkles } from "lucide-react";
+import { Compass, Footprints, MapPin, X, Sparkles, Lock, Tag, Settings2 } from "lucide-react";
+import { LocationAccessDialog } from "./LocationAccessDialog";
 
-type Loc = { id: string; name: string; image_url: string | null; map_x: number; map_y: number; parent_id: string | null };
+type Loc = {
+  id: string; name: string; image_url: string | null; map_x: number; map_y: number; parent_id: string | null;
+  is_private: boolean; is_for_sale: boolean; sale_price: number; owner_character_id: string | null;
+};
 type Conn = { a_id: string; b_id: string };
 type Mount = {
   id: string; name: string; image_url: string | null; travel_gif_url: string | null;
@@ -30,26 +35,33 @@ export function TravelDialog({ open, onOpenChange, currentLocationId, onArrived 
   const [chosenMount, setChosenMount] = useState<string | null>(null);
   const [travel, setTravel] = useState<any | null>(null);
   const [now, setNow] = useState(Date.now());
+  const [myCharId, setMyCharId] = useState<string | null>(null);
+  const [accessOpen, setAccessOpen] = useState(false);
 
   const start = useServerFn(travelTo);
   const getT = useServerFn(getMyTravel);
   const finish = useServerFn(completeTravel);
   const cancel = useServerFn(cancelTravel);
   const listMounts = useServerFn(listMyMounts);
+  const buy = useServerFn(buyLocation);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     (async () => {
-      const [{ data: l }, { data: cn }, m, t] = await Promise.all([
-        supabase.from("locations").select("id,name,image_url,map_x,map_y,parent_id").order("name"),
+      const { data: userRes } = await supabase.auth.getUser();
+      const uid = userRes.user?.id;
+      const [{ data: l }, { data: cn }, m, t, meRow] = await Promise.all([
+        supabase.from("locations").select("id,name,image_url,map_x,map_y,parent_id,is_private,is_for_sale,sale_price,owner_character_id").order("name"),
         supabase.from("location_connections").select("a_id,b_id"),
         listMounts({}), getT({}),
+        uid ? supabase.from("characters").select("id").eq("user_id", uid).maybeSingle() : Promise.resolve({ data: null }),
       ]);
       setLocs((l as Loc[]) ?? []);
       setConns((cn as Conn[]) ?? []);
       setMounts(m.mounts ?? []);
       setTravel(t.travel ?? null);
+      setMyCharId((meRow as any)?.data?.id ?? null);
       setSelected(null); setChosenMount(null);
     })();
   }, [open]);
@@ -84,6 +96,8 @@ export function TravelDialog({ open, onOpenChange, currentLocationId, onArrived 
 
   const selectedLoc = selected ? locs.find((l) => l.id === selected) ?? null : null;
   const currentLoc = currentLocationId ? locs.find((l) => l.id === currentLocationId) ?? null : null;
+  const iOwnSelected = !!(selectedLoc && myCharId && selectedLoc.owner_character_id === myCharId);
+  const selectedForSaleByOther = !!(selectedLoc && selectedLoc.is_for_sale && selectedLoc.owner_character_id !== myCharId);
 
   const isSubMove = (() => {
     if (!currentLoc || !selectedLoc) return false;
@@ -112,6 +126,23 @@ export function TravelDialog({ open, onOpenChange, currentLocationId, onArrived 
       setTravel(null);
       toast.info("Viagem cancelada.");
     } catch (e: any) { toast.error(e.message); }
+  }
+
+  async function doBuy() {
+    if (!selectedLoc) return;
+    if (!confirm(`Comprar "${selectedLoc.name}" por ${selectedLoc.sale_price} ryō?`)) return;
+    try {
+      const r = await buy({ data: { location_id: selectedLoc.id } } as any);
+      toast.success(`Você adquiriu "${r.name}" por ${r.price} ryō.`);
+      // Refetch locations
+      const { data: l } = await supabase.from("locations").select("id,name,image_url,map_x,map_y,parent_id,is_private,is_for_sale,sale_price,owner_character_id").order("name");
+      setLocs((l as Loc[]) ?? []);
+    } catch (e: any) { toast.error(e.message); }
+  }
+
+  async function refreshLocs() {
+    const { data: l } = await supabase.from("locations").select("id,name,image_url,map_x,map_y,parent_id,is_private,is_for_sale,sale_price,owner_character_id").order("name");
+    setLocs((l as Loc[]) ?? []);
   }
 
   // Bounding box para caber o mapa
