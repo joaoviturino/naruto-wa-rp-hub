@@ -8,6 +8,12 @@ async function assertAdmin(context: { supabase: any; userId: string }) {
   if (!data) throw new Error("Forbidden");
 }
 
+async function assertAdminOrMod(context: { supabase: any; userId: string }) {
+  const { data, error } = await context.supabase.rpc("has_admin_or_mod", { _user_id: context.userId });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Forbidden");
+}
+
 const rewardsSchema = z.object({
   xp: z.number().int().min(0).max(1_000_000).optional(),
   ryo: z.number().int().min(0).max(10_000_000).optional(),
@@ -257,7 +263,7 @@ export const upsertMinigame = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => upsertSchema.parse(i))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertAdminOrMod(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row, error } = await supabaseAdmin.from("minigames").upsert(data as any).select("id").single();
     if (error) throw new Error(error.message);
@@ -282,7 +288,7 @@ export const setLocationMinigames = createServerFn({ method: "POST" })
     minigame_ids: z.array(z.string().uuid()),
   }).parse(i))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertAdminOrMod(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("location_minigames").delete().eq("location_id", data.location_id);
     if (data.minigame_ids.length) {
@@ -676,7 +682,7 @@ export const setNpcLearningSteps = createServerFn({ method: "POST" })
     })),
   }).parse(i))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertAdminOrMod(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("npc_learning_steps").delete().eq("npc_id", data.npc_id);
     if (data.steps.length) {

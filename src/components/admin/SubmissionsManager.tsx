@@ -10,7 +10,7 @@ import { labelize } from "./shared";
 
 type Status = "pending" | "approved" | "rejected" | "all";
 
-export function SubmissionsManager() {
+export function SubmissionsManager({ canReject = true }: { canReject?: boolean } = {}) {
   const [status, setStatus] = useState<Status>("pending");
   const [rows, setRows] = useState<any[]>([]);
   const [viewing, setViewing] = useState<any | null>(null);
@@ -77,15 +77,19 @@ export function SubmissionsManager() {
                           try { await approve({ data: { id: r.id } } as any); toast.success("Aprovado."); load(); }
                           catch (e: any) { toast.error(e.message); }
                         }}><Check size={14} /></Button>
-                      <Button size="icon" variant="ghost" className="text-red-400" title="Rejeitar"
-                        onClick={() => { setRejectFor(r); setNotes(""); }}><X size={14} /></Button>
+                      {canReject && (
+                        <Button size="icon" variant="ghost" className="text-red-400" title="Rejeitar"
+                          onClick={() => { setRejectFor(r); setNotes(""); }}><X size={14} /></Button>
+                      )}
                     </>
                   )}
-                  <Button size="icon" variant="ghost" onClick={async () => {
-                    if (!confirm(`Remover submissão "${r.name}"?`)) return;
-                    try { await remove({ data: { id: r.id } } as any); toast.success("Removido."); load(); }
-                    catch (e: any) { toast.error(e.message); }
-                  }}><Trash2 size={14} /></Button>
+                  {canReject && (
+                    <Button size="icon" variant="ghost" onClick={async () => {
+                      if (!confirm(`Remover submissão "${r.name}"?`)) return;
+                      try { await remove({ data: { id: r.id } } as any); toast.success("Removido."); load(); }
+                      catch (e: any) { toast.error(e.message); }
+                    }}><Trash2 size={14} /></Button>
+                  )}
                 </td>
               </tr>
             ))}

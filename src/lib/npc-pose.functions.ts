@@ -8,11 +8,17 @@ async function assertAdmin(context: { supabase: any; userId: string }) {
   if (!data) throw new Error("Forbidden");
 }
 
+async function assertAdminOrMod(context: { supabase: any; userId: string }) {
+  const { data, error } = await context.supabase.rpc("has_admin_or_mod", { _user_id: context.userId });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Forbidden");
+}
+
 export const adminListNpcPoses = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ npc_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertAdminOrMod(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: rows, error } = await supabaseAdmin
       .from("npc_poses").select("*")
@@ -32,7 +38,7 @@ export const adminUpsertNpcPose = createServerFn({ method: "POST" })
     sort_order: z.number().int().min(0).max(999).optional(),
   }).parse(input))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertAdminOrMod(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const payload: any = {
       npc_id: data.npc_id,
@@ -65,7 +71,7 @@ export const adminListNpcSkillPoses = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ npc_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertAdminOrMod(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: rows, error } = await supabaseAdmin
       .from("npc_skill_poses").select("skill_id,pose_id")
@@ -82,7 +88,7 @@ export const adminSetNpcSkillPose = createServerFn({ method: "POST" })
     pose_id: z.string().uuid().nullable(),
   }).parse(input))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertAdminOrMod(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     if (data.pose_id === null) {
       const { error } = await supabaseAdmin

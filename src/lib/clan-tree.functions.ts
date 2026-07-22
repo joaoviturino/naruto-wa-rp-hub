@@ -8,6 +8,12 @@ async function assertAdmin(context: { supabase: any; userId: string }) {
   if (!data) throw new Error("Forbidden");
 }
 
+async function assertAdminOrMod(context: { supabase: any; userId: string }) {
+  const { data, error } = await context.supabase.rpc("has_admin_or_mod", { _user_id: context.userId });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Forbidden");
+}
+
 export const getClanTree = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ clan_id: z.string().uuid() }).parse(i))
@@ -53,7 +59,7 @@ export const saveClanTree = createServerFn({ method: "POST" })
     edges: z.array(edgeInput),
   }).parse(i))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertAdminOrMod(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     // Buscar existentes

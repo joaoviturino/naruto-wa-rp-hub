@@ -89,6 +89,12 @@ async function assertAdmin(context: { supabase: any; userId: string }) {
   if (!data) throw new Error("Forbidden");
 }
 
+async function assertAdminOrMod(context: { supabase: any; userId: string }) {
+  const { data, error } = await context.supabase.rpc("has_admin_or_mod", { _user_id: context.userId });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Forbidden");
+}
+
 const RANK_ORDER = ["estudante","genin","chunin","tokubetsu_jonin","jonin","anbu","sannin","kage"];
 function rankIdx(r?: string | null) { return r ? RANK_ORDER.indexOf(r) : -1; }
 const SKILL_RANKS = ["E","D","C","B","A","S"];

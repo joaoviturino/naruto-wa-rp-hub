@@ -16,13 +16,14 @@ export const Route = createFileRoute("/_authenticated")({
     const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", data.user.id);
     const isAdmin = (roles ?? []).some((r) => r.role === "admin");
     const isBlacksmith = (roles ?? []).some((r) => r.role === "blacksmith");
-    return { user: data.user, isAdmin, isBlacksmith };
+    const isModerator = (roles ?? []).some((r) => r.role === "moderator");
+    return { user: data.user, isAdmin, isBlacksmith, isModerator };
   },
   component: AuthedLayout,
 });
 
 function AuthedLayout() {
-  const { user, isAdmin, isBlacksmith } = Route.useRouteContext();
+  const { user, isAdmin, isBlacksmith, isModerator } = Route.useRouteContext();
   const navigate = useNavigate();
   async function signOut() {
     await supabase.auth.signOut();
@@ -44,12 +45,12 @@ function AuthedLayout() {
             {(isBlacksmith || isAdmin) && (
               <Link to="/blacksmith" className="px-2 sm:px-3 py-1.5 rounded hover:bg-secondary [&.active]:text-gold" activeProps={{ className: "active" }}>Forja</Link>
             )}
-            {isAdmin && (
+            {(isAdmin || isModerator) && (
               <>
                 <Link to="/admin" className="px-2 sm:px-3 py-1.5 rounded hover:bg-secondary [&.active]:text-gold" activeProps={{ className: "active" }}>
-                  Admin
+                  {isAdmin ? "Admin" : "Mod"}
                 </Link>
-                <OnlinePlayersButton isAdmin={isAdmin} />
+                {isAdmin && <OnlinePlayersButton isAdmin={isAdmin} />}
               </>
             )}
             <span className="mx-2 lg:mx-3 text-muted-foreground text-xs hidden lg:inline truncate max-w-[180px]">{user.email}</span>

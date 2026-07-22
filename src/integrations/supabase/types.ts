@@ -3585,6 +3585,7 @@ export type Database = {
         Args: { _location_id: string; _user_id: string }
         Returns: boolean
       }
+      has_admin_or_mod: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -3607,7 +3608,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "user" | "blacksmith"
+      app_role: "admin" | "user" | "blacksmith" | "moderator"
       bot_status: "disconnected" | "qr" | "connecting" | "connected"
       clan_buff_type:
         | "hp_bonus"
@@ -3857,7 +3858,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user", "blacksmith"],
+      app_role: ["admin", "user", "blacksmith", "moderator"],
       bot_status: ["disconnected", "qr", "connecting", "connected"],
       clan_buff_type: [
         "hp_bonus",

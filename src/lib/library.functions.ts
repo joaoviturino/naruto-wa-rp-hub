@@ -47,6 +47,12 @@ async function assertAdmin(context: { supabase: any; userId: string }) {
   if (!data) throw new Error("Forbidden");
 }
 
+async function assertAdminOrMod(context: { supabase: any; userId: string }) {
+  const { data, error } = await context.supabase.rpc("has_admin_or_mod", { _user_id: context.userId });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Forbidden");
+}
+
 function rankIdx(r: string | null | undefined) {
   if (!r) return -1;
   return RANKS.indexOf(r as any);
@@ -66,7 +72,7 @@ export const upsertLibrarySection = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => sectionSchema.parse(i))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertAdminOrMod(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row, error } = await supabaseAdmin.from("library_sections").upsert(data as any).select("id").single();
     if (error) throw new Error(error.message);
@@ -125,7 +131,7 @@ export const upsertLibraryBook = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => bookSchema.parse(i))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertAdminOrMod(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { id, ...rest } = data as any;
     if (id) {
@@ -157,7 +163,7 @@ export const setLocationLibraries = createServerFn({ method: "POST" })
     section_ids: z.array(z.string().uuid()),
   }).parse(i))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertAdminOrMod(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("location_libraries").delete().eq("location_id", data.location_id);
     if (data.section_ids.length) {

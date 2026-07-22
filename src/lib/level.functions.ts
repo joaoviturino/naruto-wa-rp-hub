@@ -9,6 +9,12 @@ async function assertAdmin(ctx: { supabase: any; userId: string }) {
   if (!data) throw new Error("Forbidden");
 }
 
+async function assertAdminOrMod(ctx: { supabase: any; userId: string }) {
+  const { data, error } = await ctx.supabase.rpc("has_admin_or_mod", { _user_id: ctx.userId });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Forbidden");
+}
+
 export const getLevelConfig = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<LevelConfig> => {
@@ -36,7 +42,7 @@ export const updateLevelConfig = createServerFn({ method: "POST" })
     }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertAdminOrMod(context);
     const { error } = await context.supabase
       .from("level_config")
       .upsert({ id: true, ...data }, { onConflict: "id" });

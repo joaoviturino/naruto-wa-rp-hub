@@ -8,6 +8,12 @@ async function assertAdmin(context: { supabase: any; userId: string }) {
   if (!data) throw new Error("Forbidden");
 }
 
+async function assertAdminOrMod(context: { supabase: any; userId: string }) {
+  const { data, error } = await context.supabase.rpc("has_admin_or_mod", { _user_id: context.userId });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Forbidden");
+}
+
 async function loadMyChar(context: { supabase: any; userId: string }) {
   const { data, error } = await context.supabase
     .from("characters").select("id,xp,ryo,current_location_id").eq("user_id", context.userId).maybeSingle();
@@ -40,7 +46,7 @@ export const upsertJob = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => jobPayload.parse(i))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertAdminOrMod(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row, error } = await supabaseAdmin.from("jobs").upsert(data as any).select("id").single();
     if (error) throw new Error(error.message);

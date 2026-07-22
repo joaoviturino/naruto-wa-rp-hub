@@ -8,6 +8,12 @@ async function assertAdmin(context: { supabase: any; userId: string }) {
   if (!data) throw new Error("Forbidden");
 }
 
+async function assertAdminOrMod(context: { supabase: any; userId: string }) {
+  const { data, error } = await context.supabase.rpc("has_admin_or_mod", { _user_id: context.userId });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Forbidden");
+}
+
 async function getActiveCharacter(context: { supabase: any; userId: string }) {
   const { data, error } = await context.supabase.from("characters").select("id, ryo, xp").eq("user_id", context.userId).limit(1).maybeSingle();
   if (error) throw new Error(error.message);
@@ -42,7 +48,7 @@ export const upsertSeason = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => seasonPayload.parse(i))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertAdminOrMod(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // If setting active=true, deactivate other seasons first
     if (data.active) {
@@ -100,7 +106,7 @@ export const upsertReward = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => rewardPayload.parse(i))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertAdminOrMod(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const payload: any = { ...data };
     if (payload.reward_type !== "item") payload.item_id = null;

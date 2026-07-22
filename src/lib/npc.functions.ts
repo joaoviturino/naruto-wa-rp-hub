@@ -8,6 +8,12 @@ async function assertAdmin(context: { supabase: any; userId: string }) {
   if (!data) throw new Error("Forbidden");
 }
 
+async function assertAdminOrMod(context: { supabase: any; userId: string }) {
+  const { data, error } = await context.supabase.rpc("has_admin_or_mod", { _user_id: context.userId });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Forbidden");
+}
+
 const npcPayload = z.object({
   id: z.string().uuid().optional(),
   name: z.string().min(2).max(80),
@@ -72,7 +78,7 @@ export const upsertNpc = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => npcPayload.parse(i))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertAdminOrMod(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row, error } = await supabaseAdmin.from("npcs").upsert(data as any).select("id").single();
     if (error) throw new Error(error.message);
@@ -97,7 +103,7 @@ export const setNpcSkills = createServerFn({ method: "POST" })
     skill_ids: z.array(z.string().uuid()),
   }).parse(i))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertAdminOrMod(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("npc_skills").delete().eq("npc_id", data.npc_id);
     if (data.skill_ids.length) {
@@ -115,7 +121,7 @@ export const setLocationNpcs = createServerFn({ method: "POST" })
     npc_ids: z.array(z.string().uuid()),
   }).parse(i))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertAdminOrMod(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("location_npcs").delete().eq("location_id", data.location_id);
     if (data.npc_ids.length) {
@@ -134,7 +140,7 @@ export const setNpcLocations = createServerFn({ method: "POST" })
     location_ids: z.array(z.string().uuid()),
   }).parse(i))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertAdminOrMod(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("location_npcs").delete().eq("npc_id", data.npc_id);
     if (data.location_ids.length) {
@@ -152,7 +158,7 @@ export const setLocationSpawnGroups = createServerFn({ method: "POST" })
     group_ids: z.array(z.string().uuid()),
   }).parse(i))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertAdminOrMod(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin
       .from("locations")
@@ -171,7 +177,7 @@ export const updateLocationDangerZone = createServerFn({ method: "POST" })
     spawn_tick_seconds: z.number().int().min(10).max(3600),
   }).parse(i))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertAdminOrMod(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from("locations").update({
       is_danger_zone: data.is_danger_zone,
@@ -202,7 +208,7 @@ export const applyNpcTemplate = createServerFn({ method: "POST" })
     stats: npcTemplateStats,
   }).parse(i))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertAdminOrMod(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     let q = supabaseAdmin.from("npcs").update(data.stats as any);
     if (data.target === "one") {
@@ -219,7 +225,7 @@ export const applyNpcTemplate = createServerFn({ method: "POST" })
 export const listNpcsBasic = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await assertAdmin(context);
+    await assertAdminOrMod(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data, error } = await supabaseAdmin.from("npcs").select("id,name,kind").order("name");
     if (error) throw new Error(error.message);
@@ -231,7 +237,7 @@ export const listNpcsBasic = createServerFn({ method: "POST" })
 export const listNpcGroups = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await assertAdmin(context);
+    await assertAdminOrMod(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const [{ data: groups, error: gErr }, { data: mems, error: mErr }] = await Promise.all([
       supabaseAdmin.from("npc_groups").select("*").order("name"),
@@ -253,7 +259,7 @@ export const upsertNpcGroup = createServerFn({ method: "POST" })
     music_url: z.string().nullish(),
   }).parse(i))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertAdminOrMod(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     if (data.id) {
       const { error } = await supabaseAdmin.from("npc_groups")
@@ -293,7 +299,7 @@ export const setNpcGroupMembers = createServerFn({ method: "POST" })
     })).max(20),
   }).parse(i))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    await assertAdminOrMod(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("npc_group_members").delete().eq("group_id", data.group_id);
     if (data.members.length) {
