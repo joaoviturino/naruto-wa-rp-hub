@@ -26,6 +26,44 @@ export const Route = createFileRoute("/_authenticated/chat")({ component: ChatPa
 
 const HISTORY_LIMIT = 80;
 
+/** Formata linhas de RP: "❕️ ..." = ação (itálico, mutado), "- ..." = fala (destaque). */
+function RpFormatted({ text, mine, isNpc }: { text: string; mine: boolean; isNpc: boolean }) {
+  const lines = text.split(/\r?\n/);
+  const speechColor = mine ? "text-white" : isNpc ? "text-emerald-100" : "text-foreground";
+  const actionColor = mine ? "text-white/70" : "text-muted-foreground";
+  // Se o texto tem múltiplos marcadores "❕️" ou "- " colados na mesma linha, quebra também por eles.
+  const parts: { kind: "action" | "speech" | "plain"; content: string }[] = [];
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    if (!line.trim()) { parts.push({ kind: "plain", content: "" }); continue; }
+    // Divide por marcadores no meio da linha
+    const chunks = line.split(/(?=❕️?\s)|(?=(?:^|\s)-\s)/g).map((s) => s.trim()).filter(Boolean);
+    for (const c of chunks) {
+      if (/^❕️?\s*/.test(c)) parts.push({ kind: "action", content: c.replace(/^❕️?\s*/, "") });
+      else if (/^-\s+/.test(c)) parts.push({ kind: "speech", content: c.replace(/^-\s+/, "") });
+      else parts.push({ kind: "plain", content: c });
+    }
+  }
+  return (
+    <div className="text-sm leading-relaxed break-words space-y-1">
+      {parts.map((p, i) => {
+        if (p.kind === "action") return (
+          <div key={i} className={`italic ${actionColor} flex gap-1.5`}>
+            <span className="opacity-60 shrink-0">❕️</span><span>{p.content}</span>
+          </div>
+        );
+        if (p.kind === "speech") return (
+          <div key={i} className={`${speechColor} flex gap-1.5`}>
+            <span className={`shrink-0 font-bold ${mine ? "text-white/80" : isNpc ? "text-emerald-300" : "text-gold"}`}>—</span>
+            <span>{p.content}</span>
+          </div>
+        );
+        return <div key={i} className={speechColor}>{p.content}</div>;
+      })}
+    </div>
+  );
+}
+
 type Loc = { id: string; name: string; description: string | null; image_url: string | null;
   is_danger_zone?: boolean; spawn_chance?: number; spawn_tick_seconds?: number;
   map_x?: number; map_y?: number; parent_id?: string | null };
@@ -570,7 +608,7 @@ function ChatPage() {
                             : "bg-secondary/80 border border-border/50 rounded-tl-sm"
                         } ${m.is_pinned ? "ring-2 ring-gold/70" : ""}`}>
                         {m.image_url && <img src={m.image_url} className="mb-1 rounded-lg max-h-64 object-cover" alt="" />}
-                        {m.content && <div className="whitespace-pre-wrap text-sm leading-relaxed break-words">{m.content}</div>}
+                        {m.content && <RpFormatted text={m.content} mine={mine} isNpc={isNpc} />}
                         {(mine || m.is_pinned) && (
                           <div className={`absolute -bottom-1 ${mine ? "left-2" : "right-2"} flex items-center gap-1 opacity-0 group-hover:opacity-100 transition`}>
                             {mine && (
