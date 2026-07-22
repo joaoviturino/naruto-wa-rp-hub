@@ -120,7 +120,7 @@ export const setLocationOwnership = createServerFn({ method: "POST" })
     // Locais à venda passam a ser privados por natureza para o comprador.
     if (data.is_for_sale === true) patch.is_private = true;
     if (!Object.keys(patch).length) return { ok: true };
-    const { error } = await supabaseAdmin.from("locations").update(patch).eq("id", data.location_id);
+    const { error } = await supabaseAdmin.from("locations").update(patch as any).eq("id", data.location_id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
