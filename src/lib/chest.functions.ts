@@ -66,7 +66,7 @@ export const setChestPermissions = createServerFn({ method: "POST" })
     authorized_character_ids: z.array(z.string().uuid()).default([]),
   }).parse(i))
   .handler(async ({ data, context }) => {
-    await assertAdminOrMod(context);
+    await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin.from("chest_permissions").delete().eq("chest_id", data.chest_id);
     const rows: any[] = [];

@@ -199,7 +199,7 @@ export const adminSetJob = createServerFn({ method: "POST" })
     action: z.enum(["hire","fire"]),
   }).parse(i))
   .handler(async ({ data, context }) => {
-    await assertAdminOrMod(context);
+    await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     if (data.action === "fire") {
       await supabaseAdmin.from("character_jobs").update({ status: "fired" })

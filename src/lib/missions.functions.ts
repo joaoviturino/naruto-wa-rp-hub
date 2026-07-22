@@ -385,7 +385,7 @@ export const adminMarkObjective = createServerFn({ method: "POST" })
     value: z.number().int().min(0).max(9999),
   }).parse(i))
   .handler(async ({ data, context }) => {
-    await assertAdminOrMod(context);
+    await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: existing } = await supabaseAdmin.from("character_missions").select("*").eq("character_id", data.character_id).eq("mission_id", data.mission_id).maybeSingle();
     const progress = { ...(existing?.progress ?? {}) as any, [data.objective_id]: data.value };
