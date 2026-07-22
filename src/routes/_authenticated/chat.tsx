@@ -15,6 +15,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { listMinigamesForMyLocation } from "@/lib/minigame.functions";
 import { MinigameDialog } from "@/components/minigame/MinigameDialog";
 import { NpcInteractPanel } from "@/components/chat/NpcInteractPanel";
+import { NpcAiChat } from "@/components/chat/NpcAiChat";
 import { DuelInvitesInline } from "@/components/chat/DuelInvitesInline";
 import { ChatHud } from "@/components/chat/ChatHud";
 import { MissionTracker } from "@/components/chat/MissionTracker";
@@ -25,44 +26,6 @@ import { Minimap } from "@/components/chat/Minimap";
 export const Route = createFileRoute("/_authenticated/chat")({ component: ChatPage });
 
 const HISTORY_LIMIT = 80;
-
-/** Formata linhas de RP: "❕️ ..." = ação (itálico, mutado), "- ..." = fala (destaque). */
-function RpFormatted({ text, mine, isNpc }: { text: string; mine: boolean; isNpc: boolean }) {
-  const lines = text.split(/\r?\n/);
-  const speechColor = mine ? "text-white" : "text-foreground";
-  const actionColor = mine ? "text-white/70" : "text-muted-foreground";
-  // Se o texto tem múltiplos marcadores "❕️" ou "- " colados na mesma linha, quebra também por eles.
-  const parts: { kind: "action" | "speech" | "plain"; content: string }[] = [];
-  for (const raw of lines) {
-    const line = raw.trimEnd();
-    if (!line.trim()) { parts.push({ kind: "plain", content: "" }); continue; }
-    // Divide por marcadores no meio da linha
-    const chunks = line.split(/(?=❕️?\s)|(?=(?:^|\s)-\s)/g).map((s) => s.trim()).filter(Boolean);
-    for (const c of chunks) {
-      if (/^❕️?\s*/.test(c)) parts.push({ kind: "action", content: c.replace(/^❕️?\s*/, "") });
-      else if (/^-\s+/.test(c)) parts.push({ kind: "speech", content: c.replace(/^-\s+/, "") });
-      else parts.push({ kind: "plain", content: c });
-    }
-  }
-  return (
-    <div className="text-sm leading-relaxed break-words space-y-1">
-      {parts.map((p, i) => {
-        if (p.kind === "action") return (
-          <div key={i} className={`italic ${actionColor} flex gap-1.5`}>
-            <span className="opacity-60 shrink-0">❕️</span><span>{p.content}</span>
-          </div>
-        );
-        if (p.kind === "speech") return (
-          <div key={i} className={`${speechColor} flex gap-1.5`}>
-            <span className="shrink-0 opacity-60">—</span>
-            <span>{p.content}</span>
-          </div>
-        );
-        return <div key={i} className={speechColor}>{p.content}</div>;
-      })}
-    </div>
-  );
-}
 
 type Loc = { id: string; name: string; description: string | null; image_url: string | null;
   is_danger_zone?: boolean; spawn_chance?: number; spawn_tick_seconds?: number;
@@ -345,128 +308,98 @@ function ChatPage() {
 
   if (!character) return <div className="p-10 text-center text-muted-foreground">Você precisa criar um personagem primeiro.</div>;
 
-  const SectionLabel = ({ children, icon: Icon }: { children: React.ReactNode; icon?: any }) => (
-    <div className="flex items-center gap-2 mb-2">
-      <div className="text-[10px] font-display uppercase tracking-[0.2em] text-gold/80 flex items-center gap-1.5">
-        {Icon && <Icon size={11} />} {children}
-      </div>
-      <div className="h-px flex-1 bg-gradient-to-r from-blood/40 to-transparent" />
-    </div>
-  );
-
   const sidebar = (
-    <div className="space-y-5">
-      {/* Localização atual */}
-      <div className="relative rounded-xl border border-blood/30 bg-gradient-to-b from-blood/10 to-transparent p-4 overflow-hidden">
-        <div className="flex items-center gap-2 mb-1">
-          <div className="w-1.5 h-1.5 rounded-full bg-gold animate-pulse shadow-[0_0_8px_var(--gold)]" />
-          <span className="text-[10px] uppercase tracking-[0.2em] text-gold/80 font-bold">Localização Atual</span>
-        </div>
-        <div className="font-display text-lg text-gold flex items-center gap-2 min-w-0 leading-tight">
-          <span className="truncate">{currentLoc?.name ?? "— sem local —"}</span>
-          {currentLoc?.is_danger_zone && <Skull size={14} className="text-blood shrink-0" />}
-        </div>
-        {currentLoc?.description && <p className="text-[11px] text-muted-foreground mt-1.5 line-clamp-2">{currentLoc.description}</p>}
-      </div>
-
-      {/* Minimapa */}
+    <div className="space-y-3">
       {currentLoc && (
-        <div>
-          <SectionLabel icon={Compass}>Minimapa</SectionLabel>
-          <div className="rounded-xl border border-border/60 bg-black/40 overflow-hidden">
-            <Minimap
-              locations={locs as any}
-              connections={conns}
-              currentLocationId={currentLoc.id}
-              onSelect={(id) => { if (neighbors.some((n) => n.id === id)) doMove(id); }}
-            />
-          </div>
-        </div>
+        <Minimap
+          locations={locs as any}
+          connections={conns}
+          currentLocationId={currentLoc.id}
+          onSelect={(id) => { if (neighbors.some((n) => n.id === id)) doMove(id); }}
+        />
       )}
-
-      {/* Ações rápidas */}
-      <div className="grid grid-cols-2 gap-2">
-        <Button asChild variant="outline" size="sm" className="justify-between h-9 border-blood/40 bg-blood/10 hover:bg-blood/20 text-blood hover:text-blood">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-1 sm:gap-3">
+        <Button asChild variant="outline" size="sm" className="w-full justify-between h-auto py-2">
           <Link to="/party">
-            <span className="flex items-center gap-1.5 min-w-0"><Users size={13} className="shrink-0" /> <span className="truncate text-[11px] font-bold uppercase tracking-wide">Time{partyMemberCount > 0 ? ` ${partyMemberCount}` : ""}</span></span>
+            <span className="flex items-center gap-1 min-w-0"><Users size={14} className="shrink-0" /> <span className="truncate">Meu time{partyMemberCount > 0 ? ` (${partyMemberCount})` : ""}</span></span>
             {invites.length > 0 && <span className="text-[10px] bg-blood text-white rounded-full px-1.5 shrink-0">{invites.length}</span>}
           </Link>
         </Button>
-        <div className="[&>*]:h-9 [&>*]:w-full">
-          <DuelInvitesInline />
+        <DuelInvitesInline />
+      </div>
+      <div>
+        <div className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1"><MapPin size={12} /> Você está em</div>
+        <div className="font-display text-xl text-gold flex items-center gap-2 min-w-0">
+          <span className="truncate">{currentLoc?.name ?? "— nenhum local —"}</span>
+          {currentLoc?.is_danger_zone && <span title="Zona de perigo — NPCs podem aparecer" className="shrink-0"><Skull size={16} className="text-blood" /></span>}
         </div>
+        {currentLoc?.description && <p className="text-xs text-muted-foreground mt-1">{currentLoc.description}</p>}
       </div>
 
-      {/* Pessoas presentes */}
       {currentLoc && (
-        <div>
-          <SectionLabel icon={Users}>{presentHere.length} {presentHere.length === 1 ? "shinobi" : "shinobis"} no local</SectionLabel>
-          <div className="rounded-xl border border-border/60 bg-card/40 p-2.5">
-            {presentHere.length === 0 ? (
-              <p className="text-[11px] text-muted-foreground italic px-1">Ninguém por aqui além de você.</p>
-            ) : (
-              <div className="flex flex-wrap gap-1.5">
-                {presentHere.slice(0, 8).map((p) => (
-                  <div key={p.id} title={p.nickname} className="w-7 h-7 rounded-full bg-secondary overflow-hidden ring-1 ring-border hover:ring-gold transition">
-                    {p.avatar_url && <img src={p.avatar_url} className="w-full h-full object-cover" alt={p.nickname} />}
-                  </div>
-                ))}
-                {presentHere.length > 8 && (
-                  <div className="w-7 h-7 rounded-full bg-secondary ring-1 ring-border flex items-center justify-center text-[10px] text-muted-foreground">
-                    +{presentHere.length - 8}
-                  </div>
-                )}
+        <div className="border border-border rounded p-2 space-y-1">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1">
+            <Users size={11} /> {presentHere.length} {presentHere.length === 1 ? "pessoa" : "pessoas"} no local
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {presentHere.slice(0, 5).map((p) => (
+              <div key={p.id} title={p.nickname} className="w-6 h-6 rounded-full bg-secondary overflow-hidden ring-1 ring-border">
+                {p.avatar_url && <img src={p.avatar_url} className="w-full h-full object-cover" alt={p.nickname} />}
+              </div>
+            ))}
+            {presentHere.length > 5 && (
+              <div className="w-6 h-6 rounded-full bg-secondary ring-1 ring-border flex items-center justify-center text-[10px] text-muted-foreground">
+                +{presentHere.length - 5}
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Missões */}
       {currentLoc && availableMinigames.length > 0 && (
-        <div>
-          <SectionLabel icon={Gamepad2}>Missões neste local</SectionLabel>
-          <div className="space-y-1.5">
+        <div className="border border-border rounded p-2 space-y-2">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1">
+            <Gamepad2 size={11} /> Missões neste local
+          </div>
+          <div className="space-y-1">
             {availableMinigames.map((m: any) => {
               const ready = (m.cooldown_remaining_ms ?? 0) <= 0;
               const remH = Math.ceil((m.cooldown_remaining_ms ?? 0) / 3600000);
               const remM = Math.ceil((m.cooldown_remaining_ms ?? 0) / 60000);
               return (
-                <button key={m.id} disabled={!ready} onClick={() => setActiveMinigame(m)}
-                  className={`group w-full flex items-center gap-2 p-2.5 rounded-lg border transition text-left ${ready ? "border-gold/30 bg-gold/5 hover:bg-gold/10 hover:border-gold/60" : "border-border/40 bg-card/30 opacity-60 cursor-not-allowed"}`}>
-                  <div className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${ready ? "bg-gold/20 text-gold" : "bg-secondary text-muted-foreground"}`}><Gamepad2 size={13} /></div>
-                  <span className="flex-1 truncate text-xs font-medium">{m.name}</span>
-                  <span className={`text-[10px] shrink-0 ${ready ? "text-gold" : "text-muted-foreground"}`}>{ready ? "PRONTO" : (remH >= 1 ? `${remH}h` : `${remM}m`)}</span>
-                </button>
+                <Button key={m.id} size="sm" variant={ready ? "default" : "outline"} className="w-full justify-start"
+                  disabled={!ready} onClick={() => setActiveMinigame(m)}>
+                  <Gamepad2 size={12} className="mr-1" />
+                  <span className="truncate flex-1 text-left">{m.name}</span>
+                  {!ready && <span className="text-[10px] text-muted-foreground ml-1">{remH >= 1 ? `${remH}h` : `${remM}m`}</span>}
+                </Button>
               );
             })}
           </div>
         </div>
       )}
 
-      {/* NPCs */}
       {currentLoc && <NpcInteractPanel locationId={currentLoc.id} />}
 
+      {currentLoc && <NpcAiChat locationId={currentLoc.id} />}
+
       {currentLoc && hasLibraryHere && (
-        <Link to="/library" search={{ location: currentLoc.id }}
-          className="flex items-center gap-2 p-2.5 rounded-lg border border-gold/30 bg-gold/5 hover:bg-gold/10 transition">
-          <BookOpen size={14} className="text-gold shrink-0" />
-          <span className="text-xs font-medium flex-1">Biblioteca deste local</span>
+        <Link to="/library" search={{ location: currentLoc.id }}>
+          <Button size="sm" variant="outline" className="w-full justify-start">
+            <BookOpen size={12} className="mr-1 text-gold" /> Biblioteca deste local
+          </Button>
         </Link>
       )}
 
-      {/* Movimento */}
       <div>
-        <SectionLabel icon={Compass}>{character.current_location_id ? "Locais próximos" : "Escolha onde iniciar"}</SectionLabel>
+        <div className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1 mb-2"><Compass size={12} /> {character.current_location_id ? "Locais próximos" : "Escolha onde iniciar"}</div>
         <div className="space-y-1">
-          {availableToMove.length === 0 && <div className="text-xs text-muted-foreground italic px-1">Sem locais acessíveis daqui.</div>}
+          {availableToMove.length === 0 && <div className="text-xs text-muted-foreground">Sem locais acessíveis daqui.</div>}
           {availableToMove.map((l) => (
             <button key={l.id} onClick={() => { doMove(l.id); setNavOpen(false); }}
-              className="w-full text-left p-2 rounded-lg border border-transparent hover:border-blood/40 hover:bg-blood/5 transition text-sm flex items-center gap-2.5 min-w-0 group">
-              {l.image_url
-                ? <img src={l.image_url} className="w-8 h-8 rounded-md object-cover shrink-0 ring-1 ring-border" alt="" />
-                : <div className="w-8 h-8 rounded-md bg-secondary shrink-0 flex items-center justify-center text-muted-foreground group-hover:text-gold transition"><MapPin size={13} /></div>}
-              <span className="flex-1 truncate text-xs">{l.name}</span>
+              className="w-full text-left p-2 rounded hover:bg-secondary text-sm flex items-center gap-2 min-w-0">
+              {l.image_url && <img src={l.image_url} className="w-8 h-8 rounded object-cover shrink-0" alt="" />}
+              <span className="flex-1 truncate">{l.name}</span>
               {l.is_danger_zone && <Skull size={12} className="text-blood shrink-0" />}
             </button>
           ))}
@@ -476,7 +409,7 @@ function ChatPage() {
   );
 
   return (
-    <div className="mx-auto max-w-7xl md:grid md:gap-4 md:grid-cols-[300px_1fr] md:p-4 pb-[env(safe-area-inset-bottom)]">
+    <div className="mx-auto max-w-6xl md:grid md:gap-4 md:grid-cols-[280px_1fr] md:p-4 pb-[env(safe-area-inset-bottom)]">
       {character && <ChatHud characterId={character.id} />}
       {character && <MissionTracker characterId={character.id} />}
       {character && <TradeWatcher myCharacterId={character.id} />}
@@ -487,24 +420,24 @@ function ChatPage() {
         </div>
       )}
       {/* Barra mobile */}
-      <div className="md:hidden sticky top-[54px] z-30 flex items-center gap-2 border-b border-blood/20 bg-card/95 backdrop-blur px-2 py-2">
+      <div className="md:hidden sticky top-[54px] z-30 flex items-center gap-2 border-b border-border bg-card/95 backdrop-blur px-2 py-1.5">
         <Sheet open={navOpen} onOpenChange={setNavOpen}>
           <SheetTrigger asChild>
-            <Button variant="outline" size="icon" className="h-9 w-9 border-blood/30"><Menu size={16} /></Button>
+            <Button variant="outline" size="icon" className="h-8 w-8"><Menu size={16} /></Button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-[88vw] max-w-sm overflow-y-auto p-4">
-            <div className="pt-4">{sidebar}</div>
+          <SheetContent side="left" className="w-[85vw] max-w-sm overflow-y-auto">
+            <div className="pt-6">{sidebar}</div>
           </SheetContent>
         </Sheet>
         <div className="min-w-0 flex-1">
-          <div className="text-[9px] uppercase tracking-[0.2em] text-gold/70 font-bold">Localização</div>
-          <div className="font-display text-sm text-gold truncate flex items-center gap-1 leading-tight">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Local</div>
+          <div className="font-display text-sm text-gold truncate flex items-center gap-1">
             <span className="truncate">{currentLoc?.name ?? "— nenhum —"}</span>
             {currentLoc?.is_danger_zone && <Skull size={12} className="text-blood shrink-0" />}
           </div>
         </div>
-        <div className="shrink-0 text-[10px] text-muted-foreground flex items-center gap-1 px-1.5 py-1 rounded-full bg-secondary/60"><Users size={11} /> {presentHere.length}</div>
-        <Button asChild variant="outline" size="sm" className="h-9 px-2 shrink-0 border-blood/30">
+        <div className="shrink-0 text-[10px] text-muted-foreground flex items-center gap-1"><Users size={11} /> {presentHere.length}</div>
+        <Button asChild variant="outline" size="sm" className="h-8 px-2 shrink-0">
           <Link to="/party">
             <Users size={12} className="mr-1" />
             <span className="hidden xs:inline">Time</span>
@@ -515,23 +448,21 @@ function ChatPage() {
       </div>
 
       {/* Mapa lateral desktop */}
-      <aside className="hidden md:block scroll-panel rounded-xl p-4 md:h-[calc(100vh-8rem)] md:overflow-y-auto no-scrollbar">
+      <aside className="hidden md:block scroll-panel rounded-lg p-4 md:h-[calc(100vh-8rem)] md:overflow-y-auto">
         {sidebar}
       </aside>
 
       {/* Chat */}
-      <section className="scroll-panel md:rounded-xl flex flex-col h-[calc(100dvh-9rem)] md:h-[calc(100vh-8rem)] relative overflow-hidden">
+      <section className="scroll-panel md:rounded-lg flex flex-col h-[calc(100dvh-9rem)] md:h-[calc(100vh-8rem)]">
         {!currentLoc ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-10 text-center gap-3">
-            <Compass size={40} className="text-gold/40" />
-            <div className="font-display text-lg text-gold">O caminho aguarda</div>
-            <div className="text-xs max-w-xs">Escolha um local ao lado para começar sua jornada e interagir com outros shinobis.</div>
+          <div className="flex-1 flex items-center justify-center text-muted-foreground p-10 text-center">
+            Escolha um local ao lado para começar a interagir.
           </div>
         ) : (
           <>
             {pinned.length > 0 && (
-              <div className="border-b border-gold/20 bg-gradient-to-r from-gold/10 via-gold/5 to-transparent p-2.5 max-h-32 overflow-y-auto space-y-1 no-scrollbar">
-                <div className="text-[10px] uppercase tracking-[0.2em] text-gold font-bold flex items-center gap-1.5"><Pin size={11} /> Marcadas · {pinned.length}</div>
+              <div className="border-b border-border bg-card/50 p-2 max-h-32 overflow-y-auto space-y-1">
+                <div className="text-[10px] uppercase tracking-widest text-gold flex items-center gap-1"><Pin size={11} /> Marcadas ({pinned.length})</div>
                 {pinned.map((m) => (
                   <div key={m.id} className="text-xs flex items-start gap-2 rounded p-1 hover:bg-secondary/50">
                     <span className={`font-display shrink-0 ${m.npc_id ? "text-emerald-300" : "text-gold"}`}>{m.npc_id ? (m.npc?.name ?? "NPC") : (m.character?.nickname ?? "?")}:</span>
@@ -540,91 +471,40 @@ function ChatPage() {
                 ))}
               </div>
             )}
-            <div className="flex-1 overflow-y-auto p-3 md:p-5 space-y-1">
-              {messages.length === 0 && (
-                <div className="text-center py-14 space-y-2">
-                  <div className="text-3xl opacity-30">忍</div>
-                  <div className="text-xs text-muted-foreground italic">Silêncio absoluto. Seja o primeiro a agir.</div>
-                </div>
-              )}
-              {messages.map((m, idx) => {
+            <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3">
+              {messages.length === 0 && <div className="text-center text-xs text-muted-foreground py-10">Silêncio. Seja o primeiro a agir.</div>}
+              {messages.map((m) => {
                 const mine = !!m.character_id && m.character_id === character.id;
                 const isNpc = !!m.npc_id;
-                const isSystem = !!m.content && (m.content.startsWith("❕️") || m.content.startsWith("❕"));
                 const displayName = isNpc ? (m.npc?.name ?? "NPC") : (m.character?.nickname ?? "?");
                 const avatarUrl = isNpc ? m.npc?.image_url : m.character?.avatar_url;
-                const prev = messages[idx - 1];
-                const prevSame = prev && !isSystem && prev.character_id === m.character_id && prev.npc_id === m.npc_id
-                  && !(prev.content?.startsWith("❕"));
-                const time = new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-
-                // Mensagens de sistema — divisor discreto
-                if (isSystem) {
-                  return (
-                    <div key={m.id} className="flex items-center gap-2 py-2 px-2 my-1">
-                      <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gold/20 to-transparent" />
-                      <div className="text-[11px] text-gold/70 italic font-display flex items-center gap-1.5 px-2">
-                        <span className="text-gold">•</span>
-                        <span>{m.content.replace(/^❕️?\s*/, "")}</span>
-                        <span className="text-muted-foreground text-[9px]">· {time}</span>
-                      </div>
-                      <div className="h-px flex-1 bg-gradient-to-l from-transparent via-gold/20 to-transparent" />
-                    </div>
-                  );
-                }
-
                 return (
-                  <div key={m.id} className={`flex gap-2 ${mine ? "flex-row-reverse" : ""} ${prevSame ? "mt-0.5" : "mt-3"}`}>
-                    {prevSame ? (
-                      <div className="w-9 shrink-0" />
-                    ) : (
-                      <button
-                        className={`w-9 h-9 rounded-full bg-secondary overflow-hidden shrink-0 transition ring-2 ${isNpc ? "ring-emerald-500/60" : mine ? "ring-blood/50" : "ring-transparent hover:ring-gold"}`}
-                        title={mine ? "Você" : (isNpc ? `NPC: ${displayName}` : `Interagir com ${displayName}`)}
-                        disabled={mine || isNpc}
-                        onClick={() => {
-                          if (mine || isNpc || !m.character_id) return;
-                          setTarget({ id: m.character_id, nickname: m.character?.nickname ?? "?", avatar_url: m.character?.avatar_url ?? null });
-                          setTargetOpen(true);
-                        }}>
-                        {avatarUrl
-                          ? <img src={avatarUrl} className="w-full h-full object-cover" alt="" />
-                          : <div className="w-full h-full flex items-center justify-center text-[10px] text-muted-foreground font-display">{displayName[0]?.toUpperCase()}</div>}
-                      </button>
-                    )}
-                    <div className={`group max-w-[78%] min-w-0 ${mine ? "items-end text-right" : "items-start"} flex flex-col`}>
-                      {!prevSame && (
-                        <div className={`flex items-center gap-1.5 mb-0.5 px-1 ${mine ? "flex-row-reverse" : ""}`}>
-                          <span className={`text-[11px] font-display font-bold ${isNpc ? "text-emerald-300" : mine ? "text-blood" : "text-gold"}`}>{displayName}</span>
-                          {isNpc && <span className="text-[9px] px-1 py-px rounded bg-emerald-500/20 text-emerald-300 uppercase tracking-wider">NPC</span>}
-                          <span className="text-[9px] text-muted-foreground">{time}</span>
-                        </div>
-                      )}
-                      <div className={`relative rounded-2xl px-3 py-2 shadow-sm ${
-                        mine
-                          ? "bg-gradient-to-br from-blood to-blood/70 text-white rounded-tr-sm"
-                          : isNpc
-                            ? "bg-emerald-950/50 border border-emerald-500/30 rounded-tl-sm"
-                            : "bg-secondary/80 border border-border/50 rounded-tl-sm"
-                        } ${m.is_pinned ? "ring-2 ring-gold/70" : ""}`}>
-                        {m.image_url && <img src={m.image_url} className="mb-1 rounded-lg max-h-64 object-cover" alt="" />}
-                        {m.content && <RpFormatted text={m.content} mine={mine} isNpc={isNpc} />}
-                        {(mine || m.is_pinned) && (
-                          <div className={`absolute -bottom-1 ${mine ? "left-2" : "right-2"} flex items-center gap-1 opacity-0 group-hover:opacity-100 transition`}>
-                            {mine && (
-                              <button onClick={() => doTogglePin(m.id)}
-                                title={m.is_pinned ? "Desmarcar" : "Marcar"}
-                                className="w-5 h-5 rounded-full bg-card border border-border flex items-center justify-center hover:bg-gold/20 hover:border-gold text-muted-foreground hover:text-gold transition">
-                                {m.is_pinned ? <PinOff size={10} /> : <Pin size={10} />}
-                              </button>
-                            )}
-                          </div>
+                  <div key={m.id} className={`flex gap-2 ${mine ? "flex-row-reverse" : ""}`}>
+                    <button
+                      className={`w-8 h-8 rounded-full bg-secondary overflow-hidden shrink-0 transition ${isNpc ? "ring-2 ring-emerald-500/60" : "hover:ring-2 hover:ring-gold"}`}
+                      title={mine ? "Você" : (isNpc ? `NPC: ${displayName}` : `Interagir com ${displayName}`)}
+                      disabled={mine || isNpc}
+                      onClick={() => {
+                        if (mine || isNpc || !m.character_id) return;
+                        setTarget({ id: m.character_id, nickname: m.character?.nickname ?? "?", avatar_url: m.character?.avatar_url ?? null });
+                        setTargetOpen(true);
+                      }}>
+                      {avatarUrl && <img src={avatarUrl} className="w-full h-full object-cover" alt="" />}
+                    </button>
+                    <div className={`group max-w-[75%] rounded-lg p-2 ${mine ? "bg-primary text-primary-foreground" : isNpc ? "bg-emerald-950/40 border border-emerald-500/30" : "bg-secondary"} ${m.is_pinned ? "ring-2 ring-gold" : ""}`}>
+                      <div className={`text-[10px] font-display ${mine ? "text-primary-foreground/70" : isNpc ? "text-emerald-300" : "text-gold"}`}>{displayName}{isNpc && " · NPC"}</div>
+                      {m.image_url && <img src={m.image_url} className="mt-1 rounded max-h-64 object-cover" alt="" />}
+                      {m.content && <div className="whitespace-pre-wrap text-sm mt-1">{m.content}</div>}
+                      <div className={`text-[10px] mt-1 flex items-center gap-2 ${mine ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
+                        <span>{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
+                        {mine && (
+                          <button onClick={() => doTogglePin(m.id)}
+                            title={m.is_pinned ? "Desmarcar" : "Marcar mensagem"}
+                            className="opacity-60 hover:opacity-100 transition">
+                            {m.is_pinned ? <PinOff size={11} /> : <Pin size={11} />}
+                          </button>
                         )}
-                        {m.is_pinned && (
-                          <div className={`absolute -top-1.5 ${mine ? "-left-1.5" : "-right-1.5"} w-4 h-4 rounded-full bg-gold flex items-center justify-center shadow-md`}>
-                            <Pin size={9} className="text-black" />
-                          </div>
-                        )}
+                        {m.is_pinned && !mine && <Pin size={11} className="text-gold" />}
                       </div>
                     </div>
                   </div>
@@ -634,69 +514,53 @@ function ChatPage() {
             </div>
 
             {scene && (
-              <div className="border-t border-gold/20 p-2 flex items-center gap-2 bg-gold/5">
-                <img src={scene.image_url} className="w-14 h-14 object-cover rounded-lg ring-1 ring-gold/40" alt="" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-[10px] uppercase tracking-widest text-gold font-bold">Cena anexada</div>
-                  <div className="text-xs truncate">{scene.label ?? "Sem título"}</div>
-                </div>
+              <div className="border-t border-border p-2 flex items-center gap-2 bg-card/50">
+                <img src={scene.image_url} className="w-14 h-14 object-cover rounded" alt="" />
+                <div className="text-xs flex-1 truncate">{scene.label ?? "Cena anexada"}</div>
                 <Button variant="ghost" size="icon" onClick={() => setScene(null)}><X size={14} /></Button>
               </div>
             )}
 
-            {pvpAtLocation && (
-              <div className="border-t border-blood bg-gradient-to-r from-blood/30 via-blood/10 to-blood/30 text-center text-xs text-blood py-1.5 font-bold uppercase tracking-widest flex items-center justify-center gap-2">
-                <span className="animate-pulse">⚔</span> Duelo em andamento · chat travado <span className="animate-pulse">⚔</span>
-              </div>
-            )}
-            <div className="border-t border-blood/20 bg-card/60 backdrop-blur p-2.5 md:p-3">
-              <div className="flex gap-2 items-end">
-                {character && (
-                  <ActionHotkey
-                    currentLocationId={character.current_location_id}
-                    onArrived={loadCore}
-                    disabled={!!combatId || !!pvpAtLocation}
-                  />
-                )}
-                <Dialog open={sceneOpen} onOpenChange={setSceneOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="icon" title="Anexar cena" disabled={!!pvpAtLocation}
-                      className="shrink-0 h-10 w-10 border-border/60 hover:border-gold/60 hover:text-gold"><ImagePlus size={16} /></Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
-                    <DialogHeader><DialogTitle>Escolha uma cena ({scenes.length}/10)</DialogTitle></DialogHeader>
-                    {scenes.length === 0
-                      ? <div className="text-sm text-muted-foreground p-4">Você ainda não enviou nenhuma cena. Vá em <b>Ficha → Configurações de cenas</b> para adicionar.</div>
-                      : (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[60vh] overflow-y-auto">
-                          {scenes.map((s) => (
-                            <button key={s.id} onClick={() => { setScene(s); setSceneOpen(false); }}
-                              className="rounded overflow-hidden hover:ring-2 hover:ring-gold">
-                              <img src={s.image_url} className="w-full h-28 object-cover" alt="" />
-                              {s.label && <div className="text-[10px] truncate p-1">{s.label}</div>}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                  </DialogContent>
-                </Dialog>
-                <div className="flex-1 relative">
-                  <Textarea rows={1} value={content} onChange={(e) => setContent(e.target.value)}
-                    placeholder={pvpAtLocation ? "Chat travado durante o duelo." : "Descreva sua ação (❕️) ou fale (-)…"}
-                    disabled={!!pvpAtLocation}
-                    className="resize-none min-h-10 max-h-32 rounded-xl border-border/60 bg-input/60 focus:border-gold/60 pr-2 py-2.5"
-                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); doSend(); } }} />
+            <div className="border-t border-border p-3 flex gap-2 items-end">
+              {pvpAtLocation && (
+                <div className="absolute left-0 right-0 -translate-y-full text-center text-xs bg-blood/20 border-t border-blood text-blood py-1">
+                  ⚔ Duelo em andamento — chat travado neste local.
                 </div>
-                <Button onClick={doSend} disabled={sending || !!pvpAtLocation || (!content.trim() && !scene)}
-                  className="shrink-0 h-10 w-10 p-0 rounded-xl bg-gradient-to-br from-blood to-blood/70 hover:from-blood/90 hover:to-blood/60 shadow-lg shadow-blood/30">
-                  <Send size={16} />
-                </Button>
-              </div>
-              <div className="hidden md:flex items-center gap-3 mt-1.5 px-1 text-[10px] text-muted-foreground">
-                <span><kbd className="px-1 py-0.5 rounded bg-secondary/60 text-[9px]">Enter</kbd> enviar</span>
-                <span><kbd className="px-1 py-0.5 rounded bg-secondary/60 text-[9px]">Shift+Enter</kbd> nova linha</span>
-                <span className="ml-auto">❕️ ação · - fala</span>
-              </div>
+              )}
+              {character && (
+                <ActionHotkey
+                  currentLocationId={character.current_location_id}
+                  onArrived={loadCore}
+                  disabled={!!combatId || !!pvpAtLocation}
+                />
+              )}
+              <Dialog open={sceneOpen} onOpenChange={setSceneOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="icon" title="Anexar cena" disabled={!!pvpAtLocation}><ImagePlus size={16} /></Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader><DialogTitle>Escolha uma cena ({scenes.length}/10)</DialogTitle></DialogHeader>
+                  {scenes.length === 0
+                    ? <div className="text-sm text-muted-foreground p-4">Você ainda não enviou nenhuma cena. Vá em <b>Ficha → Configurações de cenas</b> para adicionar.</div>
+                    : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[60vh] overflow-y-auto">
+                        {scenes.map((s) => (
+                          <button key={s.id} onClick={() => { setScene(s); setSceneOpen(false); }}
+                            className="rounded overflow-hidden hover:ring-2 hover:ring-gold">
+                            <img src={s.image_url} className="w-full h-28 object-cover" alt="" />
+                            {s.label && <div className="text-[10px] truncate p-1">{s.label}</div>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                </DialogContent>
+              </Dialog>
+              <Textarea rows={2} value={content} onChange={(e) => setContent(e.target.value)}
+                placeholder={pvpAtLocation ? "Chat travado durante o duelo." : "Descreva sua ação, fale…"}
+                disabled={!!pvpAtLocation}
+                className="resize-none"
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); doSend(); } }} />
+              <Button onClick={doSend} disabled={sending || !!pvpAtLocation || (!content.trim() && !scene)}><Send size={16} /></Button>
             </div>
           </>
         )}
