@@ -3585,6 +3585,7 @@ export type Database = {
         Args: { _location_id: string; _user_id: string }
         Returns: boolean
       }
+      has_admin_or_mod: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
