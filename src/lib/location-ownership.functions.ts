@@ -171,3 +171,30 @@ export const canIAccessLocation = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { allowed: !!ok };
   });
+
+/** Admin: define/limpa o dono do local pelo nickname do personagem. */
+export const adminSetLocationOwner = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    location_id: z.string().uuid(),
+    nickname: z.string().trim().max(64).nullish(),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
+    if (!isAdmin) throw new Error("Apenas admins podem transferir posse.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    let ownerId: string | null = null;
+    if (data.nickname && data.nickname.trim().length > 0) {
+      const { data: target } = await supabaseAdmin
+        .from("characters").select("id,nickname").ilike("nickname", data.nickname.trim()).limit(1).maybeSingle();
+      if (!target) throw new Error("Personagem não encontrado.");
+      ownerId = (target as any).id;
+    }
+    const { error } = await supabaseAdmin.from("locations")
+      .update({ owner_character_id: ownerId }).eq("id", data.location_id);
+    if (error) throw new Error(error.message);
+    if (!ownerId) {
+      await supabaseAdmin.from("location_permissions").delete().eq("location_id", data.location_id);
+    }
+    return { ok: true, owner_character_id: ownerId };
+  });
