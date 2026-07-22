@@ -35,12 +35,12 @@ import {
   ShieldCheck, Server, MessageSquare, Award, UsersRound, Menu, X, Rabbit, RotateCcw, AlertTriangle, Briefcase, CheckSquare, Hammer, Trophy,
 } from "lucide-react";
 
-type NavItem = { id: string; label: string; icon: React.ComponentType<{ size?: number; className?: string }>; group: string };
+type NavItem = { id: string; label: string; icon: React.ComponentType<{ size?: number; className?: string }>; group: string; adminOnly?: boolean };
 const NAV: NavItem[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, group: "Visão geral" },
-  { id: "players",   label: "Jogadores", icon: Users,           group: "Comunidade" },
-  { id: "parties",   label: "Parties",   icon: UsersRound,      group: "Comunidade" },
-  { id: "admins",    label: "Admins",    icon: ShieldCheck,     group: "Comunidade" },
+  { id: "players",   label: "Jogadores", icon: Users,           group: "Comunidade", adminOnly: true },
+  { id: "parties",   label: "Parties",   icon: UsersRound,      group: "Comunidade", adminOnly: true },
+  { id: "admins",    label: "Admins",    icon: ShieldCheck,     group: "Comunidade", adminOnly: true },
   { id: "items",     label: "Itens",     icon: Package,         group: "Conteúdo" },
   { id: "submissions", label: "Submissões", icon: Hammer,       group: "Conteúdo" },
   { id: "skills",    label: "Habilidades", icon: Sparkles,      group: "Conteúdo" },
@@ -56,19 +56,26 @@ const NAV: NavItem[] = [
   { id: "levels",    label: "Níveis",    icon: TrendingUp,      group: "Sistema" },
   { id: "battlepass", label: "Passe de Batalha", icon: Trophy,  group: "Sistema" },
   { id: "todos",     label: "Tarefas",   icon: CheckSquare,     group: "Sistema" },
-  { id: "server",    label: "Servidor",  icon: Server,          group: "Sistema" },
-  { id: "whatsapp",  label: "WhatsApp",  icon: MessageSquare,   group: "Sistema" },
+  { id: "server",    label: "Servidor",  icon: Server,          group: "Sistema", adminOnly: true },
+  { id: "whatsapp",  label: "WhatsApp",  icon: MessageSquare,   group: "Sistema", adminOnly: true },
 ];
 
-export function AdminPanel() {
+export function AdminPanel({ isAdmin = true, isModerator = false }: { isAdmin?: boolean; isModerator?: boolean } = {}) {
   const [adminUserId, setAdminUserId] = useState<string>("");
   const [active, setActive] = useState<string>("dashboard");
   const [mobileOpen, setMobileOpen] = useState(false);
   useEffect(() => { supabase.auth.getUser().then(({ data }) => setAdminUserId(data.user?.id ?? "")); }, []);
 
-  const groups = Array.from(new Set(NAV.map((n) => n.group)));
-  const current = NAV.find((n) => n.id === active) ?? NAV[0];
+  const visibleNav = NAV.filter((n) => isAdmin || !n.adminOnly);
+  const groups = Array.from(new Set(visibleNav.map((n) => n.group)));
+  const current = visibleNav.find((n) => n.id === active) ?? visibleNav[0];
+  // Guard: if a moderator lands on an adminOnly tab via stale state, snap to dashboard.
+  useEffect(() => {
+    if (!visibleNav.some((n) => n.id === active)) setActive("dashboard");
+  }, [active, isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
   const Icon = current.icon;
+  const modeLabel = isAdmin ? "Painel do Kage" : "Painel do Moderador";
+  const modeSub = isAdmin ? "Controle Total" : "Somente criar e editar";
 
   return (
     <div className="admin-shell admin-scope">
@@ -98,8 +105,8 @@ export function AdminPanel() {
             <div className="flex items-center gap-2">
               <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-blood to-gold text-lg font-black text-background shadow-lg">影</div>
               <div className="min-w-0">
-                <div className="font-display text-lg font-black leading-tight">Painel do Kage</div>
-                <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Controle Total</div>
+                <div className="font-display text-lg font-black leading-tight">{modeLabel}</div>
+                <div className="text-[10px] uppercase tracking-widest text-muted-foreground">{modeSub}</div>
               </div>
             </div>
             <button
@@ -114,7 +121,7 @@ export function AdminPanel() {
               <div key={g}>
                 <div className="mb-1 px-2 text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground/80">{g}</div>
                 <ul className="flex flex-col gap-0.5">
-                  {NAV.filter((n) => n.group === g).map((n) => {
+                  {visibleNav.filter((n) => n.group === g).map((n) => {
                     const IconC = n.icon;
                     const isActive = n.id === active;
                     return (
@@ -162,9 +169,9 @@ export function AdminPanel() {
 
           <div key={active} className="animate-admin-rise">
             {active === "dashboard" && <Dashboard onNavigate={setActive} />}
-            {active === "players" && <Players />}
+            {active === "players" && isAdmin && <Players />}
             {active === "items" && adminUserId && <ItemManager adminUserId={adminUserId} />}
-            {active === "submissions" && <SubmissionsManager />}
+            {active === "submissions" && <SubmissionsManager canReject={isAdmin} />}
             {active === "skills" && adminUserId && <SkillManager adminUserId={adminUserId} />}
             {active === "profs" && <ProficiencyManager />}
             {active === "missions" && <MissionManager />}
@@ -178,10 +185,10 @@ export function AdminPanel() {
             {active === "levels" && <LevelManager />}
             {active === "battlepass" && <BattlePassManager />}
             {active === "todos" && <TodoManager />}
-            {active === "parties" && <PartyManager />}
-            {active === "admins" && <AdminUsers />}
-            {active === "server" && <ServerControl />}
-            {active === "whatsapp" && <BotPanel />}
+            {active === "parties" && isAdmin && <PartyManager />}
+            {active === "admins" && isAdmin && <AdminUsers />}
+            {active === "server" && isAdmin && <ServerControl />}
+            {active === "whatsapp" && isAdmin && <BotPanel />}
           </div>
         </main>
       </div>
