@@ -237,6 +237,10 @@ export function TravelDialog({ open, onOpenChange, currentLocationId, onArrived 
                       {l.image_url && <img src={l.image_url} className="w-full h-full object-cover" alt="" />}
                     </div>
                     <div className="text-xs font-semibold flex-1 truncate">{l.name}</div>
+                    <div className="flex flex-col gap-0.5 shrink-0">
+                      {l.is_private && <Lock size={10} className="text-blood" />}
+                      {l.is_for_sale && <Tag size={10} className="text-gold" />}
+                    </div>
                   </button>
                 );
               })}
@@ -256,6 +260,21 @@ export function TravelDialog({ open, onOpenChange, currentLocationId, onArrived 
                   <div className="font-display text-lg text-gold">{selectedLoc.name}</div>
                 </div>
                 {selectedLoc.image_url && <img src={selectedLoc.image_url} className="w-full h-28 object-cover rounded" alt="" />}
+                <div className="flex flex-wrap gap-1 text-[10px]">
+                  {selectedLoc.is_private && <span className="rounded bg-blood/20 text-blood px-2 py-0.5 flex items-center gap-1"><Lock size={10} /> Privado</span>}
+                  {selectedLoc.is_for_sale && <span className="rounded bg-gold/20 text-gold px-2 py-0.5 flex items-center gap-1"><Tag size={10} /> À venda · {selectedLoc.sale_price} ryō</span>}
+                  {iOwnSelected && <span className="rounded bg-emerald-500/20 text-emerald-300 px-2 py-0.5">Você é o dono</span>}
+                </div>
+                {iOwnSelected && (
+                  <Button size="sm" variant="outline" className="w-full" onClick={() => setAccessOpen(true)}>
+                    <Settings2 size={14} className="mr-1" /> Gerenciar acesso / venda
+                  </Button>
+                )}
+                {selectedForSaleByOther && !iOwnSelected && (
+                  <Button size="sm" variant="secondary" className="w-full" onClick={doBuy}>
+                    <Tag size={14} className="mr-1" /> Comprar por {selectedLoc.sale_price} ryō
+                  </Button>
+                )}
                 {selected === currentLocationId ? (
                   <p className="text-xs text-muted-foreground">Você já está aqui.</p>
                 ) : dist < 0 ? (
@@ -298,6 +317,15 @@ export function TravelDialog({ open, onOpenChange, currentLocationId, onArrived 
             )}
           </aside>
         </div>
+        <LocationAccessDialog
+          open={accessOpen}
+          onOpenChange={setAccessOpen}
+          location={selectedLoc && iOwnSelected ? {
+            id: selectedLoc.id, name: selectedLoc.name,
+            is_private: selectedLoc.is_private, is_for_sale: selectedLoc.is_for_sale, sale_price: selectedLoc.sale_price,
+          } : null}
+          onChanged={refreshLocs}
+        />
       </DialogContent>
     </Dialog>
   );
