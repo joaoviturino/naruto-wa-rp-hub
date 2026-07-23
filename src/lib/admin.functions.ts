@@ -1069,6 +1069,38 @@ export const deleteUserAccount = createServerFn({ method: "POST" })
 /* ---------- FULL RESET (WIPE) ---------- */
 
 /**
+ * Zera um personagem específico: apaga a ficha e todo o progresso vinculado.
+ * A conta do usuário permanece; ele é forçado de volta ao fluxo de criação de personagem.
+ */
+export const resetCharacter = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    character_id: z.string().uuid(),
+    reason: z.string().max(400).optional(),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: ch } = await supabaseAdmin.from("characters")
+      .select("id,user_id,name").eq("id", data.character_id).maybeSingle();
+    if (!ch) throw new Error("Personagem não encontrado.");
+
+    // Limpa referências que não têm ON DELETE CASCADE para characters
+    await supabaseAdmin.from("pvp_duels").delete()
+      .or(`challenger_id.eq.${data.character_id},opponent_id.eq.${data.character_id},winner_id.eq.${data.character_id}`);
+    await supabaseAdmin.from("locations").update({ owner_character_id: null }).eq("owner_character_id", data.character_id);
+
+    const { error } = await supabaseAdmin.from("characters").delete().eq("id", data.character_id);
+    if (error) throw new Error(error.message);
+
+    await supabaseAdmin.from("audit_log").insert({
+      admin_id: context.userId, action: "reset_character", target: data.character_id,
+      meta: { user_id: ch.user_id, name: ch.name, reason: data.reason ?? null },
+    });
+    return { ok: true };
+  });
+
+/**
  * Zera todo o estado de jogo: personagens, inventários, parties, duelos, sessões,
  * presença, mensagens de chat, submissões, progresso do passe, recompensas globais reivindicadas etc.
  * Preserva: contas (auth), profiles, roles, catálogo (skills/items/npcs/locations/clans/missões/livros/minigames/mounts),
