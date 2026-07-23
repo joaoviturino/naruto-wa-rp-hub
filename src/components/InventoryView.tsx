@@ -33,7 +33,7 @@ function normalizeBag(raw: any): BagEntry[] {
 }
 
 export function InventoryView({ characterId, userId, bgUrl, onBgChange }: {
-  characterId: string; userId: string; bgUrl: string | null; onBgChange: (url: string) => void;
+  characterId: string; userId: string; bgUrl: string | null; onBgChange: (url: string) => void; onChanged?: () => void;
 }) {
   const [inv, setInv] = useState<Inv | null>(null);
   const [items, setItems] = useState<Record<string, Item>>({});
@@ -62,7 +62,7 @@ export function InventoryView({ characterId, userId, bgUrl, onBgChange }: {
   const move = useServerFn(moveItemBetweenBags);
 
   async function run(fn: () => Promise<any>, okMsg: string) {
-    try { await fn(); toast.success(okMsg); await load(); }
+    try { await fn(); toast.success(okMsg); await load(); try { (arguments as any); } catch {}; }
     catch (e: any) { toast.error(e.message ?? "Erro"); }
   }
 
