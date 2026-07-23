@@ -187,11 +187,21 @@ function ChatPage() {
   async function loadMessages(locId: string) {
     const { data } = await supabase
       .from("location_messages")
-      .select("id,content,image_url,created_at,character_id,npc_id,is_pinned,reply_to_id,reply_to:location_messages!location_messages_reply_to_id_fkey(id,content,image_url,character:characters(nickname),npc:npcs!location_messages_npc_id_fkey(name)),character:characters(nickname,avatar_url),npc:npcs!location_messages_npc_id_fkey(name,image_url)")
+      .select("id,content,image_url,created_at,character_id,npc_id,is_pinned,reply_to_id,character:characters(nickname,avatar_url),npc:npcs!location_messages_npc_id_fkey(name,image_url)")
       .eq("location_id", locId)
       .order("created_at", { ascending: false })
       .limit(HISTORY_LIMIT);
-    setMessages(((data as unknown as Msg[]) ?? []).reverse());
+    const base = ((data as unknown as Msg[]) ?? []).reverse();
+    const parentIds = Array.from(new Set(base.map((m) => m.reply_to_id).filter(Boolean))) as string[];
+    let parentsById: Record<string, Msg["reply_to"]> = {};
+    if (parentIds.length > 0) {
+      const { data: parents } = await supabase
+        .from("location_messages")
+        .select("id,content,image_url,character:characters(nickname),npc:npcs!location_messages_npc_id_fkey(name)")
+        .in("id", parentIds);
+      (parents as any[] ?? []).forEach((p) => { parentsById[p.id] = p; });
+    }
+    setMessages(base.map((m) => m.reply_to_id ? { ...m, reply_to: parentsById[m.reply_to_id] ?? null } : m));
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
   }
 
