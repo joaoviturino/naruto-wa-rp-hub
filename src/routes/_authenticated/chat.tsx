@@ -540,10 +540,38 @@ function ChatPage() {
                     </button>
                     <div className={`group max-w-[75%] rounded-lg p-2 ${mine ? "bg-primary text-primary-foreground" : isNpc ? "bg-emerald-950/40 border border-emerald-500/30" : "bg-secondary"} ${m.is_pinned ? "ring-2 ring-gold" : ""}`}>
                       <div className={`text-[10px] font-display ${mine ? "text-primary-foreground/70" : isNpc ? "text-emerald-300" : "text-gold"}`}>{displayName}{isNpc && " · NPC"}</div>
+                      {m.reply_to && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const el = document.getElementById(`msg-${m.reply_to!.id}`);
+                            if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.classList.add("ring-2","ring-gold"); setTimeout(() => el.classList.remove("ring-2","ring-gold"), 1400); }
+                          }}
+                          className={`mt-1 mb-1 block w-full text-left border-l-2 pl-2 py-1 rounded-sm text-[11px] ${mine ? "border-primary-foreground/60 bg-primary-foreground/10" : "border-gold/70 bg-black/20"}`}>
+                          <div className={`font-display text-[10px] ${mine ? "text-primary-foreground/80" : "text-gold"}`}>
+                            {m.reply_to.npc?.name ?? m.reply_to.character?.nickname ?? "?"}
+                          </div>
+                          <div className="truncate opacity-80">{m.reply_to.content || (m.reply_to.image_url ? "[imagem]" : "")}</div>
+                        </button>
+                      )}
                       {m.image_url && <img src={m.image_url} className="mt-1 rounded max-h-64 object-cover" alt="" />}
-                      {m.content && <div className="whitespace-pre-wrap text-sm mt-1">{m.content}</div>}
+                      {m.content && <div className="whitespace-pre-wrap text-sm mt-1">{renderContentWithMentions(m.content)}</div>}
                       <div className={`text-[10px] mt-1 flex items-center gap-2 ${mine ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
                         <span>{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
+                        <button
+                          onClick={() => { setReplyTo(m); setTimeout(() => textareaRef.current?.focus(), 0); }}
+                          title="Responder"
+                          className={`opacity-60 hover:opacity-100 transition ${mine ? "" : ""}`}>
+                          <Reply size={11} />
+                        </button>
+                        {!mine && !isNpc && m.character?.nickname && (
+                          <button
+                            onClick={() => insertMention(m.character!.nickname)}
+                            title={`Mencionar @${m.character?.nickname}`}
+                            className="opacity-60 hover:opacity-100 transition">
+                            <AtSign size={11} />
+                          </button>
+                        )}
                         {mine && (
                           <button onClick={() => doTogglePin(m.id)}
                             title={m.is_pinned ? "Desmarcar" : "Marcar mensagem"}
