@@ -9,8 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertTriangle } from "lucide-react";
-import spriteMaleAsset from "@/assets/shinobi-male.gif.asset.json";
-import spriteAltAsset from "@/assets/shinobi-alt.gif.asset.json";
+import spriteMaleAsset from "@/assets/shinobi-male.png.asset.json";
+import spriteAltAsset from "@/assets/shinobi-female.png.asset.json";
 
 type Clan = { id: string; name: string; village: Village; rarity: "common"|"uncommon"|"rare"|"epic"|"legendary"; element_bonus: Element | null; description: string | null; weight: number };
 type Gender = "masculino" | "feminino";
@@ -34,7 +34,7 @@ const DDI_OPTIONS: { code: string; label: string; flag: string }[] = [
 
 const SPRITE_OPTIONS = [
   { id: "male", label: "Shinobi da Capa", url: (spriteMaleAsset as { url: string }).url },
-  { id: "alt", label: "Shinobi Errante", url: (spriteAltAsset as { url: string }).url },
+  { id: "female", label: "Kunoichi Errante", url: (spriteAltAsset as { url: string }).url },
 ];
 
 export function CharacterWizard({ onDone }: { onDone: () => void }) {
