@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useServerFn } from "@tanstack/react-start";
 import { moveCharacter, sendLocationMessage, togglePinMessage } from "@/lib/chat.functions";
 import { rollSpawn, getMyActiveCombat } from "@/lib/combat.functions";
-import { MapPin, Send, ImagePlus, X, Compass, Skull, Users, Menu, Gamepad2, BookOpen, Pin, PinOff } from "lucide-react";
+import { MapPin, Send, ImagePlus, X, Compass, Skull, Users, Menu, Gamepad2, BookOpen, Pin, PinOff, Reply, AtSign } from "lucide-react";
 import { toast } from "sonner";
 import { CombatDialog } from "@/components/chat/CombatDialog";
 import { PlayerActionMenu } from "@/components/chat/PlayerActionMenu";
@@ -36,6 +36,12 @@ type Scene = { id: string; image_url: string; label: string | null };
 type Msg = {
   id: string; content: string; image_url: string | null; created_at: string;
   character_id: string | null; npc_id?: string | null; is_pinned?: boolean;
+  reply_to_id?: string | null;
+  reply_to?: {
+    id: string; content: string | null; image_url?: string | null;
+    character?: { nickname: string } | null;
+    npc?: { name: string } | null;
+  } | null;
   character?: { nickname: string; avatar_url: string | null } | null;
   npc?: { name: string; image_url: string | null } | null;
 };
@@ -51,7 +57,10 @@ function ChatPage() {
   const [scene, setScene] = useState<Scene | null>(null);
   const [sceneOpen, setSceneOpen] = useState(false);
   const [sending, setSending] = useState(false);
+  const [replyTo, setReplyTo] = useState<Msg | null>(null);
+  const [mentionOpen, setMentionOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const move = useServerFn(moveCharacter);
   const sendMsg = useServerFn(sendLocationMessage);
@@ -178,7 +187,7 @@ function ChatPage() {
   async function loadMessages(locId: string) {
     const { data } = await supabase
       .from("location_messages")
-      .select("id,content,image_url,created_at,character_id,npc_id,is_pinned,character:characters(nickname,avatar_url),npc:npcs!location_messages_npc_id_fkey(name,image_url)")
+      .select("id,content,image_url,created_at,character_id,npc_id,is_pinned,reply_to_id,reply_to:location_messages!location_messages_reply_to_id_fkey(id,content,image_url,character:characters(nickname),npc:npcs!location_messages_npc_id_fkey(name)),character:characters(nickname,avatar_url),npc:npcs!location_messages_npc_id_fkey(name,image_url)")
       .eq("location_id", locId)
       .order("created_at", { ascending: false })
       .limit(HISTORY_LIMIT);
@@ -202,7 +211,14 @@ function ChatPage() {
             const { data: c } = await supabase.from("characters").select("nickname,avatar_url").eq("id", raw.character_id).maybeSingle();
             character = c;
           }
-          setMessages((prev) => (prev.some((m) => m.id === raw.id) ? prev : [...prev, { ...raw, character, npc } as Msg]));
+          let reply_to: any = null;
+          if (raw.reply_to_id) {
+            const { data: r } = await supabase.from("location_messages")
+              .select("id,content,image_url,character:characters(nickname),npc:npcs!location_messages_npc_id_fkey(name)")
+              .eq("id", raw.reply_to_id).maybeSingle();
+            reply_to = r;
+          }
+          setMessages((prev) => (prev.some((m) => m.id === raw.id) ? prev : [...prev, { ...raw, character, npc, reply_to } as Msg]));
           setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
         })
       .on("postgres_changes",
@@ -284,10 +300,41 @@ function ChatPage() {
     if (!content.trim() && !scene) return;
     setSending(true);
     try {
-      await sendMsg({ data: { locationId: currentLoc.id, content, imageUrl: scene?.image_url ?? null } });
-      setContent(""); setScene(null);
+      await sendMsg({ data: { locationId: currentLoc.id, content, imageUrl: scene?.image_url ?? null, replyToId: replyTo?.id ?? null } });
+      setContent(""); setScene(null); setReplyTo(null);
     } catch (e: any) { toast.error(e.message); }
     finally { setSending(false); }
+  }
+
+  function insertMention(nick: string) {
+    const token = `@${nick} `;
+    const el = textareaRef.current;
+    if (el) {
+      const start = el.selectionStart ?? content.length;
+      const end = el.selectionEnd ?? content.length;
+      const next = content.slice(0, start) + token + content.slice(end);
+      setContent(next);
+      setTimeout(() => {
+        el.focus();
+        const pos = start + token.length;
+        el.setSelectionRange(pos, pos);
+      }, 0);
+    } else {
+      setContent((c) => (c.endsWith(" ") || c.length === 0 ? c : c + " ") + token);
+    }
+    setMentionOpen(false);
+  }
+
+  const myNick = character?.nickname ?? "";
+  function renderContentWithMentions(text: string) {
+    const parts = text.split(/(@[\p{L}0-9_.-]+)/gu);
+    return parts.map((p, i) => {
+      if (p.startsWith("@")) {
+        const isMe = myNick && p.slice(1).toLowerCase() === myNick.toLowerCase();
+        return <span key={i} className={isMe ? "text-gold font-semibold bg-gold/15 rounded px-0.5" : "text-gold font-semibold"}>{p}</span>;
+      }
+      return <span key={i}>{p}</span>;
+    });
   }
 
   function closeCombatDialog() {
