@@ -1864,6 +1864,7 @@ export type Database = {
           is_pinned: boolean
           location_id: string
           npc_id: string | null
+          reply_to_id: string | null
         }
         Insert: {
           character_id?: string | null
@@ -1874,6 +1875,7 @@ export type Database = {
           is_pinned?: boolean
           location_id: string
           npc_id?: string | null
+          reply_to_id?: string | null
         }
         Update: {
           character_id?: string | null
@@ -1884,6 +1886,7 @@ export type Database = {
           is_pinned?: boolean
           location_id?: string
           npc_id?: string | null
+          reply_to_id?: string | null
         }
         Relationships: [
           {
@@ -1905,6 +1908,13 @@ export type Database = {
             columns: ["npc_id"]
             isOneToOne: false
             referencedRelation: "npcs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_messages_reply_to_id_fkey"
+            columns: ["reply_to_id"]
+            isOneToOne: false
+            referencedRelation: "location_messages"
             referencedColumns: ["id"]
           },
         ]

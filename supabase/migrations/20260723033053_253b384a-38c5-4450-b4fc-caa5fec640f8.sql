@@ -1,0 +1,1 @@
+ALTER TABLE public.location_messages ADD COLUMN IF NOT EXISTS reply_to_id uuid REFERENCES public.location_messages(id) ON DELETE SET NULL; CREATE INDEX IF NOT EXISTS idx_location_messages_reply_to ON public.location_messages(reply_to_id);

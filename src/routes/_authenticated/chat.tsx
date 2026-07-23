@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useServerFn } from "@tanstack/react-start";
 import { moveCharacter, sendLocationMessage, togglePinMessage } from "@/lib/chat.functions";
 import { rollSpawn, getMyActiveCombat } from "@/lib/combat.functions";
-import { MapPin, Send, ImagePlus, X, Compass, Skull, Users, Menu, Gamepad2, BookOpen, Pin, PinOff } from "lucide-react";
+import { MapPin, Send, ImagePlus, X, Compass, Skull, Users, Menu, Gamepad2, BookOpen, Pin, PinOff, Reply, AtSign } from "lucide-react";
 import { toast } from "sonner";
 import { CombatDialog } from "@/components/chat/CombatDialog";
 import { PlayerActionMenu } from "@/components/chat/PlayerActionMenu";
@@ -36,6 +36,12 @@ type Scene = { id: string; image_url: string; label: string | null };
 type Msg = {
   id: string; content: string; image_url: string | null; created_at: string;
   character_id: string | null; npc_id?: string | null; is_pinned?: boolean;
+  reply_to_id?: string | null;
+  reply_to?: {
+    id: string; content: string | null; image_url?: string | null;
+    character?: { nickname: string } | null;
+    npc?: { name: string } | null;
+  } | null;
   character?: { nickname: string; avatar_url: string | null } | null;
   npc?: { name: string; image_url: string | null } | null;
 };
@@ -51,7 +57,10 @@ function ChatPage() {
   const [scene, setScene] = useState<Scene | null>(null);
   const [sceneOpen, setSceneOpen] = useState(false);
   const [sending, setSending] = useState(false);
+  const [replyTo, setReplyTo] = useState<Msg | null>(null);
+  const [mentionOpen, setMentionOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const move = useServerFn(moveCharacter);
   const sendMsg = useServerFn(sendLocationMessage);
@@ -178,11 +187,11 @@ function ChatPage() {
   async function loadMessages(locId: string) {
     const { data } = await supabase
       .from("location_messages")
-      .select("id,content,image_url,created_at,character_id,npc_id,is_pinned,character:characters(nickname,avatar_url),npc:npcs!location_messages_npc_id_fkey(name,image_url)")
+      .select("id,content,image_url,created_at,character_id,npc_id,is_pinned,reply_to_id,reply_to:location_messages!location_messages_reply_to_id_fkey(id,content,image_url,character:characters(nickname),npc:npcs!location_messages_npc_id_fkey(name)),character:characters(nickname,avatar_url),npc:npcs!location_messages_npc_id_fkey(name,image_url)")
       .eq("location_id", locId)
       .order("created_at", { ascending: false })
       .limit(HISTORY_LIMIT);
-    setMessages(((data as Msg[]) ?? []).reverse());
+    setMessages(((data as unknown as Msg[]) ?? []).reverse());
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
   }
 
@@ -202,7 +211,14 @@ function ChatPage() {
             const { data: c } = await supabase.from("characters").select("nickname,avatar_url").eq("id", raw.character_id).maybeSingle();
             character = c;
           }
-          setMessages((prev) => (prev.some((m) => m.id === raw.id) ? prev : [...prev, { ...raw, character, npc } as Msg]));
+          let reply_to: any = null;
+          if (raw.reply_to_id) {
+            const { data: r } = await supabase.from("location_messages")
+              .select("id,content,image_url,character:characters(nickname),npc:npcs!location_messages_npc_id_fkey(name)")
+              .eq("id", raw.reply_to_id).maybeSingle();
+            reply_to = r;
+          }
+          setMessages((prev) => (prev.some((m) => m.id === raw.id) ? prev : [...prev, { ...raw, character, npc, reply_to } as Msg]));
           setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
         })
       .on("postgres_changes",
@@ -284,10 +300,41 @@ function ChatPage() {
     if (!content.trim() && !scene) return;
     setSending(true);
     try {
-      await sendMsg({ data: { locationId: currentLoc.id, content, imageUrl: scene?.image_url ?? null } });
-      setContent(""); setScene(null);
+      await sendMsg({ data: { locationId: currentLoc.id, content, imageUrl: scene?.image_url ?? null, replyToId: replyTo?.id ?? null } });
+      setContent(""); setScene(null); setReplyTo(null);
     } catch (e: any) { toast.error(e.message); }
     finally { setSending(false); }
+  }
+
+  function insertMention(nick: string) {
+    const token = `@${nick} `;
+    const el = textareaRef.current;
+    if (el) {
+      const start = el.selectionStart ?? content.length;
+      const end = el.selectionEnd ?? content.length;
+      const next = content.slice(0, start) + token + content.slice(end);
+      setContent(next);
+      setTimeout(() => {
+        el.focus();
+        const pos = start + token.length;
+        el.setSelectionRange(pos, pos);
+      }, 0);
+    } else {
+      setContent((c) => (c.endsWith(" ") || c.length === 0 ? c : c + " ") + token);
+    }
+    setMentionOpen(false);
+  }
+
+  const myNick = character?.nickname ?? "";
+  function renderContentWithMentions(text: string) {
+    const parts = text.split(/(@[\p{L}0-9_.-]+)/gu);
+    return parts.map((p, i) => {
+      if (p.startsWith("@")) {
+        const isMe = myNick && p.slice(1).toLowerCase() === myNick.toLowerCase();
+        return <span key={i} className={isMe ? "text-gold font-semibold bg-gold/15 rounded px-0.5" : "text-gold font-semibold"}>{p}</span>;
+      }
+      return <span key={i}>{p}</span>;
+    });
   }
 
   function closeCombatDialog() {
@@ -479,7 +526,7 @@ function ChatPage() {
                 const displayName = isNpc ? (m.npc?.name ?? "NPC") : (m.character?.nickname ?? "?");
                 const avatarUrl = isNpc ? m.npc?.image_url : m.character?.avatar_url;
                 return (
-                  <div key={m.id} className={`flex gap-2 ${mine ? "flex-row-reverse" : ""}`}>
+                  <div key={m.id} id={`msg-${m.id}`} className={`flex gap-2 rounded-lg transition ${mine ? "flex-row-reverse" : ""}`}>
                     <button
                       className={`w-8 h-8 rounded-full bg-secondary overflow-hidden shrink-0 transition ${isNpc ? "ring-2 ring-emerald-500/60" : "hover:ring-2 hover:ring-gold"}`}
                       title={mine ? "Você" : (isNpc ? `NPC: ${displayName}` : `Interagir com ${displayName}`)}
@@ -493,10 +540,38 @@ function ChatPage() {
                     </button>
                     <div className={`group max-w-[75%] rounded-lg p-2 ${mine ? "bg-primary text-primary-foreground" : isNpc ? "bg-emerald-950/40 border border-emerald-500/30" : "bg-secondary"} ${m.is_pinned ? "ring-2 ring-gold" : ""}`}>
                       <div className={`text-[10px] font-display ${mine ? "text-primary-foreground/70" : isNpc ? "text-emerald-300" : "text-gold"}`}>{displayName}{isNpc && " · NPC"}</div>
+                      {m.reply_to && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const el = document.getElementById(`msg-${m.reply_to!.id}`);
+                            if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.classList.add("ring-2","ring-gold"); setTimeout(() => el.classList.remove("ring-2","ring-gold"), 1400); }
+                          }}
+                          className={`mt-1 mb-1 block w-full text-left border-l-2 pl-2 py-1 rounded-sm text-[11px] ${mine ? "border-primary-foreground/60 bg-primary-foreground/10" : "border-gold/70 bg-black/20"}`}>
+                          <div className={`font-display text-[10px] ${mine ? "text-primary-foreground/80" : "text-gold"}`}>
+                            {m.reply_to.npc?.name ?? m.reply_to.character?.nickname ?? "?"}
+                          </div>
+                          <div className="truncate opacity-80">{m.reply_to.content || (m.reply_to.image_url ? "[imagem]" : "")}</div>
+                        </button>
+                      )}
                       {m.image_url && <img src={m.image_url} className="mt-1 rounded max-h-64 object-cover" alt="" />}
-                      {m.content && <div className="whitespace-pre-wrap text-sm mt-1">{m.content}</div>}
+                      {m.content && <div className="whitespace-pre-wrap text-sm mt-1">{renderContentWithMentions(m.content)}</div>}
                       <div className={`text-[10px] mt-1 flex items-center gap-2 ${mine ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
                         <span>{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
+                        <button
+                          onClick={() => { setReplyTo(m); setTimeout(() => textareaRef.current?.focus(), 0); }}
+                          title="Responder"
+                          className={`opacity-60 hover:opacity-100 transition ${mine ? "" : ""}`}>
+                          <Reply size={11} />
+                        </button>
+                        {!mine && !isNpc && m.character?.nickname && (
+                          <button
+                            onClick={() => insertMention(m.character!.nickname)}
+                            title={`Mencionar @${m.character?.nickname}`}
+                            className="opacity-60 hover:opacity-100 transition">
+                            <AtSign size={11} />
+                          </button>
+                        )}
                         {mine && (
                           <button onClick={() => doTogglePin(m.id)}
                             title={m.is_pinned ? "Desmarcar" : "Marcar mensagem"}
@@ -512,6 +587,17 @@ function ChatPage() {
               })}
               <div ref={bottomRef} />
             </div>
+
+            {replyTo && (
+              <div className="border-t border-border p-2 flex items-center gap-2 bg-card/60">
+                <Reply size={14} className="text-gold shrink-0" />
+                <div className="text-xs flex-1 min-w-0">
+                  <div className="text-[10px] text-gold font-display">Respondendo a {replyTo.npc?.name ?? replyTo.character?.nickname ?? "?"}</div>
+                  <div className="truncate text-muted-foreground">{replyTo.content || (replyTo.image_url ? "[imagem]" : "")}</div>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setReplyTo(null)} title="Cancelar resposta"><X size={14} /></Button>
+              </div>
+            )}
 
             {scene && (
               <div className="border-t border-border p-2 flex items-center gap-2 bg-card/50">
@@ -555,7 +641,33 @@ function ChatPage() {
                     )}
                 </DialogContent>
               </Dialog>
-              <Textarea rows={2} value={content} onChange={(e) => setContent(e.target.value)}
+              <Dialog open={mentionOpen} onOpenChange={setMentionOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="icon" title="Mencionar alguém" disabled={!!pvpAtLocation || presentHere.length === 0}><AtSign size={16} /></Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-sm">
+                  <DialogHeader><DialogTitle>Mencionar alguém no local</DialogTitle></DialogHeader>
+                  {presentHere.length === 0 ? (
+                    <div className="text-sm text-muted-foreground p-2">Ninguém por aqui além de você.</div>
+                  ) : (
+                    <div className="space-y-1 max-h-[50vh] overflow-y-auto">
+                      {presentHere.filter((p) => p.id !== character.id).map((p) => (
+                        <button key={p.id} onClick={() => insertMention(p.nickname)}
+                          className="w-full text-left p-2 rounded hover:bg-secondary text-sm flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-secondary overflow-hidden">
+                            {p.avatar_url && <img src={p.avatar_url} className="w-full h-full object-cover" alt="" />}
+                          </div>
+                          <span className="text-gold">@{p.nickname}</span>
+                        </button>
+                      ))}
+                      {presentHere.filter((p) => p.id !== character.id).length === 0 && (
+                        <div className="text-sm text-muted-foreground p-2">Ninguém por aqui além de você.</div>
+                      )}
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
+              <Textarea ref={textareaRef} rows={2} value={content} onChange={(e) => setContent(e.target.value)}
                 placeholder={pvpAtLocation ? "Chat travado durante o duelo." : "Descreva sua ação, fale…"}
                 disabled={!!pvpAtLocation}
                 className="resize-none"

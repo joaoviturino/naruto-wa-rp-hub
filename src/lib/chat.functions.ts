@@ -72,6 +72,7 @@ export const sendLocationMessage = createServerFn({ method: "POST" })
     locationId: z.string().uuid(),
     content: z.string().max(2000).default(""),
     imageUrl: z.string().url().nullish(),
+    replyToId: z.string().uuid().nullish(),
   }).parse(input))
   .handler(async ({ data, context }) => {
     if (!data.content.trim() && !data.imageUrl) throw new Error("Escreva algo ou anexe uma imagem.");
@@ -108,7 +109,7 @@ export const sendLocationMessage = createServerFn({ method: "POST" })
     }
     const { data: msg, error } = await context.supabase
       .from("location_messages")
-      .insert({ location_id: data.locationId, character_id: char.id, content: data.content.trim(), image_url: data.imageUrl ?? null })
+      .insert({ location_id: data.locationId, character_id: char.id, content: data.content.trim(), image_url: data.imageUrl ?? null, reply_to_id: data.replyToId ?? null })
       .select("id").single();
     if (error) throw new Error(error.message);
     // Dispara respostas de NPCs de IA presentes no local (best-effort).
