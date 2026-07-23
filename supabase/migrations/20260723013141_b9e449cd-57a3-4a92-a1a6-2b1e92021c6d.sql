@@ -1,0 +1,1 @@
+ALTER TABLE public.characters ADD COLUMN IF NOT EXISTS gender text CHECK (gender IN ('masculino','feminino'));
