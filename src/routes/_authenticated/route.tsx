@@ -7,6 +7,7 @@ import { MaintenanceGate } from "@/components/MaintenanceGate";
 import { GlobalBroadcasts } from "@/components/GlobalBroadcasts";
 import { PresenceHeartbeat } from "@/components/chat/PresenceHeartbeat";
 import { OnlinePlayersButton } from "@/components/OnlinePlayersButton";
+import { TutorialWatcher } from "@/components/TutorialWatcher";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -65,6 +66,7 @@ function AuthedLayout() {
       <PvpInvitesWatcher />
       <GlobalBroadcasts />
       <PresenceHeartbeat />
+      <TutorialWatcher userId={user.id} />
       <Outlet />
     </div>
     </MaintenanceGate>

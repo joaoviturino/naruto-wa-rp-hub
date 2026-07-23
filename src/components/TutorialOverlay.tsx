@@ -72,9 +72,18 @@ export function TutorialOverlay({ characterId, onDone }: { characterId: string; 
   const finishFn = useServerFn(completeTutorial);
 
   const [stepIdx, setStepIdx] = useState(0);
-  const [done, setDone] = useState<Record<StepId, boolean>>({
-    kit: false, equip: false, chat: false, combat: false, final: false,
+  const storageKey = `nes.tutorial.${characterId}`;
+  const [done, setDone] = useState<Record<StepId, boolean>>(() => {
+    if (typeof window === "undefined") return { kit: false, equip: false, chat: false, combat: false, final: false };
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) return { kit: false, equip: false, chat: false, combat: false, final: false, ...JSON.parse(raw) };
+    } catch {}
+    return { kit: false, equip: false, chat: false, combat: false, final: false };
   });
+  useEffect(() => {
+    try { localStorage.setItem(storageKey, JSON.stringify(done)); } catch {}
+  }, [done, storageKey]);
   const [collapsed, setCollapsed] = useState(false);
   const [busy, setBusy] = useState(false);
   const finishedRef = useRef(false);
