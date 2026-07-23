@@ -13,13 +13,20 @@ type Job = {
   id?: string; name: string; description: string | null; image_url: string | null;
   salary_ryo: number; salary_xp: number; salary_interval_hours: number;
   fire_after_days: number; active: boolean;
+  permissions?: Record<string, boolean> | null;
 };
 
 const EMPTY: Job = {
   name: "", description: "", image_url: null,
   salary_ryo: 100, salary_xp: 0, salary_interval_hours: 24,
-  fire_after_days: 7, active: true,
+  fire_after_days: 7, active: true, permissions: {},
 };
+
+// Permissões disponíveis para empregos. Cada uma libera uma funcionalidade
+// específica do RPG quando o jogador está contratado neste emprego.
+const JOB_PERMISSIONS: { key: string; label: string; desc: string }[] = [
+  { key: "submit_items", label: "Ferreiro (enviar itens)", desc: "Permite acessar a Forja e enviar submissões de itens para aprovação dos admins." },
+];
 
 export function JobManager() {
   const [list, setList] = useState<Job[]>([]);
@@ -45,7 +52,8 @@ export function JobManager() {
         salary_interval_hours: Number(sel.salary_interval_hours) || 24,
         fire_after_days: Number(sel.fire_after_days) || 7,
         active: !!sel.active,
-      }});
+        permissions: sel.permissions ?? {},
+      } as any});
       toast.success("Emprego salvo.");
       setSel(null);
       refresh();
@@ -106,6 +114,25 @@ export function JobManager() {
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={sel.active} onChange={(e) => setSel({ ...sel, active: e.target.checked })} /> Ativo
           </label>
+          <div className="border-t border-border pt-3 space-y-2">
+            <Label>Permissões deste emprego</Label>
+            <div className="grid gap-2">
+              {JOB_PERMISSIONS.map((p) => {
+                const on = !!(sel.permissions?.[p.key]);
+                return (
+                  <label key={p.key} className="flex items-start gap-2 text-sm cursor-pointer p-2 rounded hover:bg-secondary/40">
+                    <input type="checkbox" checked={on} onChange={(e) => setSel({
+                      ...sel, permissions: { ...(sel.permissions ?? {}), [p.key]: e.target.checked },
+                    })} />
+                    <div>
+                      <div className="font-medium">{p.label}</div>
+                      <div className="text-xs text-muted-foreground">{p.desc}</div>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
           <div className="flex gap-2 pt-2">
             <Button onClick={onSave}><Save size={14} className="mr-1"/> Salvar</Button>
             {sel.id && <Button variant="destructive" onClick={async () => {

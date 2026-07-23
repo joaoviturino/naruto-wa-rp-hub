@@ -32,6 +32,7 @@ const jobPayload = z.object({
   salary_interval_hours: z.number().int().min(1).max(720).default(24),
   fire_after_days: z.number().int().min(1).max(365).default(7),
   active: z.boolean().default(true),
+  permissions: z.record(z.string(), z.boolean()).default({}),
 });
 
 export const listJobs = createServerFn({ method: "POST" })

@@ -1591,6 +1591,7 @@ export type Database = {
           id: string
           image_url: string | null
           name: string
+          permissions: Json
           salary_interval_hours: number
           salary_ryo: number
           salary_xp: number
@@ -1604,6 +1605,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           name: string
+          permissions?: Json
           salary_interval_hours?: number
           salary_ryo?: number
           salary_xp?: number
@@ -1617,6 +1619,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           name?: string
+          permissions?: Json
           salary_interval_hours?: number
           salary_ryo?: number
           salary_xp?: number
@@ -3589,6 +3592,10 @@ export type Database = {
         Returns: boolean
       }
       has_admin_or_mod: { Args: { _user_id: string }; Returns: boolean }
+      has_job_permission: {
+        Args: { _perm: string; _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

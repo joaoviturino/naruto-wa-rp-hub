@@ -4,12 +4,12 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 async function assertBlacksmithOrAdmin(context: { supabase: any; userId: string }) {
   const [b, a] = await Promise.all([
-    context.supabase.rpc("has_role", { _user_id: context.userId, _role: "blacksmith" }),
+    context.supabase.rpc("has_job_permission", { _user_id: context.userId, _perm: "submit_items" }),
     context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" }),
   ]);
   if (b.error) throw new Error(b.error.message);
   if (a.error) throw new Error(a.error.message);
-  if (!b.data && !a.data) throw new Error("Forbidden: apenas ferreiros ou admins podem enviar itens.");
+  if (!b.data && !a.data) throw new Error("Forbidden: apenas quem tem um emprego de ferreiro (permissão submit_items) ou admins podem enviar itens.");
   return { isAdmin: !!a.data };
 }
 
