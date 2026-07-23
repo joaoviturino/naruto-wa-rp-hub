@@ -707,6 +707,13 @@ function ChatPage() {
         <MinigameDialog minigame={activeMinigame} open onOpenChange={(v) => { if (!v) setActiveMinigame(null); }}
           onCompleted={refreshMinigames} />
       )}
+      <LocationPreviewDialog
+        open={!!previewLoc}
+        onOpenChange={(v) => { if (!v) setPreviewLoc(null); }}
+        location={previewLoc}
+        onGo={() => { if (previewLoc) doMove(previewLoc.id); }}
+        going={moving}
+      />
     </div>
   );
 }
