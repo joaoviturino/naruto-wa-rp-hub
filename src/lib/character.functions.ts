@@ -6,6 +6,7 @@ const villageEnum = z.enum([
   "konoha","suna","kiri","kumo","iwa","ame","kusa","taki","oto","yuki","hoshi","nomad",
 ]);
 const elementEnum = z.enum(["katon","suiton","fuuton","doton","raiton"]);
+const genderEnum = z.enum(["masculino","feminino"]);
 
 const NINJA_BAG_CAP = 20;
 const SECONDARY_CAP = 10;
@@ -58,6 +59,8 @@ export const createCharacter = createServerFn({ method: "POST" })
         village: villageEnum,
         clan_id: z.string().uuid(),
         element_primary: elementEnum,
+        gender: genderEnum,
+        sprite_url: z.string().url().optional(),
         age: z.number().int().min(8).max(120).optional(),
         appearance: z.string().max(2000).optional(),
         personality: z.string().max(2000).optional(),
@@ -91,6 +94,8 @@ export const createCharacter = createServerFn({ method: "POST" })
         village: data.village,
         clan_id: data.clan_id,
         element_primary: data.element_primary,
+        gender: data.gender,
+        inventory_bg_url: data.sprite_url ?? null,
         age: data.age,
         appearance: data.appearance,
         personality: data.personality,
