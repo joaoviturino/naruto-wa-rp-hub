@@ -1,0 +1,1 @@
+UPDATE public.characters SET tutorial_completed = true WHERE tutorial_completed = false AND created_at < now();
