@@ -1023,3 +1023,59 @@ export async function applyKitInternal(admin: any, characterId: string, kit: any
     }
   }
 }
+
+/* ---------- ACCOUNT DELETION ---------- */
+
+/** Exclui completamente a conta de um usuário (auth + profile + personagens em cascata). Age como banimento definitivo. */
+export const deleteUserAccount = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    user_id: z.string().uuid(),
+    reason: z.string().max(400).optional(),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    if (data.user_id === context.userId) {
+      throw new Error("Você não pode excluir sua própria conta.");
+    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Audita antes de apagar (o registro depende do admin, não do alvo).
+    await supabaseAdmin.from("audit_log").insert({
+      admin_id: context.userId, action: "delete_account", target: data.user_id,
+      meta: { reason: data.reason ?? null },
+    });
+    // Remove roles e profile explicitamente (evita órfãos caso FK não esteja em cascata).
+    await supabaseAdmin.from("user_roles").delete().eq("user_id", data.user_id);
+    // Personagens do usuário e dependências (inventário, skills, missões etc.) devem sair via FK on delete cascade
+    // para auth.users. Fazemos um cleanup defensivo por user_id em characters.
+    await supabaseAdmin.from("characters").delete().eq("user_id", data.user_id);
+    await supabaseAdmin.from("profiles").delete().eq("id", data.user_id);
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(data.user_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/* ---------- FULL RESET (WIPE) ---------- */
+
+/**
+ * Zera todo o estado de jogo: personagens, inventários, parties, duelos, sessões,
+ * presença, mensagens de chat, submissões, progresso do passe, recompensas globais reivindicadas etc.
+ * Preserva: contas (auth), profiles, roles, catálogo (skills/items/npcs/locations/clans/missões/livros/minigames/mounts),
+ * configurações do servidor, seasons do passe, broadcasts.
+ * Após a operação, jogadores são forçados de volta ao fluxo de criação de personagem.
+ */
+export const resetDatabase = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    confirm: z.literal("ZERAR"),
+  }).parse(i))
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.rpc("admin_reset_game_database" as any);
+    if (error) throw new Error(error.message);
+    await supabaseAdmin.from("audit_log").insert({
+      admin_id: context.userId, action: "reset_database", target: null, meta: {},
+    });
+    return { ok: true };
+  });

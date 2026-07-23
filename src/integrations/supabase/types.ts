@@ -3587,6 +3587,7 @@ export type Database = {
         Args: { _desc?: string; _label: string; _sort?: number; _value: string }
         Returns: undefined
       }
+      admin_reset_game_database: { Args: never; Returns: undefined }
       can_access_location: {
         Args: { _location_id: string; _user_id: string }
         Returns: boolean
