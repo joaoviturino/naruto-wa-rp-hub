@@ -71,7 +71,8 @@ export const grantStarterKit = createServerFn({ method: "POST" })
       description: i.description,
     }));
     if (missing.length) {
-      const { data: inserted, error: ierr } = await supabase
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: inserted, error: ierr } = await supabaseAdmin
         .from("items")
         .insert(missing)
         .select("id,name");
