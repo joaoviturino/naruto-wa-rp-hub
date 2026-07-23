@@ -6,9 +6,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Megaphone, Wrench, Trash2, Power, MessageSquareOff, MapPin, Gift, RotateCw, ArrowLeftRight, Package, Activity, Users, Send } from "lucide-react";
+import { Megaphone, Wrench, Trash2, Power, MessageSquareOff, MapPin, Gift, RotateCw, ArrowLeftRight, Package, Activity, Users, Send, AlertTriangle } from "lucide-react";
 import { ComboSelect } from "@/components/ui/combo-select";
-import { teleportAllPlayers, setChatLock, issueGlobalReward, listGlobalRewards, reapplyGlobalReward, deleteGlobalReward, saveStarterKit } from "@/lib/admin.functions";
+import { teleportAllPlayers, setChatLock, issueGlobalReward, listGlobalRewards, reapplyGlobalReward, deleteGlobalReward, saveStarterKit, resetDatabase } from "@/lib/admin.functions";
 import { adminPresenceOverview, adminTeleportPlayer } from "@/lib/presence.functions";
 import { useServerFn } from "@tanstack/react-start";
 
@@ -43,6 +43,47 @@ export function ServerControl() {
       <StarterKitCard />
       <PresenceMonitorCard />
       <TradeTaxCard />
+      <DangerZoneCard />
+    </div>
+  );
+}
+
+function DangerZoneCard() {
+  const [busy, setBusy] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+  const doReset = useServerFn(resetDatabase);
+
+  async function run() {
+    if (confirmText !== "ZERAR") { toast.error('Digite "ZERAR" para confirmar.'); return; }
+    if (!confirm("Tem CERTEZA? Isto apaga TODOS os personagens, inventários, parties, duelos e mensagens. Contas continuam existindo mas serão forçadas ao fluxo de criação de personagem.")) return;
+    setBusy(true);
+    try {
+      await doReset({ data: { confirm: "ZERAR" } } as any);
+      toast.success("Banco de dados zerado. Jogadores voltarão ao cadastro de personagem.");
+      setConfirmText("");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha ao zerar.");
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="scroll-panel rounded-lg p-4 sm:p-6 space-y-4 border border-red-500/40 lg:col-span-2">
+      <h3 className="font-display text-xl text-red-400 flex items-center gap-2">
+        <AlertTriangle size={18} /> Zona de Perigo — Reset Total
+      </h3>
+      <p className="text-xs text-muted-foreground">
+        Apaga <b>todo o estado de jogo</b>: personagens, inventários, parties, duelos, sessões, presença, mensagens de chat,
+        submissões de forja, progresso de passe e recompensas globais reivindicadas. <b>Preserva</b> contas, roles, catálogos
+        (skills, itens, npcs, locais, clãs, missões, livros, minigames, montarias) e configurações do servidor.
+        Jogadores serão forçados de volta à criação de personagem no próximo acesso.
+      </p>
+      <div className="space-y-2">
+        <Label>Digite <b>ZERAR</b> para confirmar</Label>
+        <Input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} placeholder="ZERAR" />
+      </div>
+      <Button variant="destructive" onClick={run} disabled={busy || confirmText !== "ZERAR"}>
+        <Trash2 size={14} /> {busy ? "Zerando..." : "Zerar banco de dados"}
+      </Button>
     </div>
   );
 }
