@@ -89,15 +89,9 @@ export const grantStarterKit = createServerFn({ method: "POST" })
     for (const starter of STARTER_ITEMS) {
       const itemId = byName.get(starter.name);
       if (!itemId) continue;
-      const idx = bag.findIndex((e) => e.item_id === itemId);
-      if (idx >= 0) {
-        // não empilha equipamento; apenas garante presença
-        if (starter.type === "consumable" || starter.type === "weapon") {
-          bag[idx].qty = Math.max(bag[idx].qty, starter.qty);
-        }
-      } else {
-        bag.push({ item_id: itemId, qty: starter.qty });
-      }
+      const already = bag.some((e) => e.item_id === itemId);
+      if (already) continue; // idempotente: não empilha nem repõe
+      bag.push({ item_id: itemId, qty: starter.qty });
     }
 
     const { error: uerr } = await supabase
