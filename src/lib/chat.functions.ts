@@ -141,3 +141,47 @@ export const togglePinMessage = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { pinned: !(msg as any).is_pinned };
   });
+
+/** Publica uma cena estruturada (ação/fala/pensamento) e concede XP conforme empenho. */
+export const postScene = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({
+    locationId: z.string().uuid(),
+    entries: z.array(z.object({
+      kind: z.enum(["action", "speech", "thought"]),
+      text: z.string().min(1).max(1000),
+    })).min(1).max(20),
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { data: char } = await context.supabase
+      .from("characters").select("id,current_location_id,xp").eq("user_id", context.userId).maybeSingle();
+    if (!char) throw new Error("Sem personagem.");
+    if ((char as any).current_location_id !== data.locationId) throw new Error("Você não está neste local.");
+
+    const lines = data.entries.map((e) => {
+      const t = e.text.trim();
+      if (e.kind === "action") return `*${t}*`;
+      if (e.kind === "speech") return `— "${t}"`;
+      return `( ${t} )`;
+    });
+    const content = lines.join("\n");
+
+    // XP por empenho: baseado em variedade de tipos, quantidade de entradas e caracteres.
+    const totalChars = data.entries.reduce((s, e) => s + e.text.trim().length, 0);
+    const kinds = new Set(data.entries.map((e) => e.kind)).size; // 1..3
+    const base = Math.min(80, Math.floor(totalChars / 15)); // até 80
+    const variety = kinds * 5; // 5..15
+    const count = Math.min(20, data.entries.length * 2); // até 20
+    const xpGain = Math.max(5, base + variety + count);
+
+    const { data: msg, error } = await context.supabase
+      .from("location_messages")
+      .insert({ location_id: data.locationId, character_id: (char as any).id, content })
+      .select("id").single();
+    if (error) throw new Error(error.message);
+
+    await context.supabase
+      .from("characters").update({ xp: ((char as any).xp ?? 0) + xpGain }).eq("id", (char as any).id);
+
+    return { id: msg.id, xpGain };
+  });
