@@ -15,6 +15,15 @@ import seriousImg from "@/assets/instructor-serious.jpg";
 type Mood = "neutral" | "happy" | "serious";
 const MOOD_IMG: Record<Mood, string> = { neutral: neutralImg, happy: happyImg, serious: seriousImg };
 
+const STEP_FLAG: Record<string, string> = {
+  kit: "kit_granted",
+  equip: "vest_equipped",
+  energy: "energy_recovered",
+  combat: "combat_completed",
+  final: "completed",
+};
+function stepFlag(id: string) { return STEP_FLAG[id] ?? id; }
+
 type StepId = "kit" | "equip" | "energy" | "combat" | "final";
 type Step = {
   id: StepId;
