@@ -968,7 +968,17 @@ function SmartCombatImage({ sources, alt, className, style, fallbackClassName }:
   fallbackClassName?: string;
 }) {
   const key = sources.join("|");
-  const clean = useMemo(() => Array.from(new Set(sources.filter((s): s is string => !!s && /^https?:\/\//i.test(s)))), [key]);
+  const clean = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          sources.filter(
+            (s): s is string => !!s && /^(https?:\/\/|\/|data:|blob:)/i.test(s),
+          ),
+        ),
+      ),
+    [key],
+  );
   const [idx, setIdx] = useState(0);
   useEffect(() => { setIdx(0); }, [clean.join("|")]);
   const src = clean[idx];
