@@ -792,6 +792,7 @@ export type Database = {
           qualities: string[]
           rank: Database["public"]["Enums"]["ninja_rank"]
           ryo: number
+          tutorial_completed: boolean
           updated_at: string
           user_id: string
           village: Database["public"]["Enums"]["village"]
@@ -829,6 +830,7 @@ export type Database = {
           qualities?: string[]
           rank?: Database["public"]["Enums"]["ninja_rank"]
           ryo?: number
+          tutorial_completed?: boolean
           updated_at?: string
           user_id: string
           village: Database["public"]["Enums"]["village"]
@@ -866,6 +868,7 @@ export type Database = {
           qualities?: string[]
           rank?: Database["public"]["Enums"]["ninja_rank"]
           ryo?: number
+          tutorial_completed?: boolean
           updated_at?: string
           user_id?: string
           village?: Database["public"]["Enums"]["village"]
