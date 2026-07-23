@@ -588,6 +588,17 @@ function ChatPage() {
               <div ref={bottomRef} />
             </div>
 
+            {replyTo && (
+              <div className="border-t border-border p-2 flex items-center gap-2 bg-card/60">
+                <Reply size={14} className="text-gold shrink-0" />
+                <div className="text-xs flex-1 min-w-0">
+                  <div className="text-[10px] text-gold font-display">Respondendo a {replyTo.npc?.name ?? replyTo.character?.nickname ?? "?"}</div>
+                  <div className="truncate text-muted-foreground">{replyTo.content || (replyTo.image_url ? "[imagem]" : "")}</div>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setReplyTo(null)} title="Cancelar resposta"><X size={14} /></Button>
+              </div>
+            )}
+
             {scene && (
               <div className="border-t border-border p-2 flex items-center gap-2 bg-card/50">
                 <img src={scene.image_url} className="w-14 h-14 object-cover rounded" alt="" />
@@ -630,7 +641,33 @@ function ChatPage() {
                     )}
                 </DialogContent>
               </Dialog>
-              <Textarea rows={2} value={content} onChange={(e) => setContent(e.target.value)}
+              <Dialog open={mentionOpen} onOpenChange={setMentionOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="icon" title="Mencionar alguém" disabled={!!pvpAtLocation || presentHere.length === 0}><AtSign size={16} /></Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-sm">
+                  <DialogHeader><DialogTitle>Mencionar alguém no local</DialogTitle></DialogHeader>
+                  {presentHere.length === 0 ? (
+                    <div className="text-sm text-muted-foreground p-2">Ninguém por aqui além de você.</div>
+                  ) : (
+                    <div className="space-y-1 max-h-[50vh] overflow-y-auto">
+                      {presentHere.filter((p) => p.id !== character.id).map((p) => (
+                        <button key={p.id} onClick={() => insertMention(p.nickname)}
+                          className="w-full text-left p-2 rounded hover:bg-secondary text-sm flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-secondary overflow-hidden">
+                            {p.avatar_url && <img src={p.avatar_url} className="w-full h-full object-cover" alt="" />}
+                          </div>
+                          <span className="text-gold">@{p.nickname}</span>
+                        </button>
+                      ))}
+                      {presentHere.filter((p) => p.id !== character.id).length === 0 && (
+                        <div className="text-sm text-muted-foreground p-2">Ninguém por aqui além de você.</div>
+                      )}
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
+              <Textarea ref={textareaRef} rows={2} value={content} onChange={(e) => setContent(e.target.value)}
                 placeholder={pvpAtLocation ? "Chat travado durante o duelo." : "Descreva sua ação, fale…"}
                 disabled={!!pvpAtLocation}
                 className="resize-none"
