@@ -1072,40 +1072,10 @@ export const resetDatabase = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    // Ordem: dependências antes de characters.
-    const wipeTables = [
-      "combat_participants", "combat_sessions",
-      "pvp_turns", "pvp_duels",
-      "trade_sessions", "travel_sessions",
-      "party_invites", "party_members", "parties",
-      "location_messages", "character_presence",
-      "chest_permissions", "location_permissions",
-      "minigame_runs",
-      "battle_pass_claims", "battle_pass_progress",
-      "global_reward_claims",
-      "item_submissions",
-      "character_book_reads", "character_missions", "character_mounts",
-      "character_poses", "character_skill_poses", "character_skills",
-      "character_knowledges", "character_clan_progress", "character_jobs",
-      "character_npc_rewards", "scene_images",
-      "npc_private_messages", "npc_ai_response_locks",
-      "inventory",
-      "characters",
-      "outbound_messages",
-    ];
-    const results: Record<string, string> = {};
-    for (const t of wipeTables) {
-      const { error } = await supabaseAdmin.from(t as any).delete().not("id" as any, "is", null as any);
-      // Alguns tabelas usam PK composta sem "id"; nesse caso re-tenta com filtro genérico.
-      if (error && /column .*id.* does not exist/i.test(error.message)) {
-        const { error: e2 } = await supabaseAdmin.from(t as any).delete().gte("created_at" as any, "1970-01-01");
-        results[t] = e2 ? `erro: ${e2.message}` : "ok";
-      } else {
-        results[t] = error ? `erro: ${error.message}` : "ok";
-      }
-    }
+    const { error } = await supabaseAdmin.rpc("admin_reset_game_database" as any);
+    if (error) throw new Error(error.message);
     await supabaseAdmin.from("audit_log").insert({
-      admin_id: context.userId, action: "reset_database", target: null, meta: results,
+      admin_id: context.userId, action: "reset_database", target: null, meta: {},
     });
-    return { ok: true, results };
+    return { ok: true };
   });
