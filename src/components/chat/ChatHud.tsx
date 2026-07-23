@@ -57,7 +57,7 @@ export function ChatHud({ characterId, variant = "floating" }: { characterId: st
 
   if (variant === "mobile-bar") {
     return (
-      <div className="sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur">
+      <div data-xp-target className="sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur">
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
