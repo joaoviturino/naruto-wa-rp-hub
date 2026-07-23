@@ -770,6 +770,7 @@ export type Database = {
           chakra_current: number | null
           clan_id: string | null
           clan_rerolls_used: number
+          clan_role: Database["public"]["Enums"]["clan_role"]
           created_at: string
           current_location_id: string | null
           ef_current: number | null
@@ -805,6 +806,7 @@ export type Database = {
           chakra_current?: number | null
           clan_id?: string | null
           clan_rerolls_used?: number
+          clan_role?: Database["public"]["Enums"]["clan_role"]
           created_at?: string
           current_location_id?: string | null
           ef_current?: number | null
@@ -840,6 +842,7 @@ export type Database = {
           chakra_current?: number | null
           clan_id?: string | null
           clan_rerolls_used?: number
+          clan_role?: Database["public"]["Enums"]["clan_role"]
           created_at?: string
           current_location_id?: string | null
           ef_current?: number | null
@@ -3593,6 +3596,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_clan_leader: {
+        Args: { _clan: string; _user: string }
+        Returns: boolean
+      }
       is_duel_participant: {
         Args: { _duel: string; _user: string }
         Returns: boolean
@@ -3616,6 +3623,7 @@ export type Database = {
         | "skill_power_bonus"
         | "skill_cost_reduction"
       clan_rarity: "common" | "uncommon" | "rare" | "epic" | "legendary"
+      clan_role: "lider" | "vice" | "anciao" | "elite" | "membro"
       element: "katon" | "suiton" | "fuuton" | "doton" | "raiton"
       item_type:
         | "consumable"
@@ -3867,6 +3875,7 @@ export const Constants = {
         "skill_cost_reduction",
       ],
       clan_rarity: ["common", "uncommon", "rare", "epic", "legendary"],
+      clan_role: ["lider", "vice", "anciao", "elite", "membro"],
       element: ["katon", "suiton", "fuuton", "doton", "raiton"],
       item_type: [
         "consumable",

@@ -107,9 +107,14 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
               <span style={{ color: element?.color }}>{element?.kanji} {element?.name}</span>
             </div>
             {char.clan && (
-              <a href="/clan-tree" className="mt-2 inline-flex items-center gap-1 text-xs text-gold hover:underline">
-                🌳 Árvore do Clã
-              </a>
+              <div className="mt-2 flex flex-wrap gap-3">
+                <a href="/clan" className="inline-flex items-center gap-1 text-xs text-gold hover:underline">
+                  👑 Hierarquia do Clã
+                </a>
+                <a href="/clan-tree" className="inline-flex items-center gap-1 text-xs text-gold hover:underline">
+                  🌳 Árvore do Clã
+                </a>
+              </div>
             )}
           </div>
         </div>

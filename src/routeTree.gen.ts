@@ -16,6 +16,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedPartyRouteImport } from './routes/_authenticated/party'
 import { Route as AuthenticatedLibraryRouteImport } from './routes/_authenticated/library'
 import { Route as AuthenticatedClanTreeRouteImport } from './routes/_authenticated/clan-tree'
+import { Route as AuthenticatedClanRouteImport } from './routes/_authenticated/clan'
 import { Route as AuthenticatedChatRouteImport } from './routes/_authenticated/chat'
 import { Route as AuthenticatedCharacterRouteImport } from './routes/_authenticated/character'
 import { Route as AuthenticatedBlacksmithRouteImport } from './routes/_authenticated/blacksmith'
@@ -56,6 +57,11 @@ const AuthenticatedLibraryRoute = AuthenticatedLibraryRouteImport.update({
 const AuthenticatedClanTreeRoute = AuthenticatedClanTreeRouteImport.update({
   id: '/clan-tree',
   path: '/clan-tree',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedClanRoute = AuthenticatedClanRouteImport.update({
+  id: '/clan',
+  path: '/clan',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedChatRoute = AuthenticatedChatRouteImport.update({
@@ -103,6 +109,7 @@ export interface FileRoutesByFullPath {
   '/blacksmith': typeof AuthenticatedBlacksmithRoute
   '/character': typeof AuthenticatedCharacterRoute
   '/chat': typeof AuthenticatedChatRoute
+  '/clan': typeof AuthenticatedClanRoute
   '/clan-tree': typeof AuthenticatedClanTreeRoute
   '/library': typeof AuthenticatedLibraryRoute
   '/party': typeof AuthenticatedPartyRoute
@@ -118,6 +125,7 @@ export interface FileRoutesByTo {
   '/blacksmith': typeof AuthenticatedBlacksmithRoute
   '/character': typeof AuthenticatedCharacterRoute
   '/chat': typeof AuthenticatedChatRoute
+  '/clan': typeof AuthenticatedClanRoute
   '/clan-tree': typeof AuthenticatedClanTreeRoute
   '/library': typeof AuthenticatedLibraryRoute
   '/party': typeof AuthenticatedPartyRoute
@@ -135,6 +143,7 @@ export interface FileRoutesById {
   '/_authenticated/blacksmith': typeof AuthenticatedBlacksmithRoute
   '/_authenticated/character': typeof AuthenticatedCharacterRoute
   '/_authenticated/chat': typeof AuthenticatedChatRoute
+  '/_authenticated/clan': typeof AuthenticatedClanRoute
   '/_authenticated/clan-tree': typeof AuthenticatedClanTreeRoute
   '/_authenticated/library': typeof AuthenticatedLibraryRoute
   '/_authenticated/party': typeof AuthenticatedPartyRoute
@@ -152,6 +161,7 @@ export interface FileRouteTypes {
     | '/blacksmith'
     | '/character'
     | '/chat'
+    | '/clan'
     | '/clan-tree'
     | '/library'
     | '/party'
@@ -167,6 +177,7 @@ export interface FileRouteTypes {
     | '/blacksmith'
     | '/character'
     | '/chat'
+    | '/clan'
     | '/clan-tree'
     | '/library'
     | '/party'
@@ -183,6 +194,7 @@ export interface FileRouteTypes {
     | '/_authenticated/blacksmith'
     | '/_authenticated/character'
     | '/_authenticated/chat'
+    | '/_authenticated/clan'
     | '/_authenticated/clan-tree'
     | '/_authenticated/library'
     | '/_authenticated/party'
@@ -249,6 +261,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClanTreeRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/clan': {
+      id: '/_authenticated/clan'
+      path: '/clan'
+      fullPath: '/clan'
+      preLoaderRoute: typeof AuthenticatedClanRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/chat': {
       id: '/_authenticated/chat'
       path: '/chat'
@@ -307,6 +326,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedBlacksmithRoute: typeof AuthenticatedBlacksmithRoute
   AuthenticatedCharacterRoute: typeof AuthenticatedCharacterRoute
   AuthenticatedChatRoute: typeof AuthenticatedChatRoute
+  AuthenticatedClanRoute: typeof AuthenticatedClanRoute
   AuthenticatedClanTreeRoute: typeof AuthenticatedClanTreeRoute
   AuthenticatedLibraryRoute: typeof AuthenticatedLibraryRoute
   AuthenticatedPartyRoute: typeof AuthenticatedPartyRoute
@@ -319,6 +339,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedBlacksmithRoute: AuthenticatedBlacksmithRoute,
   AuthenticatedCharacterRoute: AuthenticatedCharacterRoute,
   AuthenticatedChatRoute: AuthenticatedChatRoute,
+  AuthenticatedClanRoute: AuthenticatedClanRoute,
   AuthenticatedClanTreeRoute: AuthenticatedClanTreeRoute,
   AuthenticatedLibraryRoute: AuthenticatedLibraryRoute,
   AuthenticatedPartyRoute: AuthenticatedPartyRoute,
