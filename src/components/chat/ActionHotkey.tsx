@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Compass, Drama, Sparkles, Package, Backpack, Zap } from "lucide-react";
 import { TravelDialog } from "./TravelDialog";
+import { SceneDialog } from "./SceneDialog";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -10,6 +11,7 @@ type Props = { currentLocationId: string | null; onArrived: () => void; disabled
 export function ActionHotkey({ currentLocationId, onArrived, disabled }: Props) {
   const [open, setOpen] = useState(false);
   const [travelOpen, setTravelOpen] = useState(false);
+  const [sceneOpen, setSceneOpen] = useState(false);
   const [enabled, setEnabled] = useState(true);
 
   useEffect(() => {
@@ -39,6 +41,12 @@ export function ActionHotkey({ currentLocationId, onArrived, disabled }: Props) 
     setOpen(false);
     setTravelOpen(true);
   }
+  function openScene() {
+    if (disabled) { toast.error("Ação bloqueada agora."); return; }
+    if (!currentLocationId) { toast.error("Você precisa estar em um local."); return; }
+    setOpen(false);
+    setSceneOpen(true);
+  }
   function soon(label: string) { toast.info(`${label} — em breve.`); }
 
   return (
@@ -57,7 +65,7 @@ export function ActionHotkey({ currentLocationId, onArrived, disabled }: Props) 
         <PopoverContent side="top" align="start" className="w-64 p-2">
             <div className="text-[10px] uppercase tracking-widest text-muted-foreground px-2 pt-1 pb-2">Ações</div>
             <ActionButton icon={Compass} label="Mover-se" onClick={openTravel} />
-            <ActionButton icon={Drama} label="Cenar" onClick={() => soon("Cenar")} soon />
+            <ActionButton icon={Drama} label="Cenar" onClick={openScene} />
             <ActionButton icon={Sparkles} label="Usar habilidade" onClick={() => soon("Usar habilidade")} soon />
             <ActionButton icon={Package} label="Usar item" onClick={() => soon("Usar item")} soon />
             <ActionButton icon={Backpack} label="Ver inventário" onClick={() => soon("Ver inventário")} soon />
@@ -65,6 +73,8 @@ export function ActionHotkey({ currentLocationId, onArrived, disabled }: Props) 
       </Popover>
       <TravelDialog open={travelOpen} onOpenChange={setTravelOpen}
         currentLocationId={currentLocationId} onArrived={onArrived} />
+      <SceneDialog open={sceneOpen} onOpenChange={setSceneOpen}
+        currentLocationId={currentLocationId} />
     </>
   );
 }
