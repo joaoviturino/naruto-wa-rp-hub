@@ -22,6 +22,7 @@ import { MissionTracker } from "@/components/chat/MissionTracker";
 import { TradeWatcher } from "@/components/chat/TradeDialog";
 import { ActionHotkey } from "@/components/chat/ActionHotkey";
 import { Minimap } from "@/components/chat/Minimap";
+import { LocationPreviewDialog } from "@/components/chat/LocationPreviewDialog";
 
 export const Route = createFileRoute("/_authenticated/chat")({ component: ChatPage });
 
@@ -79,6 +80,8 @@ function ChatPage() {
   const listMg = useServerFn(listMinigamesForMyLocation);
   const [hasLibraryHere, setHasLibraryHere] = useState(false);
   const [pvpAtLocation, setPvpAtLocation] = useState<string | null>(null);
+  const [previewLoc, setPreviewLoc] = useState<Loc | null>(null);
+  const [moving, setMoving] = useState(false);
 
   async function loadCore() {
     const [{ data: c }, { data: l }, { data: cn }] = await Promise.all([
@@ -299,10 +302,18 @@ function ChatPage() {
 
   async function doMove(locId: string) {
     try {
+      setMoving(true);
       await move({ data: { locationId: locId } });
       toast.success("Você chegou.");
       loadCore();
+      setPreviewLoc(null);
     } catch (e: any) { toast.error(e.message); }
+    finally { setMoving(false); }
+  }
+
+  function openPreview(locId: string) {
+    const l = locs.find((x) => x.id === locId);
+    if (l) setPreviewLoc(l);
   }
 
   async function doSend() {
@@ -372,7 +383,7 @@ function ChatPage() {
           locations={locs as any}
           connections={conns}
           currentLocationId={currentLoc.id}
-          onSelect={(id) => { if (neighbors.some((n) => n.id === id)) doMove(id); }}
+          onSelect={(id) => { if (neighbors.some((n) => n.id === id)) openPreview(id); }}
         />
       )}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-1 sm:gap-3">
@@ -453,7 +464,7 @@ function ChatPage() {
         <div className="space-y-1">
           {availableToMove.length === 0 && <div className="text-xs text-muted-foreground">Sem locais acessíveis daqui.</div>}
           {availableToMove.map((l) => (
-            <button key={l.id} onClick={() => { doMove(l.id); setNavOpen(false); }}
+            <button key={l.id} onClick={() => { openPreview(l.id); setNavOpen(false); }}
               className="w-full text-left p-2 rounded hover:bg-secondary text-sm flex items-center gap-2 min-w-0">
               {l.image_url && <img src={l.image_url} className="w-8 h-8 rounded object-cover shrink-0" alt="" />}
               <span className="flex-1 truncate">{l.name}</span>
