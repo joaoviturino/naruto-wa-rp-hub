@@ -1574,26 +1574,26 @@ export const startTutorialCombat = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Reaproveita um Javali agressivo já cadastrado (com sprite). Preferência: menor hp_max.
-    const { data: javalis } = await supabaseAdmin
+    // Reaproveita um Lobo agressivo já cadastrado. Preferência: com cenário de batalha + menor hp_max.
+    const { data: lobosBg } = await supabaseAdmin
       .from("npcs")
-      .select("id,name,image_url,hp_max,energy_max,xp")
-      .ilike("name", "%javali%")
+      .select("id,name,image_url,battle_bg_url,music_url,hp_max,energy_max,xp")
+      .ilike("name", "%lobo%")
       .eq("kind", "aggressive")
-      .not("image_url", "is", null)
+      .not("battle_bg_url", "is", null)
       .order("hp_max", { ascending: true })
       .limit(1);
-    let npcRow: any = (javalis ?? [])[0] ?? null;
+    let npcRow: any = (lobosBg ?? [])[0] ?? null;
     if (!npcRow) {
-      // Fallback: qualquer javali agressivo, mesmo sem imagem.
-      const { data: any1 } = await supabaseAdmin
-        .from("npcs").select("id,name,image_url,hp_max,energy_max,xp")
-        .ilike("name", "%javali%").eq("kind", "aggressive")
+      const { data: lobos } = await supabaseAdmin
+        .from("npcs")
+        .select("id,name,image_url,battle_bg_url,music_url,hp_max,energy_max,xp")
+        .ilike("name", "%lobo%").eq("kind", "aggressive")
         .order("hp_max", { ascending: true }).limit(1);
-      npcRow = (any1 ?? [])[0] ?? null;
+      npcRow = (lobos ?? [])[0] ?? null;
     }
     if (!npcRow) {
-      throw new Error("Nenhum NPC 'Javali' agressivo cadastrado. Peça a um admin para criar um.");
+      throw new Error("Nenhum NPC 'Lobo' agressivo cadastrado. Peça a um admin para criar um.");
     }
 
     const s = computeStats(me.xp ?? 0);
@@ -1609,12 +1609,12 @@ export const startTutorialCombat = createServerFn({ method: "POST" })
     }];
     const npcsState: NpcState[] = [{
       id: npcRow.id, name: npcRow.name, image_url: npcRow.image_url ?? null,
-      battle_bg_url: null, music_url: null,
+      battle_bg_url: npcRow.battle_bg_url ?? null, music_url: npcRow.music_url ?? null,
       hp: npcRow.hp_max, hp_max: npcRow.hp_max, energy: npcRow.energy_max, energy_max: npcRow.energy_max, alive: true,
     }];
     const state: CombatState = {
       npc: npcsState[0], npcs: npcsState, players, active: 0, target: 0,
-      location_bg_url: null, location_music_url: null,
+      location_bg_url: npcRow.battle_bg_url ?? null, location_music_url: npcRow.music_url ?? null,
     } as any;
     (state as any).tutorial = true;
 
