@@ -555,13 +555,24 @@ export const listUsers = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: profiles } = await supabaseAdmin.from("profiles").select("id,email,created_at").order("created_at", { ascending: false });
     const { data: roles } = await supabaseAdmin.from("user_roles").select("user_id,role");
+    const { data: chars } = await supabaseAdmin.from("characters").select("id,name,user_id,level");
     const roleMap = new Map<string, string[]>();
     (roles ?? []).forEach((r) => {
       const arr = roleMap.get(r.user_id) ?? [];
       arr.push(r.role);
       roleMap.set(r.user_id, arr);
     });
-    return (profiles ?? []).map((p) => ({ ...p, roles: roleMap.get(p.id) ?? [] }));
+    const charMap = new Map<string, Array<{ id: string; name: string; level: number | null }>>();
+    (chars ?? []).forEach((c: any) => {
+      const arr = charMap.get(c.user_id) ?? [];
+      arr.push({ id: c.id, name: c.name, level: c.level });
+      charMap.set(c.user_id, arr);
+    });
+    return (profiles ?? []).map((p) => ({
+      ...p,
+      roles: roleMap.get(p.id) ?? [],
+      characters: charMap.get(p.id) ?? [],
+    }));
   });
 
 export const revokeRole = createServerFn({ method: "POST" })
