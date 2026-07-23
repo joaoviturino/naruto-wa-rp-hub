@@ -174,7 +174,8 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
         <TabsContent value="inventario" className="mt-4">
           <InventoryView characterId={characterId} userId={char.user_id}
             bgUrl={char.inventory_bg_url}
-            onBgChange={(url) => updateField("inventory_bg_url", url)} />
+            onBgChange={(url) => updateField("inventory_bg_url", url)}
+            onChanged={load} />
         </TabsContent>
         <TabsContent value="databook" className="mt-4">
           <Databook characterId={characterId} />
