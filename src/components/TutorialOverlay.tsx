@@ -62,9 +62,9 @@ const STEPS: Step[] = [
   {
     id: "combat",
     mood: "serious",
-    title: "4. Combate simulado: Javali Selvagem",
+    title: "4. Combate simulado: Lobo Selvagem",
     text:
-      "Chegou a hora. Vou soltar um Javali de Treino contra você. No campo de batalha:\n\n• Clique no inimigo para mirar (aura vermelha).\n• Escolha uma habilidade — cada uma gasta energia (EF/EM/Chakra) e tem cooldown.\n• Confirme o ataque. Quem tem mais Velocidade age primeiro.\n\nDerrote (ou fuja d)o javali para concluir. Se apanhar feio, use outra Ração.",
+      "Chegou a hora. Vou soltar um Lobo Selvagem contra você. No campo de batalha:\n\n• Clique no inimigo para mirar (aura vermelha).\n• Escolha uma habilidade — cada uma gasta energia (EF/EM/Chakra) e tem cooldown.\n• Confirme o ataque. Quem tem mais Velocidade age primeiro.\n\nDerrote (ou fuja d)o lobo para concluir. Se apanhar feio, use outra Ração.",
     hint: "Preciso que você chegue até o fim do combate.",
     icon: <Swords size={16} />,
   },
@@ -193,7 +193,7 @@ export function TutorialOverlay({ characterId, onDone }: { characterId: string; 
     try {
       const r: any = await startCombat({});
       combatStartedRef.current = r.session_id;
-      toast.success("Um javali apareceu — boa sorte!");
+      toast.success("Um lobo apareceu — boa sorte!");
       router.navigate({ to: "/chat" as any });
     } catch (e: any) {
       toast.error(e?.message ?? "Falha ao iniciar o combate.");
@@ -294,7 +294,7 @@ export function TutorialOverlay({ characterId, onDone }: { characterId: string; 
                     ) : (
                       <Button size="sm" onClick={handleStartCombat} disabled={busy}
                         className="bg-gold text-black hover:bg-gold/90">
-                        <Swords size={14} className="mr-1" /> Enfrentar Javali
+                        <Swords size={14} className="mr-1" /> Enfrentar Lobo
                       </Button>
                     )}
                   </>
