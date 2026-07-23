@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useServerFn } from "@tanstack/react-start";
-import { listUsers, grantRole, revokeRole, adminResetPassword, deleteUserAccount } from "@/lib/admin.functions";
+import { listUsers, grantRole, revokeRole, adminResetPassword, deleteUserAccount, resetCharacter } from "@/lib/admin.functions";
 import { toast } from "sonner";
 
 export function AdminUsers() {
@@ -13,6 +13,7 @@ export function AdminUsers() {
   const revoke = useServerFn(revokeRole);
   const resetPass = useServerFn(adminResetPassword);
   const deleteAcc = useServerFn(deleteUserAccount);
+  const resetChar = useServerFn(resetCharacter);
 
   async function load() { try { const data = await list({} as any); setRows(data as any); } catch (e: any) { toast.error(e.message); } }
   useEffect(() => { load(); }, []);
@@ -28,7 +29,7 @@ export function AdminUsers() {
       <div className="scroll-panel rounded-lg overflow-x-auto">
         <table className="w-full text-sm min-w-[560px]">
           <thead className="bg-secondary/50 text-xs uppercase tracking-wider">
-            <tr><th className="text-left p-2">Email</th><th className="text-left p-2">Roles</th><th className="text-left p-2">Criado</th><th></th></tr>
+            <tr><th className="text-left p-2">Email</th><th className="text-left p-2">Roles</th><th className="text-left p-2">Personagens</th><th className="text-left p-2">Criado</th><th></th></tr>
           </thead>
           <tbody>
             {filtered.map((r) => {
@@ -41,6 +42,26 @@ export function AdminUsers() {
                     {r.roles.map((role: string) => (
                       <span key={role} className={`inline-block rounded-full px-2 py-0.5 text-xs mr-1 ${role === "admin" ? "bg-gold/20 text-gold" : role === "moderator" ? "bg-sky-500/20 text-sky-300" : "bg-secondary"}`}>{role}</span>
                     ))}
+                  </td>
+                  <td className="p-2 align-top">
+                    {(r.characters ?? []).length === 0 ? (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    ) : (
+                      <div className="flex flex-col gap-1">
+                        {r.characters.map((c: any) => (
+                          <div key={c.id} className="flex items-center gap-2 text-xs">
+                            <span className="truncate max-w-[140px]">{c.nickname}</span>
+                            <span className="text-muted-foreground">[{c.rank ?? "?"}]</span>
+                            <Button size="sm" variant="destructive" className="h-6 px-2 text-[10px]" onClick={async () => {
+                              if (!confirm(`ZERAR o personagem "${c.nickname}" de ${r.email}?\n\nApaga ficha, inventário, skills e progresso. O usuário volta ao fluxo de criação de personagem.`)) return;
+                              const reason = prompt("Motivo (opcional, registrado no log):") ?? undefined;
+                              try { await resetChar({ data: { character_id: c.id, reason } } as any); toast.success("Personagem zerado."); load(); }
+                              catch (e: any) { toast.error(e.message); }
+                            }}>Zerar</Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </td>
                   <td className="p-2 text-xs text-muted-foreground">{new Date(r.created_at).toLocaleDateString()}</td>
                   <td className="p-2 text-right">
