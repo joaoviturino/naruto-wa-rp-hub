@@ -778,6 +778,7 @@ export type Database = {
           em_current: number | null
           eyes_frame_url: string | null
           flaws: string[]
+          gender: string | null
           history: string | null
           hp_current: number | null
           id: string
@@ -814,6 +815,7 @@ export type Database = {
           em_current?: number | null
           eyes_frame_url?: string | null
           flaws?: string[]
+          gender?: string | null
           history?: string | null
           hp_current?: number | null
           id?: string
@@ -850,6 +852,7 @@ export type Database = {
           em_current?: number | null
           eyes_frame_url?: string | null
           flaws?: string[]
+          gender?: string | null
           history?: string | null
           hp_current?: number | null
           id?: string
