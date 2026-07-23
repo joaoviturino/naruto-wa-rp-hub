@@ -32,7 +32,7 @@ function normalizeBag(raw: any): BagEntry[] {
     .map((e: any) => ({ item_id: e.item_id, qty: typeof e.qty === "number" && e.qty > 0 ? e.qty : 1 }));
 }
 
-export function InventoryView({ characterId, userId, bgUrl, onBgChange }: {
+export function InventoryView({ characterId, userId, bgUrl, onBgChange, onChanged }: {
   characterId: string; userId: string; bgUrl: string | null; onBgChange: (url: string) => void; onChanged?: () => void;
 }) {
   const [inv, setInv] = useState<Inv | null>(null);
