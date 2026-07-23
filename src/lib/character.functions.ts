@@ -60,7 +60,7 @@ export const createCharacter = createServerFn({ method: "POST" })
         clan_id: z.string().uuid(),
         element_primary: elementEnum,
         gender: genderEnum,
-        sprite_url: z.string().url().optional(),
+        sprite_url: z.string().min(1).max(1000).optional(),
         age: z.number().int().min(8).max(120).optional(),
         appearance: z.string().max(2000).optional(),
         personality: z.string().max(2000).optional(),
