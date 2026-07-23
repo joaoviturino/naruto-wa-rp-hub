@@ -555,17 +555,17 @@ export const listUsers = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: profiles } = await supabaseAdmin.from("profiles").select("id,email,created_at").order("created_at", { ascending: false });
     const { data: roles } = await supabaseAdmin.from("user_roles").select("user_id,role");
-    const { data: chars } = await supabaseAdmin.from("characters").select("id,name,user_id,level");
+    const { data: chars } = await supabaseAdmin.from("characters").select("id,nickname,user_id,rank,xp");
     const roleMap = new Map<string, string[]>();
     (roles ?? []).forEach((r) => {
       const arr = roleMap.get(r.user_id) ?? [];
       arr.push(r.role);
       roleMap.set(r.user_id, arr);
     });
-    const charMap = new Map<string, Array<{ id: string; name: string; level: number | null }>>();
+    const charMap = new Map<string, Array<{ id: string; nickname: string; rank: string | null; xp: number | null }>>();
     (chars ?? []).forEach((c: any) => {
       const arr = charMap.get(c.user_id) ?? [];
-      arr.push({ id: c.id, name: c.name, level: c.level });
+      arr.push({ id: c.id, nickname: c.nickname, rank: c.rank, xp: c.xp });
       charMap.set(c.user_id, arr);
     });
     return (profiles ?? []).map((p) => ({
@@ -1082,7 +1082,7 @@ export const resetCharacter = createServerFn({ method: "POST" })
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: ch } = await supabaseAdmin.from("characters")
-      .select("id,user_id,name").eq("id", data.character_id).maybeSingle();
+      .select("id,user_id,nickname").eq("id", data.character_id).maybeSingle();
     if (!ch) throw new Error("Personagem não encontrado.");
 
     // Limpa referências que não têm ON DELETE CASCADE para characters
@@ -1095,7 +1095,7 @@ export const resetCharacter = createServerFn({ method: "POST" })
 
     await supabaseAdmin.from("audit_log").insert({
       admin_id: context.userId, action: "reset_character", target: data.character_id,
-      meta: { user_id: ch.user_id, name: ch.name, reason: data.reason ?? null },
+      meta: { user_id: ch.user_id, nickname: ch.nickname, reason: data.reason ?? null },
     });
     return { ok: true };
   });
