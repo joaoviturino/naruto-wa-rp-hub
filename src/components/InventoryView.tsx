@@ -62,7 +62,7 @@ export function InventoryView({ characterId, userId, bgUrl, onBgChange }: {
   const move = useServerFn(moveItemBetweenBags);
 
   async function run(fn: () => Promise<any>, okMsg: string) {
-    try { await fn(); toast.success(okMsg); await load(); try { (arguments as any); } catch {}; }
+    try { await fn(); toast.success(okMsg); await load(); onChanged?.(); }
     catch (e: any) { toast.error(e.message ?? "Erro"); }
   }
 
