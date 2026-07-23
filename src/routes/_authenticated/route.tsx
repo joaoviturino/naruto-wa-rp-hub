@@ -15,8 +15,12 @@ export const Route = createFileRoute("/_authenticated")({
     if (error || !data.user) throw redirect({ to: "/auth" });
     const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", data.user.id);
     const isAdmin = (roles ?? []).some((r) => r.role === "admin");
-    const isBlacksmith = (roles ?? []).some((r) => r.role === "blacksmith");
     const isModerator = (roles ?? []).some((r) => r.role === "moderator");
+    // "Ferreiro" agora é um emprego com permissão submit_items — checado via RPC.
+    const { data: canForge } = await supabase.rpc("has_job_permission", {
+      _user_id: data.user.id, _perm: "submit_items",
+    });
+    const isBlacksmith = !!canForge;
     return { user: data.user, isAdmin, isBlacksmith, isModerator };
   },
   component: AuthedLayout,
