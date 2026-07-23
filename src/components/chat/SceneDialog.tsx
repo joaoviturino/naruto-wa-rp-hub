@@ -10,10 +10,13 @@ import { toast } from "sonner";
 type Kind = "action" | "speech" | "thought";
 type Entry = { kind: Kind; text: string };
 
-const META: Record<Kind, { label: string; icon: any; color: string; placeholder: string; prefix: string; suffix: string }> = {
-  action:  { label: "Ação",       icon: Zap,           color: "text-amber-400",  placeholder: "Ex.: saca a katana em um movimento fluido...", prefix: "*", suffix: "*" },
-  speech:  { label: "Fala",       icon: MessageCircle, color: "text-sky-400",    placeholder: 'Ex.: Você não deveria ter vindo aqui.',         prefix: '— "', suffix: '"' },
-  thought: { label: "Pensamento", icon: Cloud,         color: "text-violet-400", placeholder: "Ex.: preciso terminar isso rápido...",         prefix: "( ", suffix: " )" },
+const META: Record<Kind, { label: string; icon: any; color: string; placeholder: string; render: (t: string) => React.ReactNode }> = {
+  action:  { label: "Ação",       icon: Zap,           color: "text-amber-400",  placeholder: "Ex.: saca a katana em um movimento fluido...",
+             render: (t) => <><span>❕ </span><strong>{t}</strong></> },
+  speech:  { label: "Fala",       icon: MessageCircle, color: "text-sky-400",    placeholder: 'Ex.: Você não deveria ter vindo aqui.',
+             render: (t) => <>- {t}</> },
+  thought: { label: "Pensamento", icon: Cloud,         color: "text-violet-400", placeholder: "Ex.: preciso terminar isso rápido...",
+             render: (t) => <>💭 {t}</> },
 };
 
 export function SceneDialog({ open, onOpenChange, currentLocationId, onPosted }: {
@@ -78,10 +81,10 @@ export function SceneDialog({ open, onOpenChange, currentLocationId, onPosted }:
             const m = META[e.kind];
             const Icon = m.icon;
             return (
-              <div key={i} className="group flex items-start gap-2">
+              <div key={i} className="group flex items-start gap-2 py-1">
                 <Icon size={14} className={`mt-0.5 shrink-0 ${m.color}`} />
                 <div className="flex-1 whitespace-pre-wrap break-words">
-                  <span className="text-foreground">{m.prefix}{e.text}{m.suffix}</span>
+                  <span className="text-foreground">{m.render(e.text)}</span>
                 </div>
                 <button
                   type="button"
