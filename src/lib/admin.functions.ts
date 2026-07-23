@@ -555,13 +555,24 @@ export const listUsers = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: profiles } = await supabaseAdmin.from("profiles").select("id,email,created_at").order("created_at", { ascending: false });
     const { data: roles } = await supabaseAdmin.from("user_roles").select("user_id,role");
+    const { data: chars } = await supabaseAdmin.from("characters").select("id,nickname,user_id,rank,xp");
     const roleMap = new Map<string, string[]>();
     (roles ?? []).forEach((r) => {
       const arr = roleMap.get(r.user_id) ?? [];
       arr.push(r.role);
       roleMap.set(r.user_id, arr);
     });
-    return (profiles ?? []).map((p) => ({ ...p, roles: roleMap.get(p.id) ?? [] }));
+    const charMap = new Map<string, Array<{ id: string; nickname: string; rank: string | null; xp: number | null }>>();
+    (chars ?? []).forEach((c: any) => {
+      const arr = charMap.get(c.user_id) ?? [];
+      arr.push({ id: c.id, nickname: c.nickname, rank: c.rank, xp: c.xp });
+      charMap.set(c.user_id, arr);
+    });
+    return (profiles ?? []).map((p) => ({
+      ...p,
+      roles: roleMap.get(p.id) ?? [],
+      characters: charMap.get(p.id) ?? [],
+    }));
   });
 
 export const revokeRole = createServerFn({ method: "POST" })
@@ -1056,6 +1067,38 @@ export const deleteUserAccount = createServerFn({ method: "POST" })
   });
 
 /* ---------- FULL RESET (WIPE) ---------- */
+
+/**
+ * Zera um personagem específico: apaga a ficha e todo o progresso vinculado.
+ * A conta do usuário permanece; ele é forçado de volta ao fluxo de criação de personagem.
+ */
+export const resetCharacter = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    character_id: z.string().uuid(),
+    reason: z.string().max(400).optional(),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: ch } = await supabaseAdmin.from("characters")
+      .select("id,user_id,nickname").eq("id", data.character_id).maybeSingle();
+    if (!ch) throw new Error("Personagem não encontrado.");
+
+    // Limpa referências que não têm ON DELETE CASCADE para characters
+    await supabaseAdmin.from("pvp_duels").delete()
+      .or(`challenger_id.eq.${data.character_id},opponent_id.eq.${data.character_id},winner_id.eq.${data.character_id}`);
+    await supabaseAdmin.from("locations").update({ owner_character_id: null }).eq("owner_character_id", data.character_id);
+
+    const { error } = await supabaseAdmin.from("characters").delete().eq("id", data.character_id);
+    if (error) throw new Error(error.message);
+
+    await supabaseAdmin.from("audit_log").insert({
+      admin_id: context.userId, action: "reset_character", target: data.character_id,
+      meta: { user_id: ch.user_id, nickname: ch.nickname, reason: data.reason ?? null },
+    });
+    return { ok: true };
+  });
 
 /**
  * Zera todo o estado de jogo: personagens, inventários, parties, duelos, sessões,
