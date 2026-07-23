@@ -160,11 +160,11 @@ export const postScene = createServerFn({ method: "POST" })
 
     const lines = data.entries.map((e) => {
       const t = e.text.trim();
-      if (e.kind === "action") return `*${t}*`;
-      if (e.kind === "speech") return `— "${t}"`;
-      return `( ${t} )`;
+      if (e.kind === "action") return `❕ **${t}**`;
+      if (e.kind === "speech") return `- ${t}`;
+      return `💭 ${t}`;
     });
-    const content = lines.join("\n");
+    const content = lines.join("\n\n");
 
     // XP por empenho: baseado em variedade de tipos, quantidade de entradas e caracteres.
     const totalChars = data.entries.reduce((s, e) => s + e.text.trim().length, 0);
