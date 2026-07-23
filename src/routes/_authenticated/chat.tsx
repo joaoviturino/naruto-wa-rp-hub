@@ -191,7 +191,7 @@ function ChatPage() {
       .eq("location_id", locId)
       .order("created_at", { ascending: false })
       .limit(HISTORY_LIMIT);
-    setMessages(((data as Msg[]) ?? []).reverse());
+    setMessages(((data as unknown as Msg[]) ?? []).reverse());
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
   }
 
