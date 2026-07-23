@@ -526,7 +526,7 @@ function ChatPage() {
                 const displayName = isNpc ? (m.npc?.name ?? "NPC") : (m.character?.nickname ?? "?");
                 const avatarUrl = isNpc ? m.npc?.image_url : m.character?.avatar_url;
                 return (
-                  <div key={m.id} className={`flex gap-2 ${mine ? "flex-row-reverse" : ""}`}>
+                  <div key={m.id} id={`msg-${m.id}`} className={`flex gap-2 rounded-lg transition ${mine ? "flex-row-reverse" : ""}`}>
                     <button
                       className={`w-8 h-8 rounded-full bg-secondary overflow-hidden shrink-0 transition ${isNpc ? "ring-2 ring-emerald-500/60" : "hover:ring-2 hover:ring-gold"}`}
                       title={mine ? "Você" : (isNpc ? `NPC: ${displayName}` : `Interagir com ${displayName}`)}
