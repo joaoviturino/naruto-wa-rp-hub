@@ -7,6 +7,50 @@ import { useServerFn } from "@tanstack/react-start";
 import { postScene } from "@/lib/chat.functions";
 import { toast } from "sonner";
 
+function flyXpToSheet(amount: number, from: { x: number; y: number }) {
+  if (typeof document === "undefined") return;
+  // Alvo: elemento marcado (ChatHud) ou canto superior direito.
+  const target = document.querySelector<HTMLElement>("[data-xp-target]");
+  const rect = target?.getBoundingClientRect();
+  const to = rect
+    ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+    : { x: window.innerWidth - 60, y: 60 };
+
+  const el = document.createElement("div");
+  el.textContent = `+${amount} XP`;
+  Object.assign(el.style, {
+    position: "fixed",
+    left: `${from.x}px`,
+    top: `${from.y}px`,
+    transform: "translate(-50%, -50%)",
+    zIndex: "9999",
+    pointerEvents: "none",
+    padding: "4px 10px",
+    borderRadius: "9999px",
+    fontSize: "12px",
+    fontWeight: "700",
+    letterSpacing: "0.04em",
+    color: "#0b0b0b",
+    background: "linear-gradient(135deg,#f5c542,#b8860b)",
+    boxShadow: "0 0 12px rgba(245,197,66,0.6), 0 0 24px rgba(245,197,66,0.3)",
+    willChange: "transform, opacity",
+  } as CSSStyleDeclaration);
+  document.body.appendChild(el);
+
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const anim = el.animate(
+    [
+      { transform: "translate(-50%, -50%) scale(0.6)", opacity: 0, offset: 0 },
+      { transform: "translate(-50%, -50%) scale(1)",   opacity: 1, offset: 0.15 },
+      { transform: `translate(calc(-50% + ${dx * 0.6}px), calc(-50% + ${dy * 0.6}px)) scale(1)`, opacity: 1, offset: 0.7 },
+      { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(0.5)`, opacity: 0, offset: 1 },
+    ],
+    { duration: 1100, easing: "cubic-bezier(0.22, 0.61, 0.36, 1)" },
+  );
+  anim.onfinish = () => { el.remove(); if (target) { target.animate([{ transform: "scale(1)" }, { transform: "scale(1.12)" }, { transform: "scale(1)" }], { duration: 350, easing: "ease-out" }); } };
+}
+
 type Kind = "action" | "speech" | "thought";
 type Entry = { kind: Kind; text: string };
 
@@ -49,12 +93,22 @@ export function SceneDialog({ open, onOpenChange, currentLocationId, onPosted }:
     if (!currentLocationId) { toast.error("Você precisa estar em um local."); return; }
     if (entries.length === 0) { toast.error("Adicione ao menos uma ação, fala ou pensamento."); return; }
     setBusy(true);
+    // Captura a origem do botão para animar a partir dele.
+    let origin = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    const btn = document.activeElement as HTMLElement | null;
+    if (btn && typeof btn.getBoundingClientRect === "function") {
+      const r = btn.getBoundingClientRect();
+      origin = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    }
     try {
       const res = await post({ data: { locationId: currentLocationId, entries } } as any);
-      toast.success(`Cena publicada! +${(res as any).xpGain} XP`);
+      const gained = (res as any).xpGain as number;
+      toast.success(`Cena publicada! +${gained} XP`);
       reset();
       onOpenChange(false);
       onPosted?.();
+      // Anima logo após o diálogo fechar.
+      setTimeout(() => flyXpToSheet(gained, origin), 60);
     } catch (e: any) { toast.error(e?.message ?? "Falha ao publicar cena."); }
     finally { setBusy(false); }
   }
