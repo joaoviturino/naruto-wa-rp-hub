@@ -1549,3 +1549,80 @@ export async function pvpForfeitOnLeave(supabaseAdmin: any, sessionId: string, c
   if (!sess || sess.status !== "active" || (sess.state as any)?.mode !== "pvp") return;
   await pvpFlee(supabaseAdmin, sess, charId);
 }
+
+/**
+ * Tutorial: cria (ou reaproveita) um combate simulado contra o "Javali Selvagem".
+ * Idempotente — se já existir um combate ativo do jogador, retorna o mesmo id.
+ */
+export const startTutorialCombat = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const me = await loadMyChar(context);
+    if (!me.current_location_id) {
+      throw new Error("Escolha uma vila/local no chat antes de começar o combate de treino.");
+    }
+
+    // Já tem combate ativo? aproveita.
+    const { data: parts } = await context.supabase
+      .from("combat_participants").select("session_id").eq("character_id", me.id);
+    const sessIds = ((parts as any[]) ?? []).map((p) => p.session_id).filter(Boolean);
+    if (sessIds.length) {
+      const { data: act } = await context.supabase
+        .from("combat_sessions").select("id").in("id", sessIds).eq("status", "active").limit(1).maybeSingle();
+      if (act) return { session_id: (act as any).id as string, reused: true };
+    }
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Garante o NPC "Javali Selvagem (Treino)" — bem fraco, sem recompensa.
+    const NAME = "Javali Selvagem (Treino)";
+    let npcRow: any = null;
+    const { data: existing } = await supabaseAdmin.from("npcs").select("id,name,image_url,hp_max,energy_max,xp").eq("name", NAME).maybeSingle();
+    if (existing) npcRow = existing;
+    else {
+      const { data: inserted, error: nerr } = await supabaseAdmin.from("npcs").insert({
+        name: NAME,
+        description: "Um javali arisco usado pelo Sensei Hikaru para treinar novos genins.",
+        hp_max: 30, energy_max: 20, xp: 20,
+        reward_xp: 25, reward_ryo: 0, kind: "aggressive",
+        avg_damage: 3, defense: 0, max_hit_percent: 20, crit_chance: 5,
+      }).select("id,name,image_url,hp_max,energy_max,xp").single();
+      if (nerr) throw new Error(nerr.message);
+      npcRow = inserted;
+    }
+
+    const s = computeStats(me.xp ?? 0);
+    const efMax = s.ef, emMax = s.em, ckMax = s.chakra;
+    const ef = me.ef_current == null ? efMax : Math.min(efMax, me.ef_current);
+    const em = me.em_current == null ? emMax : Math.min(emMax, me.em_current);
+    const ck = me.chakra_current == null ? ckMax : Math.min(ckMax, me.chakra_current);
+    const hpMax = Math.max(1, Number(me.xp ?? 0));
+    const hp = (me as any).hp_current == null ? hpMax : Math.max(0, Math.min(hpMax, Number((me as any).hp_current)));
+    const players: Player[] = [{
+      character_id: me.id, nickname: me.nickname, avatar_url: me.avatar_url, sprite_url: (me as any).inventory_bg_url ?? null,
+      hp, hp_max: hpMax, ef, em, chakra: ck, ef_max: efMax, em_max: emMax, chakra_max: ckMax, alive: hp > 0, cooldowns: {},
+    }];
+    const npcsState: NpcState[] = [{
+      id: npcRow.id, name: npcRow.name, image_url: npcRow.image_url ?? null,
+      battle_bg_url: null, music_url: null,
+      hp: npcRow.hp_max, hp_max: npcRow.hp_max, energy: npcRow.energy_max, energy_max: npcRow.energy_max, alive: true,
+    }];
+    const state: CombatState = {
+      npc: npcsState[0], npcs: npcsState, players, active: 0, target: 0,
+      location_bg_url: null, location_music_url: null,
+    } as any;
+    (state as any).tutorial = true;
+
+    const { data: session, error: sErr } = await supabaseAdmin.from("combat_sessions").insert({
+      location_id: me.current_location_id, party_id: null, npc_id: npcRow.id, status: "active", state, log: [], turn: "player",
+    }).select("id").single();
+    if (sErr) throw new Error(sErr.message);
+    await supabaseAdmin.from("combat_participants").insert([{ session_id: session.id, character_id: me.id }]);
+
+    // Marca no tutorial_state
+    await supabaseAdmin.from("characters")
+      .update({ tutorial_state: { ...(((await context.supabase.from("characters").select("tutorial_state").eq("id", me.id).maybeSingle()).data as any)?.tutorial_state ?? {}), combat_started: true } })
+      .eq("id", me.id);
+
+    return { session_id: session.id as string, reused: false };
+  });

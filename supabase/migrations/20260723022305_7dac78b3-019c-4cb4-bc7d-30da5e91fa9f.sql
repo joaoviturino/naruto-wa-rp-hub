@@ -1,0 +1,1 @@
+ALTER TABLE public.characters ADD COLUMN IF NOT EXISTS tutorial_state jsonb NOT NULL DEFAULT '{}'::jsonb;
