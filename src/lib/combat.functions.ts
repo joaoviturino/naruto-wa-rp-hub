@@ -1574,21 +1574,26 @@ export const startTutorialCombat = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Garante o NPC "Javali Selvagem (Treino)" — bem fraco, sem recompensa.
-    const NAME = "Javali Selvagem (Treino)";
-    let npcRow: any = null;
-    const { data: existing } = await supabaseAdmin.from("npcs").select("id,name,image_url,hp_max,energy_max,xp").eq("name", NAME).maybeSingle();
-    if (existing) npcRow = existing;
-    else {
-      const { data: inserted, error: nerr } = await supabaseAdmin.from("npcs").insert({
-        name: NAME,
-        description: "Um javali arisco usado pelo Sensei Hikaru para treinar novos genins.",
-        hp_max: 30, energy_max: 20, xp: 20,
-        reward_xp: 25, reward_ryo: 0, kind: "aggressive",
-        avg_damage: 3, defense: 0, max_hit_percent: 20, crit_chance: 5,
-      }).select("id,name,image_url,hp_max,energy_max,xp").single();
-      if (nerr) throw new Error(nerr.message);
-      npcRow = inserted;
+    // Reaproveita um Javali agressivo já cadastrado (com sprite). Preferência: menor hp_max.
+    const { data: javalis } = await supabaseAdmin
+      .from("npcs")
+      .select("id,name,image_url,hp_max,energy_max,xp")
+      .ilike("name", "%javali%")
+      .eq("kind", "aggressive")
+      .not("image_url", "is", null)
+      .order("hp_max", { ascending: true })
+      .limit(1);
+    let npcRow: any = (javalis ?? [])[0] ?? null;
+    if (!npcRow) {
+      // Fallback: qualquer javali agressivo, mesmo sem imagem.
+      const { data: any1 } = await supabaseAdmin
+        .from("npcs").select("id,name,image_url,hp_max,energy_max,xp")
+        .ilike("name", "%javali%").eq("kind", "aggressive")
+        .order("hp_max", { ascending: true }).limit(1);
+      npcRow = (any1 ?? [])[0] ?? null;
+    }
+    if (!npcRow) {
+      throw new Error("Nenhum NPC 'Javali' agressivo cadastrado. Peça a um admin para criar um.");
     }
 
     const s = computeStats(me.xp ?? 0);
