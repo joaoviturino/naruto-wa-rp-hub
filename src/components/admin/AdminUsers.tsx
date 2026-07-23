@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useServerFn } from "@tanstack/react-start";
-import { listUsers, grantRole, revokeRole, adminResetPassword } from "@/lib/admin.functions";
+import { listUsers, grantRole, revokeRole, adminResetPassword, deleteUserAccount } from "@/lib/admin.functions";
 import { toast } from "sonner";
 
 export function AdminUsers() {
@@ -12,6 +12,7 @@ export function AdminUsers() {
   const grant = useServerFn(grantRole);
   const revoke = useServerFn(revokeRole);
   const resetPass = useServerFn(adminResetPassword);
+  const deleteAcc = useServerFn(deleteUserAccount);
 
   async function load() { try { const data = await list({} as any); setRows(data as any); } catch (e: any) { toast.error(e.message); } }
   useEffect(() => { load(); }, []);
@@ -51,6 +52,12 @@ export function AdminUsers() {
                       try { await resetPass({ data: { user_id: r.id, new_password: pwd } } as any); toast.success("Senha redefinida."); }
                       catch (e: any) { toast.error(e.message); }
                     }}>Redefinir senha</Button>
+                    <Button size="sm" variant="destructive" onClick={async () => {
+                      if (!confirm(`EXCLUIR permanentemente a conta ${r.email}?\n\nEsta ação apaga login, ficha, inventário e progresso. Age como banimento definitivo.`)) return;
+                      const reason = prompt("Motivo (opcional, registrado no log):") ?? undefined;
+                      try { await deleteAcc({ data: { user_id: r.id, reason } } as any); toast.success("Conta excluída."); load(); }
+                      catch (e: any) { toast.error(e.message); }
+                    }}>Excluir conta</Button>
                     {isAdmin ? (
                       <Button size="sm" variant="outline" onClick={async () => {
                         if (!confirm(`Remover admin de ${r.email}?`)) return;
