@@ -8,6 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Trash2, Upload, Plus, Search, Swords, Store, ShoppingBag, Gift, GraduationCap, MessageCircle, Package, Users, ChevronDown } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { upsertNpc, deleteNpc, setNpcSkills, setNpcLocations } from "@/lib/npc.functions";
+import { adminSetNpcStats } from "@/lib/admin.functions";
+import { StatEditor } from "./StatEditor";
 import { setNpcLearningSteps } from "@/lib/minigame.functions";
 import { adminListNpcPoses, adminUpsertNpcPose, adminDeleteNpcPose, adminListNpcSkillPoses, adminSetNpcSkillPose } from "@/lib/npc-pose.functions";
 import { ImageUpload } from "@/components/ImageUpload";
@@ -101,6 +103,7 @@ export function NpcManager() {
   const bgRef = useRef<HTMLInputElement>(null);
   const musicRef = useRef<HTMLInputElement>(null);
   const save = useServerFn(upsertNpc);
+  const saveNpcStats = useServerFn(adminSetNpcStats);
   const del = useServerFn(deleteNpc);
   const setSkillsFn = useServerFn(setNpcSkills);
   const setLocsFn = useServerFn(setNpcLocations);
@@ -438,7 +441,7 @@ export function NpcManager() {
                 { key: "hp_max", label: "HP máximo", min: 1 },
                 { key: "energy_max", label: "Energia máxima", min: 1 },
               ]}
-              onSave={async (patch) => { await saveNpcStats({ data: { npc_id: sel.id, ...patch } } as any); }}
+              onSave={async (patch: Record<string, number>) => { await saveNpcStats({ data: { npc_id: sel.id, ...patch } } as any); }}
               onSaved={load}
             />
             <div className="grid grid-cols-2 gap-3">
