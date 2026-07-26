@@ -8,6 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Trash2, Upload, Plus, Search, Swords, Store, ShoppingBag, Gift, GraduationCap, MessageCircle, Package, Users, ChevronDown } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { upsertNpc, deleteNpc, setNpcSkills, setNpcLocations } from "@/lib/npc.functions";
+import { adminSetNpcStats } from "@/lib/admin.functions";
+import { StatEditor } from "./StatEditor";
 import { setNpcLearningSteps } from "@/lib/minigame.functions";
 import { adminListNpcPoses, adminUpsertNpcPose, adminDeleteNpcPose, adminListNpcSkillPoses, adminSetNpcSkillPose } from "@/lib/npc-pose.functions";
 import { ImageUpload } from "@/components/ImageUpload";
@@ -101,6 +103,7 @@ export function NpcManager() {
   const bgRef = useRef<HTMLInputElement>(null);
   const musicRef = useRef<HTMLInputElement>(null);
   const save = useServerFn(upsertNpc);
+  const saveNpcStats = useServerFn(adminSetNpcStats);
   const del = useServerFn(deleteNpc);
   const setSkillsFn = useServerFn(setNpcSkills);
   const setLocsFn = useServerFn(setNpcLocations);
@@ -429,11 +432,18 @@ export function NpcManager() {
             {sel.kind === "aggressive" && (
             <TabsContent value="combate" className="space-y-4 mt-0">
               <div className="scroll-panel rounded-lg p-4 space-y-3">
-            <div className="grid grid-cols-3 gap-3">
-              <NumField label="HP máximo" value={sel.hp_max} onSave={(v) => save({ data: { ...sel, hp_max: v } } as any).then(load)} />
-              <NumField label="XP (define stats)" value={sel.xp} onSave={(v) => save({ data: { ...sel, xp: v } } as any).then(load)} />
-              <NumField label="Energia máxima" value={sel.energy_max} onSave={(v) => save({ data: { ...sel, energy_max: v } } as any).then(load)} />
-            </div>
+            <StatEditor
+              targetId={sel.id}
+              scope="npc"
+              values={{ xp: sel.xp, hp_max: sel.hp_max, energy_max: sel.energy_max }}
+              fields={[
+                { key: "xp", label: "XP (define EF/EM/Chakra)" },
+                { key: "hp_max", label: "HP máximo", min: 1 },
+                { key: "energy_max", label: "Energia máxima", min: 1 },
+              ]}
+              onSave={async (patch: Record<string, number>) => { await saveNpcStats({ data: { npc_id: sel.id, ...patch } } as any); }}
+              onSaved={load}
+            />
             <div className="grid grid-cols-2 gap-3">
               <NumField label="Recompensa XP" value={sel.reward_xp ?? 0} onSave={(v) => save({ data: { ...sel, reward_xp: v } } as any).then(load)} />
               <NumField label="Recompensa Ryo" value={sel.reward_ryo ?? 0} onSave={(v) => save({ data: { ...sel, reward_ryo: v } } as any).then(load)} />

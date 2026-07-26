@@ -1122,3 +1122,110 @@ export const resetDatabase = createServerFn({ method: "POST" })
     });
     return { ok: true };
   });
+
+/* ---------- STAT EDITOR (immediate save + audit) ---------- */
+
+/** Atualiza XP / EF / EM / Chakra / HP de um personagem com histórico. */
+export const adminSetCharacterStats = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    character_id: z.string().uuid(),
+    xp: z.number().int().min(0).max(2_000_000_000).nullish(),
+    ef_current: z.number().int().min(0).max(2_000_000_000).nullish(),
+    em_current: z.number().int().min(0).max(2_000_000_000).nullish(),
+    chakra_current: z.number().int().min(0).max(2_000_000_000).nullish(),
+    hp_current: z.number().int().min(0).max(2_000_000_000).nullish(),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { character_id, ...patch } = data;
+    const keys = Object.keys(patch).filter((k) => (patch as any)[k] !== undefined) as (keyof typeof patch)[];
+    if (keys.length === 0) return { ok: true };
+    const { data: before, error: bErr } = await supabaseAdmin
+      .from("characters").select("xp,ef_current,em_current,chakra_current,hp_current,nickname")
+      .eq("id", character_id).maybeSingle();
+    if (bErr) throw new Error(bErr.message);
+    if (!before) throw new Error("Personagem não encontrado.");
+    const clean: Record<string, number> = {};
+    for (const k of keys) clean[k as string] = (patch as any)[k];
+    const { error } = await supabaseAdmin.from("characters").update(clean as any).eq("id", character_id);
+    if (error) throw new Error(error.message);
+    const changes: Record<string, { from: number | null; to: number }> = {};
+    for (const k of keys) changes[k as string] = { from: (before as any)[k] ?? null, to: clean[k as string] };
+    await supabaseAdmin.from("audit_log").insert({
+      admin_id: context.userId,
+      action: "set_character_stats",
+      target: character_id,
+      meta: { nickname: (before as any).nickname, changes },
+    });
+    return { ok: true };
+  });
+
+/** Atualiza XP / Energia / HP máximos de um NPC com histórico. */
+export const adminSetNpcStats = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    npc_id: z.string().uuid(),
+    xp: z.number().int().min(0).max(2_000_000_000).nullish(),
+    energy_max: z.number().int().min(1).max(2_000_000_000).nullish(),
+    hp_max: z.number().int().min(1).max(2_000_000_000).nullish(),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdminOrMod(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { npc_id, ...patch } = data;
+    const keys = Object.keys(patch).filter((k) => (patch as any)[k] !== undefined) as (keyof typeof patch)[];
+    if (keys.length === 0) return { ok: true };
+    const { data: before, error: bErr } = await supabaseAdmin
+      .from("npcs").select("xp,energy_max,hp_max,name").eq("id", npc_id).maybeSingle();
+    if (bErr) throw new Error(bErr.message);
+    if (!before) throw new Error("NPC não encontrado.");
+    const clean: Record<string, number> = {};
+    for (const k of keys) clean[k as string] = (patch as any)[k];
+    const { error } = await supabaseAdmin.from("npcs").update(clean as any).eq("id", npc_id);
+    if (error) throw new Error(error.message);
+    const changes: Record<string, { from: number | null; to: number }> = {};
+    for (const k of keys) changes[k as string] = { from: (before as any)[k] ?? null, to: clean[k as string] };
+    await supabaseAdmin.from("audit_log").insert({
+      admin_id: context.userId,
+      action: "set_npc_stats",
+      target: npc_id,
+      meta: { name: (before as any).name, changes },
+    });
+    return { ok: true };
+  });
+
+/** Lista o histórico de alterações de stats (character ou npc) para um alvo. */
+export const getStatAudit = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    target_id: z.string().uuid(),
+    scope: z.enum(["character", "npc"]),
+    limit: z.number().int().min(1).max(200).default(50),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdminOrMod(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const action = data.scope === "character" ? "set_character_stats" : "set_npc_stats";
+    const { data: rows, error } = await supabaseAdmin
+      .from("audit_log")
+      .select("id,admin_id,action,meta,created_at")
+      .eq("target", data.target_id)
+      .eq("action", action)
+      .order("created_at", { ascending: false })
+      .limit(data.limit);
+    if (error) throw new Error(error.message);
+    const adminIds = Array.from(new Set((rows ?? []).map((r: any) => r.admin_id).filter(Boolean)));
+    let admins: Record<string, string> = {};
+    if (adminIds.length) {
+      const { data: profs } = await supabaseAdmin.from("profiles").select("id,email").in("id", adminIds);
+      admins = Object.fromEntries((profs ?? []).map((p: any) => [p.id, p.email ?? p.id]));
+    }
+    return (rows ?? []).map((r: any) => ({
+      id: r.id,
+      created_at: r.created_at,
+      admin: r.admin_id ? (admins[r.admin_id] ?? r.admin_id) : "sistema",
+      changes: r.meta?.changes ?? {},
+    }));
+  });
