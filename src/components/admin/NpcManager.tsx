@@ -429,11 +429,18 @@ export function NpcManager() {
             {sel.kind === "aggressive" && (
             <TabsContent value="combate" className="space-y-4 mt-0">
               <div className="scroll-panel rounded-lg p-4 space-y-3">
-            <div className="grid grid-cols-3 gap-3">
-              <NumField label="HP máximo" value={sel.hp_max} onSave={(v) => save({ data: { ...sel, hp_max: v } } as any).then(load)} />
-              <NumField label="XP (define stats)" value={sel.xp} onSave={(v) => save({ data: { ...sel, xp: v } } as any).then(load)} />
-              <NumField label="Energia máxima" value={sel.energy_max} onSave={(v) => save({ data: { ...sel, energy_max: v } } as any).then(load)} />
-            </div>
+            <StatEditor
+              targetId={sel.id}
+              scope="npc"
+              values={{ xp: sel.xp, hp_max: sel.hp_max, energy_max: sel.energy_max }}
+              fields={[
+                { key: "xp", label: "XP (define EF/EM/Chakra)" },
+                { key: "hp_max", label: "HP máximo", min: 1 },
+                { key: "energy_max", label: "Energia máxima", min: 1 },
+              ]}
+              onSave={async (patch) => { await saveNpcStats({ data: { npc_id: sel.id, ...patch } } as any); }}
+              onSaved={load}
+            />
             <div className="grid grid-cols-2 gap-3">
               <NumField label="Recompensa XP" value={sel.reward_xp ?? 0} onSave={(v) => save({ data: { ...sel, reward_xp: v } } as any).then(load)} />
               <NumField label="Recompensa Ryo" value={sel.reward_ryo ?? 0} onSave={(v) => save({ data: { ...sel, reward_ryo: v } } as any).then(load)} />
