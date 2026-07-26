@@ -7,7 +7,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useServerFn } from "@tanstack/react-start";
-import { updatePlayer, grantSkill, revokeSkill, grantItem, revokeItem, completeMission, uncompleteMission, giftRyo } from "@/lib/admin.functions";
+import { updatePlayer, grantSkill, revokeSkill, grantItem, revokeItem, completeMission, uncompleteMission, giftRyo, adminSetCharacterStats } from "@/lib/admin.functions";
+import { StatEditor } from "./StatEditor";
 import { adminListPoses, adminUpsertPose, adminDeletePose } from "@/lib/pose.functions";
 import { adminSetJob } from "@/lib/jobs.functions";
 import { generateTraits } from "@/lib/ai-traits.functions";
@@ -34,6 +35,7 @@ export function PlayerEditor({ characterId, open, onOpenChange, onSaved }: {
   const [charJobs, setCharJobs] = useState<any[]>([]);
 
   const save = useServerFn(updatePlayer);
+  const saveStats = useServerFn(adminSetCharacterStats);
   const gSkill = useServerFn(grantSkill);
   const rSkill = useServerFn(revokeSkill);
   const gItem = useServerFn(grantItem);
@@ -149,7 +151,25 @@ export function PlayerEditor({ characterId, open, onOpenChange, onSaved }: {
                 ))}
               </div>
             </div>
-            <div><Label>XP</Label><Input type="number" min={0} value={char.xp} onChange={(e) => up("xp", Number(e.target.value))} /></div>
+            <div className="sm:col-span-2">
+              <StatEditor
+                targetId={char.id}
+                scope="character"
+                values={{ xp: char.xp, ef_current: char.ef_current, em_current: char.em_current, chakra_current: char.chakra_current, hp_current: char.hp_current }}
+                fields={[
+                  { key: "xp", label: "XP" },
+                  { key: "ef_current", label: "EF atual" },
+                  { key: "em_current", label: "EM atual" },
+                  { key: "chakra_current", label: "Chakra atual" },
+                  { key: "hp_current", label: "HP atual" },
+                ]}
+                onSave={async (patch) => {
+                  await saveStats({ data: { character_id: char.id, ...patch } } as any);
+                  setChar((p: any) => ({ ...p, ...patch }));
+                }}
+                onSaved={onSaved}
+              />
+            </div>
             <div><Label>Patente</Label>
               <Select value={char.rank} onValueChange={(v) => up("rank", v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
