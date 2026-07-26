@@ -8,6 +8,7 @@ import { GlobalBroadcasts } from "@/components/GlobalBroadcasts";
 import { PresenceHeartbeat } from "@/components/chat/PresenceHeartbeat";
 import { OnlinePlayersButton } from "@/components/OnlinePlayersButton";
 import { TutorialWatcher } from "@/components/TutorialWatcher";
+import { NotificationsToggle } from "@/components/NotificationsToggle";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -59,6 +60,7 @@ function AuthedLayout() {
               </>
             )}
             <span className="mx-2 lg:mx-3 text-muted-foreground text-xs hidden lg:inline truncate max-w-[180px]">{user.email}</span>
+            <NotificationsToggle />
             <Button variant="outline" size="sm" className="h-8 px-2 sm:px-3 shrink-0" onClick={signOut}>Sair</Button>
           </nav>
         </div>

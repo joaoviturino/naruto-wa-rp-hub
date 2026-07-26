@@ -58,6 +58,22 @@ export const challengeDuel = createServerFn({ method: "POST" })
       status: "pending", turn_number: 0, state: {},
     }).select("id").single();
     if (error) throw new Error(error.message);
+    // Push ao oponente (best-effort).
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: opp } = await supabaseAdmin
+        .from("characters").select("user_id").eq("id", target.id).maybeSingle();
+      const oppUserId = (opp as any)?.user_id as string | undefined;
+      if (oppUserId) {
+        const { sendPushToUsers } = await import("@/lib/push.server");
+        await sendPushToUsers([oppUserId], {
+          title: "⚔️ Desafio de duelo",
+          body: `${me.nickname ?? "Um shinobi"} te chamou para um duelo.`,
+          url: `/chat`,
+          tag: `duel-${inserted.id}`,
+        });
+      }
+    } catch (e) { console.error("[push pvp]", e); }
     return { duel_id: inserted.id };
   });
 

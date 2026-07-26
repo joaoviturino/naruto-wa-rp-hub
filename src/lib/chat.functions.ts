@@ -112,6 +112,45 @@ export const sendLocationMessage = createServerFn({ method: "POST" })
       .insert({ location_id: data.locationId, character_id: char.id, content: data.content.trim(), image_url: data.imageUrl ?? null, reply_to_id: data.replyToId ?? null })
       .select("id").single();
     if (error) throw new Error(error.message);
+    // Push a mencionados e ao autor da mensagem respondida (best-effort).
+    try {
+      const targets = new Set<string>();
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      // 1) menções @nickname
+      const mentions = Array.from(new Set(
+        (data.content.match(/@([A-Za-z0-9_.\-]{2,30})/g) ?? []).map((m) => m.slice(1))
+      ));
+      if (mentions.length > 0) {
+        const { resolveUserIdsByNicknames } = await import("@/lib/push.server");
+        (await resolveUserIdsByNicknames(mentions)).forEach((u) => targets.add(u));
+      }
+      // 2) autor da mensagem respondida
+      if (data.replyToId) {
+        const { data: parent } = await supabaseAdmin
+          .from("location_messages").select("character_id").eq("id", data.replyToId).maybeSingle();
+        const pCharId = (parent as any)?.character_id as string | undefined;
+        if (pCharId) {
+          const { data: pChar } = await supabaseAdmin
+            .from("characters").select("user_id").eq("id", pCharId).maybeSingle();
+          const uid = (pChar as any)?.user_id as string | undefined;
+          if (uid) targets.add(uid);
+        }
+      }
+      targets.delete(context.userId);
+      if (targets.size > 0) {
+        const { data: me } = await supabaseAdmin
+          .from("characters").select("nickname").eq("id", char.id).maybeSingle();
+        const nick = (me as any)?.nickname ?? "Alguém";
+        const preview = data.content.trim().replace(/\s+/g, " ").slice(0, 140);
+        const { sendPushToUsers } = await import("@/lib/push.server");
+        await sendPushToUsers(Array.from(targets), {
+          title: `💬 ${nick} te mencionou`,
+          body: preview,
+          url: "/chat",
+          tag: `mention-${msg.id}`,
+        });
+      }
+    } catch (e) { console.error("[push chat]", e); }
     // Dispara respostas de NPCs de IA presentes no local (best-effort).
     try {
       const { respondNpcsInLocation } = await import("@/lib/npc-ai.functions");
