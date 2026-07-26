@@ -873,6 +873,29 @@ export const issueGlobalReward = createServerFn({ method: "POST" })
       admin_id: context.userId, action: "global_reward", target: rewardId,
       meta: { kind: data.kind, applied, skipped, note: data.note ?? null },
     });
+    // Push aos personagens que efetivamente receberam.
+    try {
+      const { data: recips } = await supabaseAdmin
+        .from("global_reward_claims").select("character_id").eq("reward_id", rewardId);
+      const charIds = ((recips ?? []) as any[]).map((r) => r.character_id);
+      if (charIds.length > 0) {
+        const { data: chars } = await supabaseAdmin
+          .from("characters").select("user_id").in("id", charIds);
+        const userIds = Array.from(new Set(((chars ?? []) as any[]).map((c) => c.user_id).filter(Boolean)));
+        if (userIds.length > 0) {
+          const { sendPushToUsers } = await import("@/lib/push.server");
+          const label = data.kind === "xp" ? `+${data.amount} XP`
+            : data.kind === "ryo" ? `+${data.amount} Ryo`
+            : data.kind === "skill" ? "Nova habilidade!" : "Novo item!";
+          await sendPushToUsers(userIds, {
+            title: `🎁 Prêmio global — ${label}`,
+            body: data.note ?? "Enviado pela administração.",
+            url: "/chat",
+            tag: `reward-${rewardId}`,
+          });
+        }
+      }
+    } catch (e) { console.error("[push reward]", e); }
     return { ok: true, reward_id: rewardId, applied, skipped, total_targets: targets.length };
   });
 
