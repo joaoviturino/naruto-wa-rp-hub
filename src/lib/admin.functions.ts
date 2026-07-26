@@ -1149,7 +1149,7 @@ export const adminSetCharacterStats = createServerFn({ method: "POST" })
     if (!before) throw new Error("Personagem não encontrado.");
     const clean: Record<string, number> = {};
     for (const k of keys) clean[k as string] = (patch as any)[k];
-    const { error } = await supabaseAdmin.from("characters").update(clean).eq("id", character_id);
+    const { error } = await supabaseAdmin.from("characters").update(clean as any).eq("id", character_id);
     if (error) throw new Error(error.message);
     const changes: Record<string, { from: number | null; to: number }> = {};
     for (const k of keys) changes[k as string] = { from: (before as any)[k] ?? null, to: clean[k as string] };
@@ -1183,7 +1183,7 @@ export const adminSetNpcStats = createServerFn({ method: "POST" })
     if (!before) throw new Error("NPC não encontrado.");
     const clean: Record<string, number> = {};
     for (const k of keys) clean[k as string] = (patch as any)[k];
-    const { error } = await supabaseAdmin.from("npcs").update(clean).eq("id", npc_id);
+    const { error } = await supabaseAdmin.from("npcs").update(clean as any).eq("id", npc_id);
     if (error) throw new Error(error.message);
     const changes: Record<string, { from: number | null; to: number }> = {};
     for (const k of keys) changes[k as string] = { from: (before as any)[k] ?? null, to: clean[k as string] };
