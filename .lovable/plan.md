@@ -1,37 +1,59 @@
-## Minigame: Selos de Mão (Hand Seals)
+# Push Notifications (Web Push VAPID) + PWA instalável
 
-Um novo tipo de minigame `hand_seals` onde o jogador executa a sequência dos 12 selos de mão (Boi, Tigre, Coelho, Dragão, Serpente, Cavalo, Carneiro, Macaco, Galo, Cão, Javali, Rato) para "aprender" uma habilidade.
+## O que o usuário vai perceber
+- Botão "Ativar notificações" no topo do app (após aceitar permissão do navegador, funciona mesmo com a aba fechada).
+- Notificação com título, corpo e ícone quando:
+  - Alguém te desafia para duelo (PvP).
+  - Alguém te menciona `@você` ou responde sua mensagem no chat.
+  - Admin envia broadcast global ou prêmio global direcionado a você.
+  - Uma tarefa admin fica atrasada / marcada como crítica (só para admins).
+- Clicar na notificação abre a rota certa (duelo, chat do local, painel admin).
+- App instalável (Add to Home Screen) em Android/iOS com ícone e splash.
 
-### Como funciona
+## Backend
 
-1. Admin cria um minigame do tipo `hand_seals` e:
-   - Escolhe **qual habilidade** será ensinada ao completar (recompensa: `learn_skill_id`)
-   - Define a **sequência de selos** (arrasta/adiciona selos de uma paleta)
-   - Ajusta **tempo por selo**, **tolerância de erro** e **modo** (por clique, arrasto ou timing tipo Guitar Hero)
-   - Upload opcional de **imagens customizadas** para cada selo (senão usa defaults do sistema)
-   - Áudio opcional de execução
+1. **Chaves VAPID** — gero par de chaves ECDSA P-256 e salvo como secrets `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (`mailto:admin@newerashinobirevolution.lovable.app`). A chave pública também vai para uma env `VITE_VAPID_PUBLIC_KEY` para o cliente.
+2. **Migração**: tabela `push_subscriptions` (`user_id`, `endpoint` unique, `p256dh`, `auth`, `user_agent`, `created_at`, `last_seen_at`) com RLS: usuário gerencia as próprias; service_role lê tudo.
+3. **Server functions em `src/lib/push.functions.ts`**:
+   - `subscribeToPush({ endpoint, p256dh, auth, user_agent })` — upsert por endpoint.
+   - `unsubscribeFromPush({ endpoint })`.
+   - `getPublicKey()` — pega VAPID pública para o cliente.
+4. **Helper server-only `src/lib/push.server.ts`**:
+   - `sendPushToUsers(userIds, payload)` — carrega inscrições via `supabaseAdmin`, envia via `web-push` (pacote npm compatível com Worker), remove inscrições que devolverem 404/410.
+   - Payload: `{ title, body, url, tag, icon }`.
+5. **Integrações (server-side, dentro dos handlers já existentes)**:
+   - `pvp.functions.ts › challengeDuel` → push ao `opponent_id` com `url=/duel/{id}` (título: "⚔️ Desafio de {nick}").
+   - `chat.functions.ts › sendLocationMessage` → parseia `@nickname` e `reply_to_id`, resolve `user_id` dos alvos, push com `url=/chat` (título: "💬 {nick} te mencionou").
+   - `admin.functions.ts › sendGlobalReward` (existente) e `createGlobalBroadcast` → push aos usuários alvo.
+   - `admin.functions.ts › createTodo`/`updateTodo` → se `urgency in ('high','critical')` ou `due_date` no passado, push aos admins/assignee.
 
-2. No jogo, o jogador:
-   - Vê o retrato do NPC/personagem à esquerda
-   - Ao centro, o próximo selo pedido é destacado
-   - Grade com os 12 selos aparece embaixo — clique/tap no correto antes do tempo acabar
-   - Ao acertar todos: animação de conclusão + som + concede a habilidade selecionada
-   - Ao errar acima da tolerância: falha, sem recompensa
+## Frontend
 
-3. Vinculável a NPCs `learning` (como o Ronin) para criar mestres de qualquer jutsu.
+1. **PWA installability** — `public/manifest.webmanifest` com nome, tema, `display: standalone`, ícones 192/512 (gero via imagegen com tema shinobi). Tags de manifest, theme-color e apple-touch-icon no `src/routes/__root.tsx`.
+2. **Service worker** — `public/sw.js` com listeners `push` (renderiza `showNotification`) e `notificationclick` (abre/foca a URL do payload). Sem cache-first: só push. Guardado por `?sw=off` para desligar.
+3. **Registrador** — `src/lib/push-register.ts` com wrapper que:
+   - Não registra em `id-preview--*`, `preview--*`, iframes, dev, ou com `?sw=off`.
+   - Só registra em produção quando o usuário clica em "Ativar notificações".
+4. **UI**:
+   - Componente `NotificationsToggle` (sino no header) que mostra estado (`default`/`granted`/`denied`), pede permissão, cria PushSubscription com a chave VAPID e envia para `subscribeToPush`. Botão desativar remove inscrição.
+   - Insere o botão no header autenticado (perto do `TodoAlertsBell` para admins e no ChatHud para jogadores).
 
-### Detalhes técnicos
+## Detalhes técnicos
 
-- **Enum**: adiciona `hand_seals` ao `minigame_kind`
-- **Recompensas**: estende `rewardsSchema` em `minigame.functions.ts` com `learn_skill_id: string` — no `processMinigameRun`, insere em `character_skills` (idempotente)
-- **Assets dos selos**: 12 imagens padrão em `src/assets/handseals/` (geradas via imagegen, transparent PNG). Config permite override por minigame.
-- **Novo componente**: `src/components/minigame/HandSealsGame.tsx` — canvas React com grid 4×3 dos selos, timer por selo, feedback visual (verde/vermelho), combo counter
-- **Editor admin**: nova aba no `MinigameManager.tsx` (ou dentro do editor genérico) — dropdown de habilidade a ensinar, editor de sequência (arrastar da paleta para lista ordenada), sliders de tempo/tolerância
-- **Integração**: `MinigameDialog.tsx` roteia `kind === "hand_seals"` para `<HandSealsGame />`
+- Usar pacote `web-push` só no server helper (import dinâmico dentro do handler). Ele funciona no Cloudflare Worker via `nodejs_compat` (usa `crypto` Web API + `fetch`).
+- Payload cifrado é feito pelo `web-push`; enviamos JSON `{ title, body, url, tag }`.
+- Deduplicação: usar `tag` (ex.: `duel-{id}`, `mention-{msgId}`) para não empilhar duplicados.
+- Failsafe: se `web-push` lançar por endpoint expirado (404/410), DELETE da inscrição.
+- iOS Safari 16.4+: só entrega push depois de o usuário instalar o app na Home Screen — vamos deixar isso claro no toast quando detectarmos iOS.
 
-### Não faz parte deste plano
+## Arquivos criados/editados
 
-- Substituir o sistema de cast de jutsus em combate por selos (só ensinar).
-- Multiplayer cooperativo de selos.
+- **novos**: `supabase/migrations/*_push_subscriptions.sql`, `src/lib/push.functions.ts`, `src/lib/push.server.ts`, `src/lib/push-register.ts`, `src/components/NotificationsToggle.tsx`, `public/sw.js`, `public/manifest.webmanifest`, `public/icons/icon-192.png`, `public/icons/icon-512.png`.
+- **editados**: `src/routes/__root.tsx` (tags manifest), `src/lib/pvp.functions.ts`, `src/lib/chat.functions.ts`, `src/lib/admin.functions.ts`, `src/routes/_authenticated/route.tsx` ou header (para incluir o toggle), `package.json` (add `web-push`).
 
-Aprova? Se sim, eu implemento tudo numa passada só.
+## Fora de escopo (por enquanto)
+
+- Cache offline do app-shell (só push + instalação).
+- Notificações agendadas (cron para atrasos futuros) — se quiser, faço numa segunda leva com pg_cron chamando um endpoint `/api/public/push-scheduler`.
+
+Aprovando, começo pela migração + geração das chaves VAPID e sigo a lista.
