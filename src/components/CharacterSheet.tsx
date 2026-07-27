@@ -18,6 +18,8 @@ import { levelProgress, DEFAULT_LEVEL_CONFIG, type LevelConfig } from "@/lib/lev
 import { listMyPoses, listMySkillPoses, setSkillPose } from "@/lib/pose.functions";
 import { MountsTab } from "@/components/MountsTab";
 import { CosmeticOverlay } from "@/components/CosmeticOverlay";
+import { AnimatedCharacter } from "@/components/AnimatedSprite";
+import { useBodySprite } from "@/hooks/useBodySprite";
 import { refreshCharacterCosmetics, useCharacterCosmetics } from "@/hooks/useCharacterCosmetics";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ComboSelect } from "@/components/ui/combo-select";
@@ -201,6 +203,8 @@ function CosmeticsTab({ characterId, baseSprite }: { characterId: string; baseSp
   const [pieces, setPieces] = useState<any[]>([]);
   const [equipped, setEquipped] = useState<Record<string, string>>({});
   const equippedList = useCharacterCosmetics(characterId);
+  const body = useBodySprite(characterId);
+  const hasSheet = !!(body?.sheet_url && body?.sheet_cols && body?.sheet_rows);
 
   async function load() {
     const [{ data: all }, { data: mine }] = await Promise.all([
@@ -241,12 +245,27 @@ function CosmeticsTab({ characterId, baseSprite }: { characterId: string; baseSp
     <div className="scroll-panel rounded-lg p-4 sm:p-6 space-y-4">
       <div className="flex items-start gap-4 flex-wrap">
         <div className="relative h-64 w-48 rounded bg-black/40 border border-border overflow-hidden shrink-0">
-          {baseSprite ? (
-            <img src={baseSprite} alt="" className="absolute inset-0 h-full w-full object-contain" />
+          {hasSheet ? (
+            <AnimatedCharacter
+              characterId={characterId}
+              body={{
+                imageUrl: baseSprite,
+                sheetUrl: body!.sheet_url,
+                cols: body!.sheet_cols,
+                rows: body!.sheet_rows,
+                states: body!.sheet_states,
+              }}
+              state="idle"
+              className="absolute inset-0 h-full w-full"
+            />
+          ) : baseSprite ? (
+            <>
+              <img src={baseSprite} alt="" className="absolute inset-0 h-full w-full object-contain" />
+              <CosmeticOverlay characterId={characterId} />
+            </>
           ) : (
             <div className="absolute inset-0 grid place-items-center text-xs text-muted-foreground">Sem sprite base</div>
           )}
-          <CosmeticOverlay characterId={characterId} />
         </div>
         <div className="min-w-0 flex-1">
           <h3 className="font-display text-lg text-gold">Personalização</h3>
