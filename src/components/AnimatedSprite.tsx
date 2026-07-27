@@ -231,25 +231,18 @@ export function AnimatedCharacter({
         flipX={flipX}
         zIndex={0}
       />
-      {/* Camadas cosméticas */}
+      {/* Camadas cosméticas — SEMPRE sincronizadas ao corpo base.
+          Mesmo peças com sheet_url próprio herdam a grade/estados do corpo
+          (mesma cols/rows/row/frame), garantindo alinhamento total. */}
       {pieces.map((p, i) => {
-        const cfg = resolveState(p.sheet_states ?? body.states ?? DEFAULT_STATES, state);
-        const pieceHasOwnSheet = !!(p.sheet_url && p.sheet_cols && p.sheet_rows);
-        // Se a peça tem sheet própria, usa a config da peça.
-        // Senão, tratamos a image_url da peça como spritesheet usando a MESMA
-        // grade/estados do corpo — assim toda camada anima em sincronia com o
-        // sprite base, sem exceção.
-        const pieceSheetUrl = pieceHasOwnSheet ? p.sheet_url : (hasBodySheet ? p.image_url : null);
-        const pieceCols = pieceHasOwnSheet ? p.sheet_cols! : cols;
-        const pieceRows = pieceHasOwnSheet ? p.sheet_rows! : rows;
-        const pieceRow = pieceHasOwnSheet ? cfg.row : masterCfg.row;
+        const pieceSheetUrl = p.sheet_url ?? (hasBodySheet ? p.image_url : null);
         return (
           <SheetLayer
             key={`${p.slot}-${i}`}
             sheetUrl={pieceSheetUrl}
-            cols={pieceCols}
-            rows={pieceRows}
-            row={pieceRow}
+            cols={cols}
+            rows={rows}
+            row={masterCfg.row}
             frame={frame}
             fallbackUrl={p.image_url}
             flipX={flipX}
