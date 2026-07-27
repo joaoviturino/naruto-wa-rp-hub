@@ -248,7 +248,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "theme-color", content: "#0a0a1a" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
-      { name: "apple-mobile-web-app-title", content: "Shinobi" },
+      { name: "apple-mobile-web-app-title", content: "New Era Shinobi" },
       { title: "New Era Shinobi — Revolution" },
       { name: "description", content: "RPG shinobi baseado em Naruto: crie seu personagem na web e jogue no WhatsApp." },
       { property: "og:title", content: "New Era Shinobi — Revolution" },
