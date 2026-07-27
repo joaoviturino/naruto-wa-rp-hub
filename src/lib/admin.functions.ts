@@ -8,6 +8,45 @@ async function assertAdmin(context: { supabase: any; userId: string }) {
   if (!data) throw new Error("Forbidden");
 }
 
+/** Envia uma notificação push personalizada. Público-alvo: todos os jogadores, apenas admins, ou um usuário específico. */
+export const sendCustomPush = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({
+    title: z.string().trim().min(1).max(80),
+    body: z.string().trim().max(300).optional(),
+    url: z.string().trim().max(500).optional(),
+    audience: z.enum(["all", "admins", "user"]).default("all"),
+    target_user_id: z.string().uuid().optional(),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    let userIds: string[] = [];
+    if (data.audience === "user") {
+      if (!data.target_user_id) throw new Error("target_user_id obrigatório");
+      userIds = [data.target_user_id];
+    } else if (data.audience === "admins") {
+      const { data: rows } = await supabaseAdmin.from("user_roles").select("user_id").eq("role", "admin");
+      userIds = Array.from(new Set(((rows ?? []) as any[]).map((r) => r.user_id).filter(Boolean)));
+    } else {
+      const { data: rows } = await supabaseAdmin.from("push_subscriptions").select("user_id");
+      userIds = Array.from(new Set(((rows ?? []) as any[]).map((r) => r.user_id).filter(Boolean)));
+    }
+    if (userIds.length === 0) return { ok: true, sent: 0, targeted: 0 };
+    const { sendPushToUsers } = await import("@/lib/push.server");
+    const sent = await sendPushToUsers(userIds, {
+      title: data.title,
+      body: data.body ?? "",
+      url: data.url && data.url.length > 0 ? data.url : "/",
+      tag: `admin-push-${Date.now()}`,
+    });
+    await supabaseAdmin.from("audit_log").insert({
+      admin_id: context.userId, action: "custom_push",
+      target: data.audience, meta: { title: data.title, body: data.body ?? null, url: data.url ?? null, sent, targeted: userIds.length },
+    });
+    return { ok: true, sent, targeted: userIds.length };
+  });
+
 async function assertAdminOrMod(context: { supabase: any; userId: string }) {
   const { data, error } = await context.supabase.rpc("has_admin_or_mod", { _user_id: context.userId });
   if (error) throw new Error(error.message);
