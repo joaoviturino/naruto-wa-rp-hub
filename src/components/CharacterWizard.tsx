@@ -9,8 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertTriangle } from "lucide-react";
-import spriteMaleAsset from "@/assets/shinobi-male.png.asset.json";
-import spriteAltAsset from "@/assets/shinobi-female.png.asset.json";
+import spriteBaseAsset from "@/assets/shinobi-base.png.asset.json";
 
 type Clan = { id: string; name: string; village: Village; rarity: "common"|"uncommon"|"rare"|"epic"|"legendary"; element_bonus: Element | null; description: string | null; weight: number };
 type Gender = "masculino" | "feminino";
@@ -32,10 +31,7 @@ const DDI_OPTIONS: { code: string; label: string; flag: string }[] = [
   { code: "+56", label: "Chile", flag: "🇨🇱" },
 ];
 
-const SPRITE_OPTIONS = [
-  { id: "male", label: "Shinobi da Capa", url: (spriteMaleAsset as { url: string }).url },
-  { id: "female", label: "Kunoichi Errante", url: (spriteAltAsset as { url: string }).url },
-];
+const BASE_SPRITE_URL = (spriteBaseAsset as { url: string }).url;
 
 export function CharacterWizard({ onDone }: { onDone: () => void }) {
   const [step, setStep] = useState(1);
@@ -48,7 +44,7 @@ export function CharacterWizard({ onDone }: { onDone: () => void }) {
   const [rerolls, setRerolls] = useState(0);
   const [element, setElement] = useState<Element | null>(null);
   const [gender, setGender] = useState<Gender | null>(null);
-  const [spriteUrl, setSpriteUrl] = useState<string | null>(null);
+  const [spriteUrl, setSpriteUrl] = useState<string | null>(BASE_SPRITE_URL);
   const [age, setAge] = useState<string>("");
   const [appearance, setAppearance] = useState("");
   const [personality, setPersonality] = useState("");
@@ -260,27 +256,19 @@ export function CharacterWizard({ onDone }: { onDone: () => void }) {
           <div>
             <h2 className="font-display text-xl mb-1">Aparência inicial</h2>
             <p className="text-xs text-muted-foreground mb-3">
-              Escolha um dos 2 modelos disponíveis. Ele ficará provisoriamente no seu inventário para uso em batalhas até que você faça upload da sua própria arte.
+              Todos começam com o mesmo sprite base — customize sua aparência depois na aba <span className="text-gold">Aparência</span> equipando cabelos, roupas e acessórios.
             </p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {SPRITE_OPTIONS.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => setSpriteUrl(s.url)}
-                  className={`p-3 rounded border transition ${spriteUrl === s.url ? "border-gold bg-secondary" : "border-border hover:border-gold/60"}`}
-                >
-                  <div className="h-56 flex items-center justify-center bg-background/40 rounded overflow-hidden">
-                    <img src={s.url} alt={s.label} className="h-full object-contain" />
-                  </div>
-                  <div className="mt-2 text-sm">{s.label}</div>
-                </button>
-              ))}
+            <div className="p-3 rounded border border-gold bg-secondary">
+              <div className="h-64 flex items-center justify-center bg-background/40 rounded overflow-hidden">
+                <img src={BASE_SPRITE_URL} alt="Sprite base do shinobi" className="h-full object-contain" />
+              </div>
+              <div className="mt-2 text-sm text-center text-muted-foreground">Shinobi Base</div>
             </div>
           </div>
 
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setStep(4)}>Voltar</Button>
-            <Button disabled={!gender || !spriteUrl} onClick={() => setStep(6)}>Continuar</Button>
+            <Button disabled={!gender} onClick={() => setStep(6)}>Continuar</Button>
           </div>
         </div>
       )}
