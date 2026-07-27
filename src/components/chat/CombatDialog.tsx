@@ -586,6 +586,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                         style={{ filter: isActing ? "drop-shadow(0 0 10px rgb(239 68 68))" : undefined }}
                         fallbackClassName={`${sizeCls} w-20 bg-secondary rounded`}
                       />
+                      {state._pvp && enemyCid && <CosmeticOverlay characterId={enemyCid} />}
                       <FloatingDamageLayer bursts={bursts[`npc:${i}`] ?? []} onExpire={(id) => expireBurst(`npc:${i}`, id)} />
                     </div>
                     <div className={`rounded px-1.5 py-0.5 max-w-[130px] w-full transition-colors ${isTarget ? "bg-red-600/80 ring-1 ring-red-300" : "bg-black/70"}`}>
@@ -638,6 +639,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                         style={{ transform: "scaleX(-1)", filter: isActive ? "drop-shadow(0 0 10px rgb(52 211 153))" : undefined }}
                         fallbackClassName={`${sizeCls} w-20 bg-secondary rounded`}
                       />
+                      <CosmeticOverlay characterId={p.character_id} flipX />
                       <FloatingDamageLayer bursts={bursts[`player:${p.character_id}`] ?? []} onExpire={(id) => expireBurst(`player:${p.character_id}`, id)} />
                       {healOverlays[p.character_id] && (
                         <HealParticles key={healOverlays[p.character_id]} />
