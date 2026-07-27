@@ -304,6 +304,15 @@ export const updatePlayer = createServerFn({ method: "POST" })
     archetype: z.string().max(80).nullable().optional(),
     qualities: z.array(z.string().max(60)).max(12).optional(),
     flaws: z.array(z.string().max(60)).max(12).optional(),
+    body_sheet_url: z.string().url().nullable().optional(),
+    body_sheet_cols: z.number().int().min(1).max(32).nullable().optional(),
+    body_sheet_rows: z.number().int().min(1).max(32).nullable().optional(),
+    body_sheet_states: z.record(z.string(), z.object({
+      row: z.number().int().min(0).max(31),
+      frames: z.number().int().min(1).max(32),
+      fps: z.number().min(1).max(60).optional(),
+      loop: z.boolean().optional(),
+    })).nullable().optional(),
   }).parse(input))
   .handler(async ({ data, context }) => {
     await assertAdmin(context);

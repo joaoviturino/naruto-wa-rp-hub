@@ -13,6 +13,8 @@ import { toast } from "sonner";
 import { Sword, Flag, Zap, FlaskConical, Users, Target } from "lucide-react";
 import { FloatingDamageLayer, type DamageBurst } from "@/components/chat/FloatingDamage";
 import { CosmeticOverlay } from "@/components/CosmeticOverlay";
+import { AnimatedCharacter, type AnimState } from "@/components/AnimatedSprite";
+import { useBodySprite } from "@/hooks/useBodySprite";
 import { HealParticles } from "@/components/chat/HealParticles";
 import { remapPvpForViewer } from "@/components/chat/pvpRemap";
 
@@ -580,14 +582,20 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                     className={`relative flex flex-col items-center gap-1 group min-w-0 ${canPick ? "cursor-pointer" : "cursor-default"}`}
                   >
                     <div ref={(el) => { npcRefs.current[i] = el; }} className={`relative transition-all ${isActing ? "drop-shadow-[0_0_18px_rgba(239,68,68,0.9)] scale-105" : ""} ${isTarget && !isActing ? "drop-shadow-[0_0_14px_rgba(239,68,68,0.75)] scale-[1.03]" : ""} ${dead ? "opacity-30 grayscale" : "group-hover:scale-105"}`}>
-                      <SmartCombatImage
+                      <CombatCharacterSprite
+                        characterId={state._pvp ? enemyCid ?? null : null}
                         sources={enemySources.filter(Boolean) as string[]}
                         alt={enemyName}
-                        className={`${sizeCls} w-auto object-contain`}
+                        sizeCls={sizeCls}
                         style={{ filter: isActing ? "drop-shadow(0 0 10px rgb(239 68 68))" : undefined }}
-                        fallbackClassName={`${sizeCls} w-20 bg-secondary rounded`}
+                        showLegacyOverlay
+                        animState={
+                          dead ? "death"
+                          : (bursts[`npc:${i}`] ?? []).some((b) => b.amount > 0 && !b.heal) ? "hurt"
+                          : isActing ? "punch"
+                          : "idle"
+                        }
                       />
-                      {state._pvp && enemyCid && <CosmeticOverlay characterId={enemyCid} />}
                       <FloatingDamageLayer bursts={bursts[`npc:${i}`] ?? []} onExpire={(id) => expireBurst(`npc:${i}`, id)} />
                     </div>
                     <div className={`rounded px-1.5 py-0.5 max-w-[130px] w-full transition-colors ${isTarget ? "bg-red-600/80 ring-1 ring-red-300" : "bg-black/70"}`}>
@@ -633,14 +641,21 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                     className={`flex flex-col items-center gap-1 min-w-0 ${isHealPick ? "cursor-pointer" : "cursor-default"}`}
                   >
                     <div ref={(el) => { playerRefs.current[p.character_id] = el; }} className={`relative transition-all ${isActive ? "drop-shadow-[0_0_18px_rgba(52,211,153,0.9)] scale-105" : ""} ${chosenHeal ? "drop-shadow-[0_0_18px_rgba(52,211,153,0.9)] scale-[1.04] ring-2 ring-emerald-400/70 rounded-md" : ""} ${!p.alive ? "opacity-30 grayscale" : ""}`}>
-                      <SmartCombatImage
+                      <CombatCharacterSprite
+                        characterId={p.character_id}
                         sources={spriteSources}
                         alt={p.nickname}
-                        className={`${sizeCls} w-auto object-contain`}
-                        style={{ transform: "scaleX(-1)", filter: isActive ? "drop-shadow(0 0 10px rgb(52 211 153))" : undefined }}
-                        fallbackClassName={`${sizeCls} w-20 bg-secondary rounded`}
+                        flipX
+                        sizeCls={sizeCls}
+                        style={{ filter: isActive ? "drop-shadow(0 0 10px rgb(52 211 153))" : undefined }}
+                        showLegacyOverlay
+                        animState={
+                          !p.alive ? "death"
+                          : (bursts[`player:${p.character_id}`] ?? []).some((b) => b.amount > 0 && !b.heal) ? "hurt"
+                          : isActive ? (isHealSkill ? "cast" : "punch")
+                          : "idle"
+                        }
                       />
-                      <CosmeticOverlay characterId={p.character_id} flipX />
                       <FloatingDamageLayer bursts={bursts[`player:${p.character_id}`] ?? []} onExpire={(id) => expireBurst(`player:${p.character_id}`, id)} />
                       {healOverlays[p.character_id] && (
                         <HealParticles key={healOverlays[p.character_id]} />
@@ -1051,5 +1066,67 @@ function SkillFxLayer({ fx }: {
         <img src={fx.url} alt="" className="w-full h-full object-contain" style={fx.mirror ? { transform: "scaleX(-1)" } : undefined} />
       )}
     </div>
+  );
+}
+
+// -----------------------------------------------------------------
+// CombatCharacterSprite: renderiza um combatente com AnimatedCharacter
+// (spritesheet + camadas cosméticas) se houver spritesheet configurada,
+// senão faz fallback para a imagem estática + overlay de cosméticos.
+// -----------------------------------------------------------------
+function CombatCharacterSprite({
+  characterId,
+  sources,
+  alt,
+  flipX,
+  sizeCls,
+  style,
+  animState,
+  showLegacyOverlay,
+}: {
+  characterId?: string | null;
+  sources: string[];
+  alt: string;
+  flipX?: boolean;
+  sizeCls: string;
+  style?: React.CSSProperties;
+  animState: AnimState;
+  showLegacyOverlay?: boolean;
+}) {
+  const body = useBodySprite(characterId ?? null);
+  const hasSheet = !!(body?.sheet_url && body?.sheet_cols && body?.sheet_rows);
+
+  if (characterId && hasSheet) {
+    return (
+      <div className={`${sizeCls} aspect-square`} style={style}>
+        <AnimatedCharacter
+          characterId={characterId}
+          body={{
+            imageUrl: body!.image_url ?? sources[0] ?? null,
+            sheetUrl: body!.sheet_url,
+            cols: body!.sheet_cols,
+            rows: body!.sheet_rows,
+            states: body!.sheet_states,
+          }}
+          state={animState}
+          flipX={flipX}
+          className="w-full h-full"
+        />
+      </div>
+    );
+  }
+
+  // Fallback estático + overlay cosmético clássico.
+  return (
+    <>
+      <SmartCombatImage
+        sources={sources}
+        alt={alt}
+        className={`${sizeCls} w-auto object-contain`}
+        style={{ ...(flipX ? { transform: "scaleX(-1)" } : null), ...style }}
+        fallbackClassName={`${sizeCls} w-20 bg-secondary rounded`}
+      />
+      {characterId && showLegacyOverlay && <CosmeticOverlay characterId={characterId} flipX={flipX} />}
+    </>
   );
 }
