@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CosmeticUploader } from "@/components/admin/CosmeticUploader";
+import { SpriteSheetConfig } from "@/components/admin/SpriteSheetConfig";
+import type { StatesMap } from "@/components/AnimatedSprite";
 import { toast } from "sonner";
 import { Pencil, Trash2, Plus, Save, X, Eye, EyeOff } from "lucide-react";
 
@@ -12,6 +14,8 @@ type Slot = "hair" | "face" | "clothing" | "accessory";
 type Piece = {
   id: string; slot: Slot; name: string; image_url: string;
   z_index: number; sort_order: number; active: boolean;
+  sheet_url: string | null; sheet_cols: number | null; sheet_rows: number | null;
+  sheet_states: StatesMap | null;
 };
 
 const SLOT_LABEL: Record<Slot, string> = {
@@ -23,7 +27,10 @@ export function CosmeticsManager({ adminUserId }: { adminUserId: string }) {
   const [rows, setRows] = useState<Piece[]>([]);
   const [editing, setEditing] = useState<Piece | null>(null);
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState<Omit<Piece, "id">>({ slot: "hair", name: "", image_url: "", z_index: 3, sort_order: 0, active: true });
+  const [form, setForm] = useState<Omit<Piece, "id">>({
+    slot: "hair", name: "", image_url: "", z_index: 3, sort_order: 0, active: true,
+    sheet_url: null, sheet_cols: null, sheet_rows: null, sheet_states: null,
+  });
   const [filter, setFilter] = useState<Slot | "all">("all");
 
   async function load() {
@@ -35,11 +42,13 @@ export function CosmeticsManager({ adminUserId }: { adminUserId: string }) {
 
   function startCreate() {
     setCreating(true); setEditing(null);
-    setForm({ slot: "hair", name: "", image_url: "", z_index: SLOT_DEFAULT_Z.hair, sort_order: rows.length * 10, active: true });
+    setForm({ slot: "hair", name: "", image_url: "", z_index: SLOT_DEFAULT_Z.hair, sort_order: rows.length * 10, active: true,
+      sheet_url: null, sheet_cols: null, sheet_rows: null, sheet_states: null });
   }
   function startEdit(r: Piece) {
     setEditing(r); setCreating(false);
-    setForm({ slot: r.slot, name: r.name, image_url: r.image_url, z_index: r.z_index, sort_order: r.sort_order, active: r.active });
+    setForm({ slot: r.slot, name: r.name, image_url: r.image_url, z_index: r.z_index, sort_order: r.sort_order, active: r.active,
+      sheet_url: r.sheet_url ?? null, sheet_cols: r.sheet_cols ?? null, sheet_rows: r.sheet_rows ?? null, sheet_states: r.sheet_states ?? null });
   }
   function cancel() { setCreating(false); setEditing(null); }
 
@@ -128,6 +137,23 @@ export function CosmeticsManager({ adminUserId }: { adminUserId: string }) {
             userId={adminUserId}
             currentUrl={form.image_url}
             onUploaded={(url) => setForm((f) => ({ ...f, image_url: url }))}
+          />
+          <SpriteSheetConfig
+            label="Spritesheet animada (opcional) — sincroniza com o corpo do personagem"
+            userId={adminUserId}
+            bucket="cosmetics"
+            sheetUrl={form.sheet_url}
+            cols={form.sheet_cols}
+            rows={form.sheet_rows}
+            states={form.sheet_states}
+            fallbackImageUrl={form.image_url}
+            onChange={(patch) => setForm((f) => ({
+              ...f,
+              sheet_url: patch.sheet_url !== undefined ? patch.sheet_url : f.sheet_url,
+              sheet_cols: patch.sheet_cols !== undefined ? patch.sheet_cols : f.sheet_cols,
+              sheet_rows: patch.sheet_rows !== undefined ? patch.sheet_rows : f.sheet_rows,
+              sheet_states: patch.sheet_states !== undefined ? patch.sheet_states : f.sheet_states,
+            }))}
           />
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={cancel}><X size={14} /> Cancelar</Button>
