@@ -17,6 +17,8 @@ import { getLevelConfig } from "@/lib/level.functions";
 import { levelProgress, DEFAULT_LEVEL_CONFIG, type LevelConfig } from "@/lib/level";
 import { listMyPoses, listMySkillPoses, setSkillPose } from "@/lib/pose.functions";
 import { MountsTab } from "@/components/MountsTab";
+import { CosmeticOverlay } from "@/components/CosmeticOverlay";
+import { refreshCharacterCosmetics, useCharacterCosmetics } from "@/hooks/useCharacterCosmetics";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ComboSelect } from "@/components/ui/combo-select";
 import { Button } from "@/components/ui/button";
@@ -149,11 +151,12 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
       </div>
 
       <Tabs defaultValue="ficha" className="p-4 sm:p-6">
-        <TabsList className="w-full sm:w-auto grid grid-cols-5 sm:inline-flex">
+        <TabsList className="w-full sm:w-auto grid grid-cols-6 sm:inline-flex">
           <TabsTrigger value="ficha" className="text-xs sm:text-sm">Ficha</TabsTrigger>
           <TabsTrigger value="inventario" className="text-xs sm:text-sm">Inventário</TabsTrigger>
           <TabsTrigger value="databook" className="text-xs sm:text-sm">Databook</TabsTrigger>
           <TabsTrigger value="poses" className="text-xs sm:text-sm">Poses</TabsTrigger>
+          <TabsTrigger value="aparencia" className="text-xs sm:text-sm">Aparência</TabsTrigger>
           <TabsTrigger value="montarias" className="text-xs sm:text-sm">Montarias</TabsTrigger>
         </TabsList>
         <TabsContent value="ficha" className="mt-4">
@@ -183,10 +186,110 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
         <TabsContent value="poses" className="mt-4">
           <PosesTab characterId={characterId} />
         </TabsContent>
+        <TabsContent value="aparencia" className="mt-4">
+          <CosmeticsTab characterId={characterId} baseSprite={char.inventory_bg_url} />
+        </TabsContent>
         <TabsContent value="montarias" className="mt-4">
           <MountsTab />
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function CosmeticsTab({ characterId, baseSprite }: { characterId: string; baseSprite: string | null }) {
+  const [pieces, setPieces] = useState<any[]>([]);
+  const [equipped, setEquipped] = useState<Record<string, string>>({});
+  const equippedList = useCharacterCosmetics(characterId);
+
+  async function load() {
+    const [{ data: all }, { data: mine }] = await Promise.all([
+      supabase.from("cosmetic_pieces").select("*").eq("active", true).order("slot").order("sort_order"),
+      supabase.from("character_cosmetics").select("slot, piece_id").eq("character_id", characterId),
+    ]);
+    setPieces((all ?? []) as any[]);
+    const map: Record<string, string> = {};
+    (mine ?? []).forEach((r: any) => { map[r.slot] = r.piece_id; });
+    setEquipped(map);
+  }
+  useEffect(() => { load(); }, [characterId]);
+
+  async function equip(slot: "hair" | "face" | "clothing" | "accessory", pieceId: string | null) {
+    if (pieceId) {
+      const { error } = await supabase.from("character_cosmetics").upsert(
+        { character_id: characterId, slot, piece_id: pieceId },
+        { onConflict: "character_id,slot" },
+      );
+      if (error) return toast.error(error.message);
+    } else {
+      const { error } = await supabase.from("character_cosmetics").delete()
+        .eq("character_id", characterId).eq("slot", slot);
+      if (error) return toast.error(error.message);
+    }
+    setEquipped((m) => { const n = { ...m }; if (pieceId) n[slot] = pieceId; else delete n[slot]; return n; });
+    refreshCharacterCosmetics(characterId);
+  }
+
+  const SLOTS: { id: "hair" | "face" | "clothing" | "accessory"; label: string }[] = [
+    { id: "hair", label: "Cabelo" },
+    { id: "face", label: "Rosto" },
+    { id: "clothing", label: "Roupa/Armadura" },
+    { id: "accessory", label: "Acessório" },
+  ];
+
+  return (
+    <div className="scroll-panel rounded-lg p-4 sm:p-6 space-y-4">
+      <div className="flex items-start gap-4 flex-wrap">
+        <div className="relative h-64 w-48 rounded bg-black/40 border border-border overflow-hidden shrink-0">
+          {baseSprite ? (
+            <img src={baseSprite} alt="" className="absolute inset-0 h-full w-full object-contain" />
+          ) : (
+            <div className="absolute inset-0 grid place-items-center text-xs text-muted-foreground">Sem sprite base</div>
+          )}
+          <CosmeticOverlay characterId={characterId} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="font-display text-lg text-gold">Personalização</h3>
+          <p className="text-xs text-muted-foreground">Escolha as peças que aparecerão sobre seu sprite (inventário, chat e combate). Peças são liberadas pelos admins.</p>
+          <div className="mt-2 text-xs text-muted-foreground">Equipadas: {equippedList.length}/{SLOTS.length}</div>
+        </div>
+      </div>
+
+      {SLOTS.map((slot) => {
+        const slotPieces = pieces.filter((p) => p.slot === slot.id);
+        return (
+          <div key={slot.id}>
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="font-display text-sm text-gold uppercase tracking-widest">{slot.label}</h4>
+              {equipped[slot.id] && (
+                <Button size="sm" variant="ghost" onClick={() => equip(slot.id, null)} className="text-xs h-7">Remover</Button>
+              )}
+            </div>
+            {slotPieces.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Nenhuma peça disponível.</p>
+            ) : (
+              <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-6 gap-2">
+                {slotPieces.map((p: any) => {
+                  const isOn = equipped[slot.id] === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => equip(slot.id, isOn ? null : p.id)}
+                      className={`relative border rounded p-1.5 transition-all ${isOn ? "border-gold ring-2 ring-gold/50 bg-gold/10" : "border-border bg-input/30 hover:border-gold/60"}`}
+                    >
+                      <div className="h-20 flex items-center justify-center bg-black/30 rounded overflow-hidden">
+                        <img src={p.image_url} alt={p.name} className="max-h-full max-w-full object-contain" />
+                      </div>
+                      <div className="text-[10px] text-center mt-1 truncate">{p.name}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

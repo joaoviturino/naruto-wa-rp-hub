@@ -386,6 +386,42 @@ export type Database = {
           },
         ]
       }
+      character_cosmetics: {
+        Row: {
+          character_id: string
+          piece_id: string
+          slot: Database["public"]["Enums"]["cosmetic_slot"]
+          updated_at: string
+        }
+        Insert: {
+          character_id: string
+          piece_id: string
+          slot: Database["public"]["Enums"]["cosmetic_slot"]
+          updated_at?: string
+        }
+        Update: {
+          character_id?: string
+          piece_id?: string
+          slot?: Database["public"]["Enums"]["cosmetic_slot"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "character_cosmetics_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "character_cosmetics_piece_id_fkey"
+            columns: ["piece_id"]
+            isOneToOne: false
+            referencedRelation: "cosmetic_pieces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       character_jobs: {
         Row: {
           character_id: string
@@ -1204,6 +1240,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      cosmetic_pieces: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          image_url: string
+          name: string
+          slot: Database["public"]["Enums"]["cosmetic_slot"]
+          sort_order: number
+          updated_at: string
+          z_index: number
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          image_url: string
+          name: string
+          slot: Database["public"]["Enums"]["cosmetic_slot"]
+          sort_order?: number
+          updated_at?: string
+          z_index?: number
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          image_url?: string
+          name?: string
+          slot?: Database["public"]["Enums"]["cosmetic_slot"]
+          sort_order?: number
+          updated_at?: string
+          z_index?: number
+        }
+        Relationships: []
       }
       global_broadcasts: {
         Row: {
@@ -3684,6 +3756,7 @@ export type Database = {
         | "skill_cost_reduction"
       clan_rarity: "common" | "uncommon" | "rare" | "epic" | "legendary"
       clan_role: "lider" | "vice" | "anciao" | "elite" | "membro"
+      cosmetic_slot: "hair" | "face" | "clothing" | "accessory"
       element: "katon" | "suiton" | "fuuton" | "doton" | "raiton"
       item_type:
         | "consumable"
@@ -3936,6 +4009,7 @@ export const Constants = {
       ],
       clan_rarity: ["common", "uncommon", "rare", "epic", "legendary"],
       clan_role: ["lider", "vice", "anciao", "elite", "membro"],
+      cosmetic_slot: ["hair", "face", "clothing", "accessory"],
       element: ["katon", "suiton", "fuuton", "doton", "raiton"],
       item_type: [
         "consumable",
