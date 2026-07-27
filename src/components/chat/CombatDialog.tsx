@@ -13,6 +13,8 @@ import { toast } from "sonner";
 import { Sword, Flag, Zap, FlaskConical, Users, Target } from "lucide-react";
 import { FloatingDamageLayer, type DamageBurst } from "@/components/chat/FloatingDamage";
 import { CosmeticOverlay } from "@/components/CosmeticOverlay";
+import { AnimatedCharacter, type AnimState } from "@/components/AnimatedSprite";
+import { useBodySprite } from "@/hooks/useBodySprite";
 import { HealParticles } from "@/components/chat/HealParticles";
 import { remapPvpForViewer } from "@/components/chat/pvpRemap";
 
