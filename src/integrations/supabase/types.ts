@@ -803,6 +803,10 @@ export type Database = {
           avatar_url: string | null
           banner_url: string | null
           bio: string | null
+          body_sheet_cols: number | null
+          body_sheet_rows: number | null
+          body_sheet_states: Json | null
+          body_sheet_url: string | null
           chakra_current: number | null
           clan_id: string | null
           clan_rerolls_used: number
@@ -842,6 +846,10 @@ export type Database = {
           avatar_url?: string | null
           banner_url?: string | null
           bio?: string | null
+          body_sheet_cols?: number | null
+          body_sheet_rows?: number | null
+          body_sheet_states?: Json | null
+          body_sheet_url?: string | null
           chakra_current?: number | null
           clan_id?: string | null
           clan_rerolls_used?: number
@@ -881,6 +889,10 @@ export type Database = {
           avatar_url?: string | null
           banner_url?: string | null
           bio?: string | null
+          body_sheet_cols?: number | null
+          body_sheet_rows?: number | null
+          body_sheet_states?: Json | null
+          body_sheet_url?: string | null
           chakra_current?: number | null
           clan_id?: string | null
           clan_rerolls_used?: number
@@ -1248,6 +1260,10 @@ export type Database = {
           id: string
           image_url: string
           name: string
+          sheet_cols: number | null
+          sheet_rows: number | null
+          sheet_states: Json | null
+          sheet_url: string | null
           slot: Database["public"]["Enums"]["cosmetic_slot"]
           sort_order: number
           updated_at: string
@@ -1259,6 +1275,10 @@ export type Database = {
           id?: string
           image_url: string
           name: string
+          sheet_cols?: number | null
+          sheet_rows?: number | null
+          sheet_states?: Json | null
+          sheet_url?: string | null
           slot: Database["public"]["Enums"]["cosmetic_slot"]
           sort_order?: number
           updated_at?: string
@@ -1270,6 +1290,10 @@ export type Database = {
           id?: string
           image_url?: string
           name?: string
+          sheet_cols?: number | null
+          sheet_rows?: number | null
+          sheet_states?: Json | null
+          sheet_url?: string | null
           slot?: Database["public"]["Enums"]["cosmetic_slot"]
           sort_order?: number
           updated_at?: string
