@@ -18,6 +18,8 @@ import { levelProgress, DEFAULT_LEVEL_CONFIG, type LevelConfig } from "@/lib/lev
 import { listMyPoses, listMySkillPoses, setSkillPose } from "@/lib/pose.functions";
 import { MountsTab } from "@/components/MountsTab";
 import { CosmeticOverlay } from "@/components/CosmeticOverlay";
+import { AnimatedCharacter } from "@/components/AnimatedSprite";
+import { useBodySprite } from "@/hooks/useBodySprite";
 import { refreshCharacterCosmetics, useCharacterCosmetics } from "@/hooks/useCharacterCosmetics";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ComboSelect } from "@/components/ui/combo-select";
