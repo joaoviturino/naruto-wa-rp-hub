@@ -12,6 +12,7 @@ import { NpcMusic } from "@/components/NpcMusic";
 import { toast } from "sonner";
 import { Sword, Flag, Zap, FlaskConical, Users, Target } from "lucide-react";
 import { FloatingDamageLayer, type DamageBurst } from "@/components/chat/FloatingDamage";
+import { CosmeticOverlay } from "@/components/CosmeticOverlay";
 import { HealParticles } from "@/components/chat/HealParticles";
 import { remapPvpForViewer } from "@/components/chat/pvpRemap";
 
