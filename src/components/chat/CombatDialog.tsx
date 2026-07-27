@@ -1055,3 +1055,65 @@ function SkillFxLayer({ fx }: {
     </div>
   );
 }
+
+// -----------------------------------------------------------------
+// CombatCharacterSprite: renderiza um combatente com AnimatedCharacter
+// (spritesheet + camadas cosméticas) se houver spritesheet configurada,
+// senão faz fallback para a imagem estática + overlay de cosméticos.
+// -----------------------------------------------------------------
+function CombatCharacterSprite({
+  characterId,
+  sources,
+  alt,
+  flipX,
+  sizeCls,
+  style,
+  animState,
+  showLegacyOverlay,
+}: {
+  characterId?: string | null;
+  sources: string[];
+  alt: string;
+  flipX?: boolean;
+  sizeCls: string;
+  style?: React.CSSProperties;
+  animState: AnimState;
+  showLegacyOverlay?: boolean;
+}) {
+  const body = useBodySprite(characterId ?? null);
+  const hasSheet = !!(body?.sheet_url && body?.sheet_cols && body?.sheet_rows);
+
+  if (characterId && hasSheet) {
+    return (
+      <div className={`${sizeCls} aspect-square`} style={style}>
+        <AnimatedCharacter
+          characterId={characterId}
+          body={{
+            imageUrl: body!.image_url ?? sources[0] ?? null,
+            sheetUrl: body!.sheet_url,
+            cols: body!.sheet_cols,
+            rows: body!.sheet_rows,
+            states: body!.sheet_states,
+          }}
+          state={animState}
+          flipX={flipX}
+          className="w-full h-full"
+        />
+      </div>
+    );
+  }
+
+  // Fallback estático + overlay cosmético clássico.
+  return (
+    <>
+      <SmartCombatImage
+        sources={sources}
+        alt={alt}
+        className={`${sizeCls} w-auto object-contain`}
+        style={{ ...(flipX ? { transform: "scaleX(-1)" } : null), ...style }}
+        fallbackClassName={`${sizeCls} w-20 bg-secondary rounded`}
+      />
+      {characterId && showLegacyOverlay && <CosmeticOverlay characterId={characterId} flipX={flipX} />}
+    </>
+  );
+}
