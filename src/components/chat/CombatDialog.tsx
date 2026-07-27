@@ -1098,7 +1098,7 @@ function CombatCharacterSprite({
 
   if (characterId && hasSheet) {
     return (
-      <div className={`${sizeCls} aspect-square`} style={style}>
+      <div className={`${sizeCls} relative`} style={style}>
         <AnimatedCharacter
           characterId={characterId}
           body={{
