@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ImageUpload } from "@/components/ImageUpload";
+import { CosmeticUploader } from "@/components/admin/CosmeticUploader";
 import { toast } from "sonner";
 import { Pencil, Trash2, Plus, Save, X, Eye, EyeOff } from "lucide-react";
 
@@ -123,12 +123,12 @@ export function CosmeticsManager({ adminUserId }: { adminUserId: string }) {
               <Input className="mt-1" type="number" value={form.z_index} onChange={(e) => setForm({ ...form, z_index: parseInt(e.target.value || "0") })} />
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="h-20 w-20 rounded border border-border bg-input/30 flex items-center justify-center overflow-hidden">
-              {form.image_url ? <img src={form.image_url} alt="" className="max-h-full max-w-full object-contain" /> : <span className="text-[10px] text-muted-foreground">Sem imagem</span>}
-            </div>
-            <ImageUpload label="Enviar PNG" bucket="cosmetics" userId={adminUserId} onUploaded={(url) => setForm({ ...form, image_url: url })} />
-          </div>
+          <CosmeticUploader
+            slot={form.slot}
+            userId={adminUserId}
+            currentUrl={form.image_url}
+            onUploaded={(url) => setForm((f) => ({ ...f, image_url: url }))}
+          />
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={cancel}><X size={14} /> Cancelar</Button>
             <Button onClick={save}><Save size={14} /> Salvar</Button>
