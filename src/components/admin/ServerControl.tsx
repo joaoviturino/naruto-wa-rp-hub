@@ -6,9 +6,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Megaphone, Wrench, Trash2, Power, MessageSquareOff, MapPin, Gift, RotateCw, ArrowLeftRight, Package, Activity, Users, Send } from "lucide-react";
+import { Megaphone, Wrench, Trash2, Power, MessageSquareOff, MapPin, Gift, RotateCw, ArrowLeftRight, Package, Activity, Users, Send, Bell } from "lucide-react";
 import { ComboSelect } from "@/components/ui/combo-select";
-import { teleportAllPlayers, setChatLock, issueGlobalReward, listGlobalRewards, reapplyGlobalReward, deleteGlobalReward, saveStarterKit } from "@/lib/admin.functions";
+import { teleportAllPlayers, setChatLock, issueGlobalReward, listGlobalRewards, reapplyGlobalReward, deleteGlobalReward, saveStarterKit, sendCustomPush } from "@/lib/admin.functions";
 import { adminPresenceOverview, adminTeleportPlayer } from "@/lib/presence.functions";
 import { useServerFn } from "@tanstack/react-start";
 
@@ -38,11 +38,75 @@ export function ServerControl() {
     <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
       <MaintenanceCard />
       <BroadcastCard />
+      <PushComposerCard />
       <GlobalToolsCard />
       <GlobalRewardsCard />
       <StarterKitCard />
       <PresenceMonitorCard />
       <TradeTaxCard />
+    </div>
+  );
+}
+
+function PushComposerCard() {
+  const send = useServerFn(sendCustomPush);
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [url, setUrl] = useState("/chat");
+  const [audience, setAudience] = useState<"all" | "admins">("all");
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    if (!title.trim()) { toast.error("Escreva um título."); return; }
+    setBusy(true);
+    try {
+      const r: any = await send({ data: { title: title.trim(), body: body.trim() || undefined, url: url.trim() || "/", audience } } as any);
+      toast.success(`Push enviado`, { description: `Entregue a ${r.sent}/${r.targeted} inscrição(ões).` });
+      setTitle(""); setBody("");
+    } catch (e: any) {
+      toast.error(e.message ?? "Falha ao enviar.");
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="rounded-2xl border border-border/60 bg-card/60 backdrop-blur p-4 sm:p-5 shadow-lg">
+      <div className="flex items-center gap-2 mb-3">
+        <Bell size={16} className="text-gold" />
+        <h3 className="font-bold text-sm uppercase tracking-widest">Notificação Push</h3>
+      </div>
+      <p className="text-xs text-muted-foreground mb-3">
+        Envia uma notificação personalizada para dispositivos inscritos (celular e PC). Só quem ativou o sino recebe.
+      </p>
+      <div className="grid gap-3">
+        <div>
+          <Label className="text-xs">Título</Label>
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} placeholder="Ex.: ⚔️ Evento começando agora" />
+        </div>
+        <div>
+          <Label className="text-xs">Mensagem</Label>
+          <Textarea rows={3} value={body} onChange={(e) => setBody(e.target.value)} maxLength={300} placeholder="Corpo da notificação (opcional)" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <Label className="text-xs">URL ao clicar</Label>
+            <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="/chat" />
+          </div>
+          <div>
+            <Label className="text-xs">Público</Label>
+            <ComboSelect
+              value={audience}
+              onChange={(v) => setAudience(v as "all" | "admins")}
+              options={[
+                { value: "all", label: "Todos os inscritos" },
+                { value: "admins", label: "Somente admins" },
+              ]}
+            />
+          </div>
+        </div>
+        <Button onClick={submit} disabled={busy} className="w-full sm:w-auto">
+          <Send size={14} className="mr-2" /> {busy ? "Enviando..." : "Enviar push"}
+        </Button>
+      </div>
     </div>
   );
 }
