@@ -214,7 +214,7 @@ function CosmeticsTab({ characterId, baseSprite }: { characterId: string; baseSp
   }
   useEffect(() => { load(); }, [characterId]);
 
-  async function equip(slot: string, pieceId: string | null) {
+  async function equip(slot: "hair" | "face" | "clothing" | "accessory", pieceId: string | null) {
     if (pieceId) {
       const { error } = await supabase.from("character_cosmetics").upsert(
         { character_id: characterId, slot, piece_id: pieceId },
@@ -230,7 +230,7 @@ function CosmeticsTab({ characterId, baseSprite }: { characterId: string; baseSp
     refreshCharacterCosmetics(characterId);
   }
 
-  const SLOTS: { id: string; label: string }[] = [
+  const SLOTS: { id: "hair" | "face" | "clothing" | "accessory"; label: string }[] = [
     { id: "hair", label: "Cabelo" },
     { id: "face", label: "Rosto" },
     { id: "clothing", label: "Roupa/Armadura" },
