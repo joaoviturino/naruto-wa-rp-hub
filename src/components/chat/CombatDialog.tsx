@@ -560,7 +560,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
               const frontCount = n <= 2 ? n : Math.ceil(n / 2);
               const front = npcs.slice(0, frontCount).map((v: any, i: number) => ({ v, i }));
               const back = npcs.slice(frontCount).map((v: any, i: number) => ({ v, i: i + frontCount }));
-              const sizeCls = n > 2 ? "max-h-[95px] sm:max-h-[130px]" : "max-h-[150px] sm:max-h-[200px]";
+              const sizeCls = n > 2 ? "h-[95px] w-[95px] sm:h-[130px] sm:w-[130px]" : "h-[150px] w-[150px] sm:h-[200px] sm:w-[200px]";
               const renderNpc = ({ v: nn, i }: { v: any; i: number }) => {
                 const dead = nn.alive === false || nn.hp <= 0;
                 const isTarget = i === targetIdx && !dead;
@@ -626,7 +626,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
               const frontCount = n <= 2 ? n : Math.ceil(n / 2);
               const front = players.slice(0, frontCount);
               const back = players.slice(frontCount);
-              const sizeCls = n > 2 ? "max-h-[95px] sm:max-h-[130px]" : "max-h-[150px] sm:max-h-[200px]";
+              const sizeCls = n > 2 ? "h-[95px] w-[95px] sm:h-[130px] sm:w-[130px]" : "h-[150px] w-[150px] sm:h-[200px] sm:w-[200px]";
               const renderPlayer = (p: any) => {
                 const isActive = session.status === "active" && !npcActive && p.character_id === activePlayer?.character_id && p.alive;
                 const spriteSources = [poses[p.character_id], sprites[p.character_id], p.sprite_url, p.inventory_bg_url, p.image_url, avatars[p.character_id], p.avatar_url].filter(Boolean) as string[];
