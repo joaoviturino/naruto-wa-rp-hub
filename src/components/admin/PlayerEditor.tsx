@@ -18,6 +18,7 @@ import { getElementValuesSync } from "@/hooks/useProficiencies";
 import { useProficiencies } from "@/hooks/useProficiencies";
 import { X, Plus, Sparkles } from "lucide-react";
 import { ImageUpload } from "@/components/ImageUpload";
+import { SpriteSheetConfig } from "@/components/admin/SpriteSheetConfig";
 
 export function PlayerEditor({ characterId, open, onOpenChange, onSaved }: {
   characterId: string | null; open: boolean; onOpenChange: (v: boolean) => void; onSaved: () => void;
@@ -113,6 +114,7 @@ export function PlayerEditor({ characterId, open, onOpenChange, onSaved }: {
             <TabsTrigger value="missions">Missões</TabsTrigger>
             <TabsTrigger value="jobs">Empregos</TabsTrigger>
             <TabsTrigger value="poses">Poses</TabsTrigger>
+            <TabsTrigger value="sprite">Sprite animada</TabsTrigger>
           </TabsList>
 
           <TabsContent value="stats" className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -359,6 +361,36 @@ export function PlayerEditor({ characterId, open, onOpenChange, onSaved }: {
 
           <TabsContent value="poses" className="mt-4">
             <PosesTab characterId={char.id} adminUserId={char.user_id} />
+          </TabsContent>
+
+          <TabsContent value="sprite" className="mt-4 space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Corpo animado por spritesheet. Cada peça cosmética equipada usa sua própria spritesheet
+              (configurada em <b>Personalização</b>) e todas ficam sincronizadas com o corpo pelo mesmo frame.
+              Se não houver spritesheet, o PNG de inventário é usado como imagem estática.
+            </p>
+            <SpriteSheetConfig
+              label="Corpo base — Spritesheet"
+              userId={char.user_id}
+              bucket="inventory"
+              sheetUrl={char.body_sheet_url}
+              cols={char.body_sheet_cols}
+              rows={char.body_sheet_rows}
+              states={char.body_sheet_states}
+              fallbackImageUrl={char.inventory_bg_url}
+              onChange={async (patch) => {
+                const mapped: any = {};
+                if (patch.sheet_url !== undefined) mapped.body_sheet_url = patch.sheet_url;
+                if (patch.sheet_cols !== undefined) mapped.body_sheet_cols = patch.sheet_cols;
+                if (patch.sheet_rows !== undefined) mapped.body_sheet_rows = patch.sheet_rows;
+                if (patch.sheet_states !== undefined) mapped.body_sheet_states = patch.sheet_states;
+                setChar((p: any) => ({ ...p, ...mapped }));
+                try {
+                  await save({ data: { character_id: char.id, ...mapped } } as any);
+                  onSaved();
+                } catch (e: any) { toast.error(e.message); }
+              }}
+            />
           </TabsContent>
 
           <TabsContent value="jobs" className="mt-4 space-y-2">
