@@ -234,16 +234,23 @@ export function AnimatedCharacter({
       {/* Camadas cosméticas */}
       {pieces.map((p, i) => {
         const cfg = resolveState(p.sheet_states ?? body.states ?? DEFAULT_STATES, state);
-        const pieceHasSheet = !!(p.sheet_url && p.sheet_cols && p.sheet_rows);
-        // Se a peça tem sheet, usa a config da peça; senão exibe estático.
+        const pieceHasOwnSheet = !!(p.sheet_url && p.sheet_cols && p.sheet_rows);
+        // Se a peça tem sheet própria, usa a config da peça.
+        // Senão, tratamos a image_url da peça como spritesheet usando a MESMA
+        // grade/estados do corpo — assim toda camada anima em sincronia com o
+        // sprite base, sem exceção.
+        const pieceSheetUrl = pieceHasOwnSheet ? p.sheet_url : (hasBodySheet ? p.image_url : null);
+        const pieceCols = pieceHasOwnSheet ? p.sheet_cols! : cols;
+        const pieceRows = pieceHasOwnSheet ? p.sheet_rows! : rows;
+        const pieceRow = pieceHasOwnSheet ? cfg.row : masterCfg.row;
         return (
           <SheetLayer
             key={`${p.slot}-${i}`}
-            sheetUrl={pieceHasSheet ? p.sheet_url : null}
-            cols={pieceHasSheet ? p.sheet_cols! : 1}
-            rows={pieceHasSheet ? p.sheet_rows! : 1}
-            row={pieceHasSheet ? cfg.row : 0}
-            frame={pieceHasSheet ? frame : 0}
+            sheetUrl={pieceSheetUrl}
+            cols={pieceCols}
+            rows={pieceRows}
+            row={pieceRow}
+            frame={frame}
             fallbackUrl={p.image_url}
             flipX={flipX}
             zIndex={10 + p.z_index}
