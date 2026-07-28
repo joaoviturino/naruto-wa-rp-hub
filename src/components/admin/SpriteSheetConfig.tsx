@@ -192,6 +192,38 @@ export function SpriteSheetConfig({
           </div>
         </div>
       </div>
+
+      {sheetUrl && (
+        <div className="rounded-md border border-border bg-black/30 p-2 text-xs space-y-1">
+          <div className="flex items-center gap-2">
+            {validating ? (
+              <><Loader2 size={12} className="animate-spin" /> Validando spritesheet…</>
+            ) : validation?.ok ? (
+              <><CheckCircle2 size={12} className="text-emerald-400" />
+                <span className="text-emerald-400">Sheet válida</span>
+                {validation.loaded && (
+                  <span className="text-muted-foreground">
+                    · {validation.width}×{validation.height}px · frame {Math.round(validation.frameWidth)}×{Math.round(validation.frameHeight)}px
+                  </span>
+                )}
+              </>
+            ) : validation ? (
+              <><AlertTriangle size={12} className="text-red-400" />
+                <span className="text-red-400">Problemas na spritesheet</span>
+                {validation.loaded && (
+                  <span className="text-muted-foreground">· {validation.width}×{validation.height}px</span>
+                )}
+              </>
+            ) : null}
+          </div>
+          {validation?.errors.map((e, i) => (
+            <div key={`e${i}`} className="text-red-400 pl-4">• {e}</div>
+          ))}
+          {validation?.warnings.map((w, i) => (
+            <div key={`w${i}`} className="text-amber-400 pl-4">• {w}</div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
