@@ -19,6 +19,7 @@ import { useProficiencies } from "@/hooks/useProficiencies";
 import { X, Plus, Sparkles } from "lucide-react";
 import { ImageUpload } from "@/components/ImageUpload";
 import { SpriteSheetConfig } from "@/components/admin/SpriteSheetConfig";
+import { validateSpriteSheet } from "@/lib/sprite-validate";
 
 export function PlayerEditor({ characterId, open, onOpenChange, onSaved }: {
   characterId: string | null; open: boolean; onOpenChange: (v: boolean) => void; onSaved: () => void;
