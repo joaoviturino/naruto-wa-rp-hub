@@ -9,6 +9,7 @@ import { SpriteSheetConfig } from "@/components/admin/SpriteSheetConfig";
 import type { StatesMap } from "@/components/AnimatedSprite";
 import { toast } from "sonner";
 import { Pencil, Trash2, Plus, Save, X, Eye, EyeOff } from "lucide-react";
+import { validateSpriteSheet } from "@/lib/sprite-validate";
 
 type Slot = "hair" | "face" | "clothing" | "accessory";
 type Piece = {
@@ -54,6 +55,13 @@ export function CosmeticsManager({ adminUserId }: { adminUserId: string }) {
 
   async function save() {
     if (!form.name.trim() || !form.image_url) return toast.error("Nome e imagem são obrigatórios.");
+    if (form.sheet_url) {
+      const v = await validateSpriteSheet(form.sheet_url, form.sheet_cols, form.sheet_rows, form.sheet_states);
+      if (!v.ok) {
+        return toast.error(`Spritesheet inválida: ${v.errors[0] ?? "verifique cols/rows/estados."}`);
+      }
+      if (v.warnings.length) toast.warning(v.warnings[0]);
+    }
     if (editing) {
       const { error } = await supabase.from("cosmetic_pieces").update(form).eq("id", editing.id);
       if (error) return toast.error(error.message);

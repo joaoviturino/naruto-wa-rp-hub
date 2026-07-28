@@ -1,10 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { AnimatedSprite, ANIM_STATE_LABEL, DEFAULT_STATES, type AnimState, type StatesMap } from "@/components/AnimatedSprite";
 import { ImageUpload } from "@/components/ImageUpload";
+import { validateSpriteSheet, type SheetValidation } from "@/lib/sprite-validate";
+import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 
 const STATE_ORDER: AnimState[] = ["idle", "run", "punch", "kick", "hurt", "cast", "death"];
 
@@ -42,6 +44,18 @@ export function SpriteSheetConfig({
 }) {
   const [preview, setPreview] = useState<AnimState>("idle");
   const effective = useMemo<StatesMap>(() => states ?? {}, [states]);
+  const [validation, setValidation] = useState<SheetValidation | null>(null);
+  const [validating, setValidating] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!sheetUrl) { setValidation(null); return; }
+    setValidating(true);
+    validateSpriteSheet(sheetUrl, cols, rows, effective)
+      .then((v) => { if (!cancelled) setValidation(v); })
+      .finally(() => { if (!cancelled) setValidating(false); });
+    return () => { cancelled = true; };
+  }, [sheetUrl, cols, rows, effective]);
 
   function updateState(name: AnimState, patch: Partial<{ row: number; frames: number; fps: number; loop: boolean }>) {
     const cur = effective[name] ?? DEFAULT_STATES[name] ?? { row: 0, frames: 1, fps: 8, loop: true };
@@ -178,6 +192,38 @@ export function SpriteSheetConfig({
           </div>
         </div>
       </div>
+
+      {sheetUrl && (
+        <div className="rounded-md border border-border bg-black/30 p-2 text-xs space-y-1">
+          <div className="flex items-center gap-2">
+            {validating ? (
+              <><Loader2 size={12} className="animate-spin" /> Validando spritesheet…</>
+            ) : validation?.ok ? (
+              <><CheckCircle2 size={12} className="text-emerald-400" />
+                <span className="text-emerald-400">Sheet válida</span>
+                {validation.loaded && (
+                  <span className="text-muted-foreground">
+                    · {validation.width}×{validation.height}px · frame {Math.round(validation.frameWidth)}×{Math.round(validation.frameHeight)}px
+                  </span>
+                )}
+              </>
+            ) : validation ? (
+              <><AlertTriangle size={12} className="text-red-400" />
+                <span className="text-red-400">Problemas na spritesheet</span>
+                {validation.loaded && (
+                  <span className="text-muted-foreground">· {validation.width}×{validation.height}px</span>
+                )}
+              </>
+            ) : null}
+          </div>
+          {validation?.errors.map((e, i) => (
+            <div key={`e${i}`} className="text-red-400 pl-4">• {e}</div>
+          ))}
+          {validation?.warnings.map((w, i) => (
+            <div key={`w${i}`} className="text-amber-400 pl-4">• {w}</div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
