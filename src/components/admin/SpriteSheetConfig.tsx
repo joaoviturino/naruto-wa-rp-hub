@@ -1,10 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { AnimatedSprite, ANIM_STATE_LABEL, DEFAULT_STATES, type AnimState, type StatesMap } from "@/components/AnimatedSprite";
 import { ImageUpload } from "@/components/ImageUpload";
+import { validateSpriteSheet, type SheetValidation } from "@/lib/sprite-validate";
+import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 
 const STATE_ORDER: AnimState[] = ["idle", "run", "punch", "kick", "hurt", "cast", "death"];
 
@@ -42,6 +44,18 @@ export function SpriteSheetConfig({
 }) {
   const [preview, setPreview] = useState<AnimState>("idle");
   const effective = useMemo<StatesMap>(() => states ?? {}, [states]);
+  const [validation, setValidation] = useState<SheetValidation | null>(null);
+  const [validating, setValidating] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!sheetUrl) { setValidation(null); return; }
+    setValidating(true);
+    validateSpriteSheet(sheetUrl, cols, rows, effective)
+      .then((v) => { if (!cancelled) setValidation(v); })
+      .finally(() => { if (!cancelled) setValidating(false); });
+    return () => { cancelled = true; };
+  }, [sheetUrl, cols, rows, effective]);
 
   function updateState(name: AnimState, patch: Partial<{ row: number; frames: number; fps: number; loop: boolean }>) {
     const cur = effective[name] ?? DEFAULT_STATES[name] ?? { row: 0, frames: 1, fps: 8, loop: true };
