@@ -386,6 +386,17 @@ export function PlayerEditor({ characterId, open, onOpenChange, onSaved }: {
                 if (patch.sheet_rows !== undefined) mapped.body_sheet_rows = patch.sheet_rows;
                 if (patch.sheet_states !== undefined) mapped.body_sheet_states = patch.sheet_states;
                 setChar((p: any) => ({ ...p, ...mapped }));
+                const nextUrl = patch.sheet_url !== undefined ? patch.sheet_url : char.body_sheet_url;
+                const nextCols = patch.sheet_cols !== undefined ? patch.sheet_cols : char.body_sheet_cols;
+                const nextRows = patch.sheet_rows !== undefined ? patch.sheet_rows : char.body_sheet_rows;
+                const nextStates = patch.sheet_states !== undefined ? patch.sheet_states : char.body_sheet_states;
+                if (nextUrl) {
+                  const v = await validateSpriteSheet(nextUrl, nextCols, nextRows, nextStates);
+                  if (!v.ok) {
+                    toast.error(`Spritesheet inválida: ${v.errors[0] ?? "verifique cols/rows/estados."} — alteração não salva.`);
+                    return;
+                  }
+                }
                 try {
                   await save({ data: { character_id: char.id, ...mapped } } as any);
                   onSaved();
