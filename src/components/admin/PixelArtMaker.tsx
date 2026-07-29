@@ -829,11 +829,6 @@ export function PixelArtMaker({
 
           <div className="rounded border border-border p-2 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs">Referência</span>
-</div></div>
-
-          <div className="rounded border border-border p-2 space-y-2">
-            <div className="flex items-center justify-between">
               <span className="text-xs">Seleção (laço)</span>
               <span className="text-[10px] text-muted-foreground">
                 {selection?.size ? `${selection.size} px` : "vazia"}
