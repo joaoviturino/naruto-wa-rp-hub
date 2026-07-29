@@ -1,4 +1,6 @@
 import baseAsset from "@/assets/sprite-test-base.png.asset.json";
+import sideRightAsset from "@/assets/sprite-base-side-right.png.asset.json";
+import sideLeftAsset from "@/assets/sprite-base-side-left.png.asset.json";
 
 /**
  * ============================================================
@@ -17,6 +19,18 @@ import baseAsset from "@/assets/sprite-test-base.png.asset.json";
  */
 
 export const BASE_SPRITE_URL = (baseAsset as { url: string }).url;
+
+/** Variantes direcionais do sprite base (mesmo canvas 512x512, sem olhos). */
+export const BASE_SPRITE_SIDE_RIGHT_URL = (sideRightAsset as { url: string }).url;
+export const BASE_SPRITE_SIDE_LEFT_URL = (sideLeftAsset as { url: string }).url;
+
+export const BASE_SPRITE_DIRECTIONS = {
+  front: BASE_SPRITE_URL,
+  right: BASE_SPRITE_SIDE_RIGHT_URL,
+  left: BASE_SPRITE_SIDE_LEFT_URL,
+} as const;
+
+export type SpriteDirection = keyof typeof BASE_SPRITE_DIRECTIONS;
 
 export const BASE_CANVAS = { width: 512, height: 512 } as const;
 
