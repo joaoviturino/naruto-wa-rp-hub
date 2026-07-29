@@ -6,13 +6,25 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import {
-  Pencil, Eraser, PaintBucket, Pipette, Undo2, Redo2, Trash2, Save, Loader2, Grid3x3, FlipHorizontal2, Download,
+  Pencil, Eraser, PaintBucket, Pipette, Undo2, Redo2, Trash2, Save, Loader2, Grid3x3,
+  FlipHorizontal2, FlipVertical2, Download, Image as ImageIcon, Move, Lock, LockOpen, X,
 } from "lucide-react";
 import { BASE_SPRITE_URL } from "@/lib/sprite-base";
 import type { CosmeticSlot } from "@/lib/sprite-align";
 
 type Tool = "pencil" | "eraser" | "bucket" | "picker";
 type Grid = (string | null)[];
+type MirrorMode = "off" | "h" | "v" | "both";
+type RefState = {
+  url: string;
+  x: number; // %  (centro)
+  y: number; // %
+  scale: number; // 1 = cobre o canvas
+  opacity: number; // 0-100
+  flipX: boolean;
+  above: boolean; // acima do desenho
+  locked: boolean;
+};
 
 const EXPORT_SIZE = 512;
 const RES_OPTIONS = [32, 48, 64, 96, 128] as const;
@@ -49,9 +61,13 @@ export function PixelArtMaker({
   const [tool, setTool] = useState<Tool>("pencil");
   const [color, setColor] = useState("#1b1b23");
   const [showGrid, setShowGrid] = useState(true);
-  const [mirror, setMirror] = useState(false);
+  const [mirrorMode, setMirrorMode] = useState<MirrorMode>("off");
   const [baseOpacity, setBaseOpacity] = useState(45);
   const [busy, setBusy] = useState(false);
+  const [ref, setRef] = useState<RefState | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const refDragRef = useRef<{ px: number; py: number; ox: number; oy: number } | null>(null);
+  const mirror = mirrorMode !== "off";
 
   const undoRef = useRef<Grid[]>([]);
   const redoRef = useRef<Grid[]>([]);
@@ -59,6 +75,7 @@ export function PixelArtMaker({
   gridRef.current = grid;
   const drawingRef = useRef(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
 
   const cellPx = useMemo(() => EXPORT_SIZE / res, [res]);
 
@@ -101,14 +118,13 @@ export function PixelArtMaker({
 
   const paint = useCallback(
     (idx: number, value: string | null, g: Grid) => {
-      g[idx] = value;
-      if (mirror) {
-        const y = Math.floor(idx / res);
-        const x = idx % res;
-        g[y * res + (res - 1 - x)] = value;
-      }
+      const y = Math.floor(idx / res);
+      const x = idx % res;
+      const xs = mirrorMode === "h" || mirrorMode === "both" ? [x, res - 1 - x] : [x];
+      const ys = mirrorMode === "v" || mirrorMode === "both" ? [y, res - 1 - y] : [y];
+      for (const yy of ys) for (const xx of xs) g[yy * res + xx] = value;
     },
-    [mirror, res],
+    [mirrorMode, res],
   );
 
   function floodFill(start: number, target: string | null, replacement: string | null) {
@@ -224,6 +240,39 @@ export function PixelArtMaker({
     }
   }
 
+  /** ---- Referência (drag & drop) ---- */
+  function loadRefFile(file: File) {
+    if (!file.type.startsWith("image/")) return toast.error("Envie um arquivo de imagem.");
+    const url = URL.createObjectURL(file);
+    setRef({ url, x: 50, y: 50, scale: 1, opacity: 55, flipX: false, above: false, locked: false });
+    toast.success("Referência carregada — arraste para posicionar.");
+  }
+
+  function onRefPointerDown(e: React.PointerEvent<HTMLElement>) {
+    if (!ref || ref.locked) return;
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    refDragRef.current = { px: e.clientX, py: e.clientY, ox: ref.x, oy: ref.y };
+  }
+  function onRefPointerMove(e: React.PointerEvent<HTMLElement>) {
+    const d = refDragRef.current;
+    if (!d || !ref || !wrapRef.current) return;
+    const rect = wrapRef.current.getBoundingClientRect();
+    setRef({
+      ...ref,
+      x: d.ox + ((e.clientX - d.px) / rect.width) * 100,
+      y: d.oy + ((e.clientY - d.py) / rect.height) * 100,
+    });
+  }
+  function onRefPointerUp() {
+    refDragRef.current = null;
+  }
+  function onRefWheel(e: React.WheelEvent<HTMLElement>) {
+    if (!ref || ref.locked) return;
+    const next = Math.min(4, Math.max(0.1, ref.scale * (e.deltaY < 0 ? 1.08 : 0.92)));
+    setRef({ ...ref, scale: next });
+  }
+
   function exportBlob(): Promise<Blob> {
     const cv = document.createElement("canvas");
     cv.width = EXPORT_SIZE;
@@ -327,18 +376,55 @@ export function PixelArtMaker({
         <Button
           type="button"
           size="sm"
-          variant={mirror ? "default" : "outline"}
+          variant={mirrorMode === "h" || mirrorMode === "both" ? "default" : "outline"}
           className="h-8 px-2"
-          title="Espelhar horizontalmente"
-          onClick={() => setMirror((v) => !v)}
+          title="Espelho horizontal"
+          onClick={() =>
+            setMirrorMode((m) => (m === "off" ? "h" : m === "h" ? "off" : m === "v" ? "both" : "v"))
+          }
         >
           <FlipHorizontal2 size={14} />
         </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={mirrorMode === "v" || mirrorMode === "both" ? "default" : "outline"}
+          className="h-8 px-2"
+          title="Espelho vertical"
+          onClick={() =>
+            setMirrorMode((m) => (m === "off" ? "v" : m === "v" ? "off" : m === "h" ? "both" : "h"))
+          }
+        >
+          <FlipVertical2 size={14} />
+        </Button>
+        <div className="w-px h-6 bg-border mx-1" />
+        <label className="inline-flex">
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) loadRefFile(f); e.target.value = ""; }}
+          />
+          <span className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-2 text-xs cursor-pointer hover:bg-accent">
+            <ImageIcon size={14} /> Referência
+          </span>
+        </label>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_240px] gap-4">
         {/* Canvas */}
-        <div className="relative w-full max-w-[520px] aspect-square rounded-md border border-border bg-[#0d0d12] overflow-hidden mx-auto lg:mx-0">
+        <div
+          ref={wrapRef}
+          className={`relative w-full max-w-[520px] aspect-square rounded-md border overflow-hidden mx-auto lg:mx-0 bg-[#0d0d12] ${dragOver ? "border-gold" : "border-border"}`}
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOver(false);
+            const f = e.dataTransfer.files?.[0];
+            if (f) loadRefFile(f);
+          }}
+        >
           <div
             className="absolute inset-0"
             style={{
@@ -355,6 +441,22 @@ export function PixelArtMaker({
             style={{ imageRendering: "pixelated", opacity: baseOpacity / 100 }}
             draggable={false}
           />
+          {ref && !ref.above && (
+            <img
+              src={ref.url}
+              alt="Referência"
+              className="absolute pointer-events-none"
+              draggable={false}
+              style={{
+                left: `${ref.x}%`, top: `${ref.y}%`,
+                width: `${ref.scale * 100}%`, height: `${ref.scale * 100}%`,
+                objectFit: "contain",
+                transform: `translate(-50%,-50%) scaleX(${ref.flipX ? -1 : 1})`,
+                opacity: ref.opacity / 100,
+                imageRendering: "pixelated",
+              }}
+            />
+          )}
           <canvas
             ref={canvasRef}
             width={EXPORT_SIZE}
@@ -375,6 +477,55 @@ export function PixelArtMaker({
                 backgroundSize: `${100 / res}% ${100 / res}%`,
               }}
             />
+          )}
+          {ref && ref.above && (
+            <img
+              src={ref.url}
+              alt="Referência"
+              className="absolute pointer-events-none"
+              draggable={false}
+              style={{
+                left: `${ref.x}%`, top: `${ref.y}%`,
+                width: `${ref.scale * 100}%`, height: `${ref.scale * 100}%`,
+                objectFit: "contain",
+                transform: `translate(-50%,-50%) scaleX(${ref.flipX ? -1 : 1})`,
+                opacity: ref.opacity / 100,
+                imageRendering: "pixelated",
+              }}
+            />
+          )}
+          {ref && !ref.locked && (
+            <div
+              className="absolute rounded border-2 border-dashed border-gold/70 pointer-events-none"
+              style={{
+                left: `${ref.x}%`, top: `${ref.y}%`,
+                width: `${ref.scale * 100}%`, height: `${ref.scale * 100}%`,
+                transform: "translate(-50%,-50%)",
+              }}
+            >
+              <span
+                className="absolute left-1 top-1 inline-flex items-center gap-1 rounded bg-black/80 px-1.5 py-1 text-[9px] text-gold cursor-move pointer-events-auto select-none"
+                style={{ touchAction: "none" }}
+                onPointerDown={onRefPointerDown}
+                onPointerMove={onRefPointerMove}
+                onPointerUp={onRefPointerUp}
+                onPointerCancel={onRefPointerUp}
+                onWheel={onRefWheel}
+                title="Arraste para mover · roda do mouse para escalar"
+              >
+                <Move size={10} /> referência
+              </span>
+            </div>
+          )}
+          {mirror && (
+            <div className="absolute inset-0 pointer-events-none">
+              {(mirrorMode === "h" || mirrorMode === "both") && (
+                <div className="absolute inset-y-0 left-1/2 w-px bg-gold/50" />
+              )}
+              {(mirrorMode === "v" || mirrorMode === "both") && (
+                <div className="absolute inset-x-0 top-1/2 h-px bg-gold/50" />
+              )}
+            </div>
           )}
         </div>
 
@@ -438,9 +589,75 @@ export function PixelArtMaker({
             />
           </div>
 
-          <div className="flex items-center justify-between rounded border border-border p-2">
-            <span className="text-xs">Espelho horizontal</span>
-            <Switch checked={mirror} onCheckedChange={setMirror} />
+          <div className="rounded border border-border p-2 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs">Desenho espelhado</span>
+              <Switch
+                checked={mirror}
+                onCheckedChange={(v) => setMirrorMode(v ? "h" : "off")}
+              />
+            </div>
+            <div className="flex gap-1">
+              {(["off", "h", "v", "both"] as MirrorMode[]).map((m) => (
+                <Button
+                  key={m}
+                  type="button"
+                  size="sm"
+                  variant={mirrorMode === m ? "default" : "outline"}
+                  className="h-7 flex-1 px-1 text-[10px]"
+                  onClick={() => setMirrorMode(m)}
+                >
+                  {m === "off" ? "Off" : m === "h" ? "↔" : m === "v" ? "↕" : "↔↕"}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded border border-border p-2 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs">Referência</span>
+              {ref && (
+                <div className="flex items-center gap-1">
+                  <Button type="button" size="sm" variant="outline" className="h-6 px-1"
+                    title={ref.locked ? "Destravar" : "Travar"}
+                    onClick={() => setRef({ ...ref, locked: !ref.locked })}>
+                    {ref.locked ? <Lock size={12} /> : <LockOpen size={12} />}
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" className="h-6 px-1 text-red-400"
+                    title="Remover" onClick={() => setRef(null)}>
+                    <X size={12} />
+                  </Button>
+                </div>
+              )}
+            </div>
+            {!ref ? (
+              <p className="text-[10px] text-muted-foreground leading-tight">
+                Arraste uma imagem para o canvas (ou use o botão “Referência”) e posicione com o mouse.
+              </p>
+            ) : (
+              <>
+                <Label className="text-[10px]">Escala — {(ref.scale * 100).toFixed(0)}%</Label>
+                <Slider min={10} max={400} step={5} value={[Math.round(ref.scale * 100)]}
+                  onValueChange={([v]) => setRef({ ...ref, scale: v / 100 })} />
+                <Label className="text-[10px]">Opacidade — {ref.opacity}%</Label>
+                <Slider min={5} max={100} step={5} value={[ref.opacity]}
+                  onValueChange={([v]) => setRef({ ...ref, opacity: v })} />
+                <div className="flex flex-wrap gap-1">
+                  <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[10px]"
+                    onClick={() => setRef({ ...ref, flipX: !ref.flipX })}>
+                    <FlipHorizontal2 size={12} className="mr-1" /> Inverter
+                  </Button>
+                  <Button type="button" size="sm" variant={ref.above ? "default" : "outline"}
+                    className="h-7 px-2 text-[10px]" onClick={() => setRef({ ...ref, above: !ref.above })}>
+                    {ref.above ? "Acima" : "Abaixo"}
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[10px]"
+                    onClick={() => setRef({ ...ref, x: 50, y: 50, scale: 1 })}>
+                    Centralizar
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
 
           {initialUrl && (
