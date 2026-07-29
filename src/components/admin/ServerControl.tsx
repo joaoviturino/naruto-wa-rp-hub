@@ -8,7 +8,8 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { Megaphone, Wrench, Trash2, Power, MessageSquareOff, MapPin, Gift, RotateCw, ArrowLeftRight, Package, Activity, Users, Send, Bell } from "lucide-react";
 import { ComboSelect } from "@/components/ui/combo-select";
-import { teleportAllPlayers, setChatLock, issueGlobalReward, listGlobalRewards, reapplyGlobalReward, deleteGlobalReward, saveStarterKit, sendCustomPush } from "@/lib/admin.functions";
+import { teleportAllPlayers, setChatLock, issueGlobalReward, listGlobalRewards, reapplyGlobalReward, deleteGlobalReward, saveStarterKit, sendCustomPush, setDefaultSprite, applyDefaultSpriteToAll } from "@/lib/admin.functions";
+import { BASE_SPRITE_URL } from "@/lib/sprite-base";
 import { adminPresenceOverview, adminTeleportPlayer } from "@/lib/presence.functions";
 import { useServerFn } from "@tanstack/react-start";
 
