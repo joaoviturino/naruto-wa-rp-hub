@@ -414,6 +414,7 @@ export function PixelArtMaker({
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_240px] gap-4">
         {/* Canvas */}
         <div
+          ref={wrapRef}
           className={`relative w-full max-w-[520px] aspect-square rounded-md border overflow-hidden mx-auto lg:mx-0 bg-[#0d0d12] ${dragOver ? "border-gold" : "border-border"}`}
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
