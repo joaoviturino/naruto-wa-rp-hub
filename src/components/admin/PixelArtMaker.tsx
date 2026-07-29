@@ -493,21 +493,23 @@ export function PixelArtMaker({
           )}
           {ref && !ref.locked && (
             <div
-              className="absolute cursor-move rounded border-2 border-dashed border-gold/70"
+              className="absolute rounded border-2 border-dashed border-gold/70 pointer-events-none"
               style={{
                 left: `${ref.x}%`, top: `${ref.y}%`,
                 width: `${ref.scale * 100}%`, height: `${ref.scale * 100}%`,
                 transform: "translate(-50%,-50%)",
-                touchAction: "none",
               }}
-              onPointerDown={onRefPointerDown}
-              onPointerMove={onRefPointerMove}
-              onPointerUp={onRefPointerUp}
-              onPointerCancel={onRefPointerUp}
-              onWheel={onRefWheel}
-              title="Arraste para mover · roda do mouse para escalar"
             >
-              <span className="absolute left-1 top-1 inline-flex items-center gap-1 rounded bg-black/70 px-1 py-0.5 text-[9px] text-gold">
+              <span
+                className="absolute left-1 top-1 inline-flex items-center gap-1 rounded bg-black/80 px-1.5 py-1 text-[9px] text-gold cursor-move pointer-events-auto select-none"
+                style={{ touchAction: "none" }}
+                onPointerDown={onRefPointerDown}
+                onPointerMove={onRefPointerMove}
+                onPointerUp={onRefPointerUp}
+                onPointerCancel={onRefPointerUp}
+                onWheel={onRefWheel}
+                title="Arraste para mover · roda do mouse para escalar"
+              >
                 <Move size={10} /> referência
               </span>
             </div>
