@@ -8,12 +8,15 @@ import { toast } from "sonner";
 import {
   Pencil, Eraser, PaintBucket, Pipette, Undo2, Redo2, Trash2, Save, Loader2, Grid3x3,
   FlipHorizontal2, FlipVertical2, Download, Image as ImageIcon, Move, Lock, LockOpen, X,
+  Lasso, ZoomIn, ZoomOut, Maximize,
 } from "lucide-react";
 import { BASE_SPRITE_URL } from "@/lib/sprite-base";
 import type { CosmeticSlot } from "@/lib/sprite-align";
 
-type Tool = "pencil" | "eraser" | "bucket" | "picker";
+type Tool = "pencil" | "eraser" | "bucket" | "picker" | "lasso";
 type Grid = (string | null)[];
+type Pt = { x: number; y: number };
+type Floating = { pixels: { x: number; y: number; c: string }[]; dx: number; dy: number };
 type MirrorMode = "off" | "h" | "v" | "both";
 type RefState = {
   url: string;
@@ -66,6 +69,11 @@ export function PixelArtMaker({
   const [busy, setBusy] = useState(false);
   const [ref, setRef] = useState<RefState | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [selection, setSelection] = useState<Set<number> | null>(null);
+  const [floating, setFloating] = useState<Floating | null>(null);
+  const [lassoPath, setLassoPath] = useState<Pt[] | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState<Pt>({ x: 0, y: 0 });
   const refDragRef = useRef<{ px: number; py: number; ox: number; oy: number } | null>(null);
   const mirror = mirrorMode !== "off";
 
@@ -76,6 +84,11 @@ export function PixelArtMaker({
   const drawingRef = useRef(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
+  const modeRef = useRef<"none" | "draw" | "lasso" | "move" | "pan">("none");
+  const moveRef = useRef<{ sx: number; sy: number } | null>(null);
+  const panRef = useRef<{ px: number; py: number; ox: number; oy: number } | null>(null);
+  const floatRef = useRef<Floating | null>(null);
+  floatRef.current = floating;
 
   const cellPx = useMemo(() => EXPORT_SIZE / res, [res]);
 
@@ -153,6 +166,63 @@ export function PixelArtMaker({
     return y * res + x;
   }
 
+  function cellPointFromEvent(e: React.PointerEvent<HTMLCanvasElement>): Pt {
+    const rect = e.currentTarget.getBoundingClientRect();
+    return {
+      x: ((e.clientX - rect.left) / rect.width) * res,
+      y: ((e.clientY - rect.top) / rect.height) * res,
+    };
+  }
+
+  /** Point-in-polygon (ray casting) sobre o centro de cada célula. */
+  function maskFromPath(path: Pt[]): Set<number> {
+    const out = new Set<number>();
+    if (path.length < 3) return out;
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const p of path) {
+      minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+      minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+    }
+    const x0 = Math.max(0, Math.floor(minX)), x1 = Math.min(res - 1, Math.ceil(maxX));
+    const y0 = Math.max(0, Math.floor(minY)), y1 = Math.min(res - 1, Math.ceil(maxY));
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const px = x + 0.5, py = y + 0.5;
+        let inside = false;
+        for (let i = 0, j = path.length - 1; i < path.length; j = i++) {
+          const a = path[i], b = path[j];
+          if ((a.y > py) !== (b.y > py) && px < ((b.x - a.x) * (py - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+        }
+        if (inside) out.add(y * res + x);
+      }
+    }
+    return out;
+  }
+
+  /** Grava os pixels flutuantes na grade e devolve a nova seleção. */
+  function commitFloating(f: Floating | null) {
+    if (!f) return;
+    const g = gridRef.current.slice();
+    const next = new Set<number>();
+    for (const p of f.pixels) {
+      const x = p.x + f.dx, y = p.y + f.dy;
+      if (x < 0 || y < 0 || x >= res || y >= res) continue;
+      g[y * res + x] = p.c;
+      next.add(y * res + x);
+    }
+    setGrid(g);
+    setSelection(next.size ? next : null);
+    setFloating(null);
+  }
+
+  function clearSelectionPixels() {
+    if (!selection?.size) return;
+    pushUndo();
+    const g = gridRef.current.slice();
+    selection.forEach((i) => { g[i] = null; });
+    setGrid(g);
+  }
+
   function applyAt(idx: number) {
     if (idx < 0) return;
     if (tool === "picker") {
@@ -175,18 +245,108 @@ export function PixelArtMaker({
 
   function onDown(e: React.PointerEvent<HTMLCanvasElement>) {
     e.currentTarget.setPointerCapture(e.pointerId);
+    // Pan: botão do meio ou Alt
+    if (e.button === 1 || e.altKey) {
+      modeRef.current = "pan";
+      panRef.current = { px: e.clientX, py: e.clientY, ox: pan.x, oy: pan.y };
+      return;
+    }
+    if (tool === "lasso") {
+      const idx = cellFromEvent(e);
+      if (selection?.size && idx >= 0 && selection.has(idx)) {
+        // começa a mover a seleção
+        pushUndo();
+        const pixels: Floating["pixels"] = [];
+        const g = gridRef.current.slice();
+        selection.forEach((i) => {
+          const c = g[i];
+          if (c) pixels.push({ x: i % res, y: Math.floor(i / res), c });
+          g[i] = null;
+        });
+        setGrid(g);
+        const p = cellPointFromEvent(e);
+        moveRef.current = { sx: p.x, sy: p.y };
+        setFloating({ pixels, dx: 0, dy: 0 });
+        modeRef.current = "move";
+        return;
+      }
+      commitFloating(floatRef.current);
+      setSelection(null);
+      setLassoPath([cellPointFromEvent(e)]);
+      modeRef.current = "lasso";
+      return;
+    }
+    commitFloating(floatRef.current);
+    modeRef.current = "draw";
     if (tool === "pencil" || tool === "eraser") pushUndo();
     drawingRef.current = true;
     applyAt(cellFromEvent(e));
   }
   function onMove(e: React.PointerEvent<HTMLCanvasElement>) {
+    if (modeRef.current === "pan" && panRef.current) {
+      const d = panRef.current;
+      setPan({ x: d.ox + (e.clientX - d.px), y: d.oy + (e.clientY - d.py) });
+      return;
+    }
+    if (modeRef.current === "lasso") {
+      const p = cellPointFromEvent(e);
+      setLassoPath((prev) => (prev ? [...prev, p] : [p]));
+      return;
+    }
+    if (modeRef.current === "move" && moveRef.current) {
+      const p = cellPointFromEvent(e);
+      const dx = Math.round(p.x - moveRef.current.sx);
+      const dy = Math.round(p.y - moveRef.current.sy);
+      setFloating((f) => (f ? { ...f, dx, dy } : f));
+      return;
+    }
     if (!drawingRef.current) return;
     if (tool !== "pencil" && tool !== "eraser") return;
     applyAt(cellFromEvent(e));
   }
   function onUp() {
+    if (modeRef.current === "pan") { panRef.current = null; modeRef.current = "none"; return; }
+    if (modeRef.current === "lasso") {
+      const path = lassoPath ?? [];
+      const mask = maskFromPath(path);
+      setSelection(mask.size ? mask : null);
+      setLassoPath(null);
+      modeRef.current = "none";
+      if (!mask.size) toast.info("Desenhe um laço fechado para selecionar.");
+      return;
+    }
+    if (modeRef.current === "move") {
+      commitFloating(floatRef.current);
+      moveRef.current = null;
+      modeRef.current = "none";
+      return;
+    }
+    modeRef.current = "none";
     drawingRef.current = false;
   }
+
+  /** Zoom com a roda do mouse, ancorado no cursor. */
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const onWheel = (ev: WheelEvent) => {
+      if ((ev.target as HTMLElement)?.dataset?.refHandle === "1") return;
+      ev.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const cx = ev.clientX - rect.left;
+      const cy = ev.clientY - rect.top;
+      setZoom((z) => {
+        const next = Math.min(16, Math.max(1, z * (ev.deltaY < 0 ? 1.15 : 1 / 1.15)));
+        setPan((p) => ({
+          x: cx - ((cx - p.x) * next) / z,
+          y: cy - ((cy - p.y) * next) / z,
+        }));
+        return next;
+      });
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
 
   /** Render do canvas de edição. */
   useEffect(() => {
@@ -204,7 +364,40 @@ export function PixelArtMaker({
       ctx.fillStyle = c;
       ctx.fillRect(x, y, cellPx, cellPx);
     }
-  }, [grid, res, cellPx]);
+    // pixels flutuantes (seleção sendo movida)
+    if (floating) {
+      for (const p of floating.pixels) {
+        const x = p.x + floating.dx, y = p.y + floating.dy;
+        if (x < 0 || y < 0 || x >= res || y >= res) continue;
+        ctx.fillStyle = p.c;
+        ctx.fillRect(x * cellPx, y * cellPx, cellPx, cellPx);
+      }
+    }
+    // realce da seleção
+    const sel = floating
+      ? new Set(floating.pixels.map((p) => (p.y + floating.dy) * res + (p.x + floating.dx)))
+      : selection;
+    if (sel?.size) {
+      ctx.fillStyle = "rgba(212,164,58,0.22)";
+      sel.forEach((i) => {
+        if (i < 0 || i >= res * res) return;
+        ctx.fillRect((i % res) * cellPx, Math.floor(i / res) * cellPx, cellPx, cellPx);
+      });
+    }
+    // traçado do laço em andamento
+    if (lassoPath && lassoPath.length > 1) {
+      ctx.save();
+      ctx.strokeStyle = "#f2d06b";
+      ctx.lineWidth = Math.max(1, EXPORT_SIZE / 220);
+      ctx.setLineDash([EXPORT_SIZE / 60, EXPORT_SIZE / 90]);
+      ctx.beginPath();
+      ctx.moveTo(lassoPath[0].x * cellPx, lassoPath[0].y * cellPx);
+      for (const p of lassoPath.slice(1)) ctx.lineTo(p.x * cellPx, p.y * cellPx);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.restore();
+    }
+  }, [grid, res, cellPx, selection, floating, lassoPath]);
 
   /** Carrega uma peça existente como ponto de partida. */
   async function importImage(url: string) {
@@ -260,8 +453,8 @@ export function PixelArtMaker({
     const rect = wrapRef.current.getBoundingClientRect();
     setRef({
       ...ref,
-      x: d.ox + ((e.clientX - d.px) / rect.width) * 100,
-      y: d.oy + ((e.clientY - d.py) / rect.height) * 100,
+      x: d.ox + ((e.clientX - d.px) / zoom / rect.width) * 100,
+      y: d.oy + ((e.clientY - d.py) / zoom / rect.height) * 100,
     });
   }
   function onRefPointerUp() {
