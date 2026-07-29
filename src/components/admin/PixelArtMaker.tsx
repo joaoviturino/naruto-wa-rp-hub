@@ -535,6 +535,7 @@ export function PixelArtMaker({
         {toolBtn("eraser", <Eraser size={14} />, "Borracha")}
         {toolBtn("bucket", <PaintBucket size={14} />, "Balde")}
         {toolBtn("picker", <Pipette size={14} />, "Conta-gotas")}
+        {toolBtn("lasso", <Lasso size={14} />, "Laço de seleção (arraste dentro para mover)")}
         <div className="w-px h-6 bg-border mx-1" />
         <Button type="button" size="sm" variant="outline" className="h-8 px-2" title="Desfazer" onClick={undo}>
           <Undo2 size={14} />
@@ -602,6 +603,20 @@ export function PixelArtMaker({
             <ImageIcon size={14} /> Referência
           </span>
         </label>
+        <div className="w-px h-6 bg-border mx-1" />
+        <Button type="button" size="sm" variant="outline" className="h-8 px-2" title="Afastar"
+          onClick={() => setZoom((z) => Math.max(1, z / 1.3))}>
+          <ZoomOut size={14} />
+        </Button>
+        <span className="text-[10px] font-mono text-muted-foreground w-10 text-center">{Math.round(zoom * 100)}%</span>
+        <Button type="button" size="sm" variant="outline" className="h-8 px-2" title="Aproximar"
+          onClick={() => setZoom((z) => Math.min(16, z * 1.3))}>
+          <ZoomIn size={14} />
+        </Button>
+        <Button type="button" size="sm" variant="outline" className="h-8 px-2" title="Resetar zoom"
+          onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}>
+          <Maximize size={14} />
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_240px] gap-4">
@@ -627,6 +642,10 @@ export function PixelArtMaker({
               backgroundPosition: "0 0,0 8px,8px -8px,-8px 0",
             }}
           />
+          <div
+            className="absolute inset-0"
+            style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: "0 0" }}
+          >
           <img
             src={BASE_SPRITE_URL}
             alt="Gabarito"
@@ -655,11 +674,11 @@ export function PixelArtMaker({
             width={EXPORT_SIZE}
             height={EXPORT_SIZE}
             className="absolute inset-0 h-full w-full touch-none cursor-crosshair"
-            style={{ imageRendering: "pixelated" }}
+            style={{ imageRendering: "pixelated", cursor: tool === "lasso" ? "cell" : "crosshair" }}
             onPointerDown={onDown}
             onPointerMove={onMove}
             onPointerUp={onUp}
-            onPointerLeave={onUp}
+            onPointerCancel={onUp}
           />
           {showGrid && (
             <div
@@ -698,6 +717,7 @@ export function PixelArtMaker({
             >
               <span
                 className="absolute left-1 top-1 inline-flex items-center gap-1 rounded bg-black/80 px-1.5 py-1 text-[9px] text-gold cursor-move pointer-events-auto select-none"
+                data-ref-handle="1"
                 style={{ touchAction: "none" }}
                 onPointerDown={onRefPointerDown}
                 onPointerMove={onRefPointerMove}
@@ -720,6 +740,7 @@ export function PixelArtMaker({
               )}
             </div>
           )}
+          </div>
         </div>
 
         {/* Painel lateral */}
