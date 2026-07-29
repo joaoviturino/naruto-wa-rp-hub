@@ -139,8 +139,15 @@ function ItemDialog({ open, onOpenChange, initial, missions, skills, adminUserId
                 />
               </Field>
           <Field label="Imagem">
-            <div className="flex items-center gap-2">
-              {f.image_url && <img src={f.image_url} alt="" className="w-12 h-12 rounded object-cover" />}
+            <div className="flex items-center gap-3">
+              <div className="relative h-24 w-24 rounded-xl overflow-hidden border border-border bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center shadow-inner">
+                <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.15) 1px, transparent 1px)", backgroundSize: "8px 8px" }} />
+                {f.image_url ? (
+                  <img src={f.image_url} alt="" className="relative z-10 max-h-full max-w-full object-contain drop-shadow-md" />
+                ) : (
+                  <span className="relative z-10 text-[10px] text-muted-foreground text-center px-2">sem imagem</span>
+                )}
+              </div>
               <ImageUpload label="Enviar" bucket="items" userId={adminUserId} onUploaded={(url) => up("image_url", url)} />
             </div>
           </Field>
