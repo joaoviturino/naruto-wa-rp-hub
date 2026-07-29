@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertTriangle } from "lucide-react";
-import spriteBaseAsset from "@/assets/shinobi-base.png.asset.json";
+import { BASE_SPRITE_URL } from "@/lib/sprite-base";
 
 type Clan = { id: string; name: string; village: Village; rarity: "common"|"uncommon"|"rare"|"epic"|"legendary"; element_bonus: Element | null; description: string | null; weight: number };
 type Gender = "masculino" | "feminino";
@@ -30,8 +30,6 @@ const DDI_OPTIONS: { code: string; label: string; flag: string }[] = [
   { code: "+54", label: "Argentina", flag: "🇦🇷" },
   { code: "+56", label: "Chile", flag: "🇨🇱" },
 ];
-
-const BASE_SPRITE_URL = (spriteBaseAsset as { url: string }).url;
 
 export function CharacterWizard({ onDone }: { onDone: () => void }) {
   const [step, setStep] = useState(1);

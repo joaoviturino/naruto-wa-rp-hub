@@ -2,20 +2,24 @@
 // base, aparando o bounding box transparente e reposicionando pelo slot. Assim, ao
 // renderizar com `object-contain` sobre o sprite base, a peça encaixa perfeitamente.
 
+import { BASE_CANVAS } from "@/lib/sprite-base";
+
 export type CosmeticSlot = "hair" | "face" | "clothing" | "accessory";
 
-// Dimensões e regiões de alvo por slot (em fração do canvas 0..1).
+// Dimensões e regiões de alvo por slot (em fração do canvas 0..1), calibradas
+// para o SPRITE BASE PIXEL ART oficial (cabeça y .14-.39, tronco .42-.67,
+// pernas .70-.86, centro horizontal .49).
 // cx/cy = centro da peça; maxW/maxH = tamanho máximo (a peça é ajustada mantendo aspecto).
 const SLOT_LAYOUT: Record<CosmeticSlot, { cx: number; cy: number; maxW: number; maxH: number }> = {
-  hair:      { cx: 0.5, cy: 0.14, maxW: 0.55, maxH: 0.25 },
-  face:      { cx: 0.5, cy: 0.20, maxW: 0.32, maxH: 0.18 },
-  clothing:  { cx: 0.5, cy: 0.52, maxW: 0.70, maxH: 0.55 },
-  accessory: { cx: 0.5, cy: 0.50, maxW: 1.00, maxH: 1.00 },
+  hair:      { cx: 0.49, cy: 0.19, maxW: 0.44, maxH: 0.20 },
+  face:      { cx: 0.49, cy: 0.28, maxW: 0.30, maxH: 0.14 },
+  clothing:  { cx: 0.49, cy: 0.62, maxW: 0.52, maxH: 0.46 },
+  accessory: { cx: 0.49, cy: 0.50, maxW: 1.00, maxH: 1.00 },
 };
 
-// Aspecto do sprite base (largura/altura). Aproxima 512×768 do shinobi base.
-const CANVAS_W = 512;
-const CANVAS_H = 768;
+// Canvas do sprite base oficial (pixel art) — peças são normalizadas nele.
+const CANVAS_W = BASE_CANVAS.width;
+const CANVAS_H = BASE_CANVAS.height;
 const ALPHA_THRESHOLD = 8; // pixels com alpha < 8 são considerados transparentes
 
 function loadImage(src: string): Promise<HTMLImageElement> {

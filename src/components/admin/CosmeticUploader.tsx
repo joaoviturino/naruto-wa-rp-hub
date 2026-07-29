@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Upload, Loader2 } from "lucide-react";
 import { normalizeCosmetic, type CosmeticSlot } from "@/lib/sprite-align";
-import baseSprite from "@/assets/shinobi-base.png.asset.json";
+import { BASE_SPRITE_URL } from "@/lib/sprite-base";
 
 /**
  * Uploader dedicado a peças cosméticas: valida o PNG, apara transparência, encaixa
@@ -66,9 +66,10 @@ export function CosmeticUploader({
     <div className="flex items-center gap-3">
       <div className="relative h-40 w-28 rounded border border-border bg-black/40 overflow-hidden shrink-0">
         <img
-          src={baseSprite.url}
-          alt="Base"
+          src={BASE_SPRITE_URL}
+          alt="Sprite base (gabarito)"
           className="absolute inset-0 h-full w-full object-contain opacity-50"
+          style={{ imageRendering: "pixelated" }}
           draggable={false}
         />
         {previewUrl && (
@@ -99,7 +100,8 @@ export function CosmeticUploader({
           <span className="ml-1">{busy ? "Alinhando…" : "Enviar PNG"}</span>
         </Button>
         <p className="text-[10px] text-muted-foreground max-w-[180px] leading-tight">
-          O sistema apara o fundo transparente e centraliza a peça no slot
+          Desenhe sempre sobre o <b className="text-gold">sprite base pixel art</b> (512×512).
+          O sistema apara o fundo transparente e encaixa a peça no slot
           <b className="text-gold"> {slot}</b> automaticamente.
         </p>
       </div>

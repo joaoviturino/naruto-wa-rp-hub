@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import baseSheet from "@/assets/sprite-test-base.png.asset.json";
+import { BASE_SPRITE_URL } from "@/lib/sprite-base";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -136,7 +136,7 @@ export function SpriteTester() {
       if (s) setSkin((prev) => ({ ...prev, src: s }));
       if (e) setEyes((prev) => ({ ...prev, src: e }));
     };
-    i.src = baseSheet.url;
+    i.src = BASE_SPRITE_URL;
   }, []);
 
   const swaps = useMemo(() => [eyes, skin], [eyes, skin]);
