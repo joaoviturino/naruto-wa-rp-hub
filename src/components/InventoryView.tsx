@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useServerFn } from "@tanstack/react-start";
 import { equipItem, unequipItem, consumeItem, dropItem, moveItemBetweenBags } from "@/lib/character.functions";
 import { toast } from "sonner";
+import { CosmeticOverlay } from "@/components/CosmeticOverlay";
 
 type Item = { id: string; name: string; type: string; slot_size: number; image_url?: string | null; description?: string | null; rank?: string; durability?: number | null };
 type BagEntry = { item_id: string; qty: number };
