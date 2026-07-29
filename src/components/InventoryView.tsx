@@ -116,7 +116,10 @@ export function InventoryView({ characterId, userId, bgUrl, onBgChange, onChange
 
         <div className="relative col-span-2 sm:col-span-1 mx-auto w-full max-w-xs sm:w-64 h-64 sm:h-80 border-2 border-gold/50 rounded-lg overflow-hidden bg-gradient-to-b from-secondary to-background flex items-center justify-center order-1 sm:order-2">
           {bgUrl ? (
-            <img src={bgUrl} alt="Personagem" className="max-h-full max-w-full object-contain" />
+            <div className="relative h-full w-full">
+              <img src={bgUrl} alt="Personagem" className="absolute inset-0 h-full w-full object-contain" />
+              <CosmeticOverlay characterId={characterId} />
+            </div>
           ) : (
             <div className="text-muted-foreground text-sm text-center px-4">
               Envie um PNG sem fundo do seu shinobi
