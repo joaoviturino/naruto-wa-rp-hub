@@ -830,6 +830,34 @@ export function PixelArtMaker({
           <div className="rounded border border-border p-2 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs">Referência</span>
+</div></div>
+
+          <div className="rounded border border-border p-2 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs">Seleção (laço)</span>
+              <span className="text-[10px] text-muted-foreground">
+                {selection?.size ? `${selection.size} px` : "vazia"}
+              </span>
+            </div>
+            <p className="text-[10px] text-muted-foreground leading-tight">
+              Com o laço ativo, contorne uma área e depois arraste <b>dentro</b> dela para mover os pixels.
+              Roda do mouse aproxima/afasta; Alt (ou botão do meio) arrasta a tela.
+            </p>
+            <div className="flex gap-1">
+              <Button type="button" size="sm" variant="outline" className="h-7 flex-1 px-1 text-[10px]"
+                disabled={!selection?.size} onClick={() => { setSelection(null); setLassoPath(null); }}>
+                Limpar seleção
+              </Button>
+              <Button type="button" size="sm" variant="outline" className="h-7 flex-1 px-1 text-[10px] text-red-400"
+                disabled={!selection?.size} onClick={clearSelectionPixels}>
+                Apagar pixels
+              </Button>
+            </div>
+          </div>
+
+          <div className="rounded border border-border p-2 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs">Referência</span>
               {ref && (
                 <div className="flex items-center gap-1">
                   <Button type="button" size="sm" variant="outline" className="h-6 px-1"
