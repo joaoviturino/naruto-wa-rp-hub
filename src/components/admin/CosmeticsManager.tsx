@@ -17,6 +17,7 @@ type Slot = "hair" | "face" | "clothing" | "accessory";
 type Piece = {
   id: string; slot: Slot; name: string; image_url: string;
   z_index: number; sort_order: number; active: boolean;
+  customizable: boolean;
   sheet_url: string | null; sheet_cols: number | null; sheet_rows: number | null;
   sheet_states: StatesMap | null;
 };
@@ -31,7 +32,7 @@ export function CosmeticsManager({ adminUserId }: { adminUserId: string }) {
   const [editing, setEditing] = useState<Piece | null>(null);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState<Omit<Piece, "id">>({
-    slot: "hair", name: "", image_url: "", z_index: 3, sort_order: 0, active: true,
+    slot: "hair", name: "", image_url: "", z_index: 3, sort_order: 0, active: true, customizable: true,
     sheet_url: null, sheet_cols: null, sheet_rows: null, sheet_states: null,
   });
   const [filter, setFilter] = useState<Slot | "all">("all");
@@ -46,11 +47,13 @@ export function CosmeticsManager({ adminUserId }: { adminUserId: string }) {
   function startCreate() {
     setCreating(true); setEditing(null);
     setForm({ slot: "hair", name: "", image_url: "", z_index: SLOT_DEFAULT_Z.hair, sort_order: rows.length * 10, active: true,
+      customizable: true,
       sheet_url: null, sheet_cols: null, sheet_rows: null, sheet_states: null });
   }
   function startEdit(r: Piece) {
     setEditing(r); setCreating(false);
     setForm({ slot: r.slot, name: r.name, image_url: r.image_url, z_index: r.z_index, sort_order: r.sort_order, active: r.active,
+      customizable: r.customizable !== false,
       sheet_url: r.sheet_url ?? null, sheet_cols: r.sheet_cols ?? null, sheet_rows: r.sheet_rows ?? null, sheet_states: r.sheet_states ?? null });
   }
   function cancel() { setCreating(false); setEditing(null); }
@@ -142,6 +145,15 @@ export function CosmeticsManager({ adminUserId }: { adminUserId: string }) {
               <Input className="mt-1" type="number" value={form.z_index} onChange={(e) => setForm({ ...form, z_index: parseInt(e.target.value || "0") })} />
             </div>
           </div>
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-input/20 p-3">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold">Disponível na personalização</div>
+              <p className="text-xs text-muted-foreground">
+                Ligado: qualquer jogador pode equipar na aba Aparência. Desligado: peça <b>exclusiva</b> — só admins conseguem colocá-la no personagem.
+              </p>
+            </div>
+            <Switch checked={form.customizable} onCheckedChange={(v) => setForm({ ...form, customizable: v })} />
+          </div>
           <Tabs defaultValue="draw">
             <TabsList>
               <TabsTrigger value="draw">Pixel Art Maker</TabsTrigger>
@@ -195,7 +207,9 @@ export function CosmeticsManager({ adminUserId }: { adminUserId: string }) {
               <img src={r.image_url} alt={r.name} className="max-h-full max-w-full object-contain" />
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-widest text-gold">{SLOT_LABEL[r.slot]} · z{r.z_index}</div>
+              <div className="text-[10px] uppercase tracking-widest text-gold">
+                {SLOT_LABEL[r.slot]} · z{r.z_index} {r.customizable === false && <span className="text-blood">· exclusiva</span>}
+              </div>
               <div className="text-sm font-semibold truncate">{r.name}</div>
             </div>
             <div className="flex items-center gap-1">
