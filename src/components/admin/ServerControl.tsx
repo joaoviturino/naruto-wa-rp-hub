@@ -37,6 +37,7 @@ export function ServerControl() {
   return (
     <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
       <MaintenanceCard />
+      <DefaultSpriteCard />
       <BroadcastCard />
       <PushComposerCard />
       <GlobalToolsCard />
@@ -49,6 +50,79 @@ export function ServerControl() {
 }
 
 function PushComposerCard() {
+  return <PushComposerCardInner />;
+}
+
+function DefaultSpriteCard() {
+  const [url, setUrl] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const setDefault = useServerFn(setDefaultSprite);
+  const applyAll = useServerFn(applyDefaultSpriteToAll);
+
+  useEffect(() => {
+    supabase.from("server_config").select("default_sprite_url").eq("id", "main").maybeSingle()
+      .then(({ data }) => setUrl(((data as any)?.default_sprite_url as string) ?? null));
+  }, []);
+
+  async function upload(file: File) {
+    setBusy(true);
+    try {
+      const path = `default-sprite/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+      const { error } = await supabase.storage.from("cosmetics").upload(path, file, { upsert: true });
+      if (error) throw error;
+      const { data } = await supabase.storage.from("cosmetics").createSignedUrl(path, 60 * 60 * 24 * 365 * 5);
+      if (!data?.signedUrl) throw new Error("Falha ao gerar URL");
+      await setDefault({ data: { url: data.signedUrl } } as any);
+      setUrl(data.signedUrl);
+      toast.success("Boneco padrão atualizado.");
+    } catch (e: any) { toast.error(e.message); } finally { setBusy(false); }
+  }
+
+  async function useBase() {
+    setBusy(true);
+    try {
+      await setDefault({ data: { url: BASE_SPRITE_URL } } as any);
+      setUrl(BASE_SPRITE_URL);
+      toast.success("Boneco oficial definido como padrão.");
+    } catch (e: any) { toast.error(e.message); } finally { setBusy(false); }
+  }
+
+  async function apply(onlyEmpty: boolean) {
+    if (!onlyEmpty && !confirm("Substituir o sprite de TODOS os personagens pelo boneco padrão?")) return;
+    setBusy(true);
+    try {
+      const r: any = await applyAll({ data: { onlyEmpty } } as any);
+      toast.success(`Aplicado a ${r.updated} personagem(ns).`);
+    } catch (e: any) { toast.error(e.message); } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="scroll-panel rounded-lg p-4 sm:p-6 space-y-4">
+      <h3 className="font-display text-xl text-gold">Boneco padrão do inventário</h3>
+      <p className="text-xs text-muted-foreground">
+        Define a PNG/sprite usada por padrão na ficha de todos os jogadores. Cada jogador pode recolorir (pele e olhos) pelo botão <b>Personalizar</b> na ficha.
+      </p>
+      <div className="flex items-center gap-3">
+        <div className="h-24 w-24 rounded-lg bg-black/40 border border-border grid place-items-center overflow-hidden">
+          {url
+            ? <img src={url} alt="padrão" className="max-h-full max-w-full object-contain" style={{ imageRendering: "pixelated" }} />
+            : <span className="text-[10px] text-muted-foreground">nenhum</span>}
+        </div>
+        <div className="space-y-2 flex-1 min-w-0">
+          <Input type="file" accept="image/*" disabled={busy}
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); }} />
+          <Button size="sm" variant="outline" disabled={busy} onClick={useBase}>Usar boneco oficial</Button>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2 border-t border-border pt-3">
+        <Button size="sm" disabled={busy} onClick={() => apply(true)}>Aplicar a quem não tem</Button>
+        <Button size="sm" variant="destructive" disabled={busy} onClick={() => apply(false)}>Aplicar a todos</Button>
+      </div>
+    </div>
+  );
+}
+
+function PushComposerCardInner() {
   const send = useServerFn(sendCustomPush);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
