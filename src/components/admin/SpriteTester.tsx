@@ -56,7 +56,17 @@ function hslToRgb(h: number, s: number, l: number): RGB {
   return [hk(h + 1 / 3) * 255, hk(h) * 255, hk(h - 1 / 3) * 255];
 }
 
-type Swap = { src: string; dst: string; hueTol: number; satMin: number };
+type Swap = {
+  src: string;
+  dst: string;
+  hueTol: number;
+  satMin: number;
+  // Faixa opcional de matiz (wraps ao redor de 360). Quando definida,
+  // substitui a checagem por distância ao src — útil para pele, que engloba
+  // tons quentes (amarelos, vermelhos e rosas de sombra).
+  hueMin?: number;
+  hueMax?: number;
+};
 
 // Paleta de tons de pele: do mais claro (porcelana) ao mais escuro (ébano).
 const SKIN_TONES: { name: string; hex: string }[] = [
@@ -75,7 +85,15 @@ export function SpriteTester() {
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   // A cor "src" é auto-amostrada do sprite base e nunca aparece na UI.
   const [eyes, setEyes] = useState<Swap>({ src: "#4ed88c", dst: "#4ed88c", hueTol: 30, satMin: 0.35 });
-  const [skin, setSkin] = useState<Swap>({ src: "#f5c57a", dst: SKIN_TONES[2].hex, hueTol: 28, satMin: 0.18 });
+  const [skin, setSkin] = useState<Swap>({
+    src: "#f5c57a",
+    dst: SKIN_TONES[2].hex,
+    hueTol: 28,
+    satMin: 0.15,
+    // Pele = quentes: 340°..360° e 0°..55° (inclui rosas de sombra e amarelos).
+    hueMin: 340,
+    hueMax: 55,
+  });
 
   useEffect(() => {
     const i = new Image();
@@ -97,7 +115,9 @@ export function SpriteTester() {
         const [h, s, l] = rgbToHsl(r, g, b);
         if (s < 0.25 || l < 0.15 || l > 0.9) continue;
         const hb = Math.round(h / 5) * 5;
-        if (h >= 20 && h <= 55) {
+        // Pele: aceita quentes 340..360 e 0..55 (inclui rosas de sombra)
+        const isWarm = (h >= 340 && h <= 360) || (h >= 0 && h <= 55);
+        if (isWarm) {
           const bkt = (skinBuckets[hb] ||= { r: 0, g: 0, b: 0, n: 0 });
           bkt.r += r; bkt.g += g; bkt.b += b; bkt.n += 1;
         } else if (h >= 90 && h <= 170) {
@@ -137,7 +157,12 @@ export function SpriteTester() {
       const src = hexToRgb(s.src); const dst = hexToRgb(s.dst);
       const [sh, ss, sl] = rgbToHsl(src[0], src[1], src[2]);
       const [dh, ds, dl] = rgbToHsl(dst[0], dst[1], dst[2]);
-      return { srcH: sh, srcS: ss, srcL: sl, dstH: dh, dstS: ds, dstL: dl, hueTol: s.hueTol, satMin: s.satMin };
+      return {
+        srcH: sh, srcS: ss, srcL: sl,
+        dstH: dh, dstS: ds, dstL: dl,
+        hueTol: s.hueTol, satMin: s.satMin,
+        hueMin: s.hueMin, hueMax: s.hueMax,
+      };
     });
     for (let i = 0; i < px.length; i += 4) {
       if (px[i + 3] < 8) continue;
@@ -147,8 +172,19 @@ export function SpriteTester() {
       let bestD = Infinity;
       for (const p of parsed) {
         if (s < p.satMin - 0.05) continue;
-        const dh = Math.min(Math.abs(h - p.srcH), 360 - Math.abs(h - p.srcH));
-        if (dh <= p.hueTol && dh < bestD) { best = p; bestD = dh; }
+        let match = false;
+        let score = 0;
+        if (p.hueMin !== undefined && p.hueMax !== undefined) {
+          // Faixa com wrap ao redor de 360 (ex: 340..55)
+          const inRange = p.hueMin <= p.hueMax
+            ? (h >= p.hueMin && h <= p.hueMax)
+            : (h >= p.hueMin || h <= p.hueMax);
+          if (inRange) { match = true; score = 0; }
+        } else {
+          const dh = Math.min(Math.abs(h - p.srcH), 360 - Math.abs(h - p.srcH));
+          if (dh <= p.hueTol) { match = true; score = dh; }
+        }
+        if (match && score < bestD) { best = p; bestD = score; }
       }
       if (!best) continue;
       // Preserva luminância (shading) e transporta hue/sat do destino
