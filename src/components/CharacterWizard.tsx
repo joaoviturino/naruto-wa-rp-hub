@@ -31,8 +31,6 @@ const DDI_OPTIONS: { code: string; label: string; flag: string }[] = [
   { code: "+56", label: "Chile", flag: "🇨🇱" },
 ];
 
-const BASE_SPRITE_URL = (spriteBaseAsset as { url: string }).url;
-
 export function CharacterWizard({ onDone }: { onDone: () => void }) {
   const [step, setStep] = useState(1);
   const [nickname, setNickname] = useState("");
