@@ -29,11 +29,13 @@ import { TodoAlertsBell } from "@/components/admin/TodoAlertsBell";
 import { SubmissionsManager } from "@/components/admin/SubmissionsManager";
 import { BattlePassManager } from "@/components/admin/BattlePassManager";
 import { CosmeticsManager } from "@/components/admin/CosmeticsManager";
+import { SpriteTester } from "@/components/admin/SpriteTester";
 import { NINJA_RANKS } from "@/components/admin/shared";
 import {
   Pencil, BatteryCharging, Eye, LayoutDashboard, Users, Package, Sparkles,
   ScrollText, GitBranch, MapPin, Ghost, Gamepad2, BookOpen, TrendingUp,
   ShieldCheck, Server, MessageSquare, Award, UsersRound, Menu, X, Rabbit, RotateCcw, AlertTriangle, Briefcase, CheckSquare, Hammer, Trophy, Shirt,
+  FlaskConical,
 } from "lucide-react";
 
 type NavItem = { id: string; label: string; icon: React.ComponentType<{ size?: number; className?: string }>; group: string; adminOnly?: boolean };
@@ -55,6 +57,7 @@ const NAV: NavItem[] = [
   { id: "minigames", label: "Minigames", icon: Gamepad2,        group: "Mundo" },
   { id: "library",   label: "Biblioteca", icon: BookOpen,       group: "Mundo" },
   { id: "cosmetics", label: "Personalização", icon: Shirt,      group: "Conteúdo" },
+  { id: "sprite-test", label: "Teste de Sprite", icon: FlaskConical, group: "Conteúdo", adminOnly: true },
   { id: "levels",    label: "Níveis",    icon: TrendingUp,      group: "Sistema" },
   { id: "battlepass", label: "Passe de Batalha", icon: Trophy,  group: "Sistema" },
   { id: "todos",     label: "Tarefas",   icon: CheckSquare,     group: "Sistema" },
@@ -187,6 +190,7 @@ export function AdminPanel({ isAdmin = true, isModerator = false }: { isAdmin?: 
             {active === "levels" && <LevelManager />}
             {active === "battlepass" && <BattlePassManager />}
             {active === "cosmetics" && adminUserId && <CosmeticsManager adminUserId={adminUserId} />}
+            {active === "sprite-test" && isAdmin && <SpriteTester />}
             {active === "todos" && <TodoManager />}
             {active === "parties" && isAdmin && <PartyManager />}
             {active === "admins" && isAdmin && <AdminUsers />}
