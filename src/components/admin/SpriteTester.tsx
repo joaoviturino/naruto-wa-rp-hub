@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import baseSheet from "@/assets/shinobi-base-sheet.png.asset.json";
+import baseSheet from "@/assets/sprite-test-base.png.asset.json";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -26,8 +26,9 @@ type Swap = { src: string; dst: string; tol: number };
 export function SpriteTester() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [img, setImg] = useState<HTMLImageElement | null>(null);
-  const [eyes, setEyes] = useState<Swap>({ src: "#3fa34d", dst: "#3fa34d", tol: 70 });
-  const [skin, setSkin] = useState<Swap>({ src: "#f2c9a1", dst: "#f2c9a1", tol: 55 });
+  // Cores extraídas do sprite base enviado: olhos verdes vivos e interior branco (pele).
+  const [eyes, setEyes] = useState<Swap>({ src: "#22c55e", dst: "#22c55e", tol: 60 });
+  const [skin, setSkin] = useState<Swap>({ src: "#ffffff", dst: "#ffffff", tol: 30 });
 
   useEffect(() => {
     const i = new Image();
