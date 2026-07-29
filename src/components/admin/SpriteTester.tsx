@@ -196,40 +196,48 @@ export function SpriteTester() {
         </div>
 
         <div className="space-y-4">
-          <SwapControls title="Olhos" swap={eyes} setSwap={setEyes} accent="text-emerald-400" />
-          <SwapControls title="Pele (interior)" swap={skin} setSwap={setSkin} accent="text-amber-300" />
+          <div className="admin-card p-3 space-y-3">
+            <div className="text-xs uppercase tracking-widest text-amber-300">Tom de pele</div>
+            <div className="grid grid-cols-4 gap-2">
+              {SKIN_TONES.map((t) => {
+                const active = t.hex.toLowerCase() === skin.dst.toLowerCase();
+                return (
+                  <button
+                    key={t.hex}
+                    type="button"
+                    onClick={() => setSkin({ ...skin, dst: t.hex })}
+                    title={t.name}
+                    className={`aspect-square rounded-md border-2 transition ${
+                      active ? "border-gold scale-105 shadow-lg" : "border-white/10 hover:border-white/40"
+                    }`}
+                    style={{ backgroundColor: t.hex }}
+                  />
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <Label className="text-[10px] text-muted-foreground">Personalizado</Label>
+              <Input
+                type="color"
+                className="h-8 w-16 p-1"
+                value={skin.dst}
+                onChange={(e) => setSkin({ ...skin, dst: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="admin-card p-3 space-y-2">
+            <div className="text-xs uppercase tracking-widest text-emerald-400">Cor dos olhos</div>
+            <Input
+              type="color"
+              className="h-10 p-1 w-full"
+              value={eyes.dst}
+              onChange={(e) => setEyes({ ...eyes, dst: e.target.value })}
+            />
+          </div>
+
           <Button onClick={exportPng} className="w-full">Exportar PNG</Button>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function SwapControls({
-  title, swap, setSwap, accent,
-}: { title: string; swap: Swap; setSwap: (s: Swap) => void; accent: string }) {
-  return (
-    <div className="admin-card p-3 space-y-2">
-      <div className={`text-xs uppercase tracking-widest ${accent}`}>{title}</div>
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <Label className="text-[10px]">Cor original (auto)</Label>
-          <Input type="color" className="h-10 p-1" value={swap.src}
-            onChange={(e) => setSwap({ ...swap, src: e.target.value })} />
-        </div>
-        <div>
-          <Label className="text-[10px]">Nova cor</Label>
-          <Input type="color" className="h-10 p-1" value={swap.dst}
-            onChange={(e) => setSwap({ ...swap, dst: e.target.value })} />
-        </div>
-      </div>
-      <div>
-        <Label className="text-[10px]">Tolerância de matiz: {swap.hueTol}°</Label>
-        <input
-          type="range" min={0} max={90} value={swap.hueTol}
-          onChange={(e) => setSwap({ ...swap, hueTol: Number(e.target.value) })}
-          className="w-full"
-        />
       </div>
     </div>
   );
