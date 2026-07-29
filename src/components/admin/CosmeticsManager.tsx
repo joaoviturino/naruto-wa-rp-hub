@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CosmeticUploader } from "@/components/admin/CosmeticUploader";
+import { PixelArtMaker } from "@/components/admin/PixelArtMaker";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SpriteSheetConfig } from "@/components/admin/SpriteSheetConfig";
 import type { StatesMap } from "@/components/AnimatedSprite";
 import { toast } from "sonner";
@@ -140,12 +142,28 @@ export function CosmeticsManager({ adminUserId }: { adminUserId: string }) {
               <Input className="mt-1" type="number" value={form.z_index} onChange={(e) => setForm({ ...form, z_index: parseInt(e.target.value || "0") })} />
             </div>
           </div>
-          <CosmeticUploader
-            slot={form.slot}
-            userId={adminUserId}
-            currentUrl={form.image_url}
-            onUploaded={(url) => setForm((f) => ({ ...f, image_url: url }))}
-          />
+          <Tabs defaultValue="draw">
+            <TabsList>
+              <TabsTrigger value="draw">Pixel Art Maker</TabsTrigger>
+              <TabsTrigger value="upload">Enviar PNG</TabsTrigger>
+            </TabsList>
+            <TabsContent value="draw" className="pt-3">
+              <PixelArtMaker
+                slot={form.slot}
+                userId={adminUserId}
+                initialUrl={form.image_url || null}
+                onSaved={(url) => setForm((f) => ({ ...f, image_url: url }))}
+              />
+            </TabsContent>
+            <TabsContent value="upload" className="pt-3">
+              <CosmeticUploader
+                slot={form.slot}
+                userId={adminUserId}
+                currentUrl={form.image_url}
+                onUploaded={(url) => setForm((f) => ({ ...f, image_url: url }))}
+              />
+            </TabsContent>
+          </Tabs>
           <SpriteSheetConfig
             label="Spritesheet animada (opcional) — sincroniza com o corpo do personagem"
             userId={adminUserId}
