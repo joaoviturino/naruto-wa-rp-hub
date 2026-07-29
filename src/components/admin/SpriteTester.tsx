@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BASE_SPRITE_URL } from "@/lib/sprite-base";
+import { BASE_SPRITE_DIRECTIONS, type SpriteDirection } from "@/lib/sprite-base";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -83,6 +83,7 @@ const SKIN_TONES: { name: string; hex: string }[] = [
 export function SpriteTester() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [img, setImg] = useState<HTMLImageElement | null>(null);
+  const [direction, setDirection] = useState<SpriteDirection>("front");
   // A cor "src" é auto-amostrada do sprite base e nunca aparece na UI.
   const [eyes, setEyes] = useState<Swap>({ src: "#4ed88c", dst: "#4ed88c", hueTol: 30, satMin: 0.35 });
   const [skin, setSkin] = useState<Swap>({
@@ -136,8 +137,8 @@ export function SpriteTester() {
       if (s) setSkin((prev) => ({ ...prev, src: s }));
       if (e) setEyes((prev) => ({ ...prev, src: e }));
     };
-    i.src = BASE_SPRITE_URL;
-  }, []);
+    i.src = BASE_SPRITE_DIRECTIONS[direction];
+  }, [direction]);
 
   const swaps = useMemo(() => [eyes, skin], [eyes, skin]);
 
@@ -206,7 +207,7 @@ export function SpriteTester() {
     if (!c) return;
     const a = document.createElement("a");
     a.href = c.toDataURL("image/png");
-    a.download = "sprite-tinted.png";
+    a.download = `sprite-tinted-${direction}.png`;
     a.click();
   }
 
@@ -223,12 +224,31 @@ export function SpriteTester() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-4">
-        <div className="admin-card p-3 flex items-center justify-center bg-black/40 min-h-[320px]">
-          <canvas
-            ref={canvasRef}
-            className="max-w-full h-auto"
-            style={{ imageRendering: "pixelated", width: "min(100%, 640px)" }}
-          />
+        <div className="admin-card p-3 space-y-3 bg-black/40 min-h-[320px]">
+          <div className="flex items-center justify-center gap-2">
+            {([
+              { key: "left", label: "◀ Esquerda" },
+              { key: "front", label: "Frente" },
+              { key: "right", label: "Direita ▶" },
+            ] as { key: SpriteDirection; label: string }[]).map((d) => (
+              <Button
+                key={d.key}
+                type="button"
+                size="sm"
+                variant={direction === d.key ? "default" : "outline"}
+                onClick={() => setDirection(d.key)}
+              >
+                {d.label}
+              </Button>
+            ))}
+          </div>
+          <div className="flex items-center justify-center">
+            <canvas
+              ref={canvasRef}
+              className="max-w-full h-auto"
+              style={{ imageRendering: "pixelated", width: "min(100%, 640px)" }}
+            />
+          </div>
         </div>
 
         <div className="space-y-4">
