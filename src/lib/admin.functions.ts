@@ -1300,3 +1300,37 @@ export const getStatAudit = createServerFn({ method: "POST" })
       changes: r.meta?.changes ?? {},
     }));
   });
+
+/** Define o boneco (sprite) padrão usado por todos os jogadores. */
+export const setDefaultSprite = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ url: z.string().trim().min(1).max(2000).nullable() }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { error } = await context.supabase
+      .from("server_config")
+      .update({ default_sprite_url: data.url, updated_at: new Date().toISOString() })
+      .eq("id", "main");
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/** Aplica o boneco padrão a todos os personagens (opcionalmente só aos que não têm sprite). */
+export const applyDefaultSpriteToAll = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: unknown) => z.object({ onlyEmpty: z.boolean().default(true) }).parse(i))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { data: cfg, error: cfgErr } = await context.supabase
+      .from("server_config").select("default_sprite_url").eq("id", "main").maybeSingle();
+    if (cfgErr) throw new Error(cfgErr.message);
+    const url = (cfg as any)?.default_sprite_url as string | null;
+    if (!url) throw new Error("Nenhum boneco padrão configurado.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    let q = supabaseAdmin.from("characters").update({ inventory_bg_url: url }).select("id");
+    if (data.onlyEmpty) q = q.is("inventory_bg_url", null);
+    else q = q.not("id", "is", null);
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+    return { updated: (rows ?? []).length };
+  });

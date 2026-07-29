@@ -18,6 +18,7 @@ import { levelProgress, DEFAULT_LEVEL_CONFIG, type LevelConfig } from "@/lib/lev
 import { listMyPoses, listMySkillPoses, setSkillPose } from "@/lib/pose.functions";
 import { MountsTab } from "@/components/MountsTab";
 import { CosmeticOverlay } from "@/components/CosmeticOverlay";
+import { SpriteColorDialog } from "@/components/SpriteColorDialog";
 import { AnimatedCharacter } from "@/components/AnimatedSprite";
 import { useBodySprite } from "@/hooks/useBodySprite";
 import { refreshCharacterCosmetics, useCharacterCosmetics } from "@/hooks/useCharacterCosmetics";
@@ -42,6 +43,7 @@ const ELEMENTS_MAP = Object.fromEntries(ELEMENTS.map((e) => [e.id, e]));
 
 export function CharacterSheet({ characterId }: { characterId: string }) {
   const [char, setChar] = useState<Character | null>(null);
+  const [defaultSprite, setDefaultSprite] = useState<string | null>(null);
   const [levelCfg, setLevelCfg] = useState<LevelConfig>(DEFAULT_LEVEL_CONFIG);
   const update = useServerFn(updateCharacter);
   const fetchLevelCfg = useServerFn(getLevelConfig);
@@ -55,6 +57,10 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
   }
   useEffect(() => { load(); }, [characterId]);
   useEffect(() => { fetchLevelCfg({}).then(setLevelCfg).catch(() => {}); }, []);
+  useEffect(() => {
+    supabase.from("server_config").select("default_sprite_url").eq("id", "main").maybeSingle()
+      .then(({ data }) => setDefaultSprite(((data as any)?.default_sprite_url as string) ?? null));
+  }, []);
 
   if (!char) return <div className="p-10 text-center text-muted-foreground">Carregando ficha…</div>;
 
@@ -178,9 +184,18 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
         </TabsContent>
         <TabsContent value="inventario" className="mt-4">
           <InventoryView characterId={characterId} userId={char.user_id}
-            bgUrl={char.inventory_bg_url}
+            bgUrl={char.inventory_bg_url ?? defaultSprite}
             onBgChange={(url) => updateField("inventory_bg_url", url)}
             onChanged={load} />
+          <div className="mt-3 flex items-center gap-2 flex-wrap">
+            <SpriteColorDialog userId={char.user_id} onSaved={(url) => updateField("inventory_bg_url", url)} />
+            {char.inventory_bg_url && defaultSprite && (
+              <Button size="sm" variant="ghost" className="text-xs"
+                onClick={() => updateField("inventory_bg_url", defaultSprite)}>
+                Voltar ao boneco padrão
+              </Button>
+            )}
+          </div>
         </TabsContent>
         <TabsContent value="databook" className="mt-4">
           <Databook characterId={characterId} />
@@ -189,7 +204,8 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
           <PosesTab characterId={characterId} />
         </TabsContent>
         <TabsContent value="aparencia" className="mt-4">
-          <CosmeticsTab characterId={characterId} baseSprite={char.inventory_bg_url} />
+          <CosmeticsTab characterId={characterId} baseSprite={char.inventory_bg_url ?? defaultSprite}
+            userId={char.user_id} onSpriteChange={(url) => updateField("inventory_bg_url", url)} />
         </TabsContent>
         <TabsContent value="montarias" className="mt-4">
           <MountsTab />
@@ -199,7 +215,9 @@ export function CharacterSheet({ characterId }: { characterId: string }) {
   );
 }
 
-function CosmeticsTab({ characterId, baseSprite }: { characterId: string; baseSprite: string | null }) {
+function CosmeticsTab({ characterId, baseSprite, userId, onSpriteChange }: {
+  characterId: string; baseSprite: string | null; userId: string; onSpriteChange: (url: string) => void;
+}) {
   const [pieces, setPieces] = useState<any[]>([]);
   const [equipped, setEquipped] = useState<Record<string, string>>({});
   const equippedList = useCharacterCosmetics(characterId);
@@ -211,9 +229,12 @@ function CosmeticsTab({ characterId, baseSprite }: { characterId: string; baseSp
       supabase.from("cosmetic_pieces").select("*").eq("active", true).order("slot").order("sort_order"),
       supabase.from("character_cosmetics").select("slot, piece_id").eq("character_id", characterId),
     ]);
-    setPieces((all ?? []) as any[]);
     const map: Record<string, string> = {};
     (mine ?? []).forEach((r: any) => { map[r.slot] = r.piece_id; });
+    // Peças exclusivas não aparecem na personalização — só ficam visíveis
+    // se já estiverem equipadas (concedidas por um admin).
+    const equippedIds = new Set(Object.values(map));
+    setPieces(((all ?? []) as any[]).filter((p) => p.customizable !== false || equippedIds.has(p.id)));
     setEquipped(map);
   }
   useEffect(() => { load(); }, [characterId]);
@@ -271,6 +292,9 @@ function CosmeticsTab({ characterId, baseSprite }: { characterId: string; baseSp
           <h3 className="font-display text-lg text-gold">Personalização</h3>
           <p className="text-xs text-muted-foreground">Escolha as peças que aparecerão sobre seu sprite (inventário, chat e combate). Peças são liberadas pelos admins.</p>
           <div className="mt-2 text-xs text-muted-foreground">Equipadas: {equippedList.length}/{SLOTS.length}</div>
+          <div className="mt-3">
+            <SpriteColorDialog userId={userId} onSaved={(url) => { onSpriteChange(url); }} />
+          </div>
         </div>
       </div>
 

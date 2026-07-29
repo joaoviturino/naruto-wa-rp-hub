@@ -1257,6 +1257,7 @@ export type Database = {
         Row: {
           active: boolean
           created_at: string
+          customizable: boolean
           id: string
           image_url: string
           name: string
@@ -1272,6 +1273,7 @@ export type Database = {
         Insert: {
           active?: boolean
           created_at?: string
+          customizable?: boolean
           id?: string
           image_url: string
           name: string
@@ -1287,6 +1289,7 @@ export type Database = {
         Update: {
           active?: boolean
           created_at?: string
+          customizable?: boolean
           id?: string
           image_url?: string
           name?: string
@@ -3378,6 +3381,7 @@ export type Database = {
         Row: {
           actions_hotkey_enabled: boolean
           chat_locked: boolean
+          default_sprite_url: string | null
           id: string
           initial_spawn_location_id: string | null
           maintenance_enabled: boolean
@@ -3393,6 +3397,7 @@ export type Database = {
         Insert: {
           actions_hotkey_enabled?: boolean
           chat_locked?: boolean
+          default_sprite_url?: string | null
           id?: string
           initial_spawn_location_id?: string | null
           maintenance_enabled?: boolean
@@ -3408,6 +3413,7 @@ export type Database = {
         Update: {
           actions_hotkey_enabled?: boolean
           chat_locked?: boolean
+          default_sprite_url?: string | null
           id?: string
           initial_spawn_location_id?: string | null
           maintenance_enabled?: boolean
