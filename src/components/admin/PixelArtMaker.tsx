@@ -75,6 +75,7 @@ export function PixelArtMaker({
   gridRef.current = grid;
   const drawingRef = useRef(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
 
   const cellPx = useMemo(() => EXPORT_SIZE / res, [res]);
 
@@ -247,15 +248,16 @@ export function PixelArtMaker({
     toast.success("Referência carregada — arraste para posicionar.");
   }
 
-  function onRefPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+  function onRefPointerDown(e: React.PointerEvent<HTMLElement>) {
     if (!ref || ref.locked) return;
+    e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
     refDragRef.current = { px: e.clientX, py: e.clientY, ox: ref.x, oy: ref.y };
   }
-  function onRefPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+  function onRefPointerMove(e: React.PointerEvent<HTMLElement>) {
     const d = refDragRef.current;
-    if (!d || !ref) return;
-    const rect = e.currentTarget.parentElement!.getBoundingClientRect();
+    if (!d || !ref || !wrapRef.current) return;
+    const rect = wrapRef.current.getBoundingClientRect();
     setRef({
       ...ref,
       x: d.ox + ((e.clientX - d.px) / rect.width) * 100,
@@ -265,7 +267,7 @@ export function PixelArtMaker({
   function onRefPointerUp() {
     refDragRef.current = null;
   }
-  function onRefWheel(e: React.WheelEvent<HTMLDivElement>) {
+  function onRefWheel(e: React.WheelEvent<HTMLElement>) {
     if (!ref || ref.locked) return;
     const next = Math.min(4, Math.max(0.1, ref.scale * (e.deltaY < 0 ? 1.08 : 0.92)));
     setRef({ ...ref, scale: next });
