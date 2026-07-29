@@ -58,12 +58,24 @@ function hslToRgb(h: number, s: number, l: number): RGB {
 
 type Swap = { src: string; dst: string; hueTol: number; satMin: number };
 
+// Paleta de tons de pele: do mais claro (porcelana) ao mais escuro (ébano).
+const SKIN_TONES: { name: string; hex: string }[] = [
+  { name: "Porcelana", hex: "#f7d7be" },
+  { name: "Marfim",    hex: "#f1c9a5" },
+  { name: "Areia",     hex: "#e6b48a" },
+  { name: "Mel",       hex: "#d69a6c" },
+  { name: "Caramelo",  hex: "#b87a4e" },
+  { name: "Bronze",    hex: "#8f5a34" },
+  { name: "Cacau",     hex: "#6b4023" },
+  { name: "Ébano",     hex: "#3d2416" },
+];
+
 export function SpriteTester() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [img, setImg] = useState<HTMLImageElement | null>(null);
-  // Padrões alinhados aos tons observados no sprite base (pele quente amarelada, olhos verdes).
-  const [eyes, setEyes] = useState<Swap>({ src: "#4ed88c", dst: "#4ed88c", hueTol: 25, satMin: 0.35 });
-  const [skin, setSkin] = useState<Swap>({ src: "#f5c57a", dst: "#f5c57a", hueTol: 22, satMin: 0.2 });
+  // A cor "src" é auto-amostrada do sprite base e nunca aparece na UI.
+  const [eyes, setEyes] = useState<Swap>({ src: "#4ed88c", dst: "#4ed88c", hueTol: 30, satMin: 0.35 });
+  const [skin, setSkin] = useState<Swap>({ src: "#f5c57a", dst: SKIN_TONES[2].hex, hueTol: 28, satMin: 0.18 });
 
   useEffect(() => {
     const i = new Image();
@@ -100,8 +112,9 @@ export function SpriteTester() {
       };
       const s = dominant(skinBuckets);
       const e = dominant(eyeBuckets);
-      if (s) setSkin((prev) => ({ ...prev, src: s, dst: s }));
-      if (e) setEyes((prev) => ({ ...prev, src: e, dst: e }));
+      // Só atualiza a cor de origem (interna) — a nova cor escolhida pelo usuário permanece.
+      if (s) setSkin((prev) => ({ ...prev, src: s }));
+      if (e) setEyes((prev) => ({ ...prev, src: e }));
     };
     i.src = baseSheet.url;
   }, []);
@@ -122,9 +135,9 @@ export function SpriteTester() {
     const px = data.data;
     const parsed = swaps.map((s) => {
       const src = hexToRgb(s.src); const dst = hexToRgb(s.dst);
-      const [sh, ss] = rgbToHsl(src[0], src[1], src[2]);
-      const [dh, ds] = rgbToHsl(dst[0], dst[1], dst[2]);
-      return { srcH: sh, srcS: ss, dstH: dh, dstS: ds, hueTol: s.hueTol, satMin: s.satMin };
+      const [sh, ss, sl] = rgbToHsl(src[0], src[1], src[2]);
+      const [dh, ds, dl] = rgbToHsl(dst[0], dst[1], dst[2]);
+      return { srcH: sh, srcS: ss, srcL: sl, dstH: dh, dstS: ds, dstL: dl, hueTol: s.hueTol, satMin: s.satMin };
     });
     for (let i = 0; i < px.length; i += 4) {
       if (px[i + 3] < 8) continue;
@@ -139,9 +152,14 @@ export function SpriteTester() {
       }
       if (!best) continue;
       // Preserva luminância (shading) e transporta hue/sat do destino
+      // Recoloração: matiz vai para destino, saturação escala proporcional, e
+      // a luminância é deslocada em torno da luminância do destino — assim tons
+      // escuros (pele negra) mantêm sombras profundas e highlights coerentes.
       const satRatio = best.srcS > 0.05 ? best.dstS / best.srcS : 1;
       const newS = Math.max(0, Math.min(1, s * satRatio));
-      const [nr, ng, nb] = hslToRgb(best.dstH, newS, l);
+      const delta = l - best.srcL;
+      const newL = Math.max(0.03, Math.min(0.97, best.dstL + delta));
+      const [nr, ng, nb] = hslToRgb(best.dstH, newS, newL);
       px[i] = nr; px[i + 1] = ng; px[i + 2] = nb;
     }
     ctx.putImageData(data, 0, 0);
@@ -178,40 +196,48 @@ export function SpriteTester() {
         </div>
 
         <div className="space-y-4">
-          <SwapControls title="Olhos" swap={eyes} setSwap={setEyes} accent="text-emerald-400" />
-          <SwapControls title="Pele (interior)" swap={skin} setSwap={setSkin} accent="text-amber-300" />
+          <div className="admin-card p-3 space-y-3">
+            <div className="text-xs uppercase tracking-widest text-amber-300">Tom de pele</div>
+            <div className="grid grid-cols-4 gap-2">
+              {SKIN_TONES.map((t) => {
+                const active = t.hex.toLowerCase() === skin.dst.toLowerCase();
+                return (
+                  <button
+                    key={t.hex}
+                    type="button"
+                    onClick={() => setSkin({ ...skin, dst: t.hex })}
+                    title={t.name}
+                    className={`aspect-square rounded-md border-2 transition ${
+                      active ? "border-gold scale-105 shadow-lg" : "border-white/10 hover:border-white/40"
+                    }`}
+                    style={{ backgroundColor: t.hex }}
+                  />
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <Label className="text-[10px] text-muted-foreground">Personalizado</Label>
+              <Input
+                type="color"
+                className="h-8 w-16 p-1"
+                value={skin.dst}
+                onChange={(e) => setSkin({ ...skin, dst: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="admin-card p-3 space-y-2">
+            <div className="text-xs uppercase tracking-widest text-emerald-400">Cor dos olhos</div>
+            <Input
+              type="color"
+              className="h-10 p-1 w-full"
+              value={eyes.dst}
+              onChange={(e) => setEyes({ ...eyes, dst: e.target.value })}
+            />
+          </div>
+
           <Button onClick={exportPng} className="w-full">Exportar PNG</Button>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function SwapControls({
-  title, swap, setSwap, accent,
-}: { title: string; swap: Swap; setSwap: (s: Swap) => void; accent: string }) {
-  return (
-    <div className="admin-card p-3 space-y-2">
-      <div className={`text-xs uppercase tracking-widest ${accent}`}>{title}</div>
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <Label className="text-[10px]">Cor original (auto)</Label>
-          <Input type="color" className="h-10 p-1" value={swap.src}
-            onChange={(e) => setSwap({ ...swap, src: e.target.value })} />
-        </div>
-        <div>
-          <Label className="text-[10px]">Nova cor</Label>
-          <Input type="color" className="h-10 p-1" value={swap.dst}
-            onChange={(e) => setSwap({ ...swap, dst: e.target.value })} />
-        </div>
-      </div>
-      <div>
-        <Label className="text-[10px]">Tolerância de matiz: {swap.hueTol}°</Label>
-        <input
-          type="range" min={0} max={90} value={swap.hueTol}
-          onChange={(e) => setSwap({ ...swap, hueTol: Number(e.target.value) })}
-          className="w-full"
-        />
       </div>
     </div>
   );
