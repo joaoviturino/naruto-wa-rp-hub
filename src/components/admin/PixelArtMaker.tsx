@@ -330,7 +330,7 @@ export function PixelArtMaker({
     const el = wrapRef.current;
     if (!el) return;
     const onWheel = (ev: WheelEvent) => {
-      if ((ev.target as HTMLElement)?.dataset?.refHandle === "1") return;
+      if ((ev.target as HTMLElement)?.closest?.('[data-ref-handle="1"]')) return;
       ev.preventDefault();
       const rect = el.getBoundingClientRect();
       const cx = ev.clientX - rect.left;
