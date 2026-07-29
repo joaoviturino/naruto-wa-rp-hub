@@ -135,9 +135,9 @@ export function SpriteTester() {
     const px = data.data;
     const parsed = swaps.map((s) => {
       const src = hexToRgb(s.src); const dst = hexToRgb(s.dst);
-      const [sh, ss] = rgbToHsl(src[0], src[1], src[2]);
-      const [dh, ds] = rgbToHsl(dst[0], dst[1], dst[2]);
-      return { srcH: sh, srcS: ss, dstH: dh, dstS: ds, hueTol: s.hueTol, satMin: s.satMin };
+      const [sh, ss, sl] = rgbToHsl(src[0], src[1], src[2]);
+      const [dh, ds, dl] = rgbToHsl(dst[0], dst[1], dst[2]);
+      return { srcH: sh, srcS: ss, srcL: sl, dstH: dh, dstS: ds, dstL: dl, hueTol: s.hueTol, satMin: s.satMin };
     });
     for (let i = 0; i < px.length; i += 4) {
       if (px[i + 3] < 8) continue;
@@ -152,17 +152,13 @@ export function SpriteTester() {
       }
       if (!best) continue;
       // Preserva luminância (shading) e transporta hue/sat do destino
-      // Ao alterar a pele, luminância também é remapeada em torno da luminância
-      // do destino — assim tons escuros ficam com sombras mais escuras (ex: pele
-      // negra tem sombras profundas) e tons claros ficam com sombras suaves.
+      // Recoloração: matiz vai para destino, saturação escala proporcional, e
+      // a luminância é deslocada em torno da luminância do destino — assim tons
+      // escuros (pele negra) mantêm sombras profundas e highlights coerentes.
       const satRatio = best.srcS > 0.05 ? best.dstS / best.srcS : 1;
       const newS = Math.max(0, Math.min(1, s * satRatio));
-      const [dstR, dstG, dstB] = hslToRgb(best.dstH, best.dstS, 0.5);
-      void dstR; void dstG; void dstB;
-      const dstL = (Math.min(...hslToRgb(best.dstH, best.dstS, 0.5)) + Math.max(...hslToRgb(best.dstH, best.dstS, 0.5))) / (2 * 255);
-      const srcL = 0.5; // referência do src cluster; deslocamos preservando o delta
-      const delta = l - srcL;
-      const newL = Math.max(0.02, Math.min(0.98, dstL + delta * 0.9));
+      const delta = l - best.srcL;
+      const newL = Math.max(0.03, Math.min(0.97, best.dstL + delta));
       const [nr, ng, nb] = hslToRgb(best.dstH, newS, newL);
       px[i] = nr; px[i + 1] = ng; px[i + 2] = nb;
     }
