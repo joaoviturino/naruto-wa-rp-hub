@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BASE_SPRITE_URL } from "@/lib/sprite-base";
+import { BASE_SPRITE_DIRECTIONS, type SpriteDirection } from "@/lib/sprite-base";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -83,6 +83,7 @@ const SKIN_TONES: { name: string; hex: string }[] = [
 export function SpriteTester() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [img, setImg] = useState<HTMLImageElement | null>(null);
+  const [direction, setDirection] = useState<SpriteDirection>("front");
   // A cor "src" é auto-amostrada do sprite base e nunca aparece na UI.
   const [eyes, setEyes] = useState<Swap>({ src: "#4ed88c", dst: "#4ed88c", hueTol: 30, satMin: 0.35 });
   const [skin, setSkin] = useState<Swap>({
@@ -136,8 +137,8 @@ export function SpriteTester() {
       if (s) setSkin((prev) => ({ ...prev, src: s }));
       if (e) setEyes((prev) => ({ ...prev, src: e }));
     };
-    i.src = BASE_SPRITE_URL;
-  }, []);
+    i.src = BASE_SPRITE_DIRECTIONS[direction];
+  }, [direction]);
 
   const swaps = useMemo(() => [eyes, skin], [eyes, skin]);
 
