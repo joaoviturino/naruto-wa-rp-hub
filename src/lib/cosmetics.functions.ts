@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
@@ -84,7 +85,8 @@ export const getCharacterCosmetics = createServerFn({ method: "GET" })
 
 export const setCharacterCosmetic = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { characterId: string; slot: CosmeticSlot; pieceId: string | null }) => d)
+  .inputValidator((d: unknown) => z.object({ characterId: z.string().uuid(),
+    slot: z.enum(["hair", "face", "clothing", "accessory"]), pieceId: z.string().uuid().nullable() }).parse(d))
   .handler(async ({ data, context }) => {
     // RLS garante que o usuário só altere o próprio personagem.
     if (data.pieceId === null) {
@@ -96,6 +98,11 @@ export const setCharacterCosmetic = createServerFn({ method: "POST" })
       if (error) throw new Error(error.message);
       return { ok: true };
     }
+    const { data: piece, error: pieceError } = await context.supabase.from("cosmetic_pieces")
+      .select("id,slot,active,customizable").eq("id", data.pieceId).maybeSingle();
+    if (pieceError) throw new Error(pieceError.message);
+    if (!piece || piece.slot !== data.slot || !piece.active) throw new Error("Peça indisponível para este slot.");
+    if (piece.customizable === false) throw new Error("Esta peça é concedida pela administração.");
     const { error } = await context.supabase
       .from("character_cosmetics")
       .upsert(

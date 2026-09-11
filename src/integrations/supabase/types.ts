@@ -2132,6 +2132,7 @@ export type Database = {
       }
       locations: {
         Row: {
+          visual_environment: string
           battle_bg_url: string | null
           created_at: string
           description: string | null
@@ -2153,6 +2154,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          visual_environment?: string
           battle_bg_url?: string | null
           created_at?: string
           description?: string | null
@@ -2174,6 +2176,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          visual_environment?: string
           battle_bg_url?: string | null
           created_at?: string
           description?: string | null

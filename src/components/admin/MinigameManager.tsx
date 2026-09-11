@@ -325,6 +325,15 @@ export function MinigameManager() {
           ) : (
             <div className="scroll-panel rounded-lg p-4 space-y-3">
               <h4 className="font-display text-lg text-gold">Configuração da limpeza</h4>
+              <div className="grid grid-cols-2 gap-3">
+                {(["tileset_cols", "tileset_rows"] as const).map((key) => <div key={key}>
+                  <Label>{key === "tileset_cols" ? "Colunas do tileset" : "Linhas do tileset"}</Label>
+                  <Input type="number" min={1} max={32} placeholder={key === "tileset_cols" ? "Automático" : "1"}
+                    value={selected.config?.[key] ?? ""} onChange={(e) => setSelected({ ...selected,
+                      config: { ...selected.config, [key]: e.target.value ? Number(e.target.value) : undefined } })} />
+                </div>)}
+              </div>
+              <p className="text-sm text-muted-foreground">Use uma grade sem margens entre os tiles. Para folhas em várias linhas, informe linhas e colunas. A prévia abaixo usa o mesmo recorte do jogo.</p>
               <div className="grid gap-3 md:grid-cols-3">
                 <div><Label>Duração (s)</Label><Input type="number" min={15} max={600} value={selected.config?.duration_seconds ?? 60} onChange={(e) => setSelected({ ...selected, config: { ...selected.config, duration_seconds: Number(e.target.value) } })} /></div>
                 <div><Label>Sujeiras na cena</Label><Input type="number" min={3} max={40} value={selected.config?.spots ?? 12} onChange={(e) => setSelected({ ...selected, config: { ...selected.config, spots: Number(e.target.value) } })} /></div>

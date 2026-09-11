@@ -1,3 +1,5 @@
+import { resolveCombatEnvironment } from "@/lib/sprite-animation";
+import { resolveSkillVisual, type CombatVisual } from "@/lib/skill-blueprints";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -165,6 +167,7 @@ type LogEntry = {
   crit_mul: number;
   msg: string;
   animation_url?: string | null;
+  visual?: CombatVisual;
   animation_mode?: "projectile" | "front" | "overlay" | null;
   sound_url?: string | null;
   pose_url?: string | null;
@@ -212,7 +215,7 @@ async function consumeDefensiveSkill(
     .eq("character_id", activePlayer.character_id).eq("skill_id", defensiveSkillId).maybeSingle();
   if (!owned) throw new Error("Você não conhece essa habilidade de defesa.");
   const { data: sk } = await supabaseUser.from("skills")
-    .select("id,name,energy_type,cost_percent,cooldown_turns,is_defensive,defense_percent,animation_url,animation_mode,sound_url,is_dash")
+    .select("id,name,energy_type,cost_percent,cooldown_turns,is_defensive,defense_percent,meta,animation_url,animation_mode,sound_url,is_dash")
     .eq("id", defensiveSkillId).maybeSingle();
   if (!sk) throw new Error("Habilidade inexistente.");
   if (!(sk as any).is_defensive) throw new Error("Essa habilidade não é defensiva.");
@@ -234,6 +237,7 @@ async function consumeDefensiveSkill(
     animation_url: (sk as any).animation_url ?? null,
       is_dash: (sk as any).is_dash ?? false,
     animation_mode: ((sk as any).animation_mode ?? "overlay") as any,
+    visual: resolveSkillVisual(sk as any),
     sound_url: (sk as any).sound_url ?? null,
     msg: `${activePlayer.nickname} assume postura defensiva com ${(sk as any).name} (−${percent}% no próximo golpe).`,
     is_defense: true, defense_percent_applied: percent,
@@ -320,7 +324,7 @@ export const rollSpawn = createServerFn({ method: "POST" })
     let groupBattleBg: string | null = null;
     let groupMusic: string | null = null;
     const { data: locFull } = await context.supabase
-      .from("locations").select("spawn_group_ids,battle_bg_url,music_url").eq("id", loc.id).maybeSingle();
+      .from("locations").select("*").eq("id", loc.id).maybeSingle();
     const groupIds = ((locFull as any)?.spawn_group_ids ?? []) as string[];
     const locBg = (locFull as any)?.battle_bg_url ?? null;
     const locMusic = (locFull as any)?.music_url ?? null;
@@ -394,6 +398,7 @@ export const rollSpawn = createServerFn({ method: "POST" })
       // Cenário/música do LOCAL têm prioridade no cliente.
       location_bg_url: locBg,
       location_music_url: locMusic,
+      location_environment: resolveCombatEnvironment(locFull?.visual_environment),
     } as any;
 
     const { data: session, error: sErr } = await supabaseAdmin.from("combat_sessions").insert({
@@ -563,6 +568,7 @@ export const playerAttack = createServerFn({ method: "POST" })
         animation_url: (skill as any).animation_url ?? null,
       is_dash: (skill as any).is_dash ?? false,
         animation_mode: ((skill as any).animation_mode ?? "overlay") as any,
+      visual: resolveSkillVisual(skill as any),
         sound_url: (skill as any).sound_url ?? null,
         msg: `${activePlayer.nickname} usa ${skill.name} (cura ${pool.toUpperCase()} ${data.energy_used}) → ${healCfg!.target === "team" ? "time" : names[0]} +${healAmount} HP${masteryMul > 1 ? ` [Maestria ×${masteryMul.toFixed(1)}]` : ""}.`,
       });
@@ -779,6 +785,7 @@ export const playerAttack = createServerFn({ method: "POST" })
       animation_url: (skill as any).animation_url ?? null,
       is_dash: (skill as any).is_dash ?? false,
       animation_mode: ((skill as any).animation_mode ?? "overlay") as any,
+      visual: resolveSkillVisual(skill as any),
       sound_url: (skill as any).sound_url ?? null,
       missed,
       msg: missed
@@ -943,7 +950,7 @@ async function runSingleNpcAttack(supabaseAdmin: any, npcState: NpcState, state:
   const critChance = Math.max(0, Math.min(100, Number(npcCfg?.crit_chance ?? 10)));
   const critMul = Math.max(1, Number(npcCfg?.crit_multiplier ?? 1.5));
   const { data: skills } = await supabaseAdmin
-    .from("npc_skills").select("skill:skills(id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic,animation_url,animation_mode,sound_url,is_dash,accuracy)").eq("npc_id", npcState.id);
+    .from("npc_skills").select("skill:skills(id,name,energy_type,base_cost,bonus_speed,bonus_critical,bonus_energetic,meta,animation_url,animation_mode,sound_url,is_dash,accuracy)").eq("npc_id", npcState.id);
   const pool = ((skills as any[]) ?? []).map((r: any) => r.skill).filter(Boolean);
   if (pool.length === 0) return;
   const affordable = pool.filter((s: any) => npcState.energy >= s.base_cost);
@@ -1009,6 +1016,7 @@ async function runSingleNpcAttack(supabaseAdmin: any, npcState: NpcState, state:
     animation_url: (skill as any).animation_url ?? null,
       is_dash: (skill as any).is_dash ?? false,
     animation_mode: ((skill as any).animation_mode ?? "overlay") as any,
+      visual: resolveSkillVisual(skill as any),
     target_char_id: target.character_id,
     actor_char_id: npcState.id,
     pose_url: npcPoseUrl,
@@ -1358,6 +1366,7 @@ async function handlePvpAttack(
       animation_url: (skill as any).animation_url ?? null,
       is_dash: (skill as any).is_dash ?? false,
       animation_mode: ((skill as any).animation_mode ?? "overlay") as any,
+      visual: resolveSkillVisual(skill as any),
       sound_url: (skill as any).sound_url ?? null,
       msg: `${activePlayer.nickname} usa ${skill.name} → ${healCfg!.target === "team" ? "time" : names[0]} +${healAmount} HP.`,
       // marcadores PvP p/ o CombatDialog
@@ -1408,6 +1417,7 @@ async function handlePvpAttack(
       animation_url: (skill as any).animation_url ?? null,
       is_dash: (skill as any).is_dash ?? false,
       animation_mode: ((skill as any).animation_mode ?? "overlay") as any,
+      visual: resolveSkillVisual(skill as any),
       sound_url: (skill as any).sound_url ?? null,
       missed,
       ...(shieldInfo ? { shield_reduced_by: shieldInfo.percent, shield_name: shieldInfo.name } : {}),

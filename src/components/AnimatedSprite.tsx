@@ -1,292 +1,142 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useCharacterCosmetics } from "@/hooks/useCharacterCosmetics";
-import { supabase } from "@/integrations/supabase/client";
+import { memo, useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
+import { useCharacterCosmetics, type EquippedPiece } from "@/hooks/useCharacterCosmetics";
+import { useReducedGameMotion } from "@/hooks/useGamePreferences";
+import { loadImageSize } from "@/lib/sprite-validate";
+import { atlasPosition, DEFAULT_STATES, mapLayerFrame, resolveSpriteState,
+  type AnimState, type StateConfig, type StatesMap, type SpriteEnvironment } from "@/lib/sprite-animation";
+export { DEFAULT_STATES, ANIM_STATE_LABEL } from "@/lib/sprite-animation";
+export type { AnimState, StateConfig, StatesMap } from "@/lib/sprite-animation";
 
-// ============================================================
-// Sistema de animação por Sprite Sheet
-// ============================================================
-// Uma spritesheet é uma PNG única com uma grade de frames:
-//   cols = colunas, rows = linhas.
-// Cada "estado" (idle, run, punch, kick, hurt, cast, death) ocupa
-// UMA linha inteira e usa as primeiras N frames dessa linha.
-//
-// Config (guardado como JSON no banco):
-//   { idle: { row: 0, frames: 4, fps: 6, loop: true }, punch: { row: 2, frames: 5, fps: 12, loop: false }, ... }
-//
-// O corpo base do personagem e cada peça cosmética podem ter sua
-// própria spritesheet — todas compartilham o mesmo relógio (frame
-// index) para ficarem perfeitamente sincronizadas.
-// ============================================================
-
-export type AnimState =
-  | "idle" | "run" | "punch" | "kick" | "hurt" | "cast" | "death";
-
-export type StateConfig = { row: number; frames: number; fps?: number; loop?: boolean };
-export type StatesMap = Partial<Record<AnimState, StateConfig>>;
-
-export const DEFAULT_STATES: StatesMap = {
-  idle:  { row: 0, frames: 4, fps: 6,  loop: true },
-  run:   { row: 1, frames: 6, fps: 10, loop: true },
-  punch: { row: 2, frames: 5, fps: 12, loop: false },
-  kick:  { row: 3, frames: 5, fps: 12, loop: false },
-  hurt:  { row: 4, frames: 3, fps: 10, loop: false },
-  cast:  { row: 5, frames: 6, fps: 10, loop: false },
-  death: { row: 6, frames: 6, fps: 8,  loop: false },
-};
-
-export const ANIM_STATE_LABEL: Record<AnimState, string> = {
-  idle: "Idle (parado)", run: "Correr", punch: "Soco",
-  kick: "Chute", hurt: "Recebendo dano", cast: "Poder / Cast", death: "Morte",
-};
-
-function resolveState(states: StatesMap | null | undefined, state: AnimState): StateConfig {
-  const s = states?.[state];
-  if (s && s.frames > 0) return { fps: 8, loop: true, ...s };
-  // fallback: idle → 1 frame estático
-  const idle = states?.idle;
-  if (idle && idle.frames > 0) return { fps: 8, loop: true, ...idle };
-  return { row: 0, frames: 1, fps: 1, loop: true };
-}
-
-// Hook: gera o frame index atual para um estado, respeitando fps/loop.
-export function useSpriteFrame(state: AnimState, cfg: StateConfig, resetKey: number = 0): number {
+// A static sprite has no timer. Non-looping actions stop on their final frame.
+// Hidden tabs and offscreen characters do no animation work.
+export function useSpriteFrame(state: AnimState, cfg: StateConfig, resetKey = 0, enabled = true): number {
   const [frame, setFrame] = useState(0);
-  const startRef = useRef<number>(performance.now());
+  const frameRef = useRef(0);
+  const lastReset = useRef("");
   useEffect(() => {
-    startRef.current = performance.now();
-    setFrame(0);
-    const dur = 1000 / (cfg.fps || 8);
-    let raf = 0;
-    const tick = () => {
-      const elapsed = performance.now() - startRef.current;
-      const raw = Math.floor(elapsed / dur);
-      const f = cfg.loop === false
-        ? Math.min(raw, Math.max(0, cfg.frames - 1))
-        : raw % Math.max(1, cfg.frames);
-      setFrame(f);
-      raf = requestAnimationFrame(tick);
+    const key = `${state}:${cfg.row}:${cfg.frames}:${cfg.fps}:${cfg.loop}:${resetKey}`;
+    if (lastReset.current !== key) { frameRef.current = 0; setFrame(0); lastReset.current = key; }
+    if (!enabled || cfg.frames <= 1) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let current = frameRef.current;
+    const fps = Math.max(1, Math.min(60, cfg.fps || 8));
+    const interval = 1000 / Math.min(30, fps);
+    // Preserve authored timing above 30 FPS by sampling frames instead of slowing the action.
+    const step = fps * interval / 1000;
+    const schedule = () => {
+      clearTimeout(timer);
+      if (document.hidden || (cfg.loop === false && current >= cfg.frames - 1)) return;
+      timer = setTimeout(() => {
+        current = cfg.loop === false ? Math.min(current + step, cfg.frames - 1) : (current + step) % cfg.frames;
+        frameRef.current = current;
+        setFrame(Math.floor(current));
+        schedule();
+      }, interval);
     };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [state, cfg.frames, cfg.fps, cfg.loop, resetKey]);
+    schedule();
+    document.addEventListener("visibilitychange", schedule);
+    return () => { clearTimeout(timer); document.removeEventListener("visibilitychange", schedule); };
+  }, [state, cfg.row, cfg.frames, cfg.fps, cfg.loop, resetKey, enabled]);
   return frame;
 }
 
-// Renderiza UMA camada de spritesheet posicionando `background-image`.
-// Se `sheetUrl` for nulo, cai no static `fallbackUrl`.
-function SheetLayer({
-  sheetUrl, cols, rows, row, frame, fallbackUrl, flipX, zIndex, className, style,
-}: {
-  sheetUrl: string | null | undefined;
-  cols: number; rows: number; row: number; frame: number;
-  fallbackUrl?: string | null;
-  flipX?: boolean; zIndex?: number;
-  className?: string; style?: React.CSSProperties;
-}) {
-  if (!sheetUrl) {
-    if (!fallbackUrl) return null;
-    return (
-      <img
-        src={fallbackUrl}
-        alt=""
-        draggable={false}
-        className={`absolute inset-0 h-full w-full object-contain ${className ?? ""}`}
-        style={{ zIndex, transform: flipX ? "scaleX(-1)" : undefined, imageRendering: "pixelated", ...style }}
-      />
-    );
-  }
-  const c = Math.max(1, cols);
-  const r = Math.max(1, rows);
-  // porcentagens de posição do frame na sheet
-  const bgPosX = c === 1 ? "50%" : `${(frame / (c - 1)) * 100}%`;
-  const bgPosY = r === 1 ? "50%" : `${(row / (r - 1)) * 100}%`;
-  return (
-    <div
-      className={`absolute inset-0 ${className ?? ""}`}
-      style={{
-        backgroundImage: `url(${sheetUrl})`,
-        backgroundRepeat: "no-repeat",
-        backgroundSize: `${c * 100}% ${r * 100}%`,
-        backgroundPosition: `${bgPosX} ${bgPosY}`,
-        imageRendering: "pixelated",
-        zIndex,
-        transform: flipX ? "scaleX(-1)" : undefined,
-        ...style,
-      }}
-    />
-  );
-}
-
-// ---------- Personagem animado completo ----------
-// Combina corpo base + peças cosméticas do banco, todos sincronizados.
-
-type PieceFull = {
-  slot: "hair" | "face" | "clothing" | "accessory";
-  image_url: string;
-  z_index: number;
-  sheet_url: string | null;
-  sheet_cols: number | null;
-  sheet_rows: number | null;
-  sheet_states: StatesMap | null;
-};
-
-// Cache local de peças com dados de sheet (não fica em useCharacterCosmetics para evitar mexer no hook base).
-const piecesCache = new Map<string, PieceFull[]>();
-const piecesListeners = new Map<string, Set<(v: PieceFull[]) => void>>();
-
-async function fetchFullPieces(characterId: string) {
-  const { data } = await supabase
-    .from("character_cosmetics")
-    .select("slot, piece:cosmetic_pieces(image_url,z_index,slot,sheet_url,sheet_cols,sheet_rows,sheet_states)")
-    .eq("character_id", characterId);
-  const list: PieceFull[] = ((data ?? []) as any[])
-    .map((r) => r.piece ? {
-      slot: r.piece.slot,
-      image_url: r.piece.image_url,
-      z_index: r.piece.z_index ?? 0,
-      sheet_url: r.piece.sheet_url ?? null,
-      sheet_cols: r.piece.sheet_cols ?? null,
-      sheet_rows: r.piece.sheet_rows ?? null,
-      sheet_states: r.piece.sheet_states ?? null,
-    } : null)
-    .filter(Boolean) as PieceFull[];
-  list.sort((a, b) => a.z_index - b.z_index);
-  piecesCache.set(characterId, list);
-  piecesListeners.get(characterId)?.forEach((cb) => cb(list));
-}
-
-function useFullCosmetics(characterId: string | null | undefined): PieceFull[] {
-  const [pieces, setPieces] = useState<PieceFull[]>(() =>
-    characterId ? piecesCache.get(characterId) ?? [] : [],
-  );
-  // Reage a mudanças básicas de cosméticos equipados (para invalidar).
-  const light = useCharacterCosmetics(characterId ?? null);
-  const sig = light.map((p) => p.image_url).join("|");
+function useSpriteViewport(ref: RefObject<HTMLDivElement | null>, image: string | null | undefined, cols = 1, rows = 1) {
+  const [visible, setVisible] = useState(true);
+  const [aspect, setAspect] = useState(1);
+  const [box, setBox] = useState<{ width: number; height: number } | null>(null);
   useEffect(() => {
-    if (!characterId) { setPieces([]); return; }
-    if (!piecesListeners.has(characterId)) piecesListeners.set(characterId, new Set());
-    const set = piecesListeners.get(characterId)!;
-    const cb = (v: PieceFull[]) => setPieces(v);
-    set.add(cb);
-    if (piecesCache.has(characterId)) setPieces(piecesCache.get(characterId)!);
-    void fetchFullPieces(characterId);
-    return () => { set.delete(cb); };
-  }, [characterId, sig]);
-  return pieces;
+    let alive = true;
+    setAspect(1);
+    if (image) void loadImageSize(image).then(({ w, h }) => {
+      if (alive) setAspect((w / Math.max(1, cols)) / (h / Math.max(1, rows)));
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, [image, cols, rows]);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      if (width && height) setBox({ width, height });
+    });
+    observer.observe(el);
+    const intersection = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting));
+    intersection.observe(el);
+    return () => { observer.disconnect(); intersection.disconnect(); };
+  }, [ref]);
+  const width = box ? Math.min(box.width, box.height * aspect) : undefined;
+  return { visible, size: width ? { width, height: width / aspect } : { width: "100%", height: "100%" } };
 }
 
-export type BodyConfig = {
-  // corpo base (fallback estático quando não há sheet)
-  imageUrl?: string | null;
-  sheetUrl?: string | null;
-  cols?: number | null;
-  rows?: number | null;
-  states?: StatesMap | null;
-};
+const SheetLayer = memo(function SheetLayer({ sheetUrl, cols, rows, row, frame, fallbackUrl, zIndex = 0,
+  slot, environment = "neutral", state = "idle", }:
+  { sheetUrl?: string | null; cols: number; rows: number; row: number; frame: number;
+    fallbackUrl?: string | null; zIndex?: number; slot?: string; environment?: SpriteEnvironment;
+    state?: AnimState }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    setFailed(false);
+    if (sheetUrl) void loadImageSize(sheetUrl).catch(() => { if (alive) setFailed(true); });
+    return () => { alive = false; };
+  }, [sheetUrl, fallbackUrl]);
+  if (!sheetUrl && (!fallbackUrl || failed)) return null;
+  const style: CSSProperties = { zIndex, imageRendering: "pixelated" };
+  return <div className="absolute inset-0 sprite-layer" data-slot={slot} data-environment={environment}
+    data-action={state} style={style}>
+    {sheetUrl && !failed ? <div className="absolute inset-0" style={{ ...atlasPosition(cols, rows, frame, row),
+      backgroundImage: `url(${JSON.stringify(sheetUrl)})`, backgroundRepeat: "no-repeat" }} />
+      : fallbackUrl ? <img src={fallbackUrl} alt="" draggable={false} decoding="async" onError={() => setFailed(true)}
+        className="absolute inset-0 h-full w-full object-contain" /> : null}
+  </div>;
+});
 
-/**
- * Personagem completo com camadas animadas sincronizadas.
- * O corpo base + cada peça cosmética são renderizados como camadas
- * na MESMA grade (mesmo aspect ratio) e compartilham o frame index.
- */
-export function AnimatedCharacter({
-  characterId,
-  body,
-  state = "idle",
-  flipX = false,
-  className = "",
-  style,
-}: {
-  characterId?: string | null;
-  body: BodyConfig;
-  state?: AnimState;
-  flipX?: boolean;
-  className?: string;
-  style?: React.CSSProperties;
-}) {
-  const pieces = useFullCosmetics(characterId ?? null);
+export type BodyConfig = { imageUrl?: string | null; sheetUrl?: string | null;
+  cols?: number | null; rows?: number | null; states?: StatesMap | null };
 
-  // Config do corpo dita o "relógio mestre" — todas as camadas usam o
-  // MESMO frame index para ficarem sincronizadas.
-  const masterCfg = useMemo(
-    () => resolveState(body.states ?? DEFAULT_STATES, state),
-    [body.states, state],
-  );
-  const frame = useSpriteFrame(state, masterCfg);
-
-  const hasBodySheet = !!(body.sheetUrl && body.cols && body.rows);
-  const cols = body.cols ?? 1;
-  const rows = body.rows ?? 1;
-
-  return (
-    <div className={`relative ${className}`} style={style}>
-      {/* Camada base: corpo */}
-      <SheetLayer
-        sheetUrl={hasBodySheet ? body.sheetUrl! : null}
-        cols={cols}
-        rows={rows}
-        row={masterCfg.row}
-        frame={frame}
-        fallbackUrl={body.imageUrl ?? null}
-        flipX={flipX}
-        zIndex={0}
-      />
-      {/* Camadas cosméticas — SEMPRE sincronizadas ao corpo base.
-          Mesmo peças com sheet_url próprio herdam a grade/estados do corpo
-          (mesma cols/rows/row/frame), garantindo alinhamento total. */}
-      {pieces.map((p, i) => {
-        const pieceSheetUrl = p.sheet_url ?? (hasBodySheet ? p.image_url : null);
-        return (
-          <SheetLayer
-            key={`${p.slot}-${i}`}
-            sheetUrl={pieceSheetUrl}
-            cols={cols}
-            rows={rows}
-            row={masterCfg.row}
-            frame={frame}
-            fallbackUrl={p.image_url}
-            flipX={flipX}
-            zIndex={10 + p.z_index}
-          />
-        );
-      })}
+export function AnimatedCharacter({ characterId, body, state = "idle", flipX = false, className = "", style,
+  pieces: previewPieces, environment = "neutral", restartKey = 0, chakraColor = "#69c7ff", motion = true, frameOverride, }:
+  { characterId?: string | null; body: BodyConfig; state?: AnimState; flipX?: boolean;
+    className?: string; style?: CSSProperties; pieces?: EquippedPiece[];
+    environment?: SpriteEnvironment; restartKey?: number; chakraColor?: string; motion?: boolean; frameOverride?: number }) {
+  // Preview data requires no extra database subscriptions.
+  const equipped = useCharacterCosmetics(previewPieces ? null : characterId);
+  const pieces = previewPieces ?? equipped;
+  const hasSheet = !!(body.sheetUrl && body.cols && body.rows);
+  const cols = body.cols ?? 1, rows = body.rows ?? 1;
+  const ref = useRef<HTMLDivElement>(null);
+  const reduced = useReducedGameMotion();
+  const { visible, size } = useSpriteViewport(ref, hasSheet ? body.sheetUrl : body.imageUrl, hasSheet ? cols : 1, hasSheet ? rows : 1);
+  const bodyCfg = useMemo(() => resolveSpriteState(body.states ?? (hasSheet ? DEFAULT_STATES : null), state,
+    hasSheet ? cols : 1, hasSheet ? rows : 1), [body.states, hasSheet, state, cols, rows]);
+  const layers = useMemo(() => pieces.map((p) => ({ ...p, cfg: resolveSpriteState(p.sheet_states,
+    state, p.sheet_cols ?? 1, p.sheet_rows ?? 1) })), [pieces, state]);
+  // Clothing can animate even over a static body; never treat a static PNG as a sheet.
+  const master = layers.reduce((best, p) => p.sheet_url && p.cfg.frames > best.frames ? p.cfg : best, bodyCfg);
+  const frame = useSpriteFrame(state, master, restartKey, visible && !reduced && motion && frameOverride === undefined);
+  const displayFrame = frameOverride ?? frame;
+  const procedural = !hasSheet || !body.states?.[state];
+  return <div ref={ref} className={`relative flex items-center justify-center ${className}`} style={style}
+    data-sprite-state={state} data-sprite-motion={visible && !reduced && motion ? "on" : "off"}>
+    <div className="relative shrink-0" style={{ ...size, transform: flipX ? "scaleX(-1)" : undefined }}>
+      <div key={`${state}-${restartKey}`} className={`absolute inset-0 sprite-pose ${procedural ? `sprite-pose-${state}` : ""}`}
+        style={{ "--chakra-color": chakraColor } as CSSProperties}>
+        <SheetLayer sheetUrl={hasSheet ? body.sheetUrl : null} cols={cols} rows={rows}
+          row={bodyCfg.row} frame={mapLayerFrame(displayFrame, master, bodyCfg)} fallbackUrl={body.imageUrl} />
+        {layers.map((p) => <SheetLayer key={p.id ?? p.slot} sheetUrl={p.sheet_url && p.sheet_cols && p.sheet_rows ? p.sheet_url : null}
+          cols={p.sheet_cols ?? 1} rows={p.sheet_rows ?? 1} row={p.cfg.row}
+          frame={mapLayerFrame(displayFrame, master, p.cfg)} fallbackUrl={p.image_url}
+          zIndex={10 + p.z_index} slot={p.slot} state={state} environment={environment} />)}
+      </div>
     </div>
-  );
+  </div>;
 }
 
-/**
- * Versão simples: apenas 1 spritesheet sem camadas cosméticas.
- * Útil para NPCs.
- */
-export function AnimatedSprite({
-  sheetUrl, cols, rows, states, state = "idle",
-  fallbackUrl, flipX = false, className = "", style,
-}: {
-  sheetUrl?: string | null;
-  cols?: number | null;
-  rows?: number | null;
-  states?: StatesMap | null;
-  state?: AnimState;
-  fallbackUrl?: string | null;
-  flipX?: boolean;
-  className?: string;
-  style?: React.CSSProperties;
-}) {
-  const cfg = useMemo(() => resolveState(states ?? DEFAULT_STATES, state), [states, state]);
-  const frame = useSpriteFrame(state, cfg);
-  const hasSheet = !!(sheetUrl && cols && rows);
-  return (
-    <div className={`relative ${className}`} style={style}>
-      <SheetLayer
-        sheetUrl={hasSheet ? sheetUrl! : null}
-        cols={cols ?? 1}
-        rows={rows ?? 1}
-        row={cfg.row}
-        frame={frame}
-        fallbackUrl={fallbackUrl}
-        flipX={flipX}
-        zIndex={0}
-      />
-    </div>
-  );
+export function AnimatedSprite({ sheetUrl, cols, rows, states, state = "idle", fallbackUrl, flipX = false,
+  className = "", style, restartKey = 0, motion = true, frameOverride }:
+  { sheetUrl?: string | null; cols?: number | null; rows?: number | null; states?: StatesMap | null;
+    state?: AnimState; fallbackUrl?: string | null; flipX?: boolean; className?: string; style?: CSSProperties;
+    restartKey?: number; motion?: boolean; frameOverride?: number }) {
+  return <AnimatedCharacter body={{ imageUrl: fallbackUrl, sheetUrl, cols, rows, states }} pieces={[]}
+    state={state} flipX={flipX} className={className} style={style} restartKey={restartKey} motion={motion} frameOverride={frameOverride} />;
 }

@@ -12,7 +12,10 @@ export function PresenceHeartbeat({ status = "chat" }: { status?: "idle"|"combat
 
   useEffect(() => {
     let cancelled = false;
+    let pending = false;
     async function tick() {
+      if (cancelled || pending || document.hidden) return;
+      pending = true;
       try {
         const res: any = await ping({ data: { status } });
         const claimed = (res?.claimed ?? []) as any[];
@@ -31,7 +34,8 @@ export function PresenceHeartbeat({ status = "chat" }: { status?: "idle"|"combat
           }
           try { await seen({ data: { reward_ids: claimed.map((c) => c.id) } }); } catch {}
         }
-      } catch { /* silencia — heartbeat não deve interromper o jogo */ }
+      } catch { /* heartbeat não deve interromper o jogo */ }
+      finally { pending = false; }
     }
     tick();
     const t = setInterval(tick, 30_000);

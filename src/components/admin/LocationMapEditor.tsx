@@ -30,7 +30,8 @@ function handlePos(x: number, y: number, h: Handle) {
 export function LocationMapEditor({ locations, connections, selectedId, onSelect, onChange }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
-  const dragRef = useRef<{ id: string; offX: number; offY: number; moved: boolean } | null>(null);
+  const dragRef = useRef<{ id: string; offX: number; offY: number; moved: boolean; x: number; y: number; original: { x: number; y: number } } | null>(null);
+  const savingPositions = useRef(new Set<string>());
   const [wire, setWire] = useState<{ from: string; x: number; y: number } | null>(null);
   const panRef = useRef<{ startX: number; startY: number; scrollLeft: number; scrollTop: number } | null>(null);
 
@@ -53,9 +54,19 @@ export function LocationMapEditor({ locations, connections, selectedId, onSelect
     });
   }, [locations]);
 
-  const persistPos = useCallback(async (id: string, x: number, y: number) => {
-    await supabase.from("locations").update({ map_x: Math.round(x), map_y: Math.round(y) }).eq("id", id);
-  }, []);
+  const persistPos = useCallback(async (id: string, x: number, y: number, original: { x: number; y: number }) => {
+    savingPositions.current.add(id);
+    try {
+      const { error } = await supabase.from("locations").update({ map_x: Math.round(x), map_y: Math.round(y) }).eq("id", id);
+      if (error) throw error;
+    } catch {
+      setPositions((p) => ({ ...p, [id]: original }));
+      toast.error("Não foi possível salvar a posição do local.");
+    } finally {
+      savingPositions.current.delete(id);
+      onChange();
+    }
+  }, [onChange]);
 
   function relCoords(e: React.PointerEvent) {
     const el = wrapRef.current!;
@@ -65,26 +76,30 @@ export function LocationMapEditor({ locations, connections, selectedId, onSelect
 
   function onNodePointerDown(e: React.PointerEvent, id: string) {
     e.stopPropagation();
+    if (savingPositions.current.has(id)) return;
     const { x, y } = relCoords(e);
     const pos = positions[id] ?? { x: 0, y: 0 };
-    dragRef.current = { id, offX: x - pos.x, offY: y - pos.y, moved: false };
+    dragRef.current = { id, offX: x - pos.x, offY: y - pos.y, moved: false, x: pos.x, y: pos.y, original: pos };
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   }
   function onNodePointerMove(e: React.PointerEvent) {
     if (!dragRef.current) return;
     const { x, y } = relCoords(e);
     const { id, offX, offY } = dragRef.current;
-    dragRef.current.moved = true;
+
     const nx = Math.max(0, x - offX);
     const ny = Math.max(0, y - offY);
+    if (Math.hypot(nx - dragRef.current.x, ny - dragRef.current.y) < 2 && !dragRef.current.moved) return;
+    dragRef.current.moved = true;
+    dragRef.current.x = nx; dragRef.current.y = ny;
     setPositions((p) => ({ ...p, [id]: { x: nx, y: ny } }));
   }
   async function onNodePointerUp() {
     if (!dragRef.current) return;
-    const { id, moved } = dragRef.current;
-    const p = positions[id];
+    const { id, moved, x, y, original } = dragRef.current;
+    const p = { x, y };
     dragRef.current = null;
-    if (moved && p) await persistPos(id, p.x, p.y);
+    if (moved && p) await persistPos(id, p.x, p.y, original);
     else if (!moved) onSelect(id);
   }
 
@@ -132,7 +147,8 @@ export function LocationMapEditor({ locations, connections, selectedId, onSelect
   }
 
   async function removeConn(id: string) {
-    await supabase.from("location_connections").delete().eq("id", id);
+    const { error } = await supabase.from("location_connections").delete().eq("id", id);
+    if (error) return toast.error("Não foi possível remover a conexão.");
     onChange();
   }
 
@@ -165,7 +181,13 @@ export function LocationMapEditor({ locations, connections, selectedId, onSelect
         onPointerDown={onBgPointerDown}
         onPointerMove={(e) => { onNodePointerMove(e); onHandlePointerMove(e); onBgPointerMove(e); }}
         onPointerUp={(e) => { onNodePointerUp(); onHandlePointerUp(e); onBgPointerUp(); }}
-        onPointerCancel={onBgPointerUp}>
+        onPointerCancel={() => {
+          const drag = dragRef.current;
+          if (drag) {
+            setPositions((p) => ({ ...p, [drag.id]: drag.original }));
+          }
+          dragRef.current = null; setWire(null); onBgPointerUp();
+        }}>
         <div className="relative" style={{ width: maxX, height: maxY }}>
           {/* Group bounding boxes */}
           {groups.map(({ parent, children }) => {

@@ -71,10 +71,9 @@ export function Minimap({
     const spanY = Math.max(1, maxY - minY);
     const pad = 20;
     const scale = Math.min((VIEW_W - pad * 2) / spanX, (VIEW_H - pad * 2) / spanY, 1);
-    // Centrar o local atual
-    const cur = nodes.find((n) => n.id === currentLocationId)!;
-    const cx = (cur.map_x || 0) * scale;
-    const cy = (cur.map_y || 0) * scale;
+    // Fit the complete neighborhood. Centering the current node could clip every neighbor.
+    const cx = ((minX + maxX) / 2) * scale;
+    const cy = ((minY + maxY) / 2) * scale;
     const tx = VIEW_W / 2 - cx;
     const ty = VIEW_H / 2 - cy;
     return { nodes, edges, tx, ty, scale };
@@ -85,8 +84,9 @@ export function Minimap({
   return (
     <div className="pointer-events-auto rounded-lg border border-border bg-card/95 backdrop-blur shadow-lg overflow-hidden">
       <button
+        aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-1 px-2 py-1 text-[10px] uppercase tracking-widest text-muted-foreground hover:bg-secondary/40 transition"
+        className="w-full flex items-center gap-1 px-3 py-3 text-xs uppercase tracking-widest text-muted-foreground hover:bg-secondary/40 transition"
       >
         <MapIcon size={12} className="text-gold" />
         <span className="flex-1 text-left">Minimapa</span>
@@ -134,6 +134,8 @@ export function Minimap({
                 key={n.id}
                 onClick={() => onSelect?.(n.id)}
                 title={n.name}
+                aria-label={isCur ? `Local atual: ${n.name}` : `Ver ${n.name}`}
+                aria-current={isCur ? "location" : undefined}
                 className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 flex items-center justify-center transition ${
                   isCur
                     ? "border-emerald-400 bg-emerald-400/20 ring-2 ring-emerald-300/50 animate-pulse"

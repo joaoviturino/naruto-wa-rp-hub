@@ -498,3 +498,64 @@ img, video, canvas, svg {
   }
 }
 
+
+/* Gameplay surfaces: keep the black, crimson and gold identity, with readable controls. */
+.game-shell { min-height: 100dvh; }
+.game-shell button, .game-shell a, .game-shell input, .game-shell textarea { -webkit-tap-highlight-color: transparent; }
+.game-nav { display: flex; align-items: center; gap: .25rem; overflow-x: auto; scrollbar-width: thin; }
+.game-nav a { display: inline-flex; align-items: center; gap: .4rem; min-height: 44px; padding: .5rem .8rem; white-space: nowrap; border-radius: .65rem; font-size: .875rem; }
+.game-nav a[aria-current="page"], .game-nav a.active { color: var(--gold); background: color-mix(in oklch, var(--gold) 9%, transparent); box-shadow: inset 0 -2px var(--gold); }
+.game-nav a:hover { background-color: var(--secondary); }
+.game-skip { position: fixed; z-index: 100; top: .5rem; left: .5rem; transform: translateY(-200%); padding: .7rem; background: var(--card); color: var(--gold); }
+.game-skip:focus { transform: none; }
+.character-preview-stage { position: relative; height: 340px; overflow: hidden; border-radius: 1rem; border: 1px solid var(--border); background: radial-gradient(ellipse at 50% 65%, #394037 0, #151819 58%, #0b0e10 100%); }
+.character-preview-stage[data-environment="wind"] { background: radial-gradient(ellipse at 65% 70%, #23463d, #101a1b 65%); }
+.character-preview-stage[data-environment="rain"] { background: linear-gradient(160deg, #1f3644, #0d151e); }
+.character-preview-stage[data-environment="water"] { background: linear-gradient(#111e29 60%, #164756 81%, #23758a); }
+.wardrobe-piece { border: 1px solid var(--border); border-radius: .75rem; padding: .75rem; background: var(--card); display: flex; flex-direction: column; gap: .5rem; font-size: .875rem; text-align: center; align-items: center; min-width: 0; }
+.wardrobe-piece:hover { border-color: var(--gold); }
+.wardrobe-piece.is-selected { border-color: var(--gold); box-shadow: 0 0 0 2px color-mix(in oklch, var(--gold) 35%, transparent); background: color-mix(in oklch, var(--gold) 8%, var(--card)); }
+.wardrobe-piece:disabled { opacity: .6; }
+.character-studio input, .skill-workshop input { min-height: 44px; }
+.skill-workshop label { font-size: .875rem; }
+.skill-workshop [data-slot="select-trigger"] { min-height: 44px; }
+.combat-dialog { overscroll-behavior: contain; padding-bottom: env(safe-area-inset-bottom); }
+.combat-dialog .font-display { line-height: 1.4; }
+.combat-dialog [role="tab"], .combat-dialog button { touch-action: manipulation; }
+.chat-messages { overflow-anchor: auto; overscroll-behavior: contain; }
+
+/* Layer transforms use the same canvas and origin as the body. They are cosmetic,
+   never combat physics. Authored sheet frames always take precedence over fallback motion. */
+.sprite-pose { transform-origin: 50% 84%; }
+.sprite-pose-run { animation: shinobi-run .45s ease-in-out infinite; }
+.sprite-pose-punch { animation: shinobi-punch .6s ease-out both; }
+.sprite-pose-kick { animation: shinobi-kick .7s ease-in-out both; }
+.sprite-pose-hurt { animation: shinobi-hurt .45s ease-out both; }
+.sprite-pose-cast { animation: shinobi-cast 1.1s ease-in-out both; }
+.sprite-pose-guard { transform: translateY(2%) scaleY(.97); filter: drop-shadow(0 0 6px var(--chakra-color, #69c7ff)); }
+.sprite-pose-death { transform: rotate(72deg) translateY(4%) scale(.8); opacity: .65; }
+.sprite-layer[data-slot="clothing"], .sprite-layer[data-slot="accessory"] { transform-origin: 50% 45%; }
+.sprite-layer:is([data-slot="clothing"], [data-slot="accessory"])[data-environment="wind"] { animation: shinobi-cloth 1.1s ease-in-out infinite alternate; }
+.sprite-layer[data-slot="hair"][data-environment="wind"] { animation: shinobi-hair 1.2s ease-in-out infinite alternate; transform-origin: 50% 28%; }
+.sprite-layer[data-slot="clothing"]:is([data-environment="rain"], [data-environment="water"]) { filter: brightness(.78) saturate(.8); }
+.sprite-layer[data-slot="clothing"][data-action="cast"] { filter: drop-shadow(0 0 6px var(--chakra-color, #69c7ff)); }
+@keyframes shinobi-run { 0%,100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-3%) rotate(2deg); } }
+@keyframes shinobi-punch { 0%,100% { transform: none; } 30% { transform: translateX(-3%) rotate(-4deg); } 55% { transform: translateX(8%) rotate(7deg); } }
+@keyframes shinobi-kick { 0%,100% { transform: none; } 40% { transform: translateY(-7%) rotate(-10deg); } 70% { transform: translateX(5%) rotate(9deg); } }
+@keyframes shinobi-hurt { 0%,100% { transform: none; } 20%,60% { transform: translateX(-4%) rotate(-4deg); } 40%,80% { transform: translateX(2%); } }
+@keyframes shinobi-cast { 0%,100% { filter: none; } 35%,70% { filter: drop-shadow(0 0 14px var(--chakra-color, #69c7ff)); transform: translateY(-2%); } }
+@keyframes shinobi-cloth { from { transform: skewX(-.6deg) translateX(-.2%); } to { transform: skewX(1deg) translateX(.4%); } }
+@keyframes shinobi-hair { from { transform: rotate(-.5deg); } to { transform: rotate(.5deg); } }
+[data-sprite-motion="off"] .sprite-pose, [data-sprite-motion="off"] .sprite-layer { animation: none !important; }
+[data-game-motion="reduced"] .game-shell *, [data-game-motion="reduced"] .combat-dialog *, [data-game-motion="reduced"] .character-studio * { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+@media (prefers-reduced-motion: reduce) {
+  .sprite-pose, .sprite-layer { animation: none !important; }
+  .game-shell *, .combat-dialog * { scroll-behavior: auto !important; }
+}
+@media (max-width: 767px) {
+  .game-shell input, .game-shell textarea { font-size: 1rem; }
+  .character-preview-stage { height: 300px; }
+  .chat-play-surface { height: calc(100dvh - 15rem); min-height: 320px; }
+  .combat-dialog button { min-height: 40px; }
+  .combat-dialog [role="tab"] { min-height: 44px; }
+}

@@ -74,7 +74,7 @@ export function SpriteColorDialog({
       if (error) return toast.error(error.message);
     }
     setEquipped((m) => { const n = { ...m }; if (pieceId) n[slot] = pieceId; else delete n[slot]; return n; });
-    refreshCharacterCosmetics(characterId);
+    void refreshCharacterCosmetics(characterId).catch(() => toast.error("A aparência foi salva, mas a prévia não atualizou. Reabra o editor."));
   }
 
   const overlays = pieces
