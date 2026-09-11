@@ -1,3 +1,4 @@
+import { combatVisualSchema } from "@/lib/skill-blueprints";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -84,6 +85,7 @@ const restoreEffect = z.object({
   amount: z.number().min(0).max(100000),
 }).nullable().optional();
 const metaSchema = z.object({
+  visual: combatVisualSchema.optional(),
   restore: restoreEffect,
   recipe: z.array(z.object({
     item_id: z.string().uuid(),
@@ -526,7 +528,8 @@ export const deleteSkill = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await supabaseAdmin.from("skills").delete().eq("id", data.id);
+    const { error } = await supabaseAdmin.from("skills").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
     return { ok: true };
   });
 

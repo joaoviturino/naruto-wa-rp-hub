@@ -1,3 +1,9 @@
+import { resolveCombatEnvironment, type SpriteEnvironment } from "@/lib/sprite-animation";
+import { resolveCombatKeys } from "@/lib/combat-playback";
+import { useCombatPlayback } from "@/hooks/useCombatPlayback";
+import { useGamePreferences } from "@/hooks/useGamePreferences";
+import { GameSettings } from "@/components/GameSettings";
+import type { CombatVisual } from "@/lib/skill-blueprints";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -12,7 +18,6 @@ import { NpcMusic } from "@/components/NpcMusic";
 import { toast } from "sonner";
 import { Sword, Flag, Zap, FlaskConical, Users, Target } from "lucide-react";
 import { FloatingDamageLayer, type DamageBurst } from "@/components/chat/FloatingDamage";
-import { CosmeticOverlay } from "@/components/CosmeticOverlay";
 import { AnimatedCharacter, type AnimState } from "@/components/AnimatedSprite";
 import { useBodySprite } from "@/hooks/useBodySprite";
 import { HealParticles } from "@/components/chat/HealParticles";
@@ -43,27 +48,12 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const [itemMap, setItemMap] = useState<Record<string, Item>>({});
   const [avatars, setAvatars] = useState<Record<string, string | null>>({});
   const [sprites, setSprites] = useState<Record<string, string | null>>({});
-  // Pose ativa por jogador (character_id → url) durante um ataque.
-  const [poses, setPoses] = useState<Record<string, string | null>>({});
-  const lastLogSeq = useRef<number>(0);
-  const animQueue = useRef<any[]>([]);
-  const animRunning = useRef<boolean>(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const pvpDuelIdRef = useRef<string | null>(null);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   // Refs para calcular posições no palco (projetéis, overlays, etc.)
   const stageRef = useRef<HTMLDivElement | null>(null);
   const npcRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const playerRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  // GIF/vídeo ativo no palco (por entrada de log)
-  const [fx, setFx] = useState<null | {
-    id: string;
-    url: string;
-    mode: "projectile" | "front" | "overlay";
-    from: { x: number; y: number };
-    to: { x: number; y: number };
-    isVideo: boolean;
-    mirror?: boolean;
-  }>(null);
   const attack = useServerFn(playerAttack);
   const flee = useServerFn(fleeCombat);
   const consume = useServerFn(consumeInCombat);
@@ -87,11 +77,13 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   }
 
   async function load() {
-    const { data } = await supabase.from("combat_sessions").select("*").eq("id", sessionId).maybeSingle();
+    const { data, error } = await supabase.from("combat_sessions").select("*").eq("id", sessionId).maybeSingle();
+    if (!mounted.current) return;
+    if (error) { toast.error("Não foi possível carregar o combate. Verifique sua conexão."); return; }
     if (!data) { onClose(); return; }
-    pvpDuelIdRef.current = (data.state as any)?.duel_id ?? null;
     if ((data.state as any)?.mode === "pvp" && (data.state as any)?.duel_id) {
       const { data: duel } = await supabase.from("pvp_duels").select("status").eq("id", (data.state as any).duel_id).maybeSingle();
+      if (!mounted.current) return;
       if (duel && duel.status !== "active") { onClose(); return; }
     }
     setSession(remapPvpForViewer(data as any, myCharId));
@@ -131,17 +123,20 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
           setSession(next);
           if (next?.state?._pvp && next?.status !== "active") onClose();
         })
-      .on("postgres_changes", { event: "*", schema: "public", table: "pvp_duels" },
-        (payload) => {
-          const currentDuelId = pvpDuelIdRef.current;
-          const row = payload.new as any;
-          if (currentDuelId && row?.id === currentDuelId && row?.status !== "active") onClose();
-          else void load();
-        })
       .subscribe((status) => { if (status === "SUBSCRIBED") void load(); });
     return () => { supabase.removeChannel(ch); };
      
   }, [sessionId, myCharId]);
+
+  useEffect(() => {
+    const duelId = session?.state?.duel_id;
+    if (!duelId) return;
+    const channel = supabase.channel(`combat-duel-${duelId}`)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "pvp_duels", filter: `id=eq.${duelId}` },
+        ({ new: duel }) => { if (mounted.current && duel.status !== "active") onClose(); })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [session?.state?.duel_id]);
 
   const participantIdsKey = useMemo(() => [
     ...(session?.state?.players ?? []).map((p: any) => p.character_id),
@@ -243,220 +238,33 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
   const defenseSkill = defensiveSkills.find((s) => s.id === selectedDefense) ?? null;
   const consumables = useMemo(() => bag.filter((e) => itemMap[e.item_id]?.type === "consumable"), [bag, itemMap]);
 
-  // Enfileira TODAS as novas entradas do log (jogador + resposta do NPC vêm juntas do backend)
-  // e roda uma de cada vez: espera pré-carregar mídia, mostra animação, toca som e SÓ ENTÃO
-  // avança para a próxima. Isso evita que o ataque do NPC "sobrescreva" o do jogador.
-  useEffect(() => {
-    if (!log.length) return;
-    const fresh = log.filter((l: any) => l.seq > lastLogSeq.current);
-    if (!fresh.length) return;
-    lastLogSeq.current = fresh[fresh.length - 1].seq;
-    for (const entry of fresh) {
-      if (entry.pose_url || entry.sound_url || entry.animation_url || entry.is_dash) animQueue.current.push(entry);
-      // MISS: mostra um "flutuante" cinza no alvo para deixar claro que errou.
-      if (entry.missed) {
-        const missId = `${entry.seq}-miss`;
-        if (entry.actor === "player") {
-          const idx = typeof entry.target_npc_idx === "number"
-            ? entry.target_npc_idx
-            : npcs.findIndex((n: any) => n.name === entry.target_name);
-          if (idx >= 0) pushBurst(`npc:${idx}`, { id: missId, amount: 0, label: "MISS" });
-        } else if (entry.actor === "npc") {
-          const cid = entry.target_char_id
-            ?? players.find((x: any) => x.nickname === entry.target_name)?.character_id;
-          if (cid) pushBurst(`player:${cid}`, { id: missId, amount: 0, label: "MISS" });
-        }
-      }
-      // Números de dano flutuantes
+  const preferences = useGamePreferences();
+  const { action: playingAction, fx } = useCombatPlayback({ sessionId, loaded: !!session, log, players, npcs,
+    playerRefs, npcRefs, stageRef, onImpact: (entry) => {
+      const { targetKey } = resolveCombatKeys(entry, players, npcs);
+      if (entry.missed && targetKey) pushBurst(targetKey, { id: `${entry.seq}-miss`, amount: 0, label: "MISS" });
       if (Number(entry.damage) > 0) {
-        const id = `${entry.seq}-${Math.random().toString(36).slice(2, 7)}`;
-        const crit = Number(entry.crit_mul ?? 1) > 1 && entry.damage > 0;
+        const id = `${entry.seq}-impact`;
+        const crit = Number(entry.crit_mul ?? 1) > 1;
         if (entry.heal) {
-          // Cura: burst verde e partículas em cada alvo curado.
-          const ids: string[] = Array.isArray(entry.heal_target_ids) && entry.heal_target_ids.length
-            ? entry.heal_target_ids
-            : (entry.heal_mode === "team"
-              ? players.filter((p: any) => p.alive).map((p: any) => p.character_id)
-              : [entry.actor_char_id].filter(Boolean));
+          const actorSide = entry.actor === "player" ? players : npcs;
+          const ids: string[] = entry.heal_target_ids?.length ? entry.heal_target_ids
+            : entry.heal_mode === "team" ? actorSide.filter((p: any) => p.alive).map((p: any) => p.character_id)
+            : [entry.target_char_id ?? entry.actor_char_id].filter((cid): cid is string => !!cid);
           for (const cid of ids) {
-            pushBurst(`player:${cid}`, { id: `${id}-${cid}`, amount: Number(entry.damage), heal: true });
-            triggerHeal(cid);
+            const player = players.find((p: any) => p.character_id === cid);
+            const npcIndex = npcs.findIndex((n: any) => n.character_id === cid || n.id === cid);
+            const key = player ? `player:${cid}` : npcIndex >= 0 ? `npc:${npcIndex}` : null;
+            if (key) pushBurst(key, { id: `${id}-${cid}`, amount: Number(entry.damage), heal: true });
+            if (player) triggerHeal(cid);
           }
-        } else if (entry.actor === "player") {
-          // dano no NPC alvo — usa o nome como fallback para achar o slot
-          const idx = npcs.findIndex((n: any) => n.name === entry.target_name);
-          const key = `npc:${idx >= 0 ? idx : 0}`;
-          pushBurst(key, { id, amount: Number(entry.damage), crit });
-        } else if (entry.actor === "npc") {
-          // dano no jogador target_name
-          const p = players.find((x: any) => x.nickname === entry.target_name);
-          if (p) pushBurst(`player:${p.character_id}`, { id, amount: Number(entry.damage), crit });
-        }
-      }
-    }
-    void runQueue();
-
-    async function runQueue() {
-      if (animRunning.current) return;
-      animRunning.current = true;
-      let lastActor: string | null = null;
-      while (animQueue.current.length) {
-        const entry = animQueue.current.shift();
-        // Pausa dramática: o NPC "respira" 3s após tomar o golpe antes de revidar.
-        if (lastActor === "player" && entry?.actor === "npc") {
-          await new Promise((r) => setTimeout(r, 3000));
-        }
-        await playOne(entry);
-        if (entry?.actor) lastActor = entry.actor;
-      }
-      animRunning.current = false;
-    }
-
-    async function playOne(entry: any) {
-      const poseUrl: string | undefined = entry.pose_url;
-      const actorCharId: string | undefined = entry.actor_char_id;
-      const soundUrl: string | undefined = entry.sound_url;
-      const animUrl: string | undefined = entry.animation_url;
-      const animMode: "projectile" | "front" | "overlay" = entry.animation_mode ?? "overlay";
-      const isDash: boolean = !!entry.is_dash;
-      const MAX_WAIT = 5000;
-      const POSE_MS = 1400;
-
-      const waitImg = poseUrl ? new Promise<boolean>((res) => {
-        const img = new Image();
-        let done = false;
-        const finish = (ok: boolean) => { if (done) return; done = true; res(ok); };
-        img.onload = () => finish(true);
-        img.onerror = () => finish(false);
-        img.src = poseUrl;
-        setTimeout(() => finish(false), MAX_WAIT);
-      }) : Promise.resolve(false);
-
-      let audio: HTMLAudioElement | null = null;
-      const waitAudio = soundUrl ? new Promise<boolean>((res) => {
-        try {
-          const a = new Audio(soundUrl);
-          a.crossOrigin = "anonymous";
-          a.preload = "auto";
-          a.volume = 0.7;
-          audio = a;
-          let done = false;
-          const finish = (ok: boolean) => { if (done) return; done = true; res(ok); };
-          a.addEventListener("canplaythrough", () => finish(true), { once: true });
-          a.addEventListener("loadeddata", () => finish(true), { once: true });
-          a.addEventListener("error", () => finish(false), { once: true });
-          a.load();
-          setTimeout(() => finish(false), MAX_WAIT);
-        } catch { res(false); }
-      }) : Promise.resolve(false);
-
-      const [imgOk] = await Promise.all([waitImg, waitAudio]);
-
-      // Tocar som
-      let audioDuration = 0;
-      const a2 = audio as HTMLAudioElement | null;
-      if (a2) {
-        if (audioRef.current) { try { audioRef.current.pause(); } catch { /* noop */ } }
-        audioRef.current = a2;
-        try { await a2.play(); } catch { /* noop */ }
-        audioDuration = Number.isFinite(a2.duration) ? a2.duration * 1000 : 0;
+        } else if (targetKey) pushBurst(targetKey, { id, amount: Number(entry.damage), crit });
       }
 
-      // Resolve origem/alvo (usado para dash e FX)
-      let fromEl: HTMLElement | null = null;
-      if (entry.actor === "player" && entry.actor_char_id) fromEl = playerRefs.current[entry.actor_char_id] ?? null;
-      else if (entry.actor === "npc") {
-        const idx = npcs.findIndex((n: any) => n.name === entry.actor_name);
-        if (idx >= 0) fromEl = npcRefs.current[idx] ?? null;
-      }
-      let toEl: HTMLElement | null = null;
-      if (entry.actor === "player") {
-        const idx = typeof entry.target_npc_idx === "number"
-          ? entry.target_npc_idx
-          : npcs.findIndex((n: any) => n.name === entry.target_name);
-        if (idx >= 0) toEl = npcRefs.current[idx] ?? null;
-      } else if (entry.actor === "npc") {
-        const cid = entry.target_char_id
-          ?? players.find((p: any) => p.nickname === entry.target_name)?.character_id;
-        if (cid) toEl = playerRefs.current[cid] ?? null;
-      }
-
-      // Dash: desloca o sprite do atacante para a frente do alvo antes da pose.
-      const DASH_MS = 260;
-      let dashApplied = false;
-      let dashPrevTransform = "";
-      let dashPrevTransition = "";
-      if (isDash && fromEl && toEl) {
-        const fr = fromEl.getBoundingClientRect();
-        const tr = toEl.getBoundingClientRect();
-        const fromCx = fr.left + fr.width / 2;
-        const fromCy = fr.top + fr.height / 2;
-        const toCx = tr.left + tr.width / 2;
-        const toCy = tr.top + tr.height / 2;
-        // Para próximo do alvo, deixando ~40px de folga do lado do atacante.
-        const dir = fromCx <= toCx ? -1 : 1; // se atacante está à esquerda, para à esquerda do alvo
-        const gap = 40 + tr.width / 2;
-        const dx = (toCx + dir * gap) - fromCx;
-        const dy = toCy - fromCy;
-        dashPrevTransition = fromEl.style.transition;
-        dashPrevTransform = fromEl.style.transform;
-        fromEl.style.transition = `transform ${DASH_MS}ms cubic-bezier(0.2,0.7,0.2,1)`;
-        fromEl.style.transform = `${dashPrevTransform ? dashPrevTransform + " " : ""}translate(${dx}px, ${dy}px)`;
-        // Leve rastro visual
-        const prevFilter = fromEl.style.filter;
-        fromEl.style.filter = `${prevFilter || ""} drop-shadow(0 0 12px rgba(255,220,120,0.85))`;
-        dashApplied = true;
-        await new Promise((r) => setTimeout(r, DASH_MS));
-        // guarda o filter anterior no dataset para restaurar depois
-        (fromEl as any)._prevFilter = prevFilter;
-      }
-
-      // Troca de pose para o jogador que agiu
-      if (poseUrl && imgOk && actorCharId) {
-        setPoses((p) => ({ ...p, [actorCharId]: poseUrl }));
-      }
-
-      // Renderiza a animação (gif/vídeo) no palco, se houver
-      if (animUrl && stageRef.current) {
-        const stageRect = stageRef.current.getBoundingClientRect();
-        const rectCenter = (el: HTMLElement | null) => {
-          if (!el) return null;
-          const r = el.getBoundingClientRect();
-          return { x: r.left + r.width / 2 - stageRect.left, y: r.top + r.height / 2 - stageRect.top };
-        };
-        const to = rectCenter(toEl);
-        const from = rectCenter(fromEl) ?? to;
-        if (to) {
-          setFx({
-            id: `${entry.seq}-fx`,
-            url: animUrl,
-            mode: animMode,
-            from: from!,
-            to,
-            isVideo: /\.(mp4|webm)$/i.test(animUrl),
-            mirror: entry.actor === "player",
-          });
-        }
-      }
-
-      // Aguarda o maior entre duração do áudio e a pose (mínimo 1.2s, máximo 6s)
-      const wait = Math.max(1200, Math.min(6000, Math.max(audioDuration || 0, poseUrl && imgOk ? POSE_MS : 0)));
-      await new Promise((r) => setTimeout(r, wait));
-
-      // Reset do dash (volta o atacante para a posição original)
-      if (dashApplied && fromEl) {
-        fromEl.style.transition = `transform ${DASH_MS}ms cubic-bezier(0.4,0,0.2,1)`;
-        fromEl.style.transform = dashPrevTransform;
-        await new Promise((r) => setTimeout(r, DASH_MS));
-        fromEl.style.transition = dashPrevTransition;
-        fromEl.style.filter = (fromEl as any)._prevFilter ?? "";
-      }
-      if (poseUrl && imgOk && actorCharId) {
-        setPoses((p) => { const { [actorCharId]: _drop, ...rest } = p; return rest; });
-      }
-      setFx(null);
-    }
-  }, [log.length]);
+    },
+  });
+  const poses: Record<string, string | undefined> = playingAction?.poseUrl
+    ? { [playingAction.actorKey.replace(/^(player|npc):/, "")]: playingAction.poseUrl } : {};
 
   if (!session) return null;
 
@@ -488,19 +296,21 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
 
   const poolColor: Record<string, string> = { ef: "oklch(0.55 0.22 25)", em: "oklch(0.6 0.15 220)", chakra: "oklch(0.78 0.15 80)" };
   const lastEntry = log[log.length - 1];
-  const npcActive = session.status === "active" && lastEntry?.actor === "npc" && Object.keys(poses).length === 0;
+  const npcActive = playingAction?.actorKey.startsWith("npc:") ?? false;
   // Preferimos cenário do genjutsu ativo; depois LOCAL; depois NPC/grupo.
   const genjutsuScene = (state as any)._scenery?.url as string | null | undefined;
+  const battleEnvironment = resolveCombatEnvironment(state.location_environment, playingAction?.visual.environment);
   const bgUrl = genjutsuScene ?? ((state as any).location_bg_url as string | null) ?? (npc.battle_bg_url as string | null);
   const battleMusic = ((state as any).location_music_url as string | null) ?? ((npc as any).music_url as string | null);
 
   return (
     <Dialog open onOpenChange={(v) => !v && session.status !== "active" && onClose()}>
-      <DialogContent className="max-w-4xl w-[calc(100vw-1rem)] p-0 overflow-hidden border-blood/30 max-h-[95vh] overflow-y-auto no-scrollbar">
-        <NpcMusic src={battleMusic} />
+      <DialogContent className="combat-dialog max-w-5xl w-[calc(100vw-1rem)] p-0 overflow-hidden border-blood/30 max-h-[95dvh] overflow-y-auto no-scrollbar">
+        <NpcMusic src={preferences.sound ? battleMusic : null} />
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 px-3 pt-3 text-sm sm:text-base">
             <Sword size={16} /> Combate: {npc.name}
+            <div className="ml-auto mr-8"><GameSettings compact /></div>
             {session.status !== "active" && <span className="ml-2 text-xs uppercase text-gold">{session.status}</span>}
             {state._pvp && !spectator && session.status === "active" && (
               <Button
@@ -560,11 +370,11 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
               const frontCount = n <= 2 ? n : Math.ceil(n / 2);
               const front = npcs.slice(0, frontCount).map((v: any, i: number) => ({ v, i }));
               const back = npcs.slice(frontCount).map((v: any, i: number) => ({ v, i: i + frontCount }));
-              const sizeCls = n > 2 ? "h-[95px] w-[95px] sm:h-[130px] sm:w-[130px]" : "h-[150px] w-[150px] sm:h-[200px] sm:w-[200px]";
+              const sizeCls = n > 2 ? "w-full aspect-square max-w-[130px]" : "w-full aspect-square max-w-[200px]";
               const renderNpc = ({ v: nn, i }: { v: any; i: number }) => {
                 const dead = nn.alive === false || nn.hp <= 0;
                 const isTarget = i === targetIdx && !dead;
-                const isActing = npcActive && i === (state.target ?? 0);
+                const isActing = playingAction?.actorKey === `npc:${i}`;
                 const canPick = !dead && myTurn;
                 // Em PvP, o "npc" na verdade é um jogador do lado adversário. Usa
                 // sprite_url do inventário e permite a troca de pose pelo character_id.
@@ -579,20 +389,24 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                     type="button"
                     disabled={!canPick}
                     onClick={() => canPick && setTargetIdx(i)}
-                    className={`relative flex flex-col items-center gap-1 group min-w-0 ${canPick ? "cursor-pointer" : "cursor-default"}`}
+                    className={`relative flex flex-col flex-1 items-center gap-1 group min-w-0 max-w-[200px] ${canPick ? "cursor-pointer" : "cursor-default"}`}
                   >
-                    <div ref={(el) => { npcRefs.current[i] = el; }} className={`relative transition-all ${isActing ? "drop-shadow-[0_0_18px_rgba(239,68,68,0.9)] scale-105" : ""} ${isTarget && !isActing ? "drop-shadow-[0_0_14px_rgba(239,68,68,0.75)] scale-[1.03]" : ""} ${dead ? "opacity-30 grayscale" : "group-hover:scale-105"}`}>
+                    <div ref={(el) => { npcRefs.current[i] = el; }} className={`relative w-full flex justify-center transition-all ${isActing ? "drop-shadow-[0_0_18px_rgba(239,68,68,0.9)] scale-105" : ""} ${isTarget && !isActing ? "drop-shadow-[0_0_14px_rgba(239,68,68,0.75)] scale-[1.03]" : ""} ${dead ? "opacity-30 grayscale" : "group-hover:scale-105"}`}>
                       <CombatCharacterSprite
                         characterId={state._pvp ? enemyCid ?? null : null}
                         sources={enemySources.filter(Boolean) as string[]}
                         alt={enemyName}
+                        visual={isActing ? playingAction?.visual : undefined}
+                        restartKey={playingAction?.seq ?? 0}
+                        poseUrl={isActing ? playingAction?.poseUrl : undefined}
+                        environment={battleEnvironment}
                         sizeCls={sizeCls}
                         style={{ filter: isActing ? "drop-shadow(0 0 10px rgb(239 68 68))" : undefined }}
                         showLegacyOverlay
                         animState={
                           dead ? "death"
                           : (bursts[`npc:${i}`] ?? []).some((b) => b.amount > 0 && !b.heal) ? "hurt"
-                          : isActing ? "punch"
+                          : isActing ? playingAction!.visual.action
                           : "idle"
                         }
                       />
@@ -626,7 +440,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
               const frontCount = n <= 2 ? n : Math.ceil(n / 2);
               const front = players.slice(0, frontCount);
               const back = players.slice(frontCount);
-              const sizeCls = n > 2 ? "h-[95px] w-[95px] sm:h-[130px] sm:w-[130px]" : "h-[150px] w-[150px] sm:h-[200px] sm:w-[200px]";
+              const sizeCls = n > 2 ? "w-full aspect-square max-w-[130px]" : "w-full aspect-square max-w-[200px]";
               const renderPlayer = (p: any) => {
                 const isActive = session.status === "active" && !npcActive && p.character_id === activePlayer?.character_id && p.alive;
                 const spriteSources = [poses[p.character_id], sprites[p.character_id], p.sprite_url, p.inventory_bg_url, p.image_url, avatars[p.character_id], p.avatar_url].filter(Boolean) as string[];
@@ -638,21 +452,25 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
                     type="button"
                     disabled={!isHealPick}
                     onClick={() => isHealPick && setHealTargetId(p.character_id)}
-                    className={`flex flex-col items-center gap-1 min-w-0 ${isHealPick ? "cursor-pointer" : "cursor-default"}`}
+                    className={`flex flex-col flex-1 items-center gap-1 min-w-0 max-w-[200px] ${isHealPick ? "cursor-pointer" : "cursor-default"}`}
                   >
-                    <div ref={(el) => { playerRefs.current[p.character_id] = el; }} className={`relative transition-all ${isActive ? "drop-shadow-[0_0_18px_rgba(52,211,153,0.9)] scale-105" : ""} ${chosenHeal ? "drop-shadow-[0_0_18px_rgba(52,211,153,0.9)] scale-[1.04] ring-2 ring-emerald-400/70 rounded-md" : ""} ${!p.alive ? "opacity-30 grayscale" : ""}`}>
+                    <div ref={(el) => { playerRefs.current[p.character_id] = el; }} className={`relative w-full flex justify-center transition-all ${isActive ? "drop-shadow-[0_0_18px_rgba(52,211,153,0.9)] scale-105" : ""} ${chosenHeal ? "drop-shadow-[0_0_18px_rgba(52,211,153,0.9)] scale-[1.04] ring-2 ring-emerald-400/70 rounded-md" : ""} ${!p.alive ? "opacity-30 grayscale" : ""}`}>
                       <CombatCharacterSprite
                         characterId={p.character_id}
                         sources={spriteSources}
                         alt={p.nickname}
+                        visual={playingAction?.actorKey === `player:${p.character_id}` ? playingAction.visual : undefined}
+                        restartKey={playingAction?.seq ?? 0}
+                        poseUrl={playingAction?.actorKey === `player:${p.character_id}` ? playingAction.poseUrl : undefined}
                         flipX
+                        environment={battleEnvironment}
                         sizeCls={sizeCls}
                         style={{ filter: isActive ? "drop-shadow(0 0 10px rgb(52 211 153))" : undefined }}
                         showLegacyOverlay
                         animState={
                           !p.alive ? "death"
                           : (bursts[`player:${p.character_id}`] ?? []).some((b) => b.amount > 0 && !b.heal) ? "hurt"
-                          : isActive ? (isHealSkill ? "cast" : "punch")
+                          : playingAction?.actorKey === `player:${p.character_id}` ? playingAction.visual.action
                           : "idle"
                         }
                       />
@@ -686,7 +504,7 @@ export function CombatDialog({ sessionId, myCharId, onClose }: { sessionId: stri
         {/* Party bar */}
         <div
           className="grid gap-2 px-2 py-2 border-b border-border bg-background/60"
-          style={{ gridTemplateColumns: `repeat(${Math.min(players.length, 6)}, minmax(0, 1fr))` }}
+          style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 150px), 1fr))" }}
         >
           {players.map((p: any) => {
             const isMe = p.character_id === myCharId;
@@ -1074,59 +892,29 @@ function SkillFxLayer({ fx }: {
 // (spritesheet + camadas cosméticas) se houver spritesheet configurada,
 // senão faz fallback para a imagem estática + overlay de cosméticos.
 // -----------------------------------------------------------------
-function CombatCharacterSprite({
-  characterId,
-  sources,
-  alt,
-  flipX,
-  sizeCls,
-  style,
-  animState,
-  showLegacyOverlay,
-}: {
-  characterId?: string | null;
-  sources: string[];
-  alt: string;
-  flipX?: boolean;
-  sizeCls: string;
-  style?: React.CSSProperties;
-  animState: AnimState;
-  showLegacyOverlay?: boolean;
-}) {
-  const body = useBodySprite(characterId ?? null);
-  const hasSheet = !!(body?.sheet_url && body?.sheet_cols && body?.sheet_rows);
-
-  if (characterId && hasSheet) {
-    return (
-      <div className={`${sizeCls} relative`} style={style}>
-        <AnimatedCharacter
-          characterId={characterId}
-          body={{
-            imageUrl: body!.image_url ?? sources[0] ?? null,
-            sheetUrl: body!.sheet_url,
-            cols: body!.sheet_cols,
-            rows: body!.sheet_rows,
-            states: body!.sheet_states,
-          }}
-          state={animState}
-          flipX={flipX}
-          className="w-full h-full"
-        />
-      </div>
-    );
-  }
-
-  // Fallback estático + overlay cosmético clássico.
-  return (
-    <>
-      <SmartCombatImage
-        sources={sources}
-        alt={alt}
-        className={`${sizeCls} w-auto object-contain`}
-        style={{ ...(flipX ? { transform: "scaleX(-1)" } : null), ...style }}
-        fallbackClassName={`${sizeCls} w-20 bg-secondary rounded`}
-      />
-      {characterId && showLegacyOverlay && <CosmeticOverlay characterId={characterId} flipX={flipX} />}
-    </>
-  );
+function CombatCharacterSprite({ characterId, sources, alt, flipX, sizeCls, style, animState, visual, restartKey = 0, poseUrl, environment = "neutral" }:
+  { characterId?: string | null; sources: string[]; alt: string; flipX?: boolean; sizeCls: string;
+    style?: React.CSSProperties; animState: AnimState; showLegacyOverlay?: boolean;
+    visual?: CombatVisual; restartKey?: number; poseUrl?: string; environment?: SpriteEnvironment }) {
+  const body = useBodySprite(characterId);
+  const [sourceIndex, setSourceIndex] = useState(0);
+  const candidates = [...new Set([poseUrl, ...sources, body?.image_url].filter((url): url is string => !!url))];
+  const sourceKey = candidates.join("|");
+  useEffect(() => { setSourceIndex(0); }, [sourceKey]);
+  // Preserve the existing source fallback chain and do not overlay front-facing pieces on authored poses.
+  const image = candidates[sourceIndex];
+  const usingPose = !!poseUrl && image === poseUrl;
+  useEffect(() => {
+    if (!image) return;
+    let alive = true;
+    const img = new Image(); img.onerror = () => { if (alive) setSourceIndex((v) => v + 1); }; img.src = image;
+    return () => { alive = false; img.onerror = null; };
+  }, [image]);
+  return <div className={`${sizeCls} relative`} style={style} role="img" aria-label={alt}>
+    <AnimatedCharacter characterId={characterId} pieces={usingPose ? [] : undefined}
+      body={{ imageUrl: image, sheetUrl: usingPose ? null : body?.sheet_url, cols: body?.sheet_cols,
+        rows: body?.sheet_rows, states: body?.sheet_states }}
+      state={animState} environment={environment} chakraColor={visual?.chakra_color}
+      restartKey={restartKey} flipX={flipX} className="h-full w-full" />
+  </div>;
 }

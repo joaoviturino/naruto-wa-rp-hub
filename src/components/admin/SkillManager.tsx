@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,9 +12,11 @@ import { toast } from "sonner";
 import { ImageUpload } from "@/components/ImageUpload";
 import { NINJA_RANKS, SKILL_RANKS, ELEMENTS, CLASSIFICATIONS, RANGES, labelize } from "./shared";
 import { useProficiencies } from "@/hooks/useProficiencies";
-import { Trash2, Pencil, Plus, Swords, FlaskConical } from "lucide-react";
+import { Trash2, Pencil, Plus, Swords, FlaskConical, Search, Copy, Download, Upload } from "lucide-react";
 import { RestoreEffectFields } from "./RestoreEffectFields";
 import { SkillTestDialog } from "./SkillTestDialog";
+import { SkillVisualFields } from "./SkillVisualFields";
+import { SKILL_BLUEPRINTS, copySkillBlueprint, exportSkillBlueprint, importSkillBlueprint, skillBalanceNotes } from "@/lib/skill-blueprints";
 
 export function SkillManager({ adminUserId }: { adminUserId: string }) {
   const [skills, setSkills] = useState<any[]>([]);
@@ -23,66 +25,102 @@ export function SkillManager({ adminUserId }: { adminUserId: string }) {
   const [items, setItems] = useState<any[]>([]);
   const [editing, setEditing] = useState<any | null>(null);
   const [open, setOpen] = useState(false);
-
+  const [search, setSearch] = useState("");
+  const [rank, setRank] = useState("all");
+  const [page, setPage] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const remove = useServerFn(deleteSkill);
   async function load() {
-    const [s, m, c, it] = await Promise.all([
-      supabase.from("skills").select("*").order("rank"),
-      supabase.from("missions").select("id,name"),
-      supabase.from("clans").select("id,name,village"),
-      supabase.from("items").select("id,name,category,rank").order("name"),
-    ]);
-    setSkills(s.data ?? []); setMissions(m.data ?? []); setClans(c.data ?? []); setItems(it.data ?? []);
+    setLoading(true); setError(null);
+    try {
+      const [s, m, c, it] = await Promise.all([
+        supabase.from("skills").select("*").order("name"),
+        supabase.from("missions").select("id,name"),
+        supabase.from("clans").select("id,name,village"),
+        supabase.from("items").select("id,name,category,rank").order("name"),
+      ]);
+      for (const result of [s, m, c, it]) if (result.error) throw result.error;
+      setSkills(s.data ?? []); setMissions(m.data ?? []); setClans(c.data ?? []); setItems(it.data ?? []);
+    } catch (e) { setError(e instanceof Error ? e.message : "Não foi possível carregar o catálogo."); }
+    finally { setLoading(false); }
   }
-  useEffect(() => { load(); }, []);
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="font-display text-xl text-gold">Habilidades ({skills.length})</h3>
-        <Button size="sm" onClick={() => { setEditing({}); setOpen(true); }}><Plus size={14} /> Nova habilidade</Button>
+  useEffect(() => { void load(); }, []);
+  function edit(skill: any) { setEditing(skill); setOpen(true); }
+  function download(skill: any) {
+    try {
+      const url = URL.createObjectURL(new Blob([exportSkillBlueprint(skill)], { type: "application/json" }));
+      const a = document.createElement("a"); a.href = url; a.download = "shinobi-habilidade.json"; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) { toast.error("Não foi possível exportar: revise os campos da habilidade."); }
+  }
+  const filtered = skills.filter((s) => (rank === "all" || s.rank === rank)
+    && `${s.name} ${s.skill_class ?? ""} ${s.element ?? ""}`.toLocaleLowerCase("pt-BR").includes(search.toLocaleLowerCase("pt-BR")));
+  const pages = Math.max(1, Math.ceil(filtered.length / 12));
+  const activePage = Math.min(page, pages - 1);
+  const visible = filtered.slice(activePage * 12, (activePage + 1) * 12);
+  const toReview = skills.filter((skill) => skillBalanceNotes(skill).length > 0).length;
+  return <div className="skill-workshop space-y-5">
+    <div className="flex justify-between gap-3 flex-wrap items-start">
+      <div><div className="text-xs uppercase tracking-widest text-gold">Oficina de jutsus</div>
+        <h3 className="font-display text-2xl mt-1">Banco de habilidades</h3>
+        <p className="text-sm text-muted-foreground mt-1">{skills.length} técnicas · {toReview} com sugestões de balanceamento</p></div>
+      <div className="flex gap-2 flex-wrap">
+        <input type="file" accept="application/json,.json" ref={fileRef} className="hidden" onChange={async (e) => {
+          const file = e.target.files?.[0]; e.target.value = "";
+          if (!file) return;
+          if (file.size > 200_000) return toast.error("O arquivo deve ter até 200 KB.");
+          try { edit(importSkillBlueprint(await file.text())); toast.info("Modelo aberto para revisão. Salve para adicionar ao catálogo."); }
+          catch (error) { toast.error(error instanceof Error ? error.message : "Modelo inválido."); }
+        }} />
+        <Button variant="outline" onClick={() => fileRef.current?.click()}><Upload size={16} /> Importar modelo</Button>
+        <Button onClick={() => edit({ name: "", rank: "E", energy_type: "chakra" })}><Plus size={16} /> Nova habilidade</Button>
       </div>
-      <div className="scroll-panel rounded-lg overflow-x-auto">
-        <table className="w-full text-sm min-w-[640px]">
-          <thead className="bg-secondary/50 text-xs uppercase tracking-wider">
-            <tr>
-              <th className="text-left p-2">Img</th>
-              <th className="text-left p-2">Nome</th>
-              <th className="text-left p-2">Rank</th>
-              <th className="text-left p-2">Classif.</th>
-              <th className="text-left p-2">Classe</th>
-              <th className="text-left p-2">Alcance</th>
-              <th className="text-left p-2">Clã</th>
-              <th className="text-left p-2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {skills.map((s) => (
-              <tr key={s.id} className="border-t border-border">
-                <td className="p-2">{s.image_url ? <img src={s.image_url} alt="" className="w-10 h-10 rounded object-cover" /> : <div className="w-10 h-10 rounded bg-secondary" />}</td>
-                <td className="p-2 font-semibold">{s.name}</td>
-                <td className="p-2">{s.rank}</td>
-                <td className="p-2">{labelize(s.classification)}</td>
-                <td className="p-2">{s.skill_class ?? "—"}</td>
-                <td className="p-2">{labelize(s.range)}</td>
-                <td className="p-2 text-xs">{clans.find((c) => c.id === s.clan_id)?.name ?? "—"}</td>
-                <td className="p-2 text-right whitespace-nowrap">
-                  <Button size="icon" variant="ghost" onClick={() => { setEditing(s); setOpen(true); }}><Pencil size={14} /></Button>
-                  <Button size="icon" variant="ghost" onClick={async () => {
-                    if (!confirm(`Remover ${s.name}?`)) return;
-                    try { await deleteSkill({ data: { id: s.id } } as any); toast.success("Removida."); load(); }
-                    catch (e: any) { toast.error(e.message); }
-                  }}><Trash2 size={14} /></Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <SkillDialog open={open} onOpenChange={setOpen} initial={editing} missions={missions} clans={clans} allSkills={skills} items={items}
-        adminUserId={adminUserId} onSaved={() => { setOpen(false); load(); }} />
     </div>
-  );
+    <div className="rounded-xl border border-gold/25 bg-gold/5 p-4 space-y-3">
+      <div className="font-semibold text-sm">Começar com uma ideia</div>
+      <div className="flex gap-2 flex-wrap">{SKILL_BLUEPRINTS.map((b) => <Button key={b.id} variant="outline" size="sm"
+        onClick={() => edit(structuredClone(b.skill))}>{b.label}</Button>)}</div>
+      <p className="text-sm text-muted-foreground">Os modelos abrem um rascunho. Ajuste requisitos, custo e recarga e teste antes de adicionar ao jogo.</p>
+    </div>
+    <div className="flex gap-3">
+      <div className="relative flex-1"><Search size={16} className="absolute top-3.5 left-3 text-muted-foreground" />
+        <Input aria-label="Buscar habilidades" placeholder="Buscar nome, classe ou elemento" className="pl-9 h-11" value={search} onChange={(e) => { setSearch(e.target.value); setPage(0); }} /></div>
+      <Select value={rank} onValueChange={(v) => { setRank(v); setPage(0); }}><SelectTrigger className="w-28 h-11" aria-label="Filtrar por rank"><SelectValue /></SelectTrigger>
+        <SelectContent><SelectItem value="all">Todos</SelectItem>{SKILL_RANKS.map((r) => <SelectItem key={r} value={r}>Rank {r}</SelectItem>)}</SelectContent></Select>
+    </div>
+    {error ? <div role="alert" className="rounded-lg border border-blood p-4 text-sm">{error}<Button variant="outline" className="ml-2" onClick={() => void load()}>Tentar novamente</Button></div>
+      : loading ? <p role="status" className="py-8 text-muted-foreground">Consultando os pergaminhos…</p>
+      : <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">{visible.map((s) => <article key={s.id} className="rounded-xl border border-border bg-card p-4 space-y-3">
+        <div className="flex gap-3"><div className="h-12 w-12 rounded-lg bg-secondary shrink-0 grid place-items-center overflow-hidden">
+          {s.image_url ? <img src={s.image_url} className="w-full h-full object-cover" alt="" loading="lazy" /> : <Swords size={22} className="text-gold" />}</div>
+          <div className="min-w-0"><span className="text-xs text-gold uppercase">Rank {s.rank} · {labelize(s.classification ?? "suplementar")}</span>
+            <h4 className="font-semibold break-words">{s.name}</h4></div></div>
+        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground"><span>{s.cost_percent}% {s.energy_type?.toUpperCase()}</span><span>Precisão {s.accuracy}%</span><span>Recarga {s.cooldown_turns}t</span></div>
+        {skillBalanceNotes(s).length > 0 && <p className="text-xs text-amber-300">{skillBalanceNotes(s).length} sugestões ao editar</p>}
+        <div className="flex gap-1 border-t border-border pt-2">
+          <Button variant="outline" size="sm" className="mr-auto" onClick={() => edit(s)}><Pencil size={14} /> Editar</Button>
+          <Button aria-label={`Duplicar ${s.name}`} variant="ghost" size="icon" onClick={() => {
+            try { edit(copySkillBlueprint(s)); } catch { toast.error("Revise os campos desta habilidade antes de duplicar."); }
+          }}><Copy size={16} /></Button>
+          <Button aria-label={`Exportar ${s.name}`} variant="ghost" size="icon" onClick={() => download(s)}><Download size={16} /></Button>
+          <Button aria-label={`Excluir ${s.name}`} disabled={!!deleting} variant="ghost" size="icon" onClick={async () => {
+            if (!confirm(`Remover ${s.name}?`)) return;
+            setDeleting(s.id);
+            try { await remove({ data: { id: s.id } }); toast.success("Habilidade removida."); await load(); }
+            catch (e) { toast.error(e instanceof Error ? e.message : "Não foi possível remover."); }
+            finally { setDeleting(null); }
+          }}><Trash2 size={16} /></Button>
+        </div>
+      </article>)}</div>}
+    {!loading && !error && !filtered.length && <p className="py-6 text-muted-foreground">Nenhuma habilidade encontrada. Crie uma técnica ou escolha um modelo.</p>}
+    {pages > 1 && <div className="flex gap-3 items-center justify-center"><Button variant="outline" disabled={activePage === 0} onClick={() => setPage(activePage - 1)}>Anterior</Button>
+      <span className="text-sm">{activePage + 1} / {pages}</span><Button variant="outline" disabled={activePage + 1 === pages} onClick={() => setPage(activePage + 1)}>Próxima</Button></div>}
+    <SkillDialog open={open} onOpenChange={setOpen} initial={editing} missions={missions} clans={clans} allSkills={skills} items={items}
+      adminUserId={adminUserId} onSaved={() => { setOpen(false); void load(); }} />
+  </div>;
 }
 
 function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, items, adminUserId, onSaved }: any) {
@@ -90,14 +128,16 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
   const save = useServerFn(upsertSkill);
   const [f, setF] = useState<any>(initial ?? {});
   const [testOpen, setTestOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   useEffect(() => { setF(initial ?? {}); }, [initial]);
   function up(k: string, v: any) { setF((p: any) => ({ ...p, [k]: v })); }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="skill-workshop max-w-3xl max-h-[92dvh] overflow-y-auto">
         <DialogHeader><DialogTitle>{f.id ? "Editar habilidade" : "Criar habilidade"}</DialogTitle></DialogHeader>
         <div className="grid gap-3 sm:grid-cols-2">
+          <SkillVisualFields skill={f} onChange={(meta) => up("meta", meta)} />
           <Field label="Nome"><Input value={f.name ?? ""} onChange={(e) => up("name", e.target.value)} /></Field>
           <Field label="Rank">
             <Select value={f.rank ?? "E"} onValueChange={(v: any) => up("rank", v)}>
@@ -362,7 +402,9 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
           <Button variant="secondary" onClick={() => setTestOpen(true)}>
             <FlaskConical size={14} /> Testar
           </Button>
-          <Button onClick={async () => {
+          <Button disabled={saving || !f.name?.trim()} onClick={async () => {
+            if (saving) return;
+            setSaving(true);
             try {
               // Normaliza meta.restore e faz cura HP roteada pelo sistema Iryo.
               const meta = { ...(f.meta ?? {}) } as any;
@@ -379,6 +421,7 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
               }
               await save({ data: {
                 ...f,
+                rank: f.rank ?? "E",
                 description: f.description || null,
                 image_url: f.image_url || null,
                 animation_url: f.animation_url || null,
@@ -401,7 +444,8 @@ function SkillDialog({ open, onOpenChange, initial, missions, clans, allSkills, 
               } } as any);
               toast.success("Habilidade salva."); onSaved();
             } catch (e: any) { toast.error(e.message); }
-          }}>Salvar</Button>
+            finally { setSaving(false); }
+          }}>{saving ? "Salvando…" : "Salvar"}</Button>
         </div>
         <SkillTestDialog open={testOpen} onOpenChange={setTestOpen} skill={f} />
       </DialogContent>

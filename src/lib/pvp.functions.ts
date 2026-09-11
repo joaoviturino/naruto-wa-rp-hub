@@ -1,3 +1,4 @@
+import { resolveCombatEnvironment } from "@/lib/sprite-animation";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -175,7 +176,7 @@ export const respondDuel = createServerFn({ method: "POST" })
 
     // Cenário/música vêm do LOCAL (não mais do NPC/grupo).
     const { data: locRow } = await supabaseAdmin
-      .from("locations").select("battle_bg_url,music_url").eq("id", locId).maybeSingle();
+      .from("locations").select("*").eq("id", locId).maybeSingle();
     const location_bg_url = (locRow as any)?.battle_bg_url ?? null;
     const location_music_url = (locRow as any)?.music_url ?? null;
 
@@ -189,6 +190,7 @@ export const respondDuel = createServerFn({ method: "POST" })
       duel_id: duel.id as string,
       location_bg_url,
       location_music_url,
+      location_environment: resolveCombatEnvironment(locRow?.visual_environment),
     };
 
     const { data: session, error: sErr } = await supabaseAdmin.from("combat_sessions").insert({

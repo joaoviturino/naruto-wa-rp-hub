@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,36 +7,40 @@ import { Label } from "@/components/ui/label";
 import { useServerFn } from "@tanstack/react-start";
 import { enqueueMessage, resetBotSession, requestBotQr, setUserXp, restoreEnergies, resetPlayerProgress, resetAllPlayers } from "@/lib/admin.functions";
 import { toast } from "sonner";
-import { PlayerEditor } from "@/components/admin/PlayerEditor";
-import { AdminPlayerViewer } from "@/components/admin/AdminPlayerViewer";
-import { ItemManager } from "@/components/admin/ItemManager";
-import { SkillManager } from "@/components/admin/SkillManager";
-import { MissionManager } from "@/components/admin/MissionManager";
-import { ClanTreeManager } from "@/components/admin/ClanTreeManager";
-import { AdminUsers } from "@/components/admin/AdminUsers";
-import { LocationManager } from "@/components/admin/LocationManager";
-import { NpcManager } from "@/components/admin/NpcManager";
-import { PartyManager } from "@/components/admin/PartyManager";
-import { MinigameManager } from "@/components/admin/MinigameManager";
-import { LibraryManager } from "@/components/admin/LibraryManager";
-import { LevelManager } from "@/components/admin/LevelManager";
-import { ProficiencyManager } from "@/components/admin/ProficiencyManager";
-import { ServerControl } from "@/components/admin/ServerControl";
-import { MountManager } from "@/components/admin/MountManager";
-import { JobManager } from "@/components/admin/JobManager";
-import { TodoManager } from "@/components/admin/TodoManager";
+
 import { TodoAlertsBell } from "@/components/admin/TodoAlertsBell";
-import { SubmissionsManager } from "@/components/admin/SubmissionsManager";
-import { BattlePassManager } from "@/components/admin/BattlePassManager";
-import { CosmeticsManager } from "@/components/admin/CosmeticsManager";
-import { SpriteTester } from "@/components/admin/SpriteTester";
 import { NINJA_RANKS } from "@/components/admin/shared";
+
 import {
   Pencil, BatteryCharging, Eye, LayoutDashboard, Users, Package, Sparkles,
   ScrollText, GitBranch, MapPin, Ghost, Gamepad2, BookOpen, TrendingUp,
   ShieldCheck, Server, MessageSquare, Award, UsersRound, Menu, X, Rabbit, RotateCcw, AlertTriangle, Briefcase, CheckSquare, Hammer, Trophy, Shirt,
   FlaskConical,
 } from "lucide-react";
+
+// Load each editor only when its section is opened.
+const PlayerEditor = lazy(() => import("@/components/admin/PlayerEditor").then((m) => ({ default: m.PlayerEditor })));
+const AdminPlayerViewer = lazy(() => import("@/components/admin/AdminPlayerViewer").then((m) => ({ default: m.AdminPlayerViewer })));
+const ItemManager = lazy(() => import("@/components/admin/ItemManager").then((m) => ({ default: m.ItemManager })));
+const SkillManager = lazy(() => import("@/components/admin/SkillManager").then((m) => ({ default: m.SkillManager })));
+const MissionManager = lazy(() => import("@/components/admin/MissionManager").then((m) => ({ default: m.MissionManager })));
+const ClanTreeManager = lazy(() => import("@/components/admin/ClanTreeManager").then((m) => ({ default: m.ClanTreeManager })));
+const AdminUsers = lazy(() => import("@/components/admin/AdminUsers").then((m) => ({ default: m.AdminUsers })));
+const LocationManager = lazy(() => import("@/components/admin/LocationManager").then((m) => ({ default: m.LocationManager })));
+const NpcManager = lazy(() => import("@/components/admin/NpcManager").then((m) => ({ default: m.NpcManager })));
+const PartyManager = lazy(() => import("@/components/admin/PartyManager").then((m) => ({ default: m.PartyManager })));
+const MinigameManager = lazy(() => import("@/components/admin/MinigameManager").then((m) => ({ default: m.MinigameManager })));
+const LibraryManager = lazy(() => import("@/components/admin/LibraryManager").then((m) => ({ default: m.LibraryManager })));
+const LevelManager = lazy(() => import("@/components/admin/LevelManager").then((m) => ({ default: m.LevelManager })));
+const ProficiencyManager = lazy(() => import("@/components/admin/ProficiencyManager").then((m) => ({ default: m.ProficiencyManager })));
+const ServerControl = lazy(() => import("@/components/admin/ServerControl").then((m) => ({ default: m.ServerControl })));
+const MountManager = lazy(() => import("@/components/admin/MountManager").then((m) => ({ default: m.MountManager })));
+const JobManager = lazy(() => import("@/components/admin/JobManager").then((m) => ({ default: m.JobManager })));
+const TodoManager = lazy(() => import("@/components/admin/TodoManager").then((m) => ({ default: m.TodoManager })));
+const SubmissionsManager = lazy(() => import("@/components/admin/SubmissionsManager").then((m) => ({ default: m.SubmissionsManager })));
+const BattlePassManager = lazy(() => import("@/components/admin/BattlePassManager").then((m) => ({ default: m.BattlePassManager })));
+const CosmeticsManager = lazy(() => import("@/components/admin/CosmeticsManager").then((m) => ({ default: m.CosmeticsManager })));
+const SpriteTester = lazy(() => import("@/components/admin/SpriteTester").then((m) => ({ default: m.SpriteTester })));
 
 type NavItem = { id: string; label: string; icon: React.ComponentType<{ size?: number; className?: string }>; group: string; adminOnly?: boolean };
 const NAV: NavItem[] = [
@@ -173,6 +177,7 @@ export function AdminPanel({ isAdmin = true, isModerator = false }: { isAdmin?: 
           </header>
 
           <div key={active} className="animate-admin-rise">
+            <Suspense fallback={<div role="status" className="rounded-xl border border-border p-6 text-sm text-muted-foreground">Abrindo {current.label.toLowerCase()}…</div>}>
             {active === "dashboard" && <Dashboard onNavigate={setActive} />}
             {active === "players" && isAdmin && <Players />}
             {active === "items" && adminUserId && <ItemManager adminUserId={adminUserId} />}
@@ -196,6 +201,7 @@ export function AdminPanel({ isAdmin = true, isModerator = false }: { isAdmin?: 
             {active === "admins" && isAdmin && <AdminUsers />}
             {active === "server" && isAdmin && <ServerControl />}
             {active === "whatsapp" && isAdmin && <BotPanel />}
+            </Suspense>
           </div>
         </main>
       </div>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type DamageBurst = {
   id: string;
@@ -30,11 +30,13 @@ export function FloatingDamageLayer({
 }
 
 function DamageNumber({ burst, onExpire }: { burst: DamageBurst; onExpire: () => void }) {
+  const expireRef = useRef(onExpire);
+  expireRef.current = onExpire;
   const [offset] = useState(() => Math.round((Math.random() - 0.5) * 40));
   useEffect(() => {
-    const t = setTimeout(onExpire, 1650);
+    const t = setTimeout(() => expireRef.current(), 1650);
     return () => clearTimeout(t);
-  }, [onExpire]);
+  }, [burst.id]);
   const color = burst.heal
     ? "text-emerald-300"
     : burst.crit

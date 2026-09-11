@@ -1,3 +1,6 @@
+import { GameSettings } from "@/components/GameSettings";
+import { GamePreferencesSync } from "@/hooks/useGamePreferences";
+import { UserRound, MessagesSquare, Award, Hammer, Shield, Users, LogOut } from "lucide-react";
 import { createFileRoute, Outlet, redirect, Link, useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -38,30 +41,27 @@ function AuthedLayout() {
   }
   return (
     <MaintenanceGate isAdmin={isAdmin}>
-    <div className="min-h-screen">
-      <header className="border-b border-border bg-card/40 backdrop-blur">
-        <div className="mx-auto max-w-6xl px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-2">
-          <Link to="/" className="font-display text-base sm:text-xl font-black shrink-0">
-            <span className="text-blood">New Era</span> <span className="text-gold">Shinobi</span>
+    <div className="game-shell">
+      <GamePreferencesSync />
+      <a href="#game-content" className="game-skip">Ir para o jogo</a>
+      <header className="border-b border-gold/20 bg-card/95">
+        <div className="mx-auto max-w-7xl px-3 sm:px-5 py-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <Link to="/chat" className="font-display text-lg font-black shrink-0 mr-auto">
+            <span className="text-red-400">New Era</span> <span className="text-gold">Shinobi</span>
           </Link>
-          <nav className="flex items-center gap-0.5 sm:gap-2 text-xs sm:text-sm min-w-0">
-            <Link to="/character" className="px-2 sm:px-3 py-1.5 rounded hover:bg-secondary [&.active]:text-gold" activeProps={{ className: "active" }}>Ficha</Link>
-            <Link to="/chat" className="px-2 sm:px-3 py-1.5 rounded hover:bg-secondary [&.active]:text-gold" activeProps={{ className: "active" }}>Chat</Link>
-            <Link to="/battle-pass" className="px-2 sm:px-3 py-1.5 rounded hover:bg-secondary [&.active]:text-gold" activeProps={{ className: "active" }}>Passe</Link>
-            {(isBlacksmith || isAdmin) && (
-              <Link to="/blacksmith" className="px-2 sm:px-3 py-1.5 rounded hover:bg-secondary [&.active]:text-gold" activeProps={{ className: "active" }}>Forja</Link>
-            )}
-            {(isAdmin || isModerator) && (
-              <>
-                <Link to="/admin" className="px-2 sm:px-3 py-1.5 rounded hover:bg-secondary [&.active]:text-gold" activeProps={{ className: "active" }}>
-                  {isAdmin ? "Admin" : "Mod"}
-                </Link>
-                {isAdmin && <OnlinePlayersButton isAdmin={isAdmin} />}
-              </>
-            )}
-            <span className="mx-2 lg:mx-3 text-muted-foreground text-xs hidden lg:inline truncate max-w-[180px]">{user.email}</span>
+          <div className="flex items-center gap-2 order-2 lg:order-3">
+            {isAdmin && <OnlinePlayersButton isAdmin={isAdmin} />}
             <NotificationsToggle />
-            <Button variant="outline" size="sm" className="h-8 px-2 sm:px-3 shrink-0" onClick={signOut}>Sair</Button>
+            <GameSettings />
+            <Button variant="ghost" size="icon" className="min-h-11" aria-label="Sair do jogo" onClick={signOut}><LogOut size={16} /></Button>
+          </div>
+          <nav aria-label="Menu do jogo" className="game-nav order-3 w-full lg:w-auto lg:order-2">
+            <Link to="/chat" activeProps={{ className: "active" }}><MessagesSquare size={16} /> Mundo</Link>
+            <Link to="/character" activeProps={{ className: "active" }}><UserRound size={16} /> Personagem</Link>
+            <Link to="/party" activeProps={{ className: "active" }}><Users size={16} /> Time</Link>
+            <Link to="/battle-pass" activeProps={{ className: "active" }}><Award size={16} /> Passe</Link>
+            {(isBlacksmith || isAdmin) && <Link to="/blacksmith" activeProps={{ className: "active" }}><Hammer size={16} /> Forja</Link>}
+            {(isAdmin || isModerator) && <Link to="/admin" activeProps={{ className: "active" }}><Shield size={16} />{isAdmin ? "Admin" : "Mod"}</Link>}
           </nav>
         </div>
       </header>
@@ -69,7 +69,7 @@ function AuthedLayout() {
       <GlobalBroadcasts />
       <PresenceHeartbeat />
       <TutorialWatcher userId={user.id} />
-      <Outlet />
+      <main id="game-content" className="min-w-0"><Outlet /></main>
     </div>
     </MaintenanceGate>
   );

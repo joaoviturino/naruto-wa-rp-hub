@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { useServerFn } from "@tanstack/react-start";
 import { equipItem, unequipItem, consumeItem, dropItem, moveItemBetweenBags } from "@/lib/character.functions";
 import { toast } from "sonner";
-import { CosmeticOverlay } from "@/components/CosmeticOverlay";
+import { AnimatedCharacter } from "@/components/AnimatedSprite";
+import { useBodySprite } from "@/hooks/useBodySprite";
 
 type Item = { id: string; name: string; type: string; slot_size: number; image_url?: string | null; description?: string | null; rank?: string; durability?: number | null };
 type BagEntry = { item_id: string; qty: number };
@@ -36,6 +37,7 @@ function normalizeBag(raw: any): BagEntry[] {
 export function InventoryView({ characterId, userId, bgUrl, onBgChange, onChanged }: {
   characterId: string; userId: string; bgUrl: string | null; onBgChange: (url: string) => void; onChanged?: () => void;
 }) {
+  const body = useBodySprite(characterId);
   const [inv, setInv] = useState<Inv | null>(null);
   const [items, setItems] = useState<Record<string, Item>>({});
   const [profs, setProfs] = useState<any>({});
@@ -118,8 +120,8 @@ export function InventoryView({ characterId, userId, bgUrl, onBgChange, onChange
         <div className="relative col-span-2 sm:col-span-1 mx-auto w-full max-w-xs sm:w-64 h-64 sm:h-80 border-2 border-gold/50 rounded-lg overflow-hidden bg-gradient-to-b from-secondary to-background flex items-center justify-center order-1 sm:order-2">
           {bgUrl ? (
             <div className="relative h-full w-full">
-              <img src={bgUrl} alt="Personagem" className="absolute inset-0 h-full w-full object-contain" />
-              <CosmeticOverlay characterId={characterId} />
+              <AnimatedCharacter characterId={characterId} body={{ imageUrl: bgUrl, sheetUrl: body?.sheet_url,
+                cols: body?.sheet_cols, rows: body?.sheet_rows, states: body?.sheet_states }} className="h-full w-full" />
             </div>
           ) : (
             <div className="text-muted-foreground text-sm text-center px-4">

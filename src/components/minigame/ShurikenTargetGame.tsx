@@ -81,22 +81,26 @@ export function ShurikenTargetGame({
   const [markers, setMarkers] = useState<Marker[]>([]);
   const idRef = useRef(1);
   const startedAt = useRef<number>(0);
-  const [tick, setTick] = useState(0);
+  const crosshairRef = useRef<HTMLDivElement>(null);
+  const scoreRef = useRef(0);
+  const leftRef = useRef(throws);
+  const finishedRef = useRef(false);
+  const finishTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const onFinishRef = useRef(onFinish);
+  onFinishRef.current = onFinish;
+  useEffect(() => () => clearTimeout(finishTimer.current), []);
 
   useEffect(() => {
     if (!running || done) return;
-    let raf = 0;
-    const loop = () => { setTick((t) => (t + 1) % 1e6); raf = requestAnimationFrame(loop); };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }, [running, done]);
-
-  useEffect(() => {
-    if (!running || done) return;
-    if (remaining <= 0) return finish();
-    const id = setTimeout(() => setRemaining((r) => r - 1), 1000);
-    return () => clearTimeout(id);
-  }, [remaining, running, done]);
+    const tick = () => {
+      const value = Math.max(0, duration - Math.floor((performance.now() - startedAt.current) / 1000));
+      setRemaining(value);
+      if (!value) finish();
+    };
+    const timer = setInterval(tick, 250);
+    document.addEventListener("visibilitychange", tick);
+    return () => { clearInterval(timer); document.removeEventListener("visibilitychange", tick); };
+  }, [running, done, duration]);
 
   // Position of crosshair (wind drift, two oscillators, X & Y)
   const cx = useMemo(() => W / 2, []);
@@ -107,6 +111,21 @@ export function ShurikenTargetGame({
     const y = cy + Math.cos(t * windSpeed * 0.9) * (windAmp * 0.6) + Math.sin(t * (windSpeed * 1.7)) * (windAmp * 0.2);
     return { x, y };
   }
+
+  useEffect(() => {
+    if (!running || done) return;
+    let raf = 0;
+    const loop = () => {
+      if (document.hidden) return;
+      const aim = currentAim();
+      const el = crosshairRef.current;
+      if (el) { el.style.left = `${aim.x / W * 100}%`; el.style.top = `${aim.y / H * 100}%`; }
+      raf = requestAnimationFrame(loop);
+    };
+    const visibility = () => { cancelAnimationFrame(raf); if (!document.hidden) loop(); };
+    loop(); document.addEventListener("visibilitychange", visibility);
+    return () => { cancelAnimationFrame(raf); document.removeEventListener("visibilitychange", visibility); };
+  }, [running, done, windAmp, windSpeed, cx, cy]);
 
   function ringAt(x: number, y: number): { ring: number; pts: number } {
     const dx = x - cx, dy = y - cy;
@@ -119,27 +138,28 @@ export function ShurikenTargetGame({
   }
 
   function throwOne() {
-    if (!running || done || left <= 0) return;
+    if (!running || finishedRef.current || leftRef.current <= 0) return;
+    if ((performance.now() - startedAt.current) >= duration * 1000) return finish();
     const aim = currentAim();
     // ninja aims for center — actual hit = center + drift (aim - center)
     const hx = aim.x, hy = aim.y;
     playWhoosh(config.throw_sound_url);
     const res = ringAt(hx, hy);
-    setScore((s) => s + res.pts);
+    scoreRef.current += res.pts;
+    setScore(scoreRef.current);
     setMarkers((m) => [...m, { id: idRef.current++, x: hx, y: hy, ring: res.ring }]);
     playHit(config.hit_sound_url, res.pts > 0 ? "wood" : "miss");
-    setLeft((l) => {
-      const nl = l - 1;
-      if (nl <= 0) setTimeout(() => finish(), 350);
-      return nl;
-    });
+    leftRef.current -= 1;
+    setLeft(leftRef.current);
+    if (!leftRef.current) finishTimer.current = setTimeout(() => finish(), 350);
   }
 
   function finish() {
-    if (done) return;
-    setDone(true);
-    setRunning(false);
-    setTimeout(() => onFinish({ score, success: score >= targetScore }), 60);
+    if (finishedRef.current) return;
+    finishedRef.current = true;
+    clearTimeout(finishTimer.current);
+    setDone(true); setRunning(false);
+    onFinishRef.current({ score: scoreRef.current, success: scoreRef.current >= targetScore });
   }
 
   const aim = running && !done ? currentAim() : { x: cx, y: cy };
@@ -170,7 +190,7 @@ export function ShurikenTargetGame({
         {/* Alvo */}
         <div
           className="absolute"
-          style={{ left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: 280, height: 280 }}
+          style={{ left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: `${280 / W * 100}%`, aspectRatio: "1" }}
         >
           {config.target_image_url ? (
             <img src={config.target_image_url} className="w-full h-full object-contain" draggable={false} alt="" />
@@ -189,7 +209,7 @@ export function ShurikenTargetGame({
         {markers.map((m) => (
           <div key={m.id}
             className="absolute"
-            style={{ left: m.x, top: m.y, transform: "translate(-50%,-50%)", width: 22, height: 22, filter: m.ring < 0 ? "grayscale(1) opacity(0.6)" : "drop-shadow(0 2px 3px rgba(0,0,0,0.6))" }}>
+            style={{ left: `${m.x / W * 100}%`, top: `${m.y / H * 100}%`, transform: "translate(-50%,-50%)", width: 22, height: 22, filter: m.ring < 0 ? "grayscale(1) opacity(0.6)" : "drop-shadow(0 2px 3px rgba(0,0,0,0.6))" }}>
             {config.shuriken_image_url ? (
               <img src={config.shuriken_image_url} className="w-full h-full object-contain" alt="" />
             ) : (
@@ -206,10 +226,11 @@ export function ShurikenTargetGame({
         {/* Mira (crosshair oscilando com o vento) */}
         {running && !done && (
           <div
+            ref={crosshairRef}
             className="absolute pointer-events-none"
             style={{
-              left: aim.x, top: aim.y, transform: "translate(-50%,-50%)",
-              width: cross, height: cross,
+              left: `${aim.x / W * 100}%`, top: `${aim.y / H * 100}%`, transform: "translate(-50%,-50%)",
+              width: `${cross / W * 100}%`, aspectRatio: "1",
             }}
           >
             <svg viewBox="-50 -50 100 100" className="w-full h-full">

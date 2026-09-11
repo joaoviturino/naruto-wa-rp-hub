@@ -1,3 +1,4 @@
+import { cleanupConfigSchema } from "@/lib/cleanup-game";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -26,12 +27,6 @@ const rewardsSchema = z.object({
     nivel: z.enum(["E", "D", "C", "B", "A", "S"]),
   })).optional(),
 }).default({});
-
-const cleanupConfigSchema = z.object({
-  duration_seconds: z.number().int().min(15).max(600).default(60),
-  spots: z.number().int().min(3).max(40).default(12),
-  target_score: z.number().int().min(1).max(40).default(8),
-}).default({ duration_seconds: 60, spots: 12, target_score: 8 });
 
 const sequenceConfigSchema = z.object({
   duration_seconds: z.number().int().min(10).max(600).default(60),

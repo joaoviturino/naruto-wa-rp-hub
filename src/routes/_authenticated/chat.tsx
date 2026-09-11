@@ -1,3 +1,6 @@
+import { mergeChatWindow } from "@/lib/chat-window";
+import { startVisiblePolling } from "@/lib/visible-polling";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,6 +52,17 @@ type Msg = {
 
 function ChatPage() {
   const { user } = Route.useRouteContext();
+  const isMobile = useIsMobile();
+  const messagesViewport = useRef<HTMLDivElement>(null);
+  const followChat = useRef(true);
+  const messagesGeneration = useRef(0);
+  function scrollChatToBottom() {
+    if (!followChat.current) return;
+    requestAnimationFrame(() => {
+      const viewport = messagesViewport.current;
+      if (viewport) viewport.scrollTop = viewport.scrollHeight;
+    });
+  }
   const [character, setCharacter] = useState<Character | null>(null);
   const [locs, setLocs] = useState<Loc[]>([]);
   const [conns, setConns] = useState<Conn[]>([]);
@@ -149,13 +163,12 @@ function ChatPage() {
     }
     loadInvites(); loadPartyMembers(); checkCombat();
     const ch = supabase.channel(`invites-${character.id}-${Math.random().toString(36).slice(2)}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "party_invites" }, loadInvites)
+      .on("postgres_changes", { event: "*", schema: "public", table: "party_invites", filter: `to_character_id=eq.${character.id}` }, loadInvites)
       .on("postgres_changes", { event: "*", schema: "public", table: "party_members" }, loadPartyMembers)
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "characters" }, loadPartyMembers)
       .subscribe();
     // Fallback de polling (caso realtime falhe por rede/RLS) — realtime é o caminho principal.
-    const poll = setInterval(() => { loadInvites(); loadPartyMembers(); checkCombat(); }, 10000);
-    return () => { supabase.removeChannel(ch); clearInterval(poll); };
+    const stopPolling = startVisiblePolling(() => Promise.all([loadInvites(), loadPartyMembers(), checkCombat()]), 10000);
+    return () => { supabase.removeChannel(ch); stopPolling(); };
   }, [character?.id]);
 
   // Polling de spawn na danger zone
@@ -165,16 +178,16 @@ function ChatPage() {
     if (!cur?.is_danger_zone || !cur?.spawn_chance) return;
     let alive = true;
     async function tick() {
-      if (!alive) return;
+      if (!alive || document.hidden) return;
       try {
         const r = await roll({});
-        if (r.session_id) setCombatId(r.session_id);
+        if (alive && r.session_id) setCombatId(r.session_id);
       } catch { /* noop */ }
     }
     tick();
     const tickMs = Math.max(15, cur.spawn_tick_seconds ?? 60) * 1000;
-    const id = setInterval(tick, tickMs);
-    return () => { alive = false; clearInterval(id); };
+    const stopPolling = startVisiblePolling(tick, tickMs);
+    return () => { alive = false; stopPolling(); };
   }, [character?.current_location_id, locs.map((l) => `${l.id}:${l.spawn_chance}:${l.spawn_tick_seconds}:${l.is_danger_zone}`).join(",")]);
 
   const currentLoc = character?.current_location_id ? locs.find((l) => l.id === character.current_location_id) ?? null : null;
@@ -187,7 +200,7 @@ function ChatPage() {
   // Se ainda não tem local, mostra todos para escolher o inicial
   const availableToMove = character?.current_location_id ? neighbors : locs;
 
-  async function loadMessages(locId: string) {
+  async function loadMessages(locId: string, generation: number) {
     const { data } = await supabase
       .from("location_messages")
       .select("id,content,image_url,created_at,character_id,npc_id,is_pinned,reply_to_id,character:characters(nickname,avatar_url),npc:npcs!location_messages_npc_id_fkey(name,image_url)")
@@ -204,13 +217,16 @@ function ChatPage() {
         .in("id", parentIds);
       (parents as any[] ?? []).forEach((p) => { parentsById[p.id] = p; });
     }
-    setMessages(base.map((m) => m.reply_to_id ? { ...m, reply_to: parentsById[m.reply_to_id] ?? null } : m));
-    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+    if (generation !== messagesGeneration.current) return;
+    setMessages((prev) => mergeChatWindow(base.map((m) => m.reply_to_id ? { ...m, reply_to: parentsById[m.reply_to_id] ?? null } : m), prev, HISTORY_LIMIT));
+    scrollChatToBottom();
   }
 
   useEffect(() => {
-    if (!currentLoc) { setMessages([]); return; }
-    loadMessages(currentLoc.id);
+    const generation = ++messagesGeneration.current;
+    setMessages([]); followChat.current = true;
+    if (!currentLoc) return;
+    void loadMessages(currentLoc.id, generation);
     const ch = supabase.channel(`loc-${currentLoc.id}-${Math.random().toString(36).slice(2)}`)
       .on("postgres_changes",
         { event: "INSERT", schema: "public", table: "location_messages", filter: `location_id=eq.${currentLoc.id}` },
@@ -231,8 +247,9 @@ function ChatPage() {
               .eq("id", raw.reply_to_id).maybeSingle();
             reply_to = r;
           }
-          setMessages((prev) => (prev.some((m) => m.id === raw.id) ? prev : [...prev, { ...raw, character, npc, reply_to } as Msg]));
-          setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+          if (generation !== messagesGeneration.current) return;
+          setMessages((prev) => mergeChatWindow(prev, [{ ...raw, character, npc, reply_to } as Msg], HISTORY_LIMIT));
+          scrollChatToBottom();
         })
       .on("postgres_changes",
         { event: "UPDATE", schema: "public", table: "location_messages", filter: `location_id=eq.${currentLoc.id}` },
@@ -241,7 +258,7 @@ function ChatPage() {
           setMessages((prev) => prev.map((m) => m.id === raw.id ? { ...m, is_pinned: raw.is_pinned, content: raw.content, image_url: raw.image_url } : m));
         })
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    return () => { messagesGeneration.current++; supabase.removeChannel(ch); };
   }, [currentLoc?.id]);
 
   // Detecta duelo PvP ativo neste local (para travar chat e abrir espectador).
@@ -268,13 +285,11 @@ function ChatPage() {
     const ch = supabase.channel(`pvp-loc-${currentLoc.id}-${Math.random().toString(36).slice(2)}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "combat_sessions", filter: `location_id=eq.${currentLoc.id}` },
         () => refreshPvp())
-      .on("postgres_changes", { event: "*", schema: "public", table: "pvp_duels" },
-        () => refreshPvp())
       .subscribe();
     // Fallback: alguns celulares/webviews perdem realtime; isso garante que
     // o chat destrave assim que o duelo mudar para finished/fled.
-    const poll = window.setInterval(refreshPvp, 6000);
-    return () => { supabase.removeChannel(ch); window.clearInterval(poll); };
+    const stopPolling = startVisiblePolling(refreshPvp, 6000);
+    return () => { supabase.removeChannel(ch); stopPolling(); };
   }, [currentLoc?.id, character?.id]);
 
   // Presença em tempo real via Realtime Presence — instantâneo, sem depender de publication
@@ -478,11 +493,11 @@ function ChatPage() {
 
   return (
     <div className="mx-auto max-w-6xl md:grid md:gap-4 md:grid-cols-[280px_1fr] md:p-4 pb-[env(safe-area-inset-bottom)]">
-      {character && <ChatHud characterId={character.id} />}
+      {character && !isMobile && <ChatHud characterId={character.id} />}
       {character && <MissionTracker characterId={character.id} />}
       {character && <TradeWatcher myCharacterId={character.id} />}
       {/* HUD mobile (barra superior) */}
-      {character && (
+      {character && isMobile && (
         <div className="md:hidden">
           <ChatHud characterId={character.id} variant="mobile-bar" />
         </div>
@@ -491,7 +506,7 @@ function ChatPage() {
       <div className="md:hidden sticky top-[54px] z-30 flex items-center gap-2 border-b border-border bg-card/95 backdrop-blur px-2 py-1.5">
         <Sheet open={navOpen} onOpenChange={setNavOpen}>
           <SheetTrigger asChild>
-            <Button variant="outline" size="icon" className="h-8 w-8"><Menu size={16} /></Button>
+            <Button variant="outline" size="icon" className="h-11 w-11" aria-label="Abrir mapa e ações"><Menu size={16} /></Button>
           </SheetTrigger>
           <SheetContent side="left" className="w-[85vw] max-w-sm overflow-y-auto">
             <div className="pt-6">{sidebar}</div>
@@ -521,7 +536,7 @@ function ChatPage() {
       </aside>
 
       {/* Chat */}
-      <section className="scroll-panel md:rounded-lg flex flex-col h-[calc(100dvh-9rem)] md:h-[calc(100vh-8rem)]">
+      <section className="chat-play-surface scroll-panel min-w-0 md:rounded-lg flex flex-col h-[calc(100dvh-9rem)] md:h-[calc(100vh-8rem)]">
         {!currentLoc ? (
           <div className="flex-1 flex items-center justify-center text-muted-foreground p-10 text-center">
             Escolha um local ao lado para começar a interagir.
@@ -539,7 +554,7 @@ function ChatPage() {
                 ))}
               </div>
             )}
-            <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3">
+            <div ref={messagesViewport} onScroll={(e) => { const el = e.currentTarget; followChat.current = el.scrollHeight - el.scrollTop - el.clientHeight < 96; }} className="chat-messages flex-1 min-h-0 overflow-y-auto p-3 md:p-4 space-y-3">
               {messages.length === 0 && <div className="text-center text-xs text-muted-foreground py-10">Silêncio. Seja o primeiro a agir.</div>}
               {messages.map((m) => {
                 const mine = !!m.character_id && m.character_id === character.id;
@@ -692,7 +707,7 @@ function ChatPage() {
                 placeholder={pvpAtLocation ? "Chat travado durante o duelo." : "Descreva sua ação, fale…"}
                 disabled={!!pvpAtLocation}
                 className="resize-none"
-                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); doSend(); } }} />
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); doSend(); } }} />
               <Button onClick={doSend} disabled={sending || !!pvpAtLocation || (!content.trim() && !scene)}><Send size={16} /></Button>
             </div>
           </>
@@ -701,7 +716,7 @@ function ChatPage() {
 
       <PlayerActionMenu target={target} open={targetOpen} onOpenChange={setTargetOpen} />
       {combatId && character && (
-        <CombatDialog sessionId={combatId} myCharId={character.id} onClose={closeCombatDialog} />
+        <CombatDialog key={combatId} sessionId={combatId} myCharId={character.id} onClose={closeCombatDialog} />
       )}
       {activeMinigame && (
         <MinigameDialog minigame={activeMinigame} open onOpenChange={(v) => { if (!v) setActiveMinigame(null); }}

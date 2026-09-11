@@ -1,3 +1,5 @@
+import { ENVIRONMENT_LABELS } from "@/components/CharacterPreview";
+import { isSpriteEnvironment, type SpriteEnvironment } from "@/lib/sprite-animation";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -24,7 +26,7 @@ type Loc = { id: string; name: string; description: string | null; image_url: st
   parent_id?: string | null;
   is_danger_zone?: boolean; spawn_chance?: number; spawn_tick_seconds?: number;
   spawn_group_ids?: string[];
-  battle_bg_url?: string | null; music_url?: string | null;
+  battle_bg_url?: string | null; music_url?: string | null; visual_environment?: string;
   is_private?: boolean; is_for_sale?: boolean; sale_price?: number;
   owner_character_id?: string | null };
 type Conn = { id: string; a_id: string; b_id: string };
@@ -64,10 +66,11 @@ export function LocationManager() {
   const [perms, setPerms] = useState<Array<{ id: string; character_id: string; nickname: string }>>([]);
   const [grantNick, setGrantNick] = useState<string>("");
   const [salePrice, setSalePrice] = useState<number>(0);
+  const [savingEnvironment, setSavingEnvironment] = useState(false);
 
   async function load() {
     const [l, c, n, ln, mg, lmg, ls, llb, gr] = await Promise.all([
-      supabase.from("locations").select("id,name,description,image_url,map_x,map_y,parent_id,is_danger_zone,spawn_chance,spawn_tick_seconds,spawn_group_ids,battle_bg_url,music_url,is_private,is_for_sale,sale_price,owner_character_id").order("name"),
+      supabase.from("locations").select("*").order("name"),
       supabase.from("location_connections").select("id,a_id,b_id"),
       supabase.from("npcs").select("id,name,kind").order("name"),
       supabase.from("location_npcs").select("location_id,npc_id"),
@@ -314,6 +317,26 @@ export function LocationManager() {
 
           <div className="scroll-panel rounded-lg p-4 space-y-3">
             <h4 className="font-display text-lg text-gold">Cenário e som de combate</h4>
+            <div className="space-y-2">
+              <Label htmlFor="location-environment">Ambiente e reação das roupas</Label>
+              <select id="location-environment" className="w-full min-h-11 rounded-md border border-border bg-input px-3 text-sm"
+                value={sel.visual_environment ?? "neutral"} disabled={savingEnvironment} onChange={async (e) => {
+                  const environment = e.target.value;
+                  if (!isSpriteEnvironment(environment)) return;
+                  const id = sel.id;
+                  setSavingEnvironment(true);
+                  try {
+                    const { error } = await supabase.from("locations").update({ visual_environment: environment }).eq("id", id);
+                    if (error) throw error;
+                    setLocs((current) => current.map((l) => l.id === id ? { ...l, visual_environment: environment } : l));
+                    toast.success("Ambiente atualizado para os próximos combates.");
+                  } catch { toast.error("Não foi possível salvar o ambiente deste local."); }
+                  finally { setSavingEnvironment(false); }
+                }}>
+                {(Object.entries(ENVIRONMENT_LABELS) as [SpriteEnvironment, string][]).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+              <p className="text-xs text-muted-foreground">Vento movimenta cabelo e tecido; chuva e água alteram o aspecto das roupas. Técnicas elementais podem mudar essa reação durante a ação.</p>
+            </div>
             <p className="text-xs text-muted-foreground">Usado por todas as batalhas iniciadas neste local (PvE e duelos PvP). Substitui as antigas configurações por NPC/grupo.</p>
             <div>
               <Label className="text-xs">URL da imagem de fundo do combate</Label>
