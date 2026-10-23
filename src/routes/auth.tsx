@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { LoaderCircle } from "lucide-react";
 
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
@@ -41,8 +42,11 @@ function AuthPage() {
 
   if (checking) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6">
-        <div className="text-sm text-muted-foreground">Verificando sessão...</div>
+      <div className="min-h-screen flex items-center justify-center p-6" role="status" aria-live="polite">
+        <div className="flex items-center gap-3 rounded-xl border border-border bg-card/80 px-5 py-4 text-sm text-muted-foreground shadow-lg">
+          <LoaderCircle size={18} className="animate-spin text-gold" aria-hidden="true" />
+          Verificando sua sessão...
+        </div>
       </div>
     );
   }
@@ -85,7 +89,7 @@ function AuthPage() {
         <p className="mt-2 text-sm text-muted-foreground">
           {mode === "signin" ? "Acesse sua ficha e inventário." : "Crie sua conta para começar a criação do personagem."}
         </p>
-        <form onSubmit={onSubmit} className="mt-6 space-y-4">
+        <form onSubmit={onSubmit} className="mt-6 space-y-4" aria-busy={loading}>
           <div>
             <Label htmlFor="email">E-mail</Label>
             <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -94,14 +98,15 @@ function AuthPage() {
             <Label htmlFor="password">Senha</Label>
             <Input id="password" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} />
           </div>
-          <Button type="submit" disabled={loading} className="w-full">
-            {loading ? "..." : mode === "signin" ? "Entrar" : "Criar conta"}
+          <Button type="submit" disabled={loading} className="w-full min-h-11">
+            {loading ? <><LoaderCircle size={16} className="mr-2 animate-spin" aria-hidden="true" />{mode === "signin" ? "Entrando..." : "Criando conta..."}</> : mode === "signin" ? "Entrar" : "Criar conta"}
           </Button>
         </form>
         <button
           type="button"
+          disabled={loading}
           onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-          className="mt-4 text-sm text-muted-foreground hover:text-gold w-full text-center"
+          className="mt-4 min-h-11 text-sm text-muted-foreground hover:text-gold w-full text-center disabled:opacity-50"
         >
           {mode === "signin" ? "Ainda não tem conta? Registrar" : "Já tem conta? Entrar"}
         </button>
