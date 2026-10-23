@@ -1,0 +1,93 @@
+/* New Era Shinobi — UI polish layer
+ * Deliberately additive: preserves gameplay components and existing utility classes.
+ */
+:root {
+  --background: oklch(0.12 0.012 255);
+  --foreground: oklch(0.94 0.012 85);
+  --card: oklch(0.165 0.016 255);
+  --card-foreground: oklch(0.94 0.012 85);
+  --popover: oklch(0.15 0.016 255);
+  --popover-foreground: oklch(0.94 0.012 85);
+  --primary: oklch(0.52 0.17 25);
+  --primary-foreground: oklch(0.98 0.005 85);
+  --secondary: oklch(0.215 0.016 255);
+  --secondary-foreground: oklch(0.92 0.01 85);
+  --muted: oklch(0.205 0.014 255);
+  --muted-foreground: oklch(0.72 0.014 255);
+  --accent: oklch(0.76 0.12 78);
+  --accent-foreground: oklch(0.16 0.015 255);
+  --border: oklch(0.29 0.018 255);
+  --input: oklch(0.19 0.016 255);
+  --ring: oklch(0.68 0.13 35);
+  --gold: oklch(0.78 0.12 80);
+  --blood: oklch(0.53 0.19 27);
+  --sidebar: oklch(0.105 0.012 255);
+  --sidebar-border: oklch(0.25 0.016 255);
+}
+
+html {
+  color-scheme: dark;
+  scroll-behavior: smooth;
+  scroll-padding-top: 1.5rem;
+}
+body {
+  background-image:
+    radial-gradient(ellipse at 12% 0%, oklch(0.34 0.09 28 / 0.11), transparent 42%),
+    radial-gradient(ellipse at 92% 75%, oklch(0.34 0.07 250 / 0.10), transparent 45%);
+  background-attachment: fixed;
+}
+::selection {
+  color: var(--foreground);
+  background: oklch(0.48 0.16 28 / 0.65);
+}
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+button, a, input, select, textarea, [role="button"] {
+  -webkit-tap-highlight-color: transparent;
+}
+button:not(:disabled), [role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+button:disabled, [role="button"][aria-disabled="true"] {
+  cursor: not-allowed;
+}
+input, select, textarea {
+  max-width: 100%;
+}
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+select, textarea {
+  border-radius: 0.65rem;
+}
+a {
+  text-underline-offset: 0.2em;
+}
+img {
+  content-visibility: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+@media (max-width: 640px) {
+  body {
+    background-attachment: scroll;
+  }
+  .character-preview-stage {
+    height: clamp(240px, 68vw, 340px);
+  }
+  .game-nav {
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    padding-bottom: 0.2rem;
+  }
+  .game-nav a {
+    scroll-snap-align: start;
+    flex-shrink: 0;
+  }
+}
